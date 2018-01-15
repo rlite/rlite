@@ -166,7 +166,7 @@ static void
 gpb2DFTEntry(DFTEntry &entry, const gpb::directoryForwardingTableEntry_t &gm)
 {
     gpb2RinaName(entry.appl_name, gm.applicationname());
-    entry.address   = gm.ipcprocesssynonym();
+    entry.ipcp_name = gm.ipcp_name();
     entry.timestamp = gm.timestamp();
 }
 
@@ -181,7 +181,7 @@ DFTEntry2gpb(const DFTEntry &entry, gpb::directoryForwardingTableEntry_t &gm)
     }
 
     gm.set_allocated_applicationname(gan);
-    gm.set_ipcprocesssynonym(entry.address);
+    gm.set_ipcp_name(entry.ipcp_name);
     gm.set_timestamp(entry.timestamp);
 
     return 0;

@@ -30,7 +30,7 @@ using namespace std;
 int
 uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
 {
-    rlm_addr_t remote_addr;
+    std::string remote_node;
     std::string appl_name;
     int ret;
 
@@ -42,8 +42,8 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     appl_name = string(req->remote_appl);
 
     /* Lookup the DFT. */
-    ret = dft->lookup_req(appl_name, &remote_addr,
-                          /* no preference */ 0, req->cookie);
+    ret = dft->lookup_req(appl_name, &remote_node,
+                          /* no preference */ string(), req->cookie);
     if (ret) {
         /* Return a negative flow allocation response immediately. */
         UPI(uipcp, "No DFT matching entry for destination %s\n",
@@ -54,9 +54,9 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
             0 /* don't care */, 1, nullptr);
     }
 
-    if (remote_addr != RL_ADDR_NULL) {
+    if (!remote_node.empty()) {
         /* DFT lookup request was served immediately, we can go ahead. */
-        return fa->fa_req(req, remote_addr);
+        return fa->fa_req(req, remote_node);
     }
 
     /* We need to wait for the DFT lookup to complete before we can go
@@ -76,7 +76,7 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
 
 void
 uipcp_rib::dft_lookup_resolved(const std::string &appl_name,
-                               rlm_addr_t remote_addr)
+                               const std::string &remote_node)
 {
     auto mit = pending_fa_reqs.find(appl_name);
 
@@ -88,18 +88,18 @@ uipcp_rib::dft_lookup_resolved(const std::string &appl_name,
 
     /* Go ahead with all the flow allocation requests that were pending
      * waiting for the DFT to resolve this name. */
-    if (remote_addr == RL_ADDR_NULL) {
+    if (remote_node.empty()) {
         UPI(uipcp, "No DFT matching entry for destination %s\n",
             appl_name.c_str());
     }
     for (auto &fr : mit->second) {
-        if (remote_addr == RL_ADDR_NULL) {
+        if (remote_node.empty()) {
             /* Return a negative flow allocation response. */
             uipcp_issue_fa_resp_arrived(uipcp, fr->local_port,
                                         0 /* don't care */, 0 /* don't care */,
                                         0 /* don't care */, 1, nullptr);
         } else {
-            fa->fa_req(fr.get(), remote_addr);
+            fa->fa_req(fr.get(), remote_node);
         }
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(fr.get()));
     }
@@ -118,7 +118,8 @@ public:
     std::unordered_map<std::string, FlowRequest> flow_reqs;
     std::unordered_map<unsigned int, FlowRequest> flow_reqs_tmp;
 
-    int fa_req(struct rl_kmsg_fa_req *req, rlm_addr_t remote_addr) override;
+    int fa_req(struct rl_kmsg_fa_req *req,
+               const std::string &remote_node) override;
     int fa_resp(struct rl_kmsg_fa_resp *resp) override;
 
     int flow_deallocated(struct rl_kmsg_flow_deallocated *req) override;
@@ -268,15 +269,19 @@ LocalFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
 
 /* (1) Initiator FA <-- Initiator application : FA_REQ */
 int
-LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req, rlm_addr_t remote_addr)
+LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
+                           const std::string &remote_node)
 {
     std::unique_ptr<CDAPMessage> m;
+    rlm_addr_t remote_addr;
     FlowRequest freq;
     ConnId conn_id;
     stringstream obj_name;
     string cubename;
     struct rl_flow_config flowcfg;
     string dest_appl = string(req->remote_appl);
+
+    remote_addr = rib->lookup_node_address(remote_node);
 
     conn_id.qos_id  = 0;
     conn_id.src_cep = req->local_cep;

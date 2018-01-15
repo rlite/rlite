@@ -319,13 +319,12 @@ struct DFT {
     virtual ~DFT() {}
 
     virtual int param_changed(const std::string &param_name) { return 0; }
-    virtual void dump(std::stringstream &ss) const                      = 0;
-    virtual int lookup_req(const std::string &appl_name, rlm_addr_t *dstaddr,
-                           const rlm_addr_t preferred, uint32_t cookie) = 0;
-    virtual int appl_register(const struct rl_kmsg_appl_register *req)  = 0;
-    virtual void update_address(rlm_addr_t new_addr)                    = 0;
+    virtual void dump(std::stringstream &ss) const                        = 0;
+    virtual int lookup_req(const std::string &appl_name, std::string *dst_node,
+                           const std::string &preferred, uint32_t cookie) = 0;
+    virtual int appl_register(const struct rl_kmsg_appl_register *req)    = 0;
     virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
-                            rlm_addr_t src_addr)                        = 0;
+                            rlm_addr_t src_addr)                          = 0;
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const
     {
         return 0;
@@ -348,8 +347,9 @@ struct FlowAllocator {
     virtual void dump(std::stringstream &ss) const          = 0;
     virtual void dump_memtrack(std::stringstream &ss) const = 0;
 
-    virtual int fa_req(struct rl_kmsg_fa_req *req, rlm_addr_t remote_addr) = 0;
-    virtual int fa_resp(struct rl_kmsg_fa_resp *resp)                      = 0;
+    virtual int fa_req(struct rl_kmsg_fa_req *req,
+                       const std::string &remote_node) = 0;
+    virtual int fa_resp(struct rl_kmsg_fa_resp *resp)  = 0;
 
     virtual int flow_deallocated(struct rl_kmsg_flow_deallocated *req) = 0;
 
@@ -492,7 +492,8 @@ struct uipcp_rib {
         pending_fa_reqs;
 
     /* Called by the DFT when a name lookup has been resolved asynchronously. */
-    void dft_lookup_resolved(const std::string &name, rlm_addr_t remote_addr);
+    void dft_lookup_resolved(const std::string &name,
+                             const std::string &remote_node);
 
     std::unique_ptr<AddrAllocator> addra;
 

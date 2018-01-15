@@ -56,10 +56,9 @@ public:
 
     void dump(std::stringstream &ss) const override;
 
-    int lookup_req(const std::string &appl_name, rlm_addr_t *dstaddr,
-                   const rlm_addr_t preferred, uint32_t cookie) override;
+    int lookup_req(const std::string &appl_name, std::string *dst_node,
+                   const std::string &preferred, uint32_t cookie) override;
     int appl_register(const struct rl_kmsg_appl_register *req) override;
-    void update_address(rlm_addr_t new_addr) override;
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
                     rlm_addr_t src_addr) override;
     int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
@@ -72,8 +71,8 @@ public:
 
 int
 FullyReplicatedDFT::lookup_req(const std::string &appl_name,
-                               rlm_addr_t *dstaddr, const rlm_addr_t preferred,
-                               uint32_t cookie)
+                               std::string *dst_node,
+                               const std::string &preferred, uint32_t cookie)
 {
     /* Fetch all entries that hold 'appl_name'. */
     auto range = dft_table.equal_range(appl_name);
@@ -89,11 +88,11 @@ FullyReplicatedDFT::lookup_req(const std::string &appl_name,
     auto mit = range.first;
 
     if (d > 1) {
-        if (preferred != RL_ADDR_NULL) {
+        if (!preferred.empty()) {
             /* Only accept the preferred address. */
 
             for (; mit != range.second; mit++) {
-                if (mit->second.address == preferred) {
+                if (mit->second.ipcp_name == preferred) {
                     break;
                 }
             }
@@ -110,7 +109,7 @@ FullyReplicatedDFT::lookup_req(const std::string &appl_name,
         assert(mit != range.second);
     }
 
-    *dstaddr = mit->second.address;
+    *dst_node = mit->second.ipcp_name;
 
     return 0;
 }
@@ -124,7 +123,7 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
     DFTSlice dft_slice;
     DFTEntry dft_entry;
 
-    dft_entry.address   = rib->myaddr;
+    dft_entry.ipcp_name = rib->myname;
     dft_entry.appl_name = RinaName(appl_name);
     dft_entry.timestamp = time64();
     dft_entry.local     = true;
@@ -133,7 +132,7 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
      * is an entry associated to this uipcp. */
     auto range = dft_table.equal_range(appl_name);
     for (mit = range.first; mit != range.second; mit++) {
-        if (mit->second.address == rib->myaddr) {
+        if (mit->second.ipcp_name == rib->myname) {
             break;
         }
     }
@@ -194,7 +193,7 @@ FullyReplicatedDFT::mod_table(const DFTEntry &e, bool add, DFTSlice *added,
     struct uipcp *uipcp = rib->uipcp;
 
     for (mit = range.first; mit != range.second; mit++) {
-        if (mit->second.address == e.address) {
+        if (mit->second.ipcp_name == e.ipcp_name) {
             break;
         }
     }
@@ -214,8 +213,8 @@ FullyReplicatedDFT::mod_table(const DFTEntry &e, bool add, DFTSlice *added,
             if (added) {
                 added->entries.push_back(e);
             }
-            UPD(uipcp, "DFT entry %s --> %lu %s remotely\n", key.c_str(),
-                e.address, (collision ? "updated" : "added"));
+            UPD(uipcp, "DFT entry %s --> %s %s remotely\n", key.c_str(),
+                e.ipcp_name.c_str(), (collision ? "updated" : "added"));
         }
 
     } else {
@@ -226,8 +225,8 @@ FullyReplicatedDFT::mod_table(const DFTEntry &e, bool add, DFTSlice *added,
             if (removed) {
                 removed->entries.push_back(e);
             }
-            UPD(uipcp, "DFT entry %s --> %lu removed remotely\n", key.c_str(),
-                e.address);
+            UPD(uipcp, "DFT entry %s --> %s removed remotely\n", key.c_str(),
+                e.ipcp_name.c_str());
         }
     }
 }
@@ -280,37 +279,6 @@ FullyReplicatedDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf,
 }
 
 void
-FullyReplicatedDFT::update_address(rlm_addr_t new_addr)
-{
-    DFTSlice prop_dft;
-    DFTSlice del_dft;
-
-    /* Update all the DFT entries corresponding to application that are
-     * registered within us. */
-    for (auto &kve : dft_table) {
-        if (kve.second.local && kve.second.address == rib->myaddr) {
-            del_dft.entries.push_back(kve.second);
-            kve.second.address   = new_addr;
-            kve.second.timestamp = time64();
-            prop_dft.entries.push_back(kve.second);
-            UPD(rib->uipcp, "Updated address for DFT entry %s\n",
-                kve.first.c_str());
-        }
-    }
-
-    /* Disseminate the update. */
-    if (prop_dft.entries.size()) {
-        rib->neighs_sync_obj_all(true, obj_class::dft, obj_name::dft,
-                                 &prop_dft);
-    }
-
-    if (del_dft.entries.size()) {
-        rib->neighs_sync_obj_all(false, obj_class::dft, obj_name::dft,
-                                 &del_dft);
-    }
-}
-
-void
 FullyReplicatedDFT::dump(stringstream &ss) const
 {
     ss << "Directory Forwarding Table:" << endl;
@@ -318,7 +286,7 @@ FullyReplicatedDFT::dump(stringstream &ss) const
         const DFTEntry &entry = kve.second;
 
         ss << "    Application: " << static_cast<string>(entry.appl_name)
-           << ", Address: " << entry.address
+           << ", Remote node: " << entry.ipcp_name
            << ", Timestamp: " << entry.timestamp << endl;
     }
 
@@ -382,14 +350,14 @@ class CentralizedFaultTolerantDFT : public DFT {
 
         /* The structure of a DFT command (i.e. a log entry for the Raft SM). */
         struct Command {
-            rlm_addr_t address;
-            char name[63];
+            char appl_name[32];
+            char ipcp_name[31];
             uint8_t opcode;
             static constexpr uint8_t OpcodeSet = 1;
             static constexpr uint8_t OpcodeDel = 2;
         } __attribute__((packed));
-        static_assert(sizeof(struct Command) == sizeof(Command::address) +
-                                                    sizeof(Command::name) +
+        static_assert(sizeof(struct Command) == sizeof(Command::ipcp_name) +
+                                                    sizeof(Command::appl_name) +
                                                     sizeof(Command::opcode),
                       "Invalid memory layout for class Replica::Command");
 
@@ -435,10 +403,10 @@ class CentralizedFaultTolerantDFT : public DFT {
         int process_sm_output(raft::RaftSMOutput out);
         int process_timeout();
         int apply(raft::LogIndex index, const char *const serbuf) override;
-        int lookup_req(const std::string &appl_name, rlm_addr_t *dstaddr,
-                       const rlm_addr_t preferred, uint32_t cookie)
+        int lookup_req(const std::string &appl_name, std::string *dst_node,
+                       const std::string &preferred, uint32_t cookie)
         {
-            return impl->lookup_req(appl_name, dstaddr, preferred, cookie);
+            return impl->lookup_req(appl_name, dst_node, preferred, cookie);
         }
         int appl_register(const struct rl_kmsg_appl_register *req);
         int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
@@ -480,8 +448,8 @@ class CentralizedFaultTolerantDFT : public DFT {
             : parent(dft), replicas(std::move(names))
         {
         }
-        int lookup_req(const std::string &appl_name, rlm_addr_t *dstaddr,
-                       const rlm_addr_t preferred, uint32_t cookie);
+        int lookup_req(const std::string &appl_name, std::string *dst_node,
+                       const std::string &preferred, uint32_t cookie);
         int appl_register(const struct rl_kmsg_appl_register *req);
         int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
                         rlm_addr_t src_addr);
@@ -506,13 +474,13 @@ public:
         }
     }
 
-    int lookup_req(const std::string &appl_name, rlm_addr_t *dstaddr,
-                   const rlm_addr_t preferred, uint32_t cookie) override
+    int lookup_req(const std::string &appl_name, std::string *dst_node,
+                   const std::string &preferred, uint32_t cookie) override
     {
         if (raft) {
-            return raft->lookup_req(appl_name, dstaddr, preferred, cookie);
+            return raft->lookup_req(appl_name, dst_node, preferred, cookie);
         }
-        return client->lookup_req(appl_name, dstaddr, preferred, cookie);
+        return client->lookup_req(appl_name, dst_node, preferred, cookie);
     }
     int appl_register(const struct rl_kmsg_appl_register *req) override
     {
@@ -521,7 +489,6 @@ public:
         }
         return client->appl_register(req);
     }
-    void update_address(rlm_addr_t new_addr) override;
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
                     rlm_addr_t src_addr) override
     {
@@ -578,12 +545,6 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
     return 0;
 }
 
-void
-CentralizedFaultTolerantDFT::update_address(rlm_addr_t new_addr)
-{
-    UPE(rib->uipcp, "Missing implementation\n");
-}
-
 /* Process the expired entries and rearm the timer according to the
  * oldest pending request (i.e. the next one that is expiring); or
  * stop it if there are no pending requests. */
@@ -632,8 +593,8 @@ CentralizedFaultTolerantDFT::Client::mod_pending_timer()
 
 int
 CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
-                                                rlm_addr_t *dstaddr,
-                                                const rlm_addr_t preferred,
+                                                std::string *dst_node,
+                                                const std::string &preferred,
                                                 uint32_t cookie)
 {
     /* Prepare an M_READ for a read operation. If we know who is the leader,
@@ -670,7 +631,7 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
 
     /* Inform the caller that we issued the request, but the
      * response will come later. */
-    *dstaddr = RL_ADDR_NULL;
+    *dst_node = std::string();
 
     return 0;
 }
@@ -698,7 +659,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
                 m->m_delete(obj_class::dft, obj_name::dft);
             }
             op_code             = m->op_code;
-            dft_entry.address   = parent->rib->myaddr;
+            dft_entry.ipcp_name = parent->rib->myname;
             dft_entry.appl_name = RinaName(appl_name);
             dft_entry.timestamp = time64();
 
@@ -788,20 +749,17 @@ CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
             rm->result ? "failed" : "was successful");
         break;
     case gpb::M_READ_R: {
-        rlm_addr_t remote_addr = RL_ADDR_NULL;
+        std::string remote_node;
 
         if (rm->result) {
             UPD(uipcp, "Lookup of name '%s' failed remotely [%s]\n",
                 pi->second.appl_name.c_str(), rm->result_reason.c_str());
         } else {
-            int64_t a;
-
-            rm->get_obj_value(a);
-            remote_addr = static_cast<rlm_addr_t>(a);
-            UPD(uipcp, "Lookup of name '%s' resolved into address '%lu'\n",
-                pi->second.appl_name.c_str(), remote_addr);
+            rm->get_obj_value(remote_node);
+            UPD(uipcp, "Lookup of name '%s' resolved to node '%s'\n",
+                pi->second.appl_name.c_str(), remote_node.c_str());
         }
-        parent->rib->dft_lookup_resolved(pi->second.appl_name, remote_addr);
+        parent->rib->dft_lookup_resolved(pi->second.appl_name, remote_node);
         break;
     }
     default:
@@ -939,8 +897,8 @@ CentralizedFaultTolerantDFT::Replica::apply(raft::LogIndex index,
     auto c = reinterpret_cast<const Command *const>(serbuf);
     DFTEntry e;
 
-    e.address   = c->address;
-    e.appl_name = RinaName(c->name);
+    e.ipcp_name = c->ipcp_name;
+    e.appl_name = RinaName(c->appl_name);
     e.timestamp = time64();
     e.local     = false;
     assert(c->opcode == Command::OpcodeSet || c->opcode == Command::OpcodeDel);
@@ -1017,8 +975,9 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
             Command c;
 
             /* Fill in the command struct (already serialized). */
-            c.address = dft_entry.address;
-            strncpy(c.name, appl_name.c_str(), sizeof(c.name));
+            strncpy(c.ipcp_name, dft_entry.ipcp_name.c_str(),
+                    sizeof(c.ipcp_name));
+            strncpy(c.appl_name, appl_name.c_str(), sizeof(c.appl_name));
             c.opcode = rm->op_code == gpb::M_WRITE ? Command::OpcodeSet
                                                    : Command::OpcodeDel;
 
@@ -1038,18 +997,18 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
              * Recover the application name, look it up in the DFT and
              * reply. */
             auto m = make_unique<CDAPMessage>();
-            rlm_addr_t remote_addr;
+            std::string remote_node;
             string appl_name;
             int ret;
 
             appl_name = rm->obj_name.substr(rm->obj_name.rfind("/") + 1);
-            ret       = impl->lookup_req(appl_name, &remote_addr,
-                                   /*preferred=*/RL_ADDR_NULL, /*cookie=*/0);
+            ret       = impl->lookup_req(appl_name, &remote_node,
+                                   /*preferred=*/std::string(), /*cookie=*/0);
             m->m_read_r(rm->obj_class, rm->obj_name, /*obj_inst=*/0,
                         /*result=*/ret ? -1 : 0,
                         /*result_reason=*/ret ? "No match found" : string());
             m->invoke_id = rm->invoke_id;
-            m->set_obj_value(static_cast<int64_t>(remote_addr));
+            m->set_obj_value(remote_node);
             parent->rib->send_to_dst_addr(std::move(m), src_addr,
                                           /*obj=*/nullptr,
                                           /*invoke_id=*/nullptr);

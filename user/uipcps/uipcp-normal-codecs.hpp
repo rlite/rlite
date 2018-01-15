@@ -95,7 +95,7 @@ struct RinaName {
 
 struct DFTEntry : public UipcpObject {
     RinaName appl_name;
-    rlm_addr_t address = RL_ADDR_NULL;
+    std::string ipcp_name;
     uint64_t timestamp = 0;
     /* Not externally visible (not serialized), true
      * if this entry refers to an application registered
