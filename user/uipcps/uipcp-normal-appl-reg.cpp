@@ -537,7 +537,6 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
 {
     list<raft::ReplicaId> peers;
     string param_value;
-    int ret = 0;
 
     if (param_name != "replicas") {
         return -1;
@@ -546,6 +545,10 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
     param_value = rib->get_param_value<std::string>("dft", "replicas");
     UPD(rib->uipcp, "replicas = %s\n", param_value.c_str());
     peers = strsplit(param_value, ',');
+
+    /* Create the client anyway. */
+    client = make_unique<Client>(this, peers);
+    UPI(rib->uipcp, "Client initialized\n");
 
     /* See if I'm also one of the replicas. */
     auto it = peers.begin();
@@ -568,16 +571,11 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
             }
             UPI(rib->uipcp, "Raft replica initialized\n");
             assert(raft != nullptr && client == nullptr);
-            ret = raft->process_sm_output(std::move(out));
-            break;
+            return raft->process_sm_output(std::move(out));
         }
     }
 
-    /* Create the client anyway. */
-    client = make_unique<Client>(this, std::move(peers));
-    UPI(rib->uipcp, "Client initialized\n");
-
-    return ret;
+    return 0;
 }
 
 void
@@ -651,13 +649,17 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
             m->m_read(obj_class::dft, obj_name::dft + "/" + appl_name);
             op_code = m->op_code;
 
-            ret = parent->rib->send_to_dst_node(std::move(m), r, nullptr,
-                                                &invoke_id);
-            if (ret) {
-                return ret;
-            }
+            m->invoke_id = invoke_id =
+                parent->rib->invoke_id_mgr.get_invoke_id();
             pending[invoke_id] =
                 std::move(PendingReq(op_code, appl_name, r, 0));
+
+            ret = parent->rib->send_to_dst_node(std::move(m), r, nullptr,
+                                                nullptr);
+            if (ret) {
+                pending.erase(invoke_id);
+                return ret;
+            }
         }
     }
 
@@ -700,13 +702,18 @@ CentralizedFaultTolerantDFT::Client::appl_register(
             dft_entry.appl_name = RinaName(appl_name);
             dft_entry.timestamp = time64();
 
-            ret = parent->rib->send_to_dst_node(std::move(m), r, &dft_entry,
-                                                &invoke_id);
-            if (ret) {
-                return ret;
-            }
+            /* Set the 'pending' map before sending, in case we are sending to
+             * ourselves (and so we wouldn't find the entry in the map).*/
+            m->invoke_id = invoke_id =
+                parent->rib->invoke_id_mgr.get_invoke_id();
             pending[invoke_id] =
                 std::move(PendingReq(op_code, appl_name, r, req->event_id));
+            ret = parent->rib->send_to_dst_node(std::move(m), r, &dft_entry,
+                                                nullptr);
+            if (ret) {
+                pending.erase(invoke_id);
+                return ret;
+            }
         }
     }
 
