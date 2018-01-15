@@ -261,6 +261,8 @@ struct CDAPMessage {
 
     void clear() { *this = CDAPMessage(); }
 
+    static std::string opcode_repr(gpb::opCode_t);
+
 private:
     int m_common(const std::string &obj_class, const std::string &obj_name,
                  long obj_inst, int scope, const std::string &filter,
