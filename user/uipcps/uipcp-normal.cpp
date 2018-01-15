@@ -766,7 +766,9 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
         m->set_obj_value(objbuf, objlen);
     }
 
-    m->invoke_id = invoke_id_mgr.get_invoke_id();
+    if (m->is_request()) {
+        m->invoke_id = invoke_id_mgr.get_invoke_id();
+    }
     if (invoke_id) {
         *invoke_id = m->invoke_id;
     }
