@@ -600,6 +600,11 @@ CentralizedFaultTolerantDFT::Client::mod_pending_timer()
                 "DFT '%d' request for name '%s' timed out\n",
                 static_cast<int>(mit->second.op_code),
                 mit->second.appl_name.c_str());
+            if (mit->second.replica == leader_id) {
+                /* We got a timeout on the leader, let's forget about it. */
+                leader_id.clear();
+                UPD(parent->rib->uipcp, "Forgetting about raft leader\n");
+            }
             mit = pending.erase(mit);
         } else {
             if (mit->second.t < t_min) {
@@ -716,8 +721,6 @@ CentralizedFaultTolerantDFT::Client::process_timeout()
 {
     std::lock_guard<std::mutex> guard(parent->rib->mutex);
 
-    /* We got a timeout, let's forget about the current leader. */
-    leader_id.clear();
     mod_pending_timer();
 
     return 0;
@@ -756,7 +759,11 @@ CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
 
     /* We assume it was the leader to answer. So now we know who the leader is.
      */
-    leader_id = pi->second.replica;
+    if (leader_id != pi->second.replica) {
+        leader_id = pi->second.replica;
+        UPD(uipcp, "Raft leader discovered: %s\n", leader_id.c_str());
+    }
+
     switch (rm->op_code) {
     case gpb::M_WRITE_R:
     case gpb::M_DELETE_R:
