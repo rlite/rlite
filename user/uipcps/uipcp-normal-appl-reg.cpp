@@ -963,9 +963,9 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
                                                   rlm_addr_t src_addr)
 {
     struct uipcp *uipcp = parent->rib->uipcp;
-    const char *objbuf;
+    const char *objbuf  = nullptr;
     raft::RaftSMOutput out;
-    size_t objlen;
+    size_t objlen = 0;
     int ret;
 
     if (src_addr == RL_ADDR_NULL) {
@@ -973,10 +973,13 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
         return 0;
     }
 
-    rm->get_obj_value(objbuf, objlen);
-    if (!objbuf) {
-        UPE(uipcp, "No object value found\n");
-        return 0;
+    /* We don't expect an obj_value if this is a DFT read request. */
+    if (!(rm->obj_class == obj_class::dft && rm->op_code == gpb::M_READ)) {
+        rm->get_obj_value(objbuf, objlen);
+        if (!objbuf) {
+            UPE(uipcp, "No object value found\n");
+            return 0;
+        }
     }
 
     if (rm->obj_class == obj_class::dft) {
@@ -1028,6 +1031,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
             m->m_read_r(rm->obj_class, rm->obj_name, /*obj_inst=*/0,
                         /*result=*/ret ? -1 : 0,
                         /*result_reason=*/ret ? "No match found" : string());
+            m->invoke_id = rm->invoke_id;
             m->set_obj_value(static_cast<int64_t>(remote_addr));
             parent->rib->send_to_dst_addr(std::move(m), src_addr,
                                           /*obj=*/nullptr,
