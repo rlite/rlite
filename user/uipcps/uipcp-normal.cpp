@@ -766,7 +766,11 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
         m->set_obj_value(objbuf, objlen);
     }
 
-    if (m->is_request()) {
+    if (!m->invoke_id_valid()) {
+        if (m->is_response()) {
+            UPE(uipcp, "Cannot send response without a valid invoke id\n");
+            return -1;
+        }
         m->invoke_id = invoke_id_mgr.get_invoke_id();
     }
     if (invoke_id) {
