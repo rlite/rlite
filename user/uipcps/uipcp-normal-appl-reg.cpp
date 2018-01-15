@@ -486,6 +486,9 @@ class CentralizedFaultTolerantDFT : public DFT {
         int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
                         rlm_addr_t src_addr);
         int process_timeout();
+
+        /* For external hints. */
+        void set_leader_id(const raft::ReplicaId &name) { leader_id = name; }
     };
     std::unique_ptr<Client> client;
 
@@ -495,37 +498,37 @@ public:
     int param_changed(const std::string &param_name) override;
     void dump(std::stringstream &ss) const override
     {
-        if (client) {
+        if (raft) {
+            raft->dump(ss);
+        } else {
             ss << "Directory Forwarding Table: not available locally" << endl
                << endl;
-        } else {
-            raft->dump(ss);
         }
     }
 
     int lookup_req(const std::string &appl_name, rlm_addr_t *dstaddr,
                    const rlm_addr_t preferred, uint32_t cookie) override
     {
-        if (client) {
-            return client->lookup_req(appl_name, dstaddr, preferred, cookie);
+        if (raft) {
+            return raft->lookup_req(appl_name, dstaddr, preferred, cookie);
         }
-        return raft->lookup_req(appl_name, dstaddr, preferred, cookie);
+        return client->lookup_req(appl_name, dstaddr, preferred, cookie);
     }
     int appl_register(const struct rl_kmsg_appl_register *req) override
     {
-        if (client) {
-            return client->appl_register(req);
+        if (raft) {
+            return raft->appl_register(req);
         }
-        return raft->appl_register(req);
+        return client->appl_register(req);
     }
     void update_address(rlm_addr_t new_addr) override;
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
                     rlm_addr_t src_addr) override
     {
-        if (client) {
-            return client->rib_handler(rm, nf, src_addr);
+        if (raft) {
+            return raft->rib_handler(rm, nf, src_addr);
         }
-        return raft->rib_handler(rm, nf, src_addr);
+        return client->rib_handler(rm, nf, src_addr);
     }
 };
 
@@ -534,6 +537,7 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
 {
     list<raft::ReplicaId> peers;
     string param_value;
+    int ret = 0;
 
     if (param_name != "replicas") {
         return -1;
@@ -543,12 +547,12 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
     UPD(rib->uipcp, "replicas = %s\n", param_value.c_str());
     peers = strsplit(param_value, ',');
 
+    /* See if I'm also one of the replicas. */
     auto it = peers.begin();
     for (; it != peers.end(); it++) {
         if (*it == rib->myname) {
             /* I'm one of the replicas. Create a Raft state machine and
              * initialize it. */
-            client.reset();
             raft = make_unique<Replica>(this);
             peers.erase(it); /* remove myself */
 
@@ -564,18 +568,16 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
             }
             UPI(rib->uipcp, "Raft replica initialized\n");
             assert(raft != nullptr && client == nullptr);
-            return raft->process_sm_output(std::move(out));
+            ret = raft->process_sm_output(std::move(out));
+            break;
         }
     }
 
-    /* I'm not one of the replicas. I'm just a client. */
-    assert(it == peers.end());
-    raft.reset();
+    /* Create the client anyway. */
     client = make_unique<Client>(this, std::move(peers));
     UPI(rib->uipcp, "Client initialized\n");
-    assert(raft == nullptr && client != nullptr);
 
-    return 0;
+    return ret;
 }
 
 void
@@ -919,8 +921,10 @@ CentralizedFaultTolerantDFT::Replica::appl_register(
     int ret;
 
     if (!leader()) {
-        UPE(parent->rib->uipcp, "Missing implementation for non-leaders\n");
-        return 0;
+        /* I'm not the leader, so I behave as any client. We also
+         * set the leader, since we know it. */
+        parent->client->set_leader_id(leader_name());
+        return parent->client->appl_register(req);
     }
 
     /* Fill in the command struct (already serialized). */
@@ -993,6 +997,13 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
     if (src_addr == RL_ADDR_NULL) {
         UPE(uipcp, "Source address not set\n");
         return 0;
+    }
+
+    if (rm->obj_class == obj_class::dft && rm->is_response()) {
+        /* This is a response to a request done by us with the
+         * role of simple clients. We forward it to the client
+         * handler. */
+        return parent->client->rib_handler(rm, nf, src_addr);
     }
 
     /* We don't expect an obj_value if this is a DFT read request. */
