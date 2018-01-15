@@ -184,8 +184,8 @@ message connectionPolicies_t {  // configuration of the policies and parameters
 message directoryForwardingTableEntry_t {  // information about a
                                            // directoryforwardingtable entry
   required applicationProcessNamingInfo_t applicationName = 1;
-  required uint64 ipcProcessSynonym = 2;  // TODO turn into an ipcp name
-  optional uint64 timestamp = 3;          // TODO turn into a seqnum
+  required string ipcp_name = 2;  // The name of the hosting IPCP
+  optional uint64 timestamp = 3;  // TODO turn into a seqnum
 }
 
 message
