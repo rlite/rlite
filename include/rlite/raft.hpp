@@ -281,8 +281,26 @@ class RaftSM {
     int log_truncate(LogIndex index);
 
     /* Logging helpers. */
-    std::ostream &IOS_ERR() { return ios_err << "(" << name << ") "; }
-    std::ostream &IOS_INF() { return ios_inf << "(" << name << ") "; }
+    std::string curtime_string(void)
+    {
+        time_t ctime = time(nullptr);
+        struct tm *time_info;
+        char tbuf[9];
+
+        time_info = localtime(&ctime);
+        strftime(tbuf, sizeof(tbuf), "%H:%M:%S", time_info);
+
+        return std::string(tbuf);
+    }
+
+    std::ostream &IOS_ERR()
+    {
+        return ios_err << "[" << curtime_string() << "](" << name << ") ";
+    }
+    std::ostream &IOS_INF()
+    {
+        return ios_inf << "[" << curtime_string() << "](" << name << ") ";
+    }
 
     int check_output_arg(RaftSMOutput *out);
     std::chrono::milliseconds rand_time_in_range(
