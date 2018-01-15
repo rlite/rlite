@@ -564,6 +564,7 @@ uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
                     uipcp_tmr_cb_t cb, void *arg)
 {
     struct uipcp_loop_tmr *e, *cur;
+    int tmrid;
 
     if (!cb) {
         UPE(uipcp, "NULL timer calback\n");
@@ -582,11 +583,40 @@ uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
     if (uipcp->timer_events_cnt >= TIMER_EVENTS_MAX) {
         UPE(uipcp, "Max number of timers reached [%u]\n",
             uipcp->timer_events_cnt);
+        pthread_mutex_unlock(&uipcp->lock);
+        free(e);
+        return -1;
     }
 
-    e->id  = uipcp->timer_next_id;
-    e->cb  = cb;
-    e->arg = arg;
+    /* Linear search for an unused timer id. */
+    {
+        int trials = 0;
+
+        tmrid = uipcp->timer_last_id;
+        for (;;) {
+            int used = 0;
+
+            if (++tmrid > TIMER_EVENTS_MAX) {
+                tmrid = 1;
+            }
+
+            list_for_each_entry (cur, &uipcp->timer_events, node) {
+                if (cur->id == tmrid) {
+                    used = 1;
+                    break;
+                }
+            }
+            if (!used) {
+                break;
+            }
+            ++trials;
+            assert(trials <= TIMER_EVENTS_MAX); /* safety check */
+        }
+    }
+
+    e->id = uipcp->timer_last_id = tmrid;
+    e->cb                        = cb;
+    e->arg                       = arg;
     clock_gettime(CLOCK_MONOTONIC, &e->exp);
     e->exp.tv_nsec += delta_ms * ONEMILLION;
     e->exp.tv_sec += e->exp.tv_nsec / ONEBILLION;
@@ -601,9 +631,6 @@ uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
     /* Insert 'e' right before 'cur'. */
     list_add_tail(&e->node, &cur->node);
     uipcp->timer_events_cnt++;
-    if (++uipcp->timer_next_id > TIMER_EVENTS_MAX) {
-        uipcp->timer_next_id = 1;
-    }
 #if 0
     printf("TIMERLIST: [");
     list_for_each_entry(cur, &uipcp->timer_events, node) {
@@ -851,7 +878,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     list_init(&uipcp->fdhs);
     list_init(&uipcp->timer_events);
     uipcp->timer_events_cnt = 0;
-    uipcp->timer_next_id    = 1;
+    uipcp->timer_last_id    = 0; /* invalid */
 
     pthread_mutex_lock(&uipcps->lock);
     if (uipcp_lookup(uipcps, upd->ipcp_id) != NULL) {
