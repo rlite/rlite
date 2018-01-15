@@ -167,6 +167,7 @@ struct CDAPMessage {
 
     bool is_request() const { return !is_response(); }
     bool is_response() const { return op_code & 0x1; }
+    bool invoke_id_valid() const { return invoke_id != 0; }
 
     void dump() const;
 

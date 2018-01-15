@@ -380,7 +380,8 @@ InvokeIdMgr::get_invoke_id()
 {
     discard();
 
-    while (pending_invoke_ids.count(Id(invoke_id_next, 0))) {
+    while (invoke_id_next == 0 ||
+           pending_invoke_ids.count(Id(invoke_id_next, 0))) {
         invoke_id_next++;
     }
 
