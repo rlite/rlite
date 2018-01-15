@@ -67,7 +67,7 @@ public:
     ~TestReplica() { shutdown(); }
 
     /* Apply a command to the replicated state machine. */
-    virtual int apply(const char *const serbuf) override
+    virtual int apply(LogIndex index, const char *const serbuf) override
     {
         uint32_t cmd = *(reinterpret_cast<const uint32_t *>(serbuf));
         committed_commands.push_back(cmd);
@@ -405,7 +405,7 @@ run_simulation(const list<TestEvent> &external_events)
                     cout << "Submitting command " << next.cmd << " to "
                          << leader->local_name() << endl;
                     if (leader->submit(
-                            reinterpret_cast<const char *>(&next.cmd),
+                            reinterpret_cast<const char *>(&next.cmd), nullptr,
                             &output_next)) {
                         return -1;
                     }

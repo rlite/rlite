@@ -355,12 +355,15 @@ public:
     int timer_expired(RaftTimerType, RaftSMOutput *out);
 
     /* Called by the user when it wants to submit a new log entry to
-     * the replicated state machine. */
-    int submit(const char *const serbuf, RaftSMOutput *out);
+     * the replicated state machine. If 'log_index_p' is not nullptr,
+     * it is filled with the index of the log entry allocated for
+     * this request. */
+    int submit(const char *const serbuf, LogIndex *log_index_p,
+               RaftSMOutput *out);
 
     /* Called by the Raft state machine when a log entry needs to
      * be applied to the replicated state machine. */
-    virtual int apply(const char *const serbuf) = 0;
+    virtual int apply(LogIndex index, const char *const serbuf) = 0;
     virtual ~RaftSM();
 
     /* True if this Raft SM is the current leader. */

@@ -563,7 +563,7 @@ RaftSM::apply_committed_entries()
                  serbuf.get(), log_command_size))) {
             return ret;
         }
-        apply(serbuf.get());
+        apply(next, serbuf.get());
         if (verbosity >= kVerboseInfo) {
             IOS_INF() << "Entry " << next << " applied" << endl;
         }
@@ -974,7 +974,8 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
 }
 
 int
-RaftSM::submit(const char *const serbuf, RaftSMOutput *out)
+RaftSM::submit(const char *const serbuf, LogIndex *log_index_p,
+               RaftSMOutput *out)
 {
     int ret;
 
@@ -993,6 +994,10 @@ RaftSM::submit(const char *const serbuf, RaftSMOutput *out)
      * servers (and restart the heartbeat timer). */
     if ((ret = prepare_append_entries(LogReplicateStrategy::Unsent, out))) {
         return ret;
+    }
+
+    if (log_index_p) {
+        *log_index_p = last_log_index;
     }
 
     return 0;
