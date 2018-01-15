@@ -597,8 +597,8 @@ CentralizedFaultTolerantDFT::Client::mod_pending_timer()
         if (mit->second.t <= now) {
             /* This request has expired. */
             UPW(parent->rib->uipcp,
-                "DFT '%d' request for name '%s' timed out\n",
-                static_cast<int>(mit->second.op_code),
+                "DFT '%s' request for name '%s' timed out\n",
+                CDAPMessage::opcode_repr(mit->second.op_code).c_str(),
                 mit->second.appl_name.c_str());
             if (mit->second.replica == leader_id) {
                 /* We got a timeout on the leader, let's forget about it. */
@@ -919,7 +919,7 @@ CentralizedFaultTolerantDFT::Replica::appl_register(
     int ret;
 
     if (!leader()) {
-        UPW(parent->rib->uipcp, "Missing implementation for non-leaders\n");
+        UPE(parent->rib->uipcp, "Missing implementation for non-leaders\n");
         return 0;
     }
 
@@ -1006,9 +1006,9 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
 
     if (rm->obj_class == obj_class::dft) {
         if (!leader()) {
-            /* We are not the leader, we need to forward it to the leader node.
+            /* We are not the leader, we could forward it to the leader node.
              */
-            UPW(uipcp, "Missing code to forward request to the leader\n");
+            UPW(uipcp, "Ignoring request, let the leader answer\n");
             return 0;
         }
 
