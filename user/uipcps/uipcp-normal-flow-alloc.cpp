@@ -376,6 +376,7 @@ LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
     m = make_unique<CDAPMessage>();
     m->m_create_r(obj_class::flow, obj_name.str(), 0, resp->response ? -1 : 0,
                   reason);
+    m->invoke_id = freq.invoke_id;
 
     ret = rib->send_to_dst_addr(std::move(m), freq.src_addr, &freq);
 
@@ -408,6 +409,7 @@ LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm)
         m = make_unique<CDAPMessage>();
         m->m_create_r(rm->obj_class, rm->obj_name, 0, -1,
                       "Cannot find DFT entry");
+        m->invoke_id = rm->invoke_id;
 
         return rib->send_to_dst_addr(std::move(m), freq.src_addr, &freq);
     }
