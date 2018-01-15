@@ -413,7 +413,7 @@ class CentralizedFaultTolerantDFT : public DFT {
               impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
         int process_sm_output(raft::RaftSMOutput out);
         int process_timeout();
-        int apply(const char *const serbuf) override;
+        int apply(raft::LogIndex index, const char *const serbuf) override;
         int lookup_req(const std::string &appl_name, rlm_addr_t *dstaddr,
                        const rlm_addr_t preferred, uint32_t cookie)
         {
@@ -886,7 +886,7 @@ CentralizedFaultTolerantDFT::Replica::appl_register(
     c.opcode = req->reg ? Command::OpcodeSet : Command::OpcodeDel;
 
     /* Submit the command to the raft state machine. */
-    ret = submit(reinterpret_cast<const char *const>(&c), &out);
+    ret = submit(reinterpret_cast<const char *const>(&c), nullptr, &out);
     if (ret) {
         UPE(parent->rib->uipcp,
             "Failed to submit application %sregistration for '%s' to the raft "
@@ -902,7 +902,8 @@ CentralizedFaultTolerantDFT::Replica::appl_register(
 /* Apply a command to the replicated state machine. We just pass the command
  * to the same multimap implementation used by the fully replicated DFT. */
 int
-CentralizedFaultTolerantDFT::Replica::apply(const char *const serbuf)
+CentralizedFaultTolerantDFT::Replica::apply(raft::LogIndex index,
+                                            const char *const serbuf)
 {
     auto c = reinterpret_cast<const Command *const>(serbuf);
     DFTEntry e;
@@ -950,6 +951,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
              * request to the Raft state machine. */
             DFTEntry dft_entry(objbuf, objlen);
             string appl_name(static_cast<string>(dft_entry.appl_name));
+            raft::LogIndex index;
             Command c;
 
             /* Fill in the command struct (already serialized). */
@@ -959,13 +961,11 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
                                                    : Command::OpcodeDel;
 
             /* Submit the command to the raft state machine. */
-            ret = submit(reinterpret_cast<const char *const>(&c), &out);
+            ret = submit(reinterpret_cast<const char *const>(&c), &index, &out);
             if (ret) {
                 UPE(parent->rib->uipcp,
                     "Failed to submit application %sregistration for '%s' to "
-                    "the "
-                    "raft "
-                    "state machine\n",
+                    "the raft state machine\n",
                     rm->op_code == gpb::M_WRITE ? "" : "un", appl_name.c_str());
                 return -1;
             }
