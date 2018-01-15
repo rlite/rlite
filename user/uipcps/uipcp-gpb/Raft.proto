@@ -1,38 +1,38 @@
-syntax="proto2";
+syntax = "proto2";
 package gpb;
 option optimize_for = LITE_RUNTIME;
 
 /* Raft protocol messages, see include/rlite/raft.hpp */
 
 message RaftRequestVote {
-    required uint32 term = 1;
-    required string candidate_id = 2;
-    required uint32 last_log_index = 3;
-    required uint32 last_log_term = 4;
+  required uint32 term = 1;
+  required string candidate_id = 2;
+  required uint32 last_log_index = 3;
+  required uint32 last_log_term = 4;
 }
 
 message RaftRequestVoteResp {
-    required uint32 term = 1;
-    required bool vote_granted = 2;
+  required uint32 term = 1;
+  required bool vote_granted = 2;
 }
 
 message RaftLogEntry {
-    required uint32 term = 1;
-    required bytes buffer = 2;
+  required uint32 term = 1;
+  required bytes buffer = 2;
 };
 
 message RaftAppendEntries {
-    required uint32 term = 1;
-    required string leader_id = 2;
-    required uint32 leader_commit = 3;
-    required uint32 prev_log_index = 4;
-    required uint32 prev_log_term = 5;
-    repeated RaftLogEntry entries = 6;
+  required uint32 term = 1;
+  required string leader_id = 2;
+  required uint32 leader_commit = 3;
+  required uint32 prev_log_index = 4;
+  required uint32 prev_log_term = 5;
+  repeated RaftLogEntry entries = 6;
 }
 
 message RaftAppendEntriesResp {
-    required uint32 term = 1;
-    required string follower_id = 2;
-    required uint32 log_index = 3;
-    required bool success = 4;
+  required uint32 term = 1;
+  required string follower_id = 2;
+  required uint32 log_index = 3;
+  required bool success = 4;
 }
