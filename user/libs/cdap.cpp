@@ -58,6 +58,15 @@ static const char *opcode_names_table[] = {
     [gpb::M_STOP_R]       = "M_STOP_R",
 };
 
+std::string
+CDAPMessage::opcode_repr(gpb::opCode_t op_code)
+{
+    if (static_cast<int>(op_code) <= gpb::M_STOP_R) {
+        return opcode_names_table[op_code];
+    }
+    return std::string();
+}
+
 #define MAX_CDAP_OPCODE gpb::M_STOP_R
 #define MAX_CDAP_FIELD gpb::CDAPMessage::kVersionFieldNumber
 
