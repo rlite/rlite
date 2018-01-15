@@ -91,9 +91,6 @@ uipcp_rib::dft_lookup_resolved(const std::string &appl_name,
     if (remote_addr == RL_ADDR_NULL) {
         UPI(uipcp, "No DFT matching entry for destination %s\n",
             appl_name.c_str());
-    } else {
-        UPD(uipcp, "DFT lookup for '%s' resolved into address '%lu'\n",
-            appl_name.c_str(), remote_addr);
     }
     for (auto &fr : mit->second) {
         if (remote_addr == RL_ADDR_NULL) {

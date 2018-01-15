@@ -467,12 +467,12 @@ class CentralizedFaultTolerantDFT : public DFT {
                        const raft::ReplicaId &r, uint32_t event_id)
                 : op_code(op), appl_name(a), replica(r), kevent_id(event_id)
             {
-                t = std::chrono::system_clock::now();
+                t = std::chrono::system_clock::now() + std::chrono::seconds(3);
             }
         };
         std::unordered_map</*invoke_id*/ int, PendingReq> pending;
 
-        void rearm_pending_timer();
+        void mod_pending_timer();
 
     public:
         Client(CentralizedFaultTolerantDFT *dft,
@@ -584,24 +584,38 @@ CentralizedFaultTolerantDFT::update_address(rlm_addr_t new_addr)
     UPE(rib->uipcp, "Missing implementation\n");
 }
 
-/* Rearm the timer according to the older pending request (i.e. the next one
- * that is expiring). */
+/* Process the expired entries and rearm the timer according to the
+ * oldest pending request (i.e. the next one that is expiring); or
+ * stop it if there are no pending requests. */
 void
-CentralizedFaultTolerantDFT::Client::rearm_pending_timer()
+CentralizedFaultTolerantDFT::Client::mod_pending_timer()
 {
-    if (pending.empty()) {
+    auto t_min = std::chrono::system_clock::time_point::max();
+    auto now   = std::chrono::system_clock::now();
+
+    for (auto mit = pending.begin(); mit != pending.end();) {
+        if (mit->second.t <= now) {
+            /* This request has expired. */
+            UPW(parent->rib->uipcp,
+                "DFT '%d' request for name '%s' timed out\n",
+                static_cast<int>(mit->second.op_code),
+                mit->second.appl_name.c_str());
+            mit = pending.erase(mit);
+        } else {
+            if (mit->second.t < t_min) {
+                /* Update the oldest request. */
+                t_min = mit->second.t;
+            }
+            ++mit;
+        }
+    }
+
+    /* Update the timer. */
+    if (t_min == std::chrono::system_clock::time_point::max()) {
         timer = nullptr;
     } else {
-        auto t_min = std::chrono::system_clock::time_point::max();
-        for (const auto &kv : pending) {
-            if (kv.second.t < t_min) {
-                t_min = kv.second.t;
-            }
-        }
         timer = make_unique<TimeoutEvent>(
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now() + std::chrono::seconds(3) -
-                t_min),
+            std::chrono::duration_cast<std::chrono::milliseconds>(t_min - now),
             parent->rib->uipcp, this, [](struct uipcp *uipcp, void *arg) {
                 auto cli =
                     static_cast<CentralizedFaultTolerantDFT::Client *>(arg);
@@ -640,7 +654,7 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
         }
     }
 
-    rearm_pending_timer();
+    mod_pending_timer();
 
     UPI(parent->rib->uipcp, "Read request for '%s' issued\n",
         appl_name.c_str());
@@ -689,7 +703,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
         }
     }
 
-    rearm_pending_timer();
+    mod_pending_timer();
 
     UPI(parent->rib->uipcp, "Write request '%s <= %lu' issued\n",
         appl_name.c_str(), parent->rib->myaddr);
@@ -704,8 +718,8 @@ CentralizedFaultTolerantDFT::Client::process_timeout()
 
     /* We got a timeout, let's forget about the current leader. */
     leader_id.clear();
-    rearm_pending_timer();
-    UPE(parent->rib->uipcp, "Missing implementation\n");
+    mod_pending_timer();
+
     return 0;
 }
 
@@ -778,6 +792,7 @@ CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
         assert(false);
     }
     pending.erase(pi);
+    mod_pending_timer();
 
     return 0;
 }
