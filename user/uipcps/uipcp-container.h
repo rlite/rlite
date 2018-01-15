@@ -197,7 +197,7 @@ struct uipcp {
     pthread_mutex_t lock;
     struct list_head timer_events;
     int timer_events_cnt;
-    int timer_next_id;
+    int timer_last_id;
 
     /* Used to store the list of file descriptor callbacks registered within
      * the uipcp main loop. */
