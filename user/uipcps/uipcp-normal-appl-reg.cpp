@@ -916,34 +916,11 @@ int
 CentralizedFaultTolerantDFT::Replica::appl_register(
     const struct rl_kmsg_appl_register *req)
 {
-    raft::RaftSMOutput out;
-    Command c;
-    int ret;
-
-    if (!leader()) {
-        /* I'm not the leader, so I behave as any client. We also
-         * set the leader, since we know it. */
-        parent->client->set_leader_id(leader_name());
-        return parent->client->appl_register(req);
-    }
-
-    /* Fill in the command struct (already serialized). */
-    c.address = parent->rib->myaddr;
-    strncpy(c.name, req->appl_name, sizeof(c.name));
-    c.opcode = req->reg ? Command::OpcodeSet : Command::OpcodeDel;
-
-    /* Submit the command to the raft state machine. */
-    ret = submit(reinterpret_cast<const char *const>(&c), nullptr, &out);
-    if (ret) {
-        UPE(parent->rib->uipcp,
-            "Failed to submit application %sregistration for '%s' to the raft "
-            "state machine\n",
-            req->reg ? "" : "un", req->appl_name);
-        return -1;
-    }
-
-    /* Complete raft processing. */
-    return process_sm_output(std::move(out));
+    /* We may be the leader or a follower, but here we can behave as as any
+     * client to improve code reuse. We also set the leader, since we know it.
+     */
+    parent->client->set_leader_id(leader_name());
+    return parent->client->appl_register(req);
 }
 
 /* Apply a command to the replicated state machine. We just pass the command
