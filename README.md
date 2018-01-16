@@ -740,7 +740,7 @@ two nodes (it will register on the normal DIF by default):
 
     (node A)$ rinaperf -l
 
-while the other node runs the server
+while the other node runs the client in ping mode
 
     (node B)$ rinaperf
 
