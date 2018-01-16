@@ -103,7 +103,7 @@ while True:
         linecnt += 1
 
         line = line.replace('\n', '').strip()
-        if line.startswith("#"):
+        if line.startswith("#") or line == "":
             continue
 
         splitted = line.split()
