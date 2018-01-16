@@ -8,7 +8,7 @@ usr:
 	cd build && $(MAKE)
 
 ker:
-	$(MAKE) -C $(KERNBUILDDIR) M=$(KERNMODDIR) PWD=$(PWD)/kernel \
+	$(MAKE) -C $(KERNBUILDDIR) M=$(KERNMODDIR) PWD=$(shell pwd)/kernel \
 			WITH_SHIM_UDP4=@WITH_SHIM_UDP4@ \
 			WITH_SHIM_TCP4=@WITH_SHIM_TCP4@ \
 			modules
