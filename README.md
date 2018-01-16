@@ -929,6 +929,8 @@ components of a normal IPCP process:
 | ------------------- | -----------------|-----------------------------------|
 | address-allocator   | manual           | Manual address allocation         |
 | address-allocator   | distributed      | Automated address allocation      |
+| dft                 | fully-replicated | Every node has a full copy of the DFT |
+| dft                 | centralized-fault-tolerant | DFT stored by a fault-tolerant cluster of replicas |
 | routing             | link-state       | Link state routing algorithm      |
 | routing             | link-state-lfa   | Link state enhanced with Loop Free Alternate |
 
@@ -943,6 +945,7 @@ of a normal IPCP process:
 | Component           | Policy            | Parameter          | Description     |
 | --------------------| ------------------|--------------------|-----------------|
 | address-allocator   | distributed       | nack-wait-secs     | Time to wait for a NACK before deciding that the address is good. |
+| dft                 | centralized-fault-tolerant | replicas  | Name of the IPCPs that constitute the fault-tolerant cluster. |
 | enrollment          | *                 | timeout            | Enrollment timeout in milliseconds. |
 | enrollment          | *                 | keepalive          | Neighbor keepalive timeout in seconds (0 to disable). |
 | enrollment          | *                 | keepalive-thresh   | Number of allowed pending keepalive requests. If exceeded, the N-1 low is pruned. |

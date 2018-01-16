@@ -6,12 +6,6 @@ Open tasks, in decreasing order of priority:
       SSIDs and switch to the SSID that has the strongest signal
       (with hysteresis)
 
-* implement the Bully algorithm for fault-tolerant leader election
-    * the leader can then support centralized address allocation:
-      the address allocation table may still be replicated, but
-      only the leader decides for new allocations
-    * another use case is centralized bandwidth allocation
-
 * implement a distributed and fault-tolerant DFT by means of a
   Kademlia DHT
 
