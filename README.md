@@ -452,7 +452,7 @@ network interfaces:
   towards C is named eth1
 * On node C, the interface towards B is named eth0
 
-An all the three nodes, load the kernel modules and run the userspace
+On all the three nodes, load the kernel modules and run the userspace
 daemon (in the example the daemon is run in foreground):
 
     $ sudo modprobe rlite
@@ -651,6 +651,14 @@ services to the applications; the shim-wifi inherits the limitations of the
 shim-eth (e.g. only a single flow supported between two nodes in the DIF),
 that is used to implement its datapath.
 
+On both nodes, load the kernel modules and run the userspace daemon
+(in the example the daemon is run in background):
+
+    $ sudo modprobe rlite
+    $ sudo modprobe rlite-normal
+    $ sudo modprobe rlite-shim-eth
+    $ sudo rlite-uipcps -d
+
 On the AP side, the following *hostapd* configuration file can be stored
 in `/etc/hostapd/rlite.conf`:
 
@@ -732,7 +740,7 @@ two nodes (it will register on the normal DIF by default):
 
     (node A)$ rinaperf -l
 
-while the other node runs the server
+while the other node runs the client in ping mode
 
     (node B)$ rinaperf
 
