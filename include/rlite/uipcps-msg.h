@@ -51,6 +51,7 @@ enum {
     RLITE_U_IPCP_POLICY_PARAM_LIST_REQ,  /* 17 */
     RLITE_U_IPCP_POLICY_PARAM_LIST_RESP, /* 18 */
     RLITE_U_TERMINATE,                   /* 19 */
+    RLITE_U_IPCP_NEIGHBOR_DISCONNECT,    /* 20 */
 
     RLITE_U_MSG_MAX,
 };
@@ -173,6 +174,16 @@ struct rl_cmsg_ipcp_config {
     rl_ipcp_id_t ipcp_id;
     char *name;
     char *value;
+} __attribute__((packed));
+
+/* rlite-ctl --> uipcps message to enroll an IPC process
+ * to another IPC process, or to only alloc a flow. */
+struct rl_cmsg_ipcp_neighbor_disconnect {
+    rl_msg_t msg_type;
+    uint32_t event_id;
+
+    char *ipcp_name;  /* local IPCP */
+    char *neigh_name; /* neigh IPCP to disconnect from */
 } __attribute__((packed));
 
 #endif /* __RLITE_U_MSG_H__ */
