@@ -792,6 +792,32 @@ terminate(int argc, char **argv, struct cmd_descriptor *cd)
     return request_response(RLITE_MB(&req), NULL);
 }
 
+static int
+ipcp_neigh_disconnect(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    struct rl_cmsg_ipcp_neighbor_disconnect req;
+    struct ipcp_attrs *attrs;
+    const char *ipcp_name;
+    const char *neigh_name;
+
+    assert(argc >= 2);
+    ipcp_name  = argv[0];
+    neigh_name = argv[1];
+
+    req.ipcp_name  = strdup(ipcp_name);
+    req.neigh_name = strdup(neigh_name);
+    attrs          = lookup_ipcp_by_name(req.ipcp_name);
+    if (!attrs) {
+        PE("Could not find IPC process %s\n", ipcp_name);
+        return -1;
+    }
+
+    req.msg_type = RLITE_U_IPCP_NEIGHBOR_DISCONNECT;
+    req.event_id = 0;
+
+    return request_response(RLITE_MB(&req), NULL);
+}
+
 #ifdef RL_MEMTRACK
 static int
 memtrack_dump(int argc, char **argv, struct cmd_descriptor *cd)
@@ -1173,6 +1199,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage    = "",
         .num_args = 0,
         .func     = terminate,
+    },
+    {
+        .name     = "ipcp-neigh-disconnect",
+        .usage    = "IPCP_NAME NEIGH_NAME",
+        .num_args = 2,
+        .func     = ipcp_neigh_disconnect,
     },
 #if 0
     {
