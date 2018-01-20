@@ -602,6 +602,7 @@ struct uipcp_rib {
     void neigh_flow_prune(NeighFlow *nf);
     int enroll(const char *neigh_name, const char *supp_dif_name,
                int wait_for_completion);
+    int neigh_disconnect(const std::string &neigh_name);
     void trigger_re_enrollments();
 
     int fa_req(struct rl_kmsg_fa_req *req);
@@ -652,6 +653,9 @@ struct uipcp_rib {
     {
         return addra->rib_handler(rm, nf, src_addr);
     }
+
+    int lowerflow_handler(const CDAPMessage *rm, NeighFlow *nf,
+                          rlm_addr_t src_addr);
 
     void neighs_refresh();
     void neighs_refresh_tmr_restart();
