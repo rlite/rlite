@@ -422,6 +422,8 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     handlers.insert(make_pair(obj_name::status, &uipcp_rib::status_handler));
     handlers.insert(make_pair(obj_name::addr_alloc_table,
                               &uipcp_rib::addr_alloc_table_handler));
+    handlers.insert(
+        make_pair(obj_name::lowerflow, &uipcp_rib::lowerflow_handler));
 
     /* Start timers for periodic tasks. */
     age_incr_tmr_restart();
@@ -1788,6 +1790,20 @@ normal_trigger_tasks(struct uipcp *uipcp)
     rib->check_for_address_conflicts();
 }
 
+static int
+normal_neigh_disconnect(struct uipcp *uipcp,
+                        const struct rl_cmsg_ipcp_neigh_disconnect *req)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+
+    if (!req->neigh_name) {
+        UPE(uipcp, "No neighbor name specified\n");
+        return -1;
+    }
+
+    return rib->neigh_disconnect(req->neigh_name);
+}
+
 extern "C" void
 normal_lib_init(void)
 {
@@ -1820,4 +1836,6 @@ struct uipcp_ops normal_ops = {
     .policy_list          = normal_policy_list,
     .policy_param_mod     = normal_policy_param_mod,
     .policy_param_list    = normal_policy_param_list,
+    .config               = nullptr,
+    .neigh_disconnect     = normal_neigh_disconnect,
 };

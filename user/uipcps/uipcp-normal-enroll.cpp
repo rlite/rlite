@@ -1296,6 +1296,24 @@ uipcp_rib::keepalive_handler(const CDAPMessage *rm, NeighFlow *nf,
     return 0;
 }
 
+int
+uipcp_rib::lowerflow_handler(const CDAPMessage *rm, NeighFlow *nf,
+                             rlm_addr_t src_addr)
+{
+    std::string neigh_name = nf->neigh->ipcp_name;
+
+    if (rm->obj_class != obj_class::lowerflow || rm->op_code != gpb::M_STOP) {
+        UPE(uipcp, "Cannot handle obj_class %s and op_code %s\n",
+            rm->obj_class.c_str(),
+            CDAPMessage::opcode_repr(rm->op_code).c_str());
+        return -1;
+    }
+    del_neighbor(neigh_name);
+    neighbors_deleted.erase(neigh_name);
+
+    return 0;
+}
+
 NeighFlow *
 uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id)
 {
@@ -1545,6 +1563,31 @@ uipcp_rib::enroller_enable(bool enable)
     }
 
     realize_registrations(enable);
+
+    return 0;
+}
+
+int
+uipcp_rib::neigh_disconnect(const std::string &neigh_name)
+{
+    auto neigh = get_neighbor(neigh_name, /*create=*/false);
+
+    if (neigh == nullptr) {
+        UPE(uipcp, "No such neighbor '%s'\n", neigh_name.c_str());
+        return -1;
+    }
+
+    /* Stop all the lower flows to trigger deallocation on the remote side. */
+    for (auto &kv : neigh->flows) {
+        std::shared_ptr<NeighFlow> nf = kv.second;
+        CDAPMessage m;
+
+        m.m_stop(obj_class::lowerflow, obj_name::lowerflow);
+        nf->send_to_port_id(&m, 0, nullptr);
+    }
+
+    del_neighbor(neigh_name);
+    neighbors_deleted.erase(neigh_name);
 
     return 0;
 }
