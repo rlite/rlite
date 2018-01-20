@@ -13,7 +13,7 @@ class DistributedAddrAllocator : public AddrAllocator {
 
 public:
     RL_NODEFAULT_NONCOPIABLE(DistributedAddrAllocator);
-    DistributedAddrAllocator(struct uipcp_rib *_ur) : AddrAllocator(_ur) {}
+    DistributedAddrAllocator(uipcp_rib *_ur) : AddrAllocator(_ur) {}
     ~DistributedAddrAllocator() {}
 
     void dump(std::stringstream &ss) const override;
@@ -289,9 +289,7 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf,
 class ManualAddrAllocator : public DistributedAddrAllocator {
 public:
     RL_NODEFAULT_NONCOPIABLE(ManualAddrAllocator);
-    ManualAddrAllocator(struct uipcp_rib *_ur) : DistributedAddrAllocator(_ur)
-    {
-    }
+    ManualAddrAllocator(uipcp_rib *_ur) : DistributedAddrAllocator(_ur) {}
     rlm_addr_t allocate() override { return RL_ADDR_NULL; }
 };
 

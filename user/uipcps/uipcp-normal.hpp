@@ -117,6 +117,7 @@ struct PolicyParam {
 
 struct Neighbor;
 struct NeighFlow;
+struct uipcp_rib;
 
 /* Temporary resources needed to carry out an enrollment procedure
  * (initiator or slave) on a NeighFlow. */
@@ -232,7 +233,7 @@ struct NeighFlow {
 /* Holds the information about a neighbor IPCP. */
 struct Neighbor {
     /* Backpointer to the RIB. */
-    struct uipcp_rib *rib;
+    uipcp_rib *rib;
 
     /* Name of the neighbor. */
     std::string ipcp_name;
@@ -266,7 +267,7 @@ struct Neighbor {
     std::chrono::system_clock::time_point unheard_since;
 
     RL_NODEFAULT_NONCOPIABLE(Neighbor);
-    Neighbor(struct uipcp_rib *rib, const std::string &name);
+    Neighbor(uipcp_rib *rib, const std::string &name);
     bool operator==(const Neighbor &other) const
     {
         return ipcp_name == other.ipcp_name;
@@ -312,10 +313,10 @@ private:
 /* Naming service, to translate names to addresses. */
 struct DFT {
     /* Backpointer to parent data structure. */
-    struct uipcp_rib *rib;
+    uipcp_rib *rib;
 
     RL_NODEFAULT_NONCOPIABLE(DFT);
-    DFT(struct uipcp_rib *_ur) : rib(_ur) {}
+    DFT(uipcp_rib *_ur) : rib(_ur) {}
     virtual ~DFT() {}
 
     virtual int param_changed(const std::string &param_name) { return 0; }
@@ -335,13 +336,13 @@ struct DFT {
 /* Allocation and deallocation of N-flows used applications. */
 struct FlowAllocator {
     /* Backpointer to parent data structure. */
-    struct uipcp_rib *rib;
+    uipcp_rib *rib;
 
     /* Id to be used with incoming flow allocation request. */
     uint32_t kevent_id_cnt;
 
     RL_NODEFAULT_NONCOPIABLE(FlowAllocator);
-    FlowAllocator(struct uipcp_rib *_ur) : rib(_ur), kevent_id_cnt(1) {}
+    FlowAllocator(uipcp_rib *_ur) : rib(_ur), kevent_id_cnt(1) {}
     virtual ~FlowAllocator() {}
 
     virtual void dump(std::stringstream &ss) const          = 0;
@@ -364,10 +365,10 @@ struct FlowAllocator {
  * related to (N-1)-flows. */
 struct LFDB {
     /* Backpointer to parent data structure. */
-    struct uipcp_rib *rib;
+    uipcp_rib *rib;
 
     RL_NODEFAULT_NONCOPIABLE(LFDB);
-    LFDB(struct uipcp_rib *_ur) : rib(_ur) {}
+    LFDB(uipcp_rib *_ur) : rib(_ur) {}
     virtual ~LFDB() {}
 
     virtual void dump(std::stringstream &ss) const         = 0;
@@ -394,10 +395,10 @@ struct LFDB {
 /* Address allocation for the members of the N-DIF. */
 struct AddrAllocator {
     /* Backpointer to parent data structure. */
-    struct uipcp_rib *rib;
+    uipcp_rib *rib;
 
     RL_NODEFAULT_NONCOPIABLE(AddrAllocator);
-    AddrAllocator(struct uipcp_rib *_ur) : rib(_ur) {}
+    AddrAllocator(uipcp_rib *_ur) : rib(_ur) {}
     virtual ~AddrAllocator() {}
 
     virtual void dump(std::stringstream &ss) const                  = 0;
