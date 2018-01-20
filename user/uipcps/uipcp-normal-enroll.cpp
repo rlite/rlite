@@ -458,7 +458,6 @@ NeighFlow::enrollee_default(std::unique_lock<std::mutex> &lk)
     {
         /* (3) I --> S: M_START */
         EnrollmentInfo enr_info;
-        UipcpObject *obj = nullptr;
         CDAPMessage m;
         int ret;
 
@@ -466,10 +465,9 @@ NeighFlow::enrollee_default(std::unique_lock<std::mutex> &lk)
          * enrollment. */
         enr_info.address    = rib->myaddr;
         enr_info.lower_difs = rib->lower_difs;
-        obj                 = &enr_info;
 
         m.m_start(obj_class::enrollment, obj_name::enrollment);
-        ret = send_to_port_id(&m, 0, obj);
+        ret = send_to_port_id(&m, 0, &enr_info);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             return -1;
