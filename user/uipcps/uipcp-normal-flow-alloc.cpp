@@ -109,7 +109,7 @@ uipcp_rib::dft_lookup_resolved(const std::string &appl_name,
 class LocalFlowAllocator : public FlowAllocator {
 public:
     RL_NODEFAULT_NONCOPIABLE(LocalFlowAllocator);
-    LocalFlowAllocator(struct uipcp_rib *_ur) : FlowAllocator(_ur) {}
+    LocalFlowAllocator(uipcp_rib *_ur) : FlowAllocator(_ur) {}
     ~LocalFlowAllocator() {}
 
     void dump(std::stringstream &ss) const override;

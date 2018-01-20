@@ -33,7 +33,7 @@ using namespace std;
 class RoutingEngine {
 public:
     RL_NODEFAULT_NONCOPIABLE(RoutingEngine);
-    RoutingEngine(struct uipcp_rib *r) : lfa_enabled(false), rib(r) {}
+    RoutingEngine(uipcp_rib *r) : lfa_enabled(false), rib(r) {}
 
     /* Recompute routing and forwarding table and possibly
      * update kernel forwarding data structures. */
@@ -83,7 +83,7 @@ private:
     /* Set of ports that are currently down. */
     std::unordered_set<rl_port_t> ports_down;
 
-    struct uipcp_rib *rib;
+    uipcp_rib *rib;
 };
 
 class FullyReplicatedLFDB : public LFDB {
@@ -96,7 +96,7 @@ public:
     RoutingEngine re;
 
     RL_NODEFAULT_NONCOPIABLE(FullyReplicatedLFDB);
-    FullyReplicatedLFDB(struct uipcp_rib *_ur) : LFDB(_ur), re(_ur) {}
+    FullyReplicatedLFDB(uipcp_rib *_ur) : LFDB(_ur), re(_ur) {}
     ~FullyReplicatedLFDB() {}
 
     void dump(std::stringstream &ss) const override;
@@ -401,7 +401,7 @@ uipcp_rib::age_incr_tmr_restart()
         std::chrono::seconds(
             get_param_value<int>("routing", "age-incr-intval")),
         uipcp, this, [](struct uipcp *uipcp, void *arg) {
-            struct uipcp_rib *rib = (struct uipcp_rib *)arg;
+            uipcp_rib *rib = (uipcp_rib *)arg;
             rib->age_incr_timer->fired();
             rib->lfdb->age_incr();
         });

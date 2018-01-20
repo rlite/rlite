@@ -282,7 +282,7 @@ NeighFlow::keepalive_tmr_stop()
     keepalive_timer->clear();
 }
 
-Neighbor::Neighbor(struct uipcp_rib *rib_, const string &name)
+Neighbor::Neighbor(uipcp_rib *rib_, const string &name)
 {
     rib       = rib_;
     initiator = false;
@@ -398,7 +398,7 @@ Neighbor::mgmt_conn()
 void
 NeighFlow::enrollment_commit()
 {
-    struct uipcp_rib *rib = neigh->rib;
+    uipcp_rib *rib = neigh->rib;
 
     keepalive_tmr_start();
     enroll_state_set(EnrollState::NEIGH_ENROLLED);

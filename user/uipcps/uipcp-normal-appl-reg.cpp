@@ -51,7 +51,7 @@ class FullyReplicatedDFT : public DFT {
 
 public:
     RL_NODEFAULT_NONCOPIABLE(FullyReplicatedDFT);
-    FullyReplicatedDFT(struct uipcp_rib *_ur) : DFT(_ur) {}
+    FullyReplicatedDFT(uipcp_rib *_ur) : DFT(_ur) {}
     ~FullyReplicatedDFT() {}
 
     void dump(std::stringstream &ss) const override;
@@ -462,7 +462,7 @@ class CentralizedFaultTolerantDFT : public DFT {
 
 public:
     RL_NODEFAULT_NONCOPIABLE(CentralizedFaultTolerantDFT);
-    CentralizedFaultTolerantDFT(struct uipcp_rib *_ur) : DFT(_ur) {}
+    CentralizedFaultTolerantDFT(uipcp_rib *_ur) : DFT(_ur) {}
     int param_changed(const std::string &param_name) override;
     void dump(std::stringstream &ss) const override
     {
