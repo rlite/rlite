@@ -795,7 +795,7 @@ terminate(int argc, char **argv, struct cmd_descriptor *cd)
 static int
 ipcp_neigh_disconnect(int argc, char **argv, struct cmd_descriptor *cd)
 {
-    struct rl_cmsg_ipcp_neighbor_disconnect req;
+    struct rl_cmsg_ipcp_neigh_disconnect req;
     struct ipcp_attrs *attrs;
     const char *ipcp_name;
     const char *neigh_name;
@@ -812,7 +812,7 @@ ipcp_neigh_disconnect(int argc, char **argv, struct cmd_descriptor *cd)
         return -1;
     }
 
-    req.msg_type = RLITE_U_IPCP_NEIGHBOR_DISCONNECT;
+    req.msg_type = RLITE_U_IPCP_NEIGH_DISCONNECT;
     req.event_id = 0;
 
     return request_response(RLITE_MB(&req), NULL);

@@ -426,6 +426,26 @@ rl_u_terminate(struct uipcps *uipcps, int sfd, const struct rl_msg_base *b_req)
     return rl_u_response(sfd, RLITE_MB(b_req), &resp);
 }
 
+static int
+rl_u_ipcp_neigh_disconnect(struct uipcps *uipcps, int sfd,
+                           const struct rl_msg_base *b_req)
+{
+    struct rl_cmsg_ipcp_neigh_disconnect *req =
+        (struct rl_cmsg_ipcp_neigh_disconnect *)b_req;
+    struct rl_msg_base_resp resp;
+    struct uipcp *uipcp;
+
+    resp.result = RLITE_ERR;
+    uipcp       = uipcp_get_by_name(uipcps, req->ipcp_name);
+    if (uipcp && uipcp->ops.neigh_disconnect) {
+        resp.result = uipcp->ops.neigh_disconnect(uipcp, req);
+    }
+
+    uipcp_put(uipcp);
+
+    return rl_u_response(sfd, RLITE_MB(req), &resp);
+}
+
 #ifdef RL_MEMTRACK
 static int
 rl_u_memtrack_dump(struct uipcps *uipcps, int sfd,
@@ -458,6 +478,7 @@ static rl_req_handler_t rl_config_handlers[] = {
     [RLITE_U_IPCP_POLICY_LIST_REQ]       = rl_u_ipcp_policy_list,
     [RLITE_U_IPCP_POLICY_PARAM_LIST_REQ] = rl_u_ipcp_policy_list,
     [RLITE_U_TERMINATE]                  = rl_u_terminate,
+    [RLITE_U_IPCP_NEIGH_DISCONNECT]      = rl_u_ipcp_neigh_disconnect,
 #ifdef RL_MEMTRACK
     [RLITE_U_MEMTRACK_DUMP] = rl_u_memtrack_dump,
 #endif /* RL_MEMTRACK */
