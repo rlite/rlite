@@ -124,9 +124,9 @@ struct rl_msg_layout rl_uipcps_numtables[] = {
         {
             .copylen = sizeof(struct rl_msg_base),
         },
-    [RLITE_U_IPCP_NEIGHBOR_DISCONNECT] =
+    [RLITE_U_IPCP_NEIGH_DISCONNECT] =
         {
-            .copylen = sizeof(struct rl_cmsg_ipcp_neighbor_disconnect) -
+            .copylen = sizeof(struct rl_cmsg_ipcp_neigh_disconnect) -
                        2 * sizeof(char *),
             .strings = 2,
         },

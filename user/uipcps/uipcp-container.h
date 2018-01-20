@@ -159,9 +159,14 @@ struct uipcp_ops {
         struct uipcp *uipcp,
         const struct rl_cmsg_ipcp_policy_param_list_req *req, char **resp_msg);
 
-    /* User wnats to change a configuration parameter of this uipcp.
+    /* User wants to change a configuration parameter of this uipcp.
      * This request may be forwarded to kernel-space. */
     int (*config)(struct uipcp *uipcp, const struct rl_cmsg_ipcp_config *req);
+
+    /* User wants to disconnect from a given neighbor, deallocating all the
+     * lower flows. */
+    int (*neigh_disconnect)(struct uipcp *uipcp,
+                            const struct rl_cmsg_ipcp_neigh_disconnect *req);
 };
 
 struct ipcp_node {
