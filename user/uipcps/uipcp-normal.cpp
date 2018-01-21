@@ -435,15 +435,26 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
 
 uipcp_rib::~uipcp_rib()
 {
+    /* We need to destroy all children objects that have raw backpointers to
+     * us, otherwise they are destroyed after this destructor, so while the
+     * backpointer is invalid. A better solution would be to use std::weak_ptr
+     * for backpointers, everywhere. */
+    neighbors.clear();
+    addra.reset();
+    dft.reset();
+    lfdb.reset();
+    fa.reset();
+    sync_timer.reset();
+    age_incr_timer.reset();
+
     for (auto &kv : pending_fa_reqs) {
         for (auto &p : kv.second) {
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(p.get()));
         }
     }
-    sync_timer->clear();
-    age_incr_timer->clear();
     uipcp_loop_fdh_del(uipcp, mgmtfd);
     close(mgmtfd);
+    UPD(uipcp, "RIB %s destroyed\n", myname.c_str());
 }
 
 #ifdef RL_USE_QOS_CUBES
