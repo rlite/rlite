@@ -294,8 +294,12 @@ Neighbor::Neighbor(uipcp_rib *rib_, const string &name)
 
 Neighbor::~Neighbor()
 {
+    /* Make sure NeighFlow objects are destroyed before this Neighbor
+     * object. */
+    flows.clear();
     mgmt_only_set(nullptr);
     n_flow_set(nullptr);
+    UPD(rib->uipcp, "Neighbor %s deleted\n", ipcp_name.c_str());
 }
 
 void
