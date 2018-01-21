@@ -279,7 +279,10 @@ NeighFlow::keepalive_tmr_start()
 void
 NeighFlow::keepalive_tmr_stop()
 {
-    keepalive_timer->clear();
+    if (keepalive_timer) {
+        keepalive_timer->clear();
+        keepalive_timer = nullptr;
+    }
 }
 
 Neighbor::Neighbor(uipcp_rib *rib_, const string &name)
