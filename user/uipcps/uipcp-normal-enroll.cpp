@@ -1113,8 +1113,16 @@ uipcp_rib::get_neighbor(const string &neigh_name, bool create)
     return neighbors[neigh_name];
 }
 
+/* Delete a Neighbor object. Note that the first argument of this function
+ * is not a reference. This is useful because if this function is called
+ * in this way:
+ *          Neighbor *neigh = ...
+ *          del_neighbor(neigh->ipcp_name);
+ * the neigh_name argument is valid also after the erase() call. If it were
+ * a reference, it wouldn't be valid anymore.
+ */
 int
-uipcp_rib::del_neighbor(const std::string &neigh_name, bool reconnect)
+uipcp_rib::del_neighbor(std::string neigh_name, bool reconnect)
 {
     auto mit = neighbors.find(neigh_name);
 
