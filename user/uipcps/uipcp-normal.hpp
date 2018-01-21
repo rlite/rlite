@@ -174,7 +174,8 @@ struct NeighFlow {
 
     /* If this is a kernel-bound flow, flow_fd is only used for close().
      * Otherwise, this is a management-only flow, and the file descriptor
-     * is also used for I/O. */
+     * is also used for I/O. In any case the flow_fd is a valid file
+     * descriptor. */
     int flow_fd;
 
     /* Is this flow reliable or not? A management-only flow must be
@@ -213,7 +214,6 @@ struct NeighFlow {
 
     void keepalive_tmr_start();
     void keepalive_tmr_stop();
-    void keepalive_timeout();
 
     void enroller_thread();
     int enroller_default(std::unique_lock<std::mutex> &lk);
@@ -486,6 +486,9 @@ struct uipcp_rib {
     std::unordered_set<std::string> neighbors_cand;
     std::unordered_set<std::string> neighbors_deleted;
 
+    std::unordered_map<int /*flow_fd*/, std::unique_ptr<TimeoutEvent>>
+        keepalive_timers;
+
     /* A map of current policies. */
     std::unordered_map<std::string, std::string> policies;
 
@@ -607,6 +610,7 @@ struct uipcp_rib {
                int wait_for_completion);
     int neigh_disconnect(const std::string &neigh_name);
     void trigger_re_enrollments();
+    void keepalive_timeout(NeighFlow *nf);
 
     int fa_req(struct rl_kmsg_fa_req *req);
 

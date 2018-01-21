@@ -220,42 +220,6 @@ NeighFlow::enroll_state_set(EnrollState st)
 }
 
 void
-NeighFlow::keepalive_timeout()
-{
-    uipcp_rib *rib = neigh->rib;
-    std::lock_guard<std::mutex> guard(rib->mutex);
-    CDAPMessage m;
-    int ret;
-
-    UPV(rib->uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
-        static_cast<string>(neigh->ipcp_name).c_str());
-
-    m.m_read(obj_class::keepalive, obj_name::keepalive);
-
-    ret = send_to_port_id(&m, 0, nullptr);
-    if (ret) {
-        UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
-    }
-    pending_keepalive_reqs++;
-
-    if (pending_keepalive_reqs >
-        neigh->rib->get_param_value<int>("enrollment", "keepalive-thresh")) {
-        /* We assume the neighbor is not alive on this flow, so
-         * we prune the flow. */
-        UPI(rib->uipcp,
-            "Neighbor %s is not alive on N-1 flow %u "
-            "and therefore will be pruned\n",
-            neigh->ipcp_name.c_str(), port_id);
-
-        rib->neigh_flow_prune(this);
-
-    } else {
-        /* Schedule the next keepalive request. */
-        keepalive_tmr_start();
-    }
-}
-
-void
 NeighFlow::keepalive_tmr_start()
 {
     /* Keepalive timeout is expressed in seconds. */
@@ -267,22 +231,22 @@ NeighFlow::keepalive_tmr_start()
         return;
     }
 
-    keepalive_timer = make_unique<TimeoutEvent>(
+    neigh->rib->keepalive_timers[flow_fd] = make_unique<TimeoutEvent>(
         std::chrono::seconds(keepalive), neigh->rib->uipcp, this,
         [](struct uipcp *uipcp, void *arg) {
-            NeighFlow *nf = static_cast<NeighFlow *>(arg);
-            nf->keepalive_timer->fired();
-            nf->keepalive_timeout();
+            NeighFlow *nf  = static_cast<NeighFlow *>(arg);
+            uipcp_rib *rib = nf->neigh->rib;
+            std::lock_guard<std::mutex> guard(rib->mutex);
+
+            rib->keepalive_timers[nf->flow_fd]->fired();
+            rib->keepalive_timeout(nf);
         });
 }
 
 void
 NeighFlow::keepalive_tmr_stop()
 {
-    if (keepalive_timer) {
-        keepalive_timer->clear();
-        keepalive_timer = nullptr;
-    }
+    neigh->rib->keepalive_timers[flow_fd].reset();
 }
 
 Neighbor::Neighbor(uipcp_rib *rib_, const string &name)
@@ -1097,6 +1061,41 @@ uipcp_rib::neighs_refresh()
                             &ncl);
     }
     neighs_refresh_tmr_restart();
+}
+
+void
+uipcp_rib::keepalive_timeout(NeighFlow *nf)
+{
+    std::string neigh_name = nf->neigh->ipcp_name;
+    CDAPMessage m;
+    int ret;
+
+    UPV(uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
+        static_cast<string>(neigh_name).c_str());
+
+    m.m_read(obj_class::keepalive, obj_name::keepalive);
+
+    ret = nf->send_to_port_id(&m, 0, nullptr);
+    if (ret) {
+        UPE(uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
+    }
+    nf->pending_keepalive_reqs++;
+
+    if (nf->pending_keepalive_reqs >
+        get_param_value<int>("enrollment", "keepalive-thresh")) {
+        /* We assume the neighbor is not alive on this flow, so
+         * we prune the flow. */
+        UPI(uipcp,
+            "Neighbor %s is not alive on N-1 flow %u "
+            "and therefore will be pruned\n",
+            neigh_name.c_str(), nf->port_id);
+
+        neigh_flow_prune(nf);
+
+    } else {
+        /* Schedule the next keepalive request. */
+        nf->keepalive_tmr_start();
+    }
 }
 
 std::shared_ptr<Neighbor>
