@@ -235,7 +235,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
         }
 
         if (neigh->enrollment_complete() && nf == neigh->mgmt_conn() &&
-            !neigh->initiator && is_connect_attempt &&
+            !nf->initiator && is_connect_attempt &&
             src_appl == neigh->ipcp_name) {
             /* We thought we were already enrolled to this neighbor, but
              * he is trying to start again the enrollment procedure on the
@@ -258,7 +258,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
         nf->last_activity = std::chrono::system_clock::now();
 
         if (neigh->enrollment_complete() && nf != neigh->mgmt_conn() &&
-            !neigh->initiator && m->op_code == gpb::M_START &&
+            !neigh->mgmt_conn()->initiator && m->op_code == gpb::M_START &&
             m->obj_name == obj_name::enrollment &&
             m->obj_class == obj_class::enrollment) {
             /* We thought we were already enrolled to this neighbor, but
@@ -1198,13 +1198,13 @@ uipcp_rib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     std::shared_ptr<Neighbor> neigh =
         get_neighbor(string(req->remote_appl), true);
 
-    neigh->initiator = false;
     assert(neigh->flows.count(neigh_port_id) == 0); /* kernel bug */
 
     /* Add the flow. */
-    nf           = std::make_shared<NeighFlow>(neigh.get(), string(supp_dif),
+    nf            = std::make_shared<NeighFlow>(neigh.get(), string(supp_dif),
                                      neigh_port_id, 0, lower_ipcp_id);
-    nf->reliable = is_reliable_spec(&req->flowspec);
+    nf->initiator = false;
+    nf->reliable  = is_reliable_spec(&req->flowspec);
 
     /* If flow is reliable, we assume it is a management-only flow, and so
      * we don't bound the kernel datapath. If we bound it, EFCP would be
