@@ -25,6 +25,7 @@
 #include <cerrno>
 #include <sstream>
 #include <iostream>
+#include <functional>
 
 #include "uipcp-normal.hpp"
 
@@ -335,30 +336,24 @@ int
 FullyReplicatedLFDB::sync_neigh(NeighFlow *nf, unsigned int limit) const
 {
     LowerFlowList lfl;
-    int ret = 0;
+    auto func = std::bind(&Neighbor::neigh_sync_obj, nf->neigh, nf, true,
+                          obj_class::lfdb, obj_name::lfdb, &lfl);
+    int ret   = 0;
 
-    if (db.size() > 0) {
-        auto it = db.begin();
-        auto jt = it->second.begin();
-        for (;;) {
-            if (jt == it->second.end()) {
-                if (++it != db.end()) {
-                    jt = it->second.begin();
-                }
-            }
+    for (const auto &kvi : db) {
+        for (const auto &kvj : kvi.second) {
+            const LowerFlow &flow = kvj.second;
 
-            if (lfl.flows.size() >= limit || it == db.end()) {
-                ret |= nf->neigh->neigh_sync_obj(nf, true, obj_class::lfdb,
-                                                 obj_name::lfdb, &lfl);
+            lfl.flows.push_back(flow);
+            if (lfl.flows.size() >= limit) {
+                ret |= func();
                 lfl.flows.clear();
-                if (it == db.end()) {
-                    break;
-                }
             }
-
-            lfl.flows.push_back(jt->second);
-            jt++;
         }
+    }
+
+    if (!lfl.flows.empty()) {
+        ret |= func();
     }
 
     return ret;
