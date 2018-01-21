@@ -439,13 +439,14 @@ uipcp_rib::~uipcp_rib()
      * us, otherwise they are destroyed after this destructor, so while the
      * backpointer is invalid. A better solution would be to use std::weak_ptr
      * for backpointers, everywhere. */
+    sync_timer.reset();
+    age_incr_timer.reset();
+    keepalive_timers.clear();
     neighbors.clear();
     addra.reset();
     dft.reset();
     lfdb.reset();
     fa.reset();
-    sync_timer.reset();
-    age_incr_timer.reset();
 
     for (auto &kv : pending_fa_reqs) {
         for (auto &p : kv.second) {
