@@ -287,9 +287,7 @@ NeighFlow::keepalive_tmr_stop()
 
 Neighbor::Neighbor(uipcp_rib *rib_, const string &name)
 {
-    rib       = rib_;
-    initiator = false;
-    mgmt_only = n_flow = nullptr;
+    rib                = rib_;
     ipcp_name          = name;
     unheard_since      = std::chrono::system_clock::now();
     flow_alloc_enabled = true;
@@ -420,7 +418,7 @@ NeighFlow::enrollment_commit()
     neigh->neigh_sync_rib(this);
     er->stopped.notify_all();
 
-    if (neigh->initiator) {
+    if (initiator) {
         UPI(rib->uipcp, "Enrolled to DIF %s through neighbor %s\n",
             rib->uipcp->dif_name, neigh->ipcp_name.c_str());
     } else {
@@ -1526,10 +1524,9 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
         }
     }
 
-    neigh->initiator = true;
-
     assert(neigh->has_flows());
-    nf = neigh->mgmt_conn();
+    nf            = neigh->mgmt_conn();
+    nf->initiator = true;
     if (nf->enroll_state != EnrollState::NEIGH_NONE) {
         UPI(uipcp, "Enrollment already in progress [state=%s]\n",
             Neighbor::enroll_state_repr(nf->enroll_state));
@@ -1697,7 +1694,7 @@ uipcp_rib::allocate_n_flows()
         auto neigh = neighbors.find(nc);
 
         if (neigh == neighbors.end() || !neigh->second->enrollment_complete() ||
-            !neigh->second->initiator) {
+            !neigh->second->mgmt_conn()->initiator) {
             continue;
         }
 

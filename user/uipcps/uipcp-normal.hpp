@@ -190,6 +190,10 @@ struct NeighFlow {
     std::shared_ptr<EnrollmentResources> enrollment_rsrc_get(bool initiator);
     std::shared_ptr<EnrollmentResources> er;
 
+    /* Did we initiate the enrollment procedure towards the neighbor
+     * or were we the target? */
+    bool initiator = false;
+
     std::unique_ptr<TimeoutEvent> keepalive_timer;
     int pending_keepalive_reqs;
 
@@ -232,10 +236,6 @@ struct Neighbor {
 
     /* Name of the neighbor. */
     std::string ipcp_name;
-
-    /* Did we initiate the enrollment procedure towards this neighbor
-     * or were we the target? */
-    bool initiator;
 
     /* Kernel-bound N-1 flows used for data transfers and optionally
      * management. NeighFlow objects (including the ones below) are
