@@ -207,11 +207,6 @@ struct NeighFlow {
               rl_ipcp_id_t lid);
     ~NeighFlow();
 
-    /* Get a std::shared_ptr reference to the shared pointer object that stores
-     * this NeighFlow object. The shared pointer itself is stored in the
-     * associated Neighbor object (this->neigh). */
-    std::shared_ptr<NeighFlow> getref();
-
     void keepalive_tmr_start();
     void keepalive_tmr_stop();
     void keepalive_timeout();
@@ -291,6 +286,11 @@ struct Neighbor {
                        const UipcpObject *obj_value) const;
 
     int neigh_sync_rib(NeighFlow *nf) const;
+
+    /* Get a std::shared_ptr reference to the shared pointer object that stores
+     * the specified NeighFlow object. The shared pointer itself is stored in
+     * the associated Neighbor object. */
+    std::shared_ptr<NeighFlow> getref(NeighFlow *nf);
 
 private:
     const NeighFlow *_mgmt_conn() const;

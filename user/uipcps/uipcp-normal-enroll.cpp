@@ -78,16 +78,16 @@ NeighFlow::~NeighFlow()
 }
 
 std::shared_ptr<NeighFlow>
-NeighFlow::getref()
+Neighbor::getref(NeighFlow *nf)
 {
-    if (this == neigh->mgmt_only.get()) {
-        return neigh->mgmt_only;
-    } else if (this == neigh->n_flow.get()) {
-        return neigh->n_flow;
+    if (nf == mgmt_only.get()) {
+        return mgmt_only;
+    } else if (nf == n_flow.get()) {
+        return n_flow;
     }
-    assert(neigh->flows.count(port_id));
+    assert(flows.count(nf->port_id));
 
-    return neigh->flows[port_id];
+    return flows[nf->port_id];
 }
 
 /* Does not take ownership of m. */
@@ -951,7 +951,7 @@ NeighFlow::enrollment_rsrc_get(bool initiator)
             neigh->ipcp_name.c_str());
         enroll_state_set(EnrollState::NEIGH_ENROLLING);
         er = std::shared_ptr<EnrollmentResources>(
-            new EnrollmentResources(this->getref(), initiator));
+            new EnrollmentResources(neigh->getref(this), initiator));
     }
 
     return er;
