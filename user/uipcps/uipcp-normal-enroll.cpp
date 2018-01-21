@@ -1110,15 +1110,18 @@ uipcp_rib::get_neighbor(const string &neigh_name, bool create)
 }
 
 int
-uipcp_rib::del_neighbor(const std::string &neigh_name)
+uipcp_rib::del_neighbor(const std::string &neigh_name, bool reconnect)
 {
     auto mit = neighbors.find(neigh_name);
 
     assert(mit != neighbors.end());
 
     neighbors.erase(mit);
-    neighbors_deleted.insert(neigh_name);
-    UPI(uipcp, "Neighbor %s deleted\n", neigh_name.c_str());
+    if (reconnect) {
+        neighbors_deleted.insert(neigh_name);
+    }
+    UPI(uipcp, "Neighbor %s deleted (reconnect=%d)\n", neigh_name.c_str(),
+        reconnect);
 
     return 0;
 }
@@ -1308,8 +1311,8 @@ uipcp_rib::lowerflow_handler(const CDAPMessage *rm, NeighFlow *nf,
             CDAPMessage::opcode_repr(rm->op_code).c_str());
         return -1;
     }
+    UPD(uipcp, "Peer %s wants to disconnect\n", neigh_name.c_str());
     del_neighbor(neigh_name);
-    neighbors_deleted.erase(neigh_name);
 
     return 0;
 }
@@ -1587,7 +1590,6 @@ uipcp_rib::neigh_disconnect(const std::string &neigh_name)
     }
 
     del_neighbor(neigh_name);
-    neighbors_deleted.erase(neigh_name);
 
     return 0;
 }

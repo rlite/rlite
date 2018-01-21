@@ -579,7 +579,7 @@ struct uipcp_rib {
 
     std::shared_ptr<Neighbor> get_neighbor(const std::string &neigh_name,
                                            bool create);
-    int del_neighbor(const std::string &neigh_name);
+    int del_neighbor(const std::string &neigh_name, bool reconnect = false);
     int neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req);
     int neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req);
     void allocate_n_flows();

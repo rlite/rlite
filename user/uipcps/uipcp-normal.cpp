@@ -972,7 +972,7 @@ uipcp_rib::neigh_flow_prune(NeighFlow *nf)
     /* If there are no other N-1 flows, delete the neighbor. */
     if (neigh->flows.size() == 0 && neigh->mgmt_only == nullptr &&
         neigh->n_flow == nullptr) {
-        del_neighbor(neigh->ipcp_name);
+        del_neighbor(neigh->ipcp_name, /*reconnect=*/true);
     }
 }
 
