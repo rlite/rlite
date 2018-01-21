@@ -57,6 +57,15 @@ args = argparser.parse_args()
 configured = False
 daemonized = False
 
+try:
+    subprocess.check_call(['modprobe', 'rlite'], stderr = subprocess.STDOUT)
+    subprocess.check_call(['modprobe', 'rlite-normal'], stderr = subprocess.STDOUT)
+    subprocess.check_call(['modprobe', 'rlite-shim-eth'], stderr = subprocess.STDOUT)
+    subprocess.check_call(['modprobe', 'rlite-shim-udp4'], stderr = subprocess.STDOUT)
+except Exception as ee:
+    print("Error: failed to modprobe rlite modules")
+    quit()
+
 while True:
     # Check if rlite-uipcps it still there.
     try:
