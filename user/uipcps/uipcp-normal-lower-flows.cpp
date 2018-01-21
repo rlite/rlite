@@ -114,6 +114,7 @@ public:
     void update_local(const std::string &neigh_name) override;
     void update_routing() override;
     int flow_state_update(struct rl_kmsg_flow_state *upd) override;
+    void neigh_disconnected(const std::string &neigh_name) override;
 
     const LowerFlow *_find(const NodeId &local_node,
                            const NodeId &remote_node) const;
@@ -407,6 +408,7 @@ uipcp_rib::age_incr_tmr_restart()
         });
 }
 
+/* Called from timer context, we need to take the RIB lock. */
 void
 FullyReplicatedLFDB::age_incr()
 {
@@ -449,6 +451,36 @@ FullyReplicatedLFDB::age_incr()
 
     /* Reschedule */
     rib->age_incr_tmr_restart();
+}
+
+void
+FullyReplicatedLFDB::neigh_disconnected(const std::string &neigh_name)
+{
+    bool discarded = false;
+
+    for (auto &kvi : db) {
+        list<unordered_map<NodeId, LowerFlow>::iterator> discard_list;
+
+        for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
+            if ((kvi.first == rib->myname && jt->first == neigh_name) ||
+                (kvi.first == neigh_name && jt->first == rib->myname)) {
+                /* Insert this into the list of entries to be discarded. */
+                discard_list.push_back(jt);
+                discarded = true;
+            }
+        }
+
+        for (const auto &dit : discard_list) {
+            UPI(rib->uipcp, "Discarded lower-flow %s\n",
+                static_cast<string>(dit->second).c_str());
+            kvi.second.erase(dit);
+        }
+    }
+
+    if (discarded) {
+        /* Update the routing table. */
+        re.update_kernel_routing(rib->myname);
+    }
 }
 
 void

@@ -384,6 +384,9 @@ struct LFDB {
     virtual void update_routing()                                         = 0;
     virtual int flow_state_update(struct rl_kmsg_flow_state *upd)         = 0;
 
+    /* Called to flush all the local entries related to a given neighbor. */
+    virtual void neigh_disconnected(const std::string &neigh_name) = 0;
+
     virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
                             rlm_addr_t src_addr) = 0;
 
