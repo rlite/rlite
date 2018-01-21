@@ -1123,6 +1123,9 @@ uipcp_rib::del_neighbor(const std::string &neigh_name, bool reconnect)
     UPI(uipcp, "Neighbor %s deleted (reconnect=%d)\n", neigh_name.c_str(),
         reconnect);
 
+    /* Tell the routing subsystem that this neighbor disconnected. */
+    lfdb->neigh_disconnected(neigh_name);
+
     return 0;
 }
 
