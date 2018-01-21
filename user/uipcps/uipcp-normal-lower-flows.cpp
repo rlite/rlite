@@ -413,7 +413,10 @@ void
 FullyReplicatedLFDB::age_incr()
 {
     std::lock_guard<std::mutex> guard(rib->mutex);
-    bool discarded = false;
+    unsigned int age_inc_intval =
+        rib->get_param_value<int>("routing", "age-incr-intval");
+    unsigned int age_max = rib->get_param_value<int>("routing", "age-max");
+    bool discarded       = false;
 
     for (auto &kvi : db) {
         list<unordered_map<NodeId, LowerFlow>::iterator> discard_list;
@@ -424,9 +427,6 @@ FullyReplicatedLFDB::age_incr()
             continue;
         }
 
-        unsigned int age_inc_intval =
-            rib->get_param_value<int>("routing", "age-incr-intval");
-        unsigned int age_max = rib->get_param_value<int>("routing", "age-max");
         for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
             jt->second.age += age_inc_intval;
 
