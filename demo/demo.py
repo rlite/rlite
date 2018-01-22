@@ -7,10 +7,9 @@
 import multiprocessing
 import subprocess
 import argparse
-import json
-import copy
-import re
 import os
+
+from libdemo import Demo, prefix_parse
 
 
 def download_if_needed(locpath, url):
@@ -50,38 +49,6 @@ def join_keys(d1, d2):
     for d in d2:
         k.append(d)
     return k
-
-
-# @prefix is a string
-def prefix_parse(prefix):
-    m = re.match('^(\d+)\.(\d+)\.(\d+)\.(\d+)/(\d+)$', prefix)
-    if not m:
-        return None, None, None
-
-    a = int(m.group(1))
-    b = int(m.group(2))
-    c = int(m.group(3))
-    d = int(m.group(4))
-    m = int(m.group(5))
-
-    v = lambda x: x >= 0 and x <= 255
-    if not v(a) or not v(b) or not v(c) or not v(d) or m < 0 or m > 32:
-        return None, None, None
-
-    num = (a << 24) + (b << 16) + (c << 8) + d
-    mask = ((1 << m) - 1) << (32 - m)
-
-    return (num, mask, m)
-
-
-# @prefix is a string
-def prefix_is_valid(prefix):
-    num, mask, size = prefix_parse(prefix)
-
-    if num == None or mask == None:
-        return False
-
-    return True
 
 
 def prefix_prune_size(prefix):
@@ -373,339 +340,37 @@ fout = open('sshopts', 'w')
 fout.write(sshopts)
 fout.close()
 
-############################# Parse demo.conf ##############################
-fin = open(args.conf, 'r')
+demo = Demo(flavour_suffix=flavour_suffix,
+            addr_alloc_policy=args.addr_alloc_policy,
+            reliable_flows=args.reliable_flows,
+            reliable_n_flows=args.reliable_n_flows,
+            keepalive=args.keepalive,
+            register=args.register,
+            simulate=args.simulate,
+            broadcast_enrollment=args.broadcast_enrollment,
+            enrollment_strategy=args.enrollment_strategy)
 
-vms = dict()
-shims = dict()
-links = []
-difs = dict()
-enrollments = dict()
-lowerflowallocs = dict()
-dif_graphs = dict()
-dif_policies = dict()
-dns_mappings = dict()
-netems = dict()
-hostfwds = dict()
-
-linecnt = 0
-
-while 1:
-    line = fin.readline()
-    if line == '':
-        break
-    linecnt += 1
-
-    line = line.replace('\n', '').strip()
-
-    if line.startswith('#') or line == "":
-        continue
-
-    m = re.match(r'\s*eth\s+([\w-]+)\s+(\d+)([GMK])bps\s+(\w.*)$', line)
-    if m:
-        shim = m.group(1)
-        speed = int(m.group(2))
-        speed_unit = m.group(3).lower()
-        vm_list = m.group(4).split()
-
-        if shim in shims:
-            print('Error: Line %d: shim %s already defined' \
-                                            % (linecnt, shim))
-            continue
-
-        shims[shim] = {'name': shim, 'speed': speed, 'vms': vm_list,
-                       'speed_unit': speed_unit, 'type': 'eth'}
-
-        for vm in vm_list:
-            if vm not in vms:
-                vms[vm] = {'name': vm, 'ports': [], 'enrolling': []}
-            links.append((shim, vm))
-
-        #for i in range(len(vm_list)-1):
-        #    for j in range(i + 1, len(vm_list)):
-        #        print(vm_list[i], vm_list[j])
-        continue
-
-    m = re.match(r'\s*udp4\s+([\w-]+)\s+(\w.*)$', line)
-    if m:
-        shim = m.group(1)
-        members = m.group(2).split()
-
-        if shim in shims:
-            print('Error: Line %d: udp4 %s already defined' \
-                                            % (linecnt, shim))
-            continue
-
-        shims[shim] = {'name': shim, 'type': 'udp4', 'vms': []}
-
-        dns_mappings[shim] = dict()
-
-        for member in members:
-            vm, ip = member.split(':')
-
-            if not prefix_is_valid(ip):
-                print('Error: Line %d: ip %s is not valid' \
-                                                % (linecnt, ip))
-                continue
-
-            shims[shim]['vms'].append(vm)
-            if vm not in vms:
-                vms[vm] = {'name': vm, 'ports': [], 'enrolling': []}
-            links.append((shim, vm))
-            dns_mappings[shim][vm] = {'ip': ip}
-        continue
-
-    m = re.match(r'\s*dif\s+([\w-]+)\s+([\w-]+)\s+(\w.*)$', line)
-    if m:
-        dif = m.group(1)
-        vm = m.group(2)
-        dif_list = m.group(3).split()
-
-        if vm not in vms:
-            vms[vm] = {'name': vm, 'ports': [], 'enrolling': []}
-
-        if dif not in difs:
-            difs[dif] = dict()
-
-        if vm in sorted(difs[dif]):
-            print('Error: Line %d: vm %s in dif %s already specified' \
-                                            % (linecnt, vm, dif))
-            continue
-
-        difs[dif][vm] = dif_list
-
-        continue
-
-    m = re.match(r'\s*netem\s+([\w-]+)\s+([\w-]+)\s+(\w.*)$', line)
-    if m:
-        dif = m.group(1)
-        vmname = m.group(2)
-        netem_args = m.group(3)
-
-        if dif not in netems:
-            netems[dif] = dict()
-        netems[dif][vmname] = {'args': netem_args, 'linecnt': linecnt}
-
-        continue
-
-    m = re.match(r'\s*hostfwd\s+([\w-]+)\s+((:?\d+:\d+\s*)+)$', line)
-    if m:
-        vmname = m.group(1)
-        fwdlist = m.group(2).split()
-
-        if vmname in hostfwds:
-            print('Error: Line %d: hostfwd for %s already defined' \
-                                            % (linecnt, vmname))
-            continue
-
-        # check for uniqueness of guest ports
-        sg = set([int(x.split(':')[1]) for x in fwdlist])
-        if 22 in sg or len(sg) != len(fwdlist):
-            print('Error: Line %d: hostfwd for %s has conflicting mappings' \
-                                            % (linecnt, vmname))
-            continue
-
-        hostfwds[vmname] = fwdlist
-
-        continue
-
-    m = re.match(r'\s*policy\s+(\w+)\s+(\*|(?:(?:\w+,)*\w+))\s+([*\w.-]+)\s+([\w-]+)((?:\s+[\w.-]+\s*=\s*[/\w.,\$-]+)*)\s*$', line)
-    if m:
-        dif = m.group(1)
-        nodes = m.group(2)
-        path = m.group(3)
-        ps = m.group(4)
-        parms = list()
-        if m.group(5) != None:
-            parms_str = m.group(5).strip()
-            if parms_str != '':
-                parms = parms_str.split(' ')
-
-        if dif not in dif_policies:
-            dif_policies[dif] = []
-
-        if nodes == '*':
-            nodes = []
-        else:
-            nodes = nodes.split(',')
-
-        dif_policies[dif].append({'path': path, 'nodes': nodes,
-                                  'ps': ps, 'parms' : parms})
-        continue
-
-    # No match, spit a warning
-    print('Warning: Line %d unrecognized and ignored' % linecnt)
-
-
-fin.close()
-
-# check for uniqueness of host ports
-fwd_hports = set()
-for vmname in hostfwds:
-    for fwdr in hostfwds[vmname]:
-        p = int(fwdr.split(':')[0])
-        if p in fwd_hports:
-            print('Error: hostfwds have mapping conflicts for port %d' % p)
-            quit()
-        fwd_hports.add(p)
-
+demo.parse_config(args.conf)
 
 boot_batch_size = max(1, multiprocessing.cpu_count() / 2)
-if len(vms) > boot_batch_size:
+if len(demo.vms) > boot_batch_size:
     print("You want to run a lot of nodes, so it's better if I give "
           "each node some time to boot (since the boot is CPU-intensive)")
 
 VMTHRESH = 10
 if not args.backend:
-    args.backend = 'tap' if len(vms) <= VMTHRESH else 'udp'
+    args.backend = 'tap' if len(demo.vms) <= VMTHRESH else 'udp'
 
 if args.backend == 'tap':
     which('brctl', sudo=True)
 
 if not args.enrollment_order:
-    args.enrollment_order = 'sequential' if len(vms) <= VMTHRESH else 'parallel'
+    args.enrollment_order = 'sequential' if len(demo.vms) <= VMTHRESH else 'parallel'
 if args.dump_initscripts:
     args.enrollment_order = 'parallel'
 
-
-############ Compute registration/enrollment order for DIFs ###############
-
-# Compute DIFs dependency graph, as both adjacency and incidence list.
-difsdeps_adj = dict()
-difsdeps_inc = dict()
-for dif in sorted(difs):
-    difsdeps_inc[dif] = set()
-    difsdeps_adj[dif] = set()
-for shim in shims:
-    difsdeps_inc[shim] = set()
-    difsdeps_adj[shim] = set()
-
-for dif in sorted(difs):
-    for vmname in sorted(difs[dif]):
-        for lower_dif in sorted(difs[dif][vmname]):
-            difsdeps_inc[dif].add(lower_dif)
-            difsdeps_adj[lower_dif].add(dif)
-
-# Kahn's algorithm below only needs per-node count of
-# incident edges, so we compute these counts from the
-# incidence list and drop the latter.
-difsdeps_inc_cnt = dict()
-for dif in difsdeps_inc:
-    difsdeps_inc_cnt[dif] = len(difsdeps_inc[dif])
-del difsdeps_inc
-
-#print(difsdeps_adj)
-#print(difsdeps_inc_inc)
-
-# Run Kahn's algorithm to compute topological ordering on the DIFs graph.
-frontier = FrontierSet()
-dif_ordering = []
-for dif in sorted(difsdeps_inc_cnt):
-    if difsdeps_inc_cnt[dif] == 0:
-        frontier.add(dif)
-
-while not frontier.empty():
-    cur = frontier.pop()
-    dif_ordering.append(cur)
-    for nxt in sorted(difsdeps_adj[cur]):
-        difsdeps_inc_cnt[nxt] -= 1
-        if difsdeps_inc_cnt[nxt] == 0:
-            frontier.add(nxt)
-    difsdeps_adj[cur] = set()
-
-circular_set = [dif for dif in difsdeps_inc_cnt if difsdeps_inc_cnt[dif] != 0]
-if len(circular_set):
-    print("Fatal error: The specified DIFs topology has one or more"\
-          "circular dependencies, involving the following"\
-          " DIFs: %s" % circular_set)
-    print("             DIFs dependency graph: %s" % difsdeps_adj);
-    quit(1)
-
-for dif in dif_ordering:
-    if dif not in dif_policies:
-        dif_policies[dif] = []
-        if args.addr_alloc_policy == "manual":
-            dif_policies[dif].append({'path': 'address-allocator', 'nodes': [],
-                                      'ps': 'manual', 'parms' : []})
-
-
-####################### Compute DIF graphs #######################
-for dif in sorted(difs):
-    neighsets = dict()
-    dif_graphs[dif] = dict()
-
-    # For each N-1-DIF supporting this DIF, compute the set of nodes that
-    # share such N-1-DIF. This set will be called the 'neighset' of
-    # the N-1-DIF for the current DIF.
-
-    for vmname in sorted(difs[dif]):
-        dif_graphs[dif][vmname] = [] # init for later use
-        for lower_dif in sorted(difs[dif][vmname]):
-            if lower_dif not in neighsets:
-                neighsets[lower_dif] = []
-            neighsets[lower_dif].append(vmname)
-
-    # Build the graph, represented as adjacency list
-    for lower_dif in neighsets:
-        # Each neighset corresponds to a complete (sub)graph.
-        for vm1 in neighsets[lower_dif]:
-            for vm2 in neighsets[lower_dif]:
-                if vm1 != vm2:
-                    dif_graphs[dif][vm1].append((vm2, lower_dif))
-    #print(neighsets)
-    #print(dif_graphs[dif])
-
-##### Compute the center of each DIF, to speed up parallel enrollment #####
-dif_center = dict()
-for dif in sorted(difs):
-    master = None
-    master_level = len(vms) + 1
-    for vmname in dif_graphs[dif]:
-        level = graph_node_depth(dif_graphs[dif], vmname, master_level)
-        if level < master_level:
-            master = vmname
-            master_level = level
-    dif_center[dif] = master
-
-####################### Compute enrollments #######################
-for dif in sorted(difs):
-    enrollments[dif] = []
-    # To generate the list of enrollments, we simulate one,
-    # using breadth-first trasversal.
-    enrolled = set([dif_center[dif]])
-    frontier = FrontierSet([dif_center[dif]])
-    edges_covered = set()
-    while not frontier.empty():
-        cur = frontier.pop()
-        for edge in dif_graphs[dif][cur]:
-            if edge[0] not in enrolled:
-                enrolled.add(edge[0])
-                edges_covered.add((edge[0], cur))
-                enrollments[dif].append({'enrollee': edge[0],
-                                         'enroller': cur,
-                                         'lower_dif': edge[1]})
-                vms[edge[0]]['enrolling'].append(dif)
-                frontier.add(edge[0])
-
-    lowerflowallocs[dif] = []
-    if args.enrollment_strategy == 'full-mesh':
-        for cur in dif_graphs[dif]:
-            for edge in dif_graphs[dif][cur]:
-                if cur < edge[0]:
-                    if (cur, edge[0]) not in edges_covered and \
-                            (edge[0], cur) not in edges_covered:
-                        lowerflowallocs[dif].append({'enrollee': cur,
-                                                     'enroller': edge[0],
-                                                     'lower_dif': edge[1]})
-                        edges_covered.add((cur, edge[0]))
-
-shim_id = 1
-for shim in shims:
-    enrollments[shim] = []
-    lowerflowallocs[shim] = []
-    shims[shim]['id'] = shim_id
-    shim_id += 1
-
+demo.enrollment_order = args.enrollment_order
+demo.realize_config()
 
 ###################### Generate UP script ########################
 fout = open('up.sh', 'w')
@@ -716,30 +381,30 @@ outs =  '#!/bin/bash\n'             \
         '\n';
 
 if args.backend == 'tap':
-    for shim in sorted(shims):
+    for shim in sorted(demo.shims):
         outs += '(\n'                               \
                 'sudo brctl addbr %(br)s\n'         \
                 'sudo ip link set %(br)s up\n'      \
                 ') &\n' % {'br': shim}
     outs += 'wait\n'
 elif args.backend == 'udp':
-    for shim in sorted(shims):
-        if len(shims[shim]['vms']) != 2:
+    for shim in sorted(demo.shims):
+        if len(demo.shims[shim]['vms']) != 2:
             print('Error: UDP backend only supports peer-to-peer links')
             quit()
 
 udp_idx = args.base_port
 udp_map = dict()
 
-for l in sorted(links):
+for l in sorted(demo.links):
     shim, vm = l
-    idx = len(vms[vm]['ports']) + 1
+    idx = len(demo.vms[vm]['ports']) + 1
     tap = '%s.%02x' % (vm, idx)
 
     # Assign UDP ports
     if shim not in udp_map:
         udp_map[shim] = dict()
-    for shvm in shims[shim]['vms']:
+    for shvm in demo.shims[shim]['vms']:
         if shvm not in udp_map[shim]:
             udp_map[shim][shvm] = udp_idx
             udp_idx += 1
@@ -755,8 +420,8 @@ for l in sorted(links):
                 'sudo brctl addif %(br)s %(tap)s\n'             \
                     % {'tap': tap, 'br': shim}
 
-        if shims[shim]['type'] == 'eth' and shims[shim]['speed'] > 0:
-            speed = '%d%sbit' % (shims[shim]['speed'], shims[shim]['speed_unit'])
+        if demo.shims[shim]['type'] == 'eth' and demo.shims[shim]['speed'] > 0:
+            speed = '%d%sbit' % (demo.shims[shim]['speed'], demo.shims[shim]['speed_unit'])
 
             # Rate limit the traffic transmitted on the TAP interface
             outs += 'sudo tc qdisc add dev %(tap)s handle 1: root '     \
@@ -769,21 +434,21 @@ for l in sorted(links):
 
         outs += ') & \n'
 
-    vms[vm]['ports'].append({'tap': tap, 'shim': shim, 'idx': idx,
-                             'ip': dns_mappings[shim][vm]['ip'] if shim in dns_mappings else None,
+    demo.vms[vm]['ports'].append({'tap': tap, 'shim': shim, 'idx': idx,
+                             'ip': demo.dns_mappings[shim][vm]['ip'] if shim in
+                             demo.dns_mappings else None,
                              'udpl': udp_local_port, 'udpr': udp_remote_port,
                             })
 
 if args.backend == 'tap':
     outs += 'wait\n'
 
-vmid = 1
 budget = boot_batch_size
 
-for vmname in sorted(vms):
-    vm = vms[vmname]
+for vmname in sorted(demo.vms):
+    vm = demo.vms[vmname]
 
-    vm['id'] = vmid
+    vmid = vm['id']
 
     fwdp = args.base_port + vmid
     fwdc = fwdp + 10000
@@ -797,20 +462,20 @@ for vmname in sorted(vms):
                  'vmname': vmname, 'numcpus': args.num_cpus}
 
     hostfwdstr = 'hostfwd=tcp::%(fwdp)s-:22' % vars_dict
-    if vmname in hostfwds:
-        for fwdr in hostfwds[vmname]:
+    if vmname in demo.hostfwds:
+        for fwdr in demo.hostfwds[vmname]:
             hport, gport = fwdr.split(':')
             hostfwdstr += ',hostfwd=tcp::%s-:%s' % (hport, gport)
 
     vars_dict['hostfwdstr'] = hostfwdstr
 
-    #'-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '         \
+    # '-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '
     outs += 'qemu-system-x86_64 '
-    if args.image != '': # standard buildroot image
+    if args.image != '':  # standard buildroot image
         outs += args.image + ' -snapshot '
     else:
-        outs += '-kernel buildroot/bzImage '                        \
-                '-append "console=ttyS0" '                          \
+        outs += '-kernel buildroot/bzImage '                    \
+                '-append "console=ttyS0" '                      \
                 '-initrd %(vmimgpath)s ' % vars_dict
     outs += '-vga std '                                         \
             '-display none '                                    \
@@ -818,10 +483,10 @@ for vmname in sorted(vms):
             '-smp %(numcpus)s '                                 \
             '-m %(memory)sM '                                   \
             '-device %(frontend)s,mac=%(mac)s,netdev=mgmt '     \
-            '-netdev user,id=mgmt,%(hostfwdstr)s '   \
+            '-netdev user,id=mgmt,%(hostfwdstr)s '              \
             '-pidfile rina-%(id)s.pid '                         \
-            '-serial file:%(vmname)s.log '                          \
-                        % vars_dict
+            '-serial file:%(vmname)s.log '                      \
+            % vars_dict
 
     del vars_dict
 
@@ -854,20 +519,18 @@ for vmname in sorted(vms):
         outs += 'sleep %s\n' % args.wait_for_boot
         budget = boot_batch_size
 
-    vmid += 1
-
 # Compute DNS mappings
-for vmname in sorted(vms):
-    vm = vms[vmname]
-    for dif in dif_ordering:
-        if dif in shims or vmname not in difs[dif]:
+for vmname in sorted(demo.vms):
+    vm = demo.vms[vmname]
+    for dif in demo.dif_ordering:
+        if dif in demo.shims or vmname not in demo.difs[dif]:
             continue
 
         # Scan all the lower DIFs of the current DIF, for the current node
-        for lower_dif in sorted(difs[dif][vmname]):
-            if lower_dif in shims and shims[lower_dif]['type'] == 'udp4':
+        for lower_dif in sorted(demo.difs[dif][vmname]):
+            if lower_dif in demo.shims and demo.shims[lower_dif]['type'] == 'udp4':
                 vars_dict = {'dif': dif, 'id': vm['id']}
-                dns_mappings[lower_dif][vmname]['name'] = '%(dif)s.%(id)s.IPCP' % vars_dict
+                demo.dns_mappings[lower_dif][vmname]['name'] = '%(dif)s.%(id)s.IPCP' % vars_dict
                 del vars_dict
 
 
@@ -875,8 +538,8 @@ for vmname in sorted(vms):
 vm_conf_batch = 20
 vm_conf_count = 0
 outs += 'SUBSHELLS=""\n'
-for vmname in sorted(vms):
-    vm = vms[vmname]
+for vmname in sorted(demo.vms):
+    vm = demo.vms[vmname]
 
     if vm_conf_count == vm_conf_batch:
             outs += 'wait $SUBSHELLS\n\n'
@@ -915,115 +578,25 @@ for vmname in sorted(vms):
                            'valgrind': 'valgrind' if args.valgrind else ''}
 
     ctrl_cmds = []
+
     # Create and configure shim IPCPs
-    for port in vm['ports']:
-        shim = shims[port['shim']]
-        vars_dict = {'mac': port['mac'], 'idx': port['idx'],
-                     'shim': port['shim'], 'id': vm['id'],
-                     'shimtype': shim['type']}
-        outs +=     'PORT%(idx)s=$(mac2ifname %(mac)s)\n'\
-                    '$SUDO ip link set $PORT%(idx)s up\n' % vars_dict
-        ctrl_cmds.append('ipcp-create %(shim)s.%(id)s.IPCP shim-%(shimtype)s %(shim)s.DIF\n' % vars_dict)
-        if shim['type'] == 'eth':
-                ctrl_cmds.append('ipcp-config %(shim)s.%(id)s.IPCP netdev $PORT%(idx)s\n' % vars_dict)
-        elif shim['type'] == 'udp4':
-                outs += '$SUDO ip addr add %s dev $PORT%s\n' % (port['ip'], port['idx'])
-        del vars_dict
+    pouts, pctrl_cmds = demo.compute_shim_ipcps(vm)
+    outs += pouts
+    ctrl_cmds += pctrl_cmds
 
     # Create normal IPCPs (it's handy to do it in topological DIF order)
-    for dif in dif_ordering:
-        if dif not in shims and vmname in difs[dif]:
-            ctrl_cmds.append('ipcp-create %(dif)s.%(id)s.IPCP normal%(flsuf)s %(dif)s.DIF\n'\
-                                                                % {'dif': dif, 'id': vm['id'],
-                                                                   'flsuf': flavour_suffix})
-            if args.addr_alloc_policy == "manual":
-                ctrl_cmds.append('ipcp-config %(dif)s.%(id)s.IPCP address %(id)d\n'\
-                                                                % {'dif': dif, 'id': vm['id']})
-            elif args.addr_alloc_policy == "distributed":
-                nack_wait_secs = 5 if args.enrollment_order == 'parallel' and len(vms) > 30 else 1
-                ctrl_cmds.append('dif-policy-param-mod %(dif)s.DIF address-allocator nack-wait-secs %(nws)d\n'\
-                                                    % {'dif': dif, 'nws': nack_wait_secs})
-            if args.reliable_flows:
-                ctrl_cmds.append('dif-policy-param-mod %(dif)s.DIF resource-allocator reliable-flows true\n'\
-                        % {'dif': dif})
-            if args.reliable_n_flows:
-                ctrl_cmds.append('dif-policy-param-mod %(dif)s.DIF resource-allocator reliable-n-flows true\n'\
-                        % {'dif': dif})
-            ctrl_cmds.append('dif-policy-param-mod %(dif)s.DIF enrollment keepalive %(keepalive)s\n'\
-                        % {'dif': dif, 'keepalive': args.keepalive})
-
-            for p in dif_policies[dif]:
-                if len(p['nodes']) == 0 or vmname in p.nodes:
-                    ctrl_cmds.append('dif-policy-mod %(dif)s.DIF %(comp)s %(policy)s\n'\
-                                % {'dif': dif, 'comp': p['path'], 'policy': p['ps']})
-                    for param in p['parms']:
-                        pname, pvalue = param.split('=')
-                        def replfun(m):
-                            return "%s.%s.IPCP" % (dif, vms[m.group(1)]['id'])
-                        pvalue = re.sub(r'\$([\w-]+)', replfun, pvalue)
-                        ctrl_cmds.append('dif-policy-param-mod %(dif)s.DIF %(comp)s %(pname)s %(pvalue)s\n'\
-                                    % {'dif': dif, 'comp': p['path'], 'pname': pname, 'pvalue': pvalue})
+    ctrl_cmds += demo.compute_normal_ipcps(vmname)
 
     # Update /etc/hosts file with DIF mappings
-    for sh in dns_mappings:
-        for nm in dns_mappings[sh]:
+    for sh in demo.dns_mappings:
+        for nm in demo.dns_mappings[sh]:
             outs += 'echo "%(ip)s %(name)s" >> /etc/hosts\n' \
-                    % {'ip': prefix_prune_size(dns_mappings[sh][nm]['ip']), 'name': dns_mappings[sh][nm]['name']}
+                    % {'ip': prefix_prune_size(demo.dns_mappings[sh][nm]['ip']),
+                            'name': demo.dns_mappings[sh][nm]['name']}
 
     # Carry out registrations following the DIF ordering,
-    enroll_cmds = []
-    appl_cmds = []
-    for dif in dif_ordering:
-        if dif in shims:
-            # Shims don't register to other IPCPs
-            continue
-
-        if vmname not in difs[dif]:
-            # Current node does not partecipate into the current DIF
-            continue
-
-        # Scan all the lower DIFs of the current DIF, for the current node
-        for lower_dif in sorted(difs[dif][vmname]):
-            vars_dict = {'dif': dif, 'id': vm['id'], 'lodif': lower_dif}
-            ctrl_cmds.append('ipcp-register %(dif)s.%(id)s.IPCP %(lodif)s.DIF\n'\
-                        % vars_dict)
-            del vars_dict
-
-        if dif not in vm['enrolling']:
-            vars_dict = {'dif': dif, 'id': vm['id']}
-            ctrl_cmds.append('ipcp-enroller-enable %(dif)s.%(id)s.IPCP\n'\
-                        % vars_dict)
-            print("Node %s is the enrollment master for DIF %s" % (vmname, dif))
-            del vars_dict
-
-        vars_dict = {'echoname': 'rina-echo-async.%s' % vm['name'],
-                       'dif': dif, 'perfname': 'rinaperf.%s' % vm['name']}
-        if args.register:
-            appl_cmds.append('rina-echo-async -z %(echoname)s -lw -d %(dif)s.DIF > rina-echo-async-%(dif)s.log 2>&1\n' % vars_dict)
-        if args.simulate:
-            appl_cmds.append('rinaperf -z %(perfname)s -lw -d %(dif)s.DIF > rinaperf-%(dif)s.log 2>&1\n' % vars_dict)
-        del vars_dict
-
-        enrollments_list = enrollments[dif] + lowerflowallocs[dif]
-        for enrollment in enrollments_list:
-            if enrollment['enrollee'] != vmname:
-                continue
-
-            if enrollment in lowerflowallocs[dif]:
-                oper = 'lower-flow-alloc'
-            else:
-                oper = 'enroll'
-
-            vars_dict = {'id': vm['id'],
-                         'pvid': vms[enrollment['enroller']]['id'],
-                         'vmname': vmname, 'oper': oper,
-                         'dif': dif, 'ldif': enrollment['lower_dif'] }
-            cmd = 'ipcp-%(oper)s %(dif)s.%(id)s.IPCP %(dif)s.DIF %(ldif)s.DIF' % vars_dict
-            if not args.broadcast_enrollment:
-                cmd += ' %(dif)s.%(pvid)s.IPCP' % vars_dict
-            cmd += '\n'
-            del vars_dict
-            enroll_cmds.append(cmd)
+    pctrl_cmds, enroll_cmds, appl_cmds = demo.compute_enrollments(vmname)
+    ctrl_cmds += pctrl_cmds
 
     if args.dump_initscripts:
         initscript_name = vm['name'] + '.initscript'
@@ -1086,23 +659,23 @@ if vm_conf_count > 0:
     outs += 'wait $SUBSHELLS\n\n'
 
 
-if len(dns_mappings) > 0:
-    print("DNS mappings: %s" % (dns_mappings))
+if len(demo.dns_mappings) > 0:
+    print("DNS mappings: %s" % (demo.dns_mappings))
 
 if args.enrollment_order == 'sequential':
     # Run the enrollment operations in an order which respect the dependencies
-    for dif in dif_ordering:
-        enrollments_list = enrollments[dif] + lowerflowallocs[dif]
+    for dif in demo.dif_ordering:
+        enrollments_list = demo.enrollments[dif] + demo.lowerflowallocs[dif]
         for enrollment in enrollments_list:
-            vm = vms[enrollment['enrollee']]
+            vm = demo.vms[enrollment['enrollee']]
 
-            if enrollment in lowerflowallocs[dif]:
+            if enrollment in demo.lowerflowallocs[dif]:
                 oper = 'lower-flow-alloc'
             else:
                 oper = 'enroll-retry'
 
             vars_dict = {'ssh': vm['ssh'], 'id': vm['id'],
-                         'pvid': vms[enrollment['enroller']]['id'],
+                         'pvid': demo.vms[enrollment['enroller']]['id'],
                          'username': args.user,
                          'vmname': vm['name'],
                          'dif': dif, 'ldif': enrollment['lower_dif'],
@@ -1116,7 +689,7 @@ if args.enrollment_order == 'sequential':
                     'SUDO=%(sudo)s\n'\
                     '$SUDO rlite-ctl ipcp-%(oper)s %(dif)s.%(id)s.IPCP %(dif)s.DIF '\
                             '%(ldif)s.DIF ' % vars_dict
-            if not args.broadcast_enrollment:
+            if not demo.broadcast_enrollment:
                 outs += '%(dif)s.%(pvid)s.IPCP\n' % vars_dict
             else:
                 outs += '\n'
@@ -1130,19 +703,19 @@ if args.enrollment_order == 'sequential':
                     'done\n\n' % vars_dict
 
 # Just for debugging
-for dif in dif_ordering:
-    enrollments_list = enrollments[dif] + lowerflowallocs[dif]
+for dif in demo.dif_ordering:
+    enrollments_list = demo.enrollments[dif] + demo.lowerflowallocs[dif]
     for enrollment in enrollments_list:
-        vm = vms[enrollment['enrollee']]
+        vm = demo.vms[enrollment['enrollee']]
 
-        if enrollment in lowerflowallocs[dif]:
+        if enrollment in demo.lowerflowallocs[dif]:
             oper = 'lower-flow-alloc'
         else:
             oper = 'enroll'
 
         info = "%s %s to DIF %s through lower DIF %s" % (oper,
                     enrollment['enrollee'], dif, enrollment['lower_dif'])
-        if not args.broadcast_enrollment:
+        if not demo.broadcast_enrollment:
             info += " [unicast to neighbor %s]" % enrollment['enroller']
         else:
             info += " [broadcast]"
@@ -1156,17 +729,17 @@ for dif in dif_ordering:
 # times by the uipcps daemon (to cope with losses), but with many nodes
 # the likelyhood of some enrollment failing many times is quite high.
 if args.backend == 'tap':
-    for shim in shims:
-        if shim not in netems:
+    for shim in demo.shims:
+        if shim not in demo.netems:
             continue
-        for vm in netems[shim]:
-            if not netem_validate(netems[shim][vm]['args']):
+        for vm in demo.netems[shim]:
+            if not netem_validate(demo.netems[shim][vm]['args']):
                 print('Warning: line %(linecnt)s is invalid and '\
-                      'will be ignored' % netems[shim][vm])
+                      'will be ignored' % demo.netems[shim][vm])
                 continue
             outs += 'sudo tc qdisc add dev %(tap)s root netem '\
                     '%(args)s\n'\
-                    % {'tap': tap, 'args': netems[shim][vm]['args']}
+                    % {'tap': tap, 'args': demo.netems[shim][vm]['args']}
 
 
 fout.write(outs)
@@ -1196,15 +769,15 @@ outs =  '#!/bin/bash\n'             \
         '   rm $PIDFILE\n'                                      \
         '}\n\n'
 
-for vmname in sorted(vms):
-    vm = vms[vmname]
+for vmname in sorted(demo.vms):
+    vm = demo.vms[vmname]
     outs += '( kill_qemu rina-%(id)s.pid ) &\n' % {'id': vm['id']}
 
 outs += 'wait\n'
 
 if args.backend == 'tap':
-    for vmname in sorted(vms):
-        vm = vms[vmname]
+    for vmname in sorted(demo.vms):
+        vm = demo.vms[vmname]
         for port in vm['ports']:
             tap = port['tap']
             shim = port['shim']
@@ -1218,7 +791,7 @@ if args.backend == 'tap':
     outs += 'wait\n'
 
 if args.backend == 'tap':
-    for shim in sorted(shims):
+    for shim in sorted(demo.shims):
         outs += '(\n'                                   \
                 'sudo ip link set %(br)s down\n'        \
                 'sudo brctl delbr %(br)s\n'             \
@@ -1234,8 +807,8 @@ subprocess.call(['chmod', '+x', 'down.sh'])
 
 # Dump the mapping from nodes to SSH ports
 fout = open('demo.map', 'w')
-for vmname in sorted(vms):
-    fout.write('%s %d\n' % (vmname, args.base_port + vms[vmname]['id']))
+for vmname in sorted(demo.vms):
+    fout.write('%s %d\n' % (vmname, args.base_port + demo.vms[vmname]['id']))
 fout.close()
 
 
@@ -1248,16 +821,16 @@ if args.graphviz:
 
         gvizg = pydot.Dot(graph_type = 'graph')
         i = 0
-        for dif in sorted(difs):
-            for vmname in dif_graphs[dif]:
+        for dif in sorted(demo.difs):
+            for vmname in demo.dif_graphs[dif]:
                 node = pydot.Node(dif + vmname,
                                   label = "%s(%s)" % (vmname, dif),
                                   style = "filled", fillcolor = colors[i],
                                   fontcolor = fcolors[i])
                 gvizg.add_node(node)
 
-            for vmname in dif_graphs[dif]:
-                for (neigh, lower_dif) in dif_graphs[dif][vmname]:
+            for vmname in demo.dif_graphs[dif]:
+                for (neigh, lower_dif) in demo.dif_graphs[dif][vmname]:
                     if vmname > neigh:
                         # Use lexicographical filter to avoid duplicate edges
                         continue
@@ -1284,21 +857,21 @@ if args.register:
             '#set -x\n'
 
     # For each DIF
-    for dif in dif_ordering:
-        if dif in shims or len(difs[dif]) == 0:
+    for dif in demo.dif_ordering:
+        if dif in demo.shims or len(demo.difs[dif]) == 0:
             continue
 
         # Select a pivot node
-        pivot = sorted(difs[dif])[0]
+        pivot = sorted(demo.difs[dif])[0]
         outs += 'echo "Use \"%(pivot)s\" as a pivot for DIF %(dif)s"\n'\
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
             '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
                     '#set -x\n' % {'sshopts': sshopts, 'username': args.user,
-                                  'ssh': vms[pivot]['ssh'], 'pivot': pivot,
+                                  'ssh': demo.vms[pivot]['ssh'], 'pivot': pivot,
                                   'dif': dif}
 
-        for vmname in sorted(difs[dif]):
+        for vmname in sorted(demo.difs[dif]):
             outs += 'echo "%(pivot)s --> %(vmname)s"\n'\
                     'rina-echo-async -z rina-echo-async.%(vmname)s -d %(dif)s.DIF\n' \
                     '[ "$?" == "0" ] || echo "Failed to reach %(vmname)s ' \
@@ -1328,8 +901,8 @@ outs =  '#!/bin/bash\n'             \
         '   exit 255\n'\
         'fi\n'\
 
-for vmname in sorted(vms):
-    vm = vms[vmname]
+for vmname in sorted(demo.vms):
+    vm = demo.vms[vmname]
     outs += 'echo "Accessing log for node %(vmname)s"\n'\
         'DONE=255\n'\
         'while [ $DONE != "0" ]; do\n'\
