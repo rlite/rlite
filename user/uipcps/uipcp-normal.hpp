@@ -412,12 +412,13 @@ struct PolicyBuilder {
  * (initiator or slave) on a NeighFlow. */
 struct EnrollmentResources {
     RL_NODEFAULT_NONCOPIABLE(EnrollmentResources);
-    EnrollmentResources(std::shared_ptr<NeighFlow> f,
-                        std::shared_ptr<Neighbor> ng, bool init);
+    EnrollmentResources(std::shared_ptr<NeighFlow> const &f,
+                        std::shared_ptr<Neighbor> const &ng, bool init);
     ~EnrollmentResources();
 
     std::shared_ptr<NeighFlow> nf;
     std::shared_ptr<Neighbor> neigh;
+    int flow_fd; /* for debugging only */
     bool initiator;
     std::list<std::unique_ptr<const CDAPMessage>> msgs;
     std::thread th;
@@ -433,6 +434,9 @@ struct EnrollmentResources {
         std::unique_lock<std::mutex> &lk);
     void enrollment_commit();
     void enrollment_abort();
+
+    void set_terminated() { nf.reset(); }
+    bool is_terminated() const { return nf == nullptr; }
 };
 
 /* Main class representing an IPCP. */
@@ -502,9 +506,9 @@ struct uipcp_rib {
      * NeighFlow objects. */
     std::unordered_map<int /*flow_fd*/, std::unique_ptr<EnrollmentResources>>
         enrollment_resources;
-    EnrollmentResources *enrollment_rsrc_get(std::shared_ptr<NeighFlow> nf,
-                                             std::shared_ptr<Neighbor> neigh,
-                                             bool initiator);
+    EnrollmentResources *enrollment_rsrc_get(
+        std::shared_ptr<NeighFlow> const &nf,
+        std::shared_ptr<Neighbor> const &neigh, bool initiator);
 
     /* A map of current policies. */
     std::unordered_map<std::string, std::string> policies;
