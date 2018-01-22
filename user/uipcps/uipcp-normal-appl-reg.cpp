@@ -59,7 +59,8 @@ public:
     int lookup_req(const std::string &appl_name, std::string *dst_node,
                    const std::string &preferred, uint32_t cookie) override;
     int appl_register(const struct rl_kmsg_appl_register *req) override;
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+                    std::shared_ptr<Neighbor> const &neigh,
                     rlm_addr_t src_addr) override;
     int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
     int neighs_refresh(size_t limit) override;
@@ -232,7 +233,9 @@ FullyReplicatedDFT::mod_table(const DFTEntry &e, bool add, DFTSlice *added,
 }
 
 int
-FullyReplicatedDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+FullyReplicatedDFT::rib_handler(const CDAPMessage *rm,
+                                std::shared_ptr<NeighFlow> const &nf,
+                                std::shared_ptr<Neighbor> const &neigh,
                                 rlm_addr_t src_addr)
 {
     struct uipcp *uipcp = rib->uipcp;
@@ -266,12 +269,12 @@ FullyReplicatedDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf,
     /* Propagate the DFT entries update to the other neighbors,
      * except for who told us. */
     if (prop_dft_add.entries.size()) {
-        rib->neighs_sync_obj_excluding(nf->neigh, true, obj_class::dft,
+        rib->neighs_sync_obj_excluding(neigh.get(), true, obj_class::dft,
                                        obj_name::dft, &prop_dft_add);
     }
 
     if (prop_dft_del.entries.size()) {
-        rib->neighs_sync_obj_excluding(nf->neigh, false, obj_class::dft,
+        rib->neighs_sync_obj_excluding(neigh.get(), false, obj_class::dft,
                                        obj_name::dft, &prop_dft_del);
     }
 
@@ -409,7 +412,9 @@ class CentralizedFaultTolerantDFT : public DFT {
             return impl->lookup_req(appl_name, dst_node, preferred, cookie);
         }
         int appl_register(const struct rl_kmsg_appl_register *req);
-        int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+        int rib_handler(const CDAPMessage *rm,
+                        std::shared_ptr<NeighFlow> const &nf,
+                        std::shared_ptr<Neighbor> const &neigh,
                         rlm_addr_t src_addr);
         void dump(std::stringstream &ss) const { impl->dump(ss); };
     };
@@ -451,7 +456,9 @@ class CentralizedFaultTolerantDFT : public DFT {
         int lookup_req(const std::string &appl_name, std::string *dst_node,
                        const std::string &preferred, uint32_t cookie);
         int appl_register(const struct rl_kmsg_appl_register *req);
-        int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+        int rib_handler(const CDAPMessage *rm,
+                        std::shared_ptr<NeighFlow> const &nf,
+                        std::shared_ptr<Neighbor> const &neigh,
                         rlm_addr_t src_addr);
         int process_timeout();
 
@@ -489,13 +496,13 @@ public:
         }
         return client->appl_register(req);
     }
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
-                    rlm_addr_t src_addr) override
+    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+                    std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)
     {
         if (raft) {
-            return raft->rib_handler(rm, nf, src_addr);
+            return raft->rib_handler(rm, nf, neigh, src_addr);
         }
-        return client->rib_handler(rm, nf, src_addr);
+        return client->rib_handler(rm, nf, neigh, src_addr);
     }
 };
 
@@ -697,9 +704,9 @@ CentralizedFaultTolerantDFT::Client::process_timeout()
 }
 
 int
-CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
-                                                 NeighFlow *nf,
-                                                 rlm_addr_t src_addr)
+CentralizedFaultTolerantDFT::Client::rib_handler(
+    const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+    std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)
 {
     struct uipcp *uipcp = parent->rib->uipcp;
 
@@ -926,9 +933,9 @@ CentralizedFaultTolerantDFT::Replica::apply(raft::LogIndex index,
 }
 
 int
-CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
-                                                  NeighFlow *nf,
-                                                  rlm_addr_t src_addr)
+CentralizedFaultTolerantDFT::Replica::rib_handler(
+    const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+    std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)
 {
     struct uipcp *uipcp = parent->rib->uipcp;
     const char *objbuf  = nullptr;
@@ -945,7 +952,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
         /* This is a response to a request done by us with the
          * role of simple clients. We forward it to the client
          * handler. */
-        return parent->client->rib_handler(rm, nf, src_addr);
+        return parent->client->rib_handler(rm, nf, neigh, src_addr);
     }
 
     /* We don't expect an obj_value if this is a DFT read request. */

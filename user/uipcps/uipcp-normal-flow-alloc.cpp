@@ -571,7 +571,9 @@ LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm)
 }
 
 int
-FlowAllocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+FlowAllocator::rib_handler(const CDAPMessage *rm,
+                           std::shared_ptr<NeighFlow> const &nf,
+                           std::shared_ptr<Neighbor> const &neigh,
                            rlm_addr_t src_addr)
 {
     switch (rm->op_code) {

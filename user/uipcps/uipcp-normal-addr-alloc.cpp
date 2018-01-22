@@ -18,7 +18,8 @@ public:
 
     void dump(std::stringstream &ss) const override;
     rlm_addr_t allocate() override;
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+                    std::shared_ptr<Neighbor> const &neigh,
                     rlm_addr_t src_addr) override;
     int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
 };
@@ -133,7 +134,9 @@ DistributedAddrAllocator::allocate()
 }
 
 int
-DistributedAddrAllocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
+                                      std::shared_ptr<NeighFlow> const &nf,
+                                      std::shared_ptr<Neighbor> const &neigh,
                                       rlm_addr_t src_addr)
 {
     bool create;
@@ -237,8 +240,8 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf,
 
         if (propagate) {
             /* nf can be nullptr for M_DELETE messages */
-            rib->neighs_sync_obj_excluding(nf ? nf->neigh : nullptr, create,
-                                           rm->obj_class, rm->obj_name, &aar);
+            rib->neighs_sync_obj_excluding(neigh.get(), create, rm->obj_class,
+                                           rm->obj_name, &aar);
         }
 
     } else if (rm->obj_class == obj_class::addr_alloc_table) {
@@ -275,7 +278,7 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf,
 
         if (prop_aal.entries.size() > 0) {
             assert(nf);
-            rib->neighs_sync_obj_excluding(nf->neigh, create, rm->obj_class,
+            rib->neighs_sync_obj_excluding(neigh.get(), create, rm->obj_class,
                                            rm->obj_name, &prop_aal);
         }
 

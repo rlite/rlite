@@ -119,21 +119,6 @@ struct Neighbor;
 struct NeighFlow;
 struct uipcp_rib;
 
-/* Temporary resources needed to carry out an enrollment procedure
- * (initiator or slave) on a NeighFlow. */
-struct EnrollmentResources {
-    RL_NODEFAULT_NONCOPIABLE(EnrollmentResources);
-    EnrollmentResources(std::shared_ptr<NeighFlow> f, bool init);
-    ~EnrollmentResources();
-
-    std::shared_ptr<NeighFlow> nf;
-    bool initiator;
-    std::list<std::unique_ptr<const CDAPMessage>> msgs;
-    std::thread th;
-    std::condition_variable msgs_avail;
-    std::condition_variable stopped;
-};
-
 struct TimeoutEvent {
     std::chrono::milliseconds delta;
     struct uipcp *uipcp = nullptr;
@@ -188,15 +173,11 @@ struct NeighFlow {
     std::chrono::system_clock::time_point last_activity;
 
     EnrollState enroll_state;
-    std::shared_ptr<EnrollmentResources> enrollment_rsrc_get(bool initiator);
-    std::shared_ptr<EnrollmentResources> er;
+    int pending_keepalive_reqs;
 
     /* Did we initiate the enrollment procedure towards the neighbor
      * or were we the target? */
     bool initiator = false;
-
-    std::unique_ptr<TimeoutEvent> keepalive_timer;
-    int pending_keepalive_reqs;
 
     /* Statistics about management traffic. */
     struct {
@@ -215,16 +196,7 @@ struct NeighFlow {
     void keepalive_tmr_start();
     void keepalive_tmr_stop();
 
-    void enroller_thread();
-    int enroller_default(std::unique_lock<std::mutex> &lk);
-    void enrollee_thread();
-    int enrollee_default(std::unique_lock<std::mutex> &lk);
-
     void enroll_state_set(EnrollState st);
-    std::unique_ptr<const CDAPMessage> next_enroll_msg(
-        std::unique_lock<std::mutex> &lk);
-    void enrollment_commit();
-    void enrollment_abort();
 
     int send_to_port_id(CDAPMessage *m, int invoke_id, const UipcpObject *obj);
 };
@@ -324,7 +296,9 @@ struct DFT {
     virtual int lookup_req(const std::string &appl_name, std::string *dst_node,
                            const std::string &preferred, uint32_t cookie) = 0;
     virtual int appl_register(const struct rl_kmsg_appl_register *req)    = 0;
-    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+    virtual int rib_handler(const CDAPMessage *rm,
+                            std::shared_ptr<NeighFlow> const &nf,
+                            std::shared_ptr<Neighbor> const &neigh,
                             rlm_addr_t src_addr)                          = 0;
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const
     {
@@ -358,7 +332,9 @@ struct FlowAllocator {
     virtual int flows_handler_create_r(const CDAPMessage *rm) = 0;
     virtual int flows_handler_delete(const CDAPMessage *rm)   = 0;
 
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf, rlm_addr_t src_addr);
+    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+                    std::shared_ptr<Neighbor> const &neigh,
+                    rlm_addr_t src_addr);
 };
 
 /* Lower Flows Database and dissemination of routing information,
@@ -387,7 +363,9 @@ struct LFDB {
     /* Called to flush all the local entries related to a given neighbor. */
     virtual void neigh_disconnected(const std::string &neigh_name) = 0;
 
-    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+    virtual int rib_handler(const CDAPMessage *rm,
+                            std::shared_ptr<NeighFlow> const &nf,
+                            std::shared_ptr<Neighbor> const &neigh,
                             rlm_addr_t src_addr) = 0;
 
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
@@ -406,7 +384,9 @@ struct AddrAllocator {
 
     virtual void dump(std::stringstream &ss) const                  = 0;
     virtual rlm_addr_t allocate()                                   = 0;
-    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+    virtual int rib_handler(const CDAPMessage *rm,
+                            std::shared_ptr<NeighFlow> const &nf,
+                            std::shared_ptr<Neighbor> const &neigh,
                             rlm_addr_t src_addr)                    = 0;
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
 };
@@ -428,6 +408,33 @@ struct PolicyBuilder {
     operator std::string() { return name; }
 };
 
+/* Temporary resources needed to carry out an enrollment procedure
+ * (initiator or slave) on a NeighFlow. */
+struct EnrollmentResources {
+    RL_NODEFAULT_NONCOPIABLE(EnrollmentResources);
+    EnrollmentResources(std::shared_ptr<NeighFlow> f,
+                        std::shared_ptr<Neighbor> ng, bool init);
+    ~EnrollmentResources();
+
+    std::shared_ptr<NeighFlow> nf;
+    std::shared_ptr<Neighbor> neigh;
+    bool initiator;
+    std::list<std::unique_ptr<const CDAPMessage>> msgs;
+    std::thread th;
+    std::condition_variable msgs_avail;
+    std::condition_variable stopped;
+
+    void enroller_thread();
+    int enroller_default(std::unique_lock<std::mutex> &lk);
+    void enrollee_thread();
+    int enrollee_default(std::unique_lock<std::mutex> &lk);
+
+    std::unique_ptr<const CDAPMessage> next_enroll_msg(
+        std::unique_lock<std::mutex> &lk);
+    void enrollment_commit();
+    void enrollment_abort();
+};
+
 /* Main class representing an IPCP. */
 struct uipcp_rib {
     /* Backpointer to parent data structure. */
@@ -443,8 +450,9 @@ struct uipcp_rib {
     /* RIB lock. */
     std::mutex mutex;
 
-    typedef int (uipcp_rib::*rib_handler_t)(const CDAPMessage *rm,
-                                            NeighFlow *nf, rlm_addr_t src_addr);
+    typedef int (uipcp_rib::*rib_handler_t)(
+        const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+        std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr);
     std::unordered_map<std::string, rib_handler_t> handlers;
 
     /* Positive if this IPCP is enrolled to the DIF, zero otherwise.
@@ -486,8 +494,17 @@ struct uipcp_rib {
     std::unordered_set<std::string> neighbors_cand;
     std::unordered_set<std::string> neighbors_deleted;
 
+    /* A map to keep the keepalive timers for all the NeighFlow objects. */
     std::unordered_map<int /*flow_fd*/, std::unique_ptr<TimeoutEvent>>
         keepalive_timers;
+
+    /* A map to keep the temporary enrollment resources for all the
+     * NeighFlow objects. */
+    std::unordered_map<int /*flow_fd*/, std::unique_ptr<EnrollmentResources>>
+        enrollment_resources;
+    EnrollmentResources *enrollment_rsrc_get(std::shared_ptr<NeighFlow> nf,
+                                             std::shared_ptr<Neighbor> neigh,
+                                             bool initiator);
 
     /* A map of current policies. */
     std::unordered_map<std::string, std::string> policies;
@@ -604,7 +621,13 @@ struct uipcp_rib {
     void check_for_address_conflicts();
 
     NeighborCandidate neighbor_cand_get() const;
-    NeighFlow *lookup_neigh_flow_by_port_id(rl_port_t port_id);
+    int lookup_neigh_flow_by_port_id(rl_port_t port_id,
+                                     std::shared_ptr<NeighFlow> *pnf,
+                                     std::shared_ptr<Neighbor> *pneigh);
+
+    int lookup_neigh_flow_by_flow_fd(int flow_fd,
+                                     std::shared_ptr<NeighFlow> *pnf,
+                                     std::shared_ptr<Neighbor> *pneigh);
     void neigh_flow_prune(NeighFlow *nf);
     int enroll(const char *neigh_name, const char *supp_dif_name,
                int wait_for_completion);
@@ -614,7 +637,8 @@ struct uipcp_rib {
 
     int fa_req(struct rl_kmsg_fa_req *req);
 
-    int recv_msg(char *serbuf, int serlen, NeighFlow *nf);
+    int recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
+                 std::shared_ptr<Neighbor> neigh);
     int mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
                               size_t buflen);
     int send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
@@ -633,35 +657,54 @@ struct uipcp_rib {
                             const UipcpObject *obj_value) const;
 
     /* Receive info from neighbors. */
-    int cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf,
+    int cdap_dispatch(const CDAPMessage *rm,
+                      std::shared_ptr<NeighFlow> const &nf,
+                      std::shared_ptr<Neighbor> const &neigh,
                       rlm_addr_t src_addr);
 
     /* RIB handlers for received CDAP messages. */
-    int dft_handler(const CDAPMessage *rm, NeighFlow *nf, rlm_addr_t src_addr)
+    int dft_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+                    std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)
     {
-        return dft->rib_handler(rm, nf, src_addr);
+        return dft->rib_handler(rm, nf, neigh, src_addr);
     };
-    int neighbors_handler(const CDAPMessage *rm, NeighFlow *nf,
+    int neighbors_handler(const CDAPMessage *rm,
+                          std::shared_ptr<NeighFlow> const &nf,
+                          std::shared_ptr<Neighbor> const &neigh,
                           rlm_addr_t src_addr);
-    int lfdb_handler(const CDAPMessage *rm, NeighFlow *nf, rlm_addr_t src_addr)
+    int lfdb_handler(const CDAPMessage *rm,
+                     std::shared_ptr<NeighFlow> const &nf,
+                     std::shared_ptr<Neighbor> const &neigh,
+                     rlm_addr_t src_addr)
     {
-        return lfdb->rib_handler(rm, nf, src_addr);
+        return lfdb->rib_handler(rm, nf, neigh, src_addr);
     };
-    int flows_handler(const CDAPMessage *rm, NeighFlow *nf, rlm_addr_t src_addr)
+    int flows_handler(const CDAPMessage *rm,
+                      std::shared_ptr<NeighFlow> const &nf,
+                      std::shared_ptr<Neighbor> const &neigh,
+                      rlm_addr_t src_addr)
     {
-        return fa->rib_handler(rm, nf, src_addr);
+        return fa->rib_handler(rm, nf, neigh, src_addr);
     };
-    int keepalive_handler(const CDAPMessage *rm, NeighFlow *nf,
+    int keepalive_handler(const CDAPMessage *rm,
+                          std::shared_ptr<NeighFlow> const &nf,
+                          std::shared_ptr<Neighbor> const &neigh,
                           rlm_addr_t src_addr);
-    int status_handler(const CDAPMessage *rm, NeighFlow *nf,
+    int status_handler(const CDAPMessage *rm,
+                       std::shared_ptr<NeighFlow> const &nf,
+                       std::shared_ptr<Neighbor> const &neigh,
                        rlm_addr_t src_addr);
-    int addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf,
+    int addr_alloc_table_handler(const CDAPMessage *rm,
+                                 std::shared_ptr<NeighFlow> const &nf,
+                                 std::shared_ptr<Neighbor> const &neigh,
                                  rlm_addr_t src_addr)
     {
-        return addra->rib_handler(rm, nf, src_addr);
+        return addra->rib_handler(rm, nf, neigh, src_addr);
     }
 
-    int lowerflow_handler(const CDAPMessage *rm, NeighFlow *nf,
+    int lowerflow_handler(const CDAPMessage *rm,
+                          std::shared_ptr<NeighFlow> const &nf,
+                          std::shared_ptr<Neighbor> const &neigh,
                           rlm_addr_t src_addr);
 
     void neighs_refresh();

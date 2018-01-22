@@ -120,7 +120,8 @@ public:
     const LowerFlow *_find(const NodeId &local_node,
                            const NodeId &remote_node) const;
 
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+                    std::shared_ptr<Neighbor> const &neigh,
                     rlm_addr_t src_addr) override;
 
     int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
@@ -235,7 +236,9 @@ FullyReplicatedLFDB::update_local(const string &node_name)
 }
 
 int
-FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm,
+                                 std::shared_ptr<NeighFlow> const &nf,
+                                 std::shared_ptr<Neighbor> const &neigh,
                                  rlm_addr_t src_addr)
 {
     const char *objbuf;
@@ -279,9 +282,8 @@ FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm, NeighFlow *nf,
 
     if (modified) {
         /* Send the received lower flows to the other neighbors. */
-        rib->neighs_sync_obj_excluding(nf ? nf->neigh : nullptr, add_f,
-                                       obj_class::lfdb, obj_name::lfdb,
-                                       &prop_lfl);
+        rib->neighs_sync_obj_excluding(neigh.get(), add_f, obj_class::lfdb,
+                                       obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */
         re.update_kernel_routing(rib->myname);
