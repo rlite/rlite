@@ -146,10 +146,10 @@ uipcp_rib::mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
 }
 
 int
-uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
+uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
+                    std::shared_ptr<Neighbor> neigh)
 {
     std::unique_ptr<CDAPMessage> m;
-    Neighbor *neigh;
     int ret = 1;
 #if 0
     /* Track minimum and maximum length of CDAP messages. It's
@@ -207,7 +207,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
                 return 0;
             }
 
-            cdap_dispatch(adata.cdap.get(), nullptr, adata.src_addr);
+            cdap_dispatch(adata.cdap.get(), nullptr, nullptr, adata.src_addr);
 
             return 0;
         }
@@ -228,13 +228,12 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
             UPE(uipcp, "Received message from unknown port id\n");
             return -1;
         }
-        neigh = nf->neigh;
 
         if (!nf->conn) {
             nf->conn = make_unique<CDAPConn>(nf->flow_fd);
         }
 
-        if (neigh->enrollment_complete() && nf == neigh->mgmt_conn() &&
+        if (neigh->enrollment_complete() && nf.get() == neigh->mgmt_conn() &&
             !nf->initiator && is_connect_attempt &&
             src_appl == neigh->ipcp_name) {
             /* We thought we were already enrolled to this neighbor, but
@@ -257,7 +256,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
 
         nf->last_activity = std::chrono::system_clock::now();
 
-        if (neigh->enrollment_complete() && nf != neigh->mgmt_conn() &&
+        if (neigh->enrollment_complete() && nf.get() != neigh->mgmt_conn() &&
             !neigh->mgmt_conn()->initiator && m->op_code == gpb::M_START &&
             m->obj_name == obj_name::enrollment &&
             m->obj_class == obj_class::enrollment) {
@@ -275,8 +274,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
 
         if (nf->enroll_state != EnrollState::NEIGH_ENROLLED) {
             /* Start the enrollment as a slave (enroller), if needed. */
-            std::shared_ptr<EnrollmentResources> er =
-                nf->enrollment_rsrc_get(false);
+            EnrollmentResources *er = enrollment_rsrc_get(nf, neigh, false);
 
             /* Enrollment is ongoing, we need to push this message to the
              * enrolling thread (also ownership is passed) and notify it. */
@@ -285,7 +283,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
         } else {
             /* We are already enrolled, we can dispatch this message to
              * the RIB. */
-            ret = cdap_dispatch(m.get(), nf, RL_ADDR_NULL);
+            ret = cdap_dispatch(m.get(), nf, neigh, RL_ADDR_NULL);
         }
 
     } catch (std::bad_alloc) {
@@ -301,7 +299,8 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     char mgmtbuf[MGMTBUF_SIZE_MAX];
     struct rl_mgmt_hdr *mhdr;
-    NeighFlow *nf;
+    std::shared_ptr<NeighFlow> nf;
+    std::shared_ptr<Neighbor> neigh;
     int n;
 
     assert(fd == rib->mgmtfd);
@@ -327,29 +326,35 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 
     /* Lookup neighbor by port id. If ADATA, it is not an error
      * if the lookup fails (nf == nullptr). */
-    nf = rib->lookup_neigh_flow_by_port_id(mhdr->local_port);
+    rib->lookup_neigh_flow_by_port_id(mhdr->local_port, &nf, &neigh);
 
     /* Hand off the message to the RIB. */
-    rib->recv_msg(((char *)(mhdr + 1)), n - sizeof(*mhdr), nf);
+    rib->recv_msg(((char *)(mhdr + 1)), n - sizeof(*mhdr), nf, neigh);
 }
 
 void
 normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 {
-    struct NeighFlow *nf = (struct NeighFlow *)opaque;
+    uipcp_rib *rib = (uipcp_rib *)opaque;
     char mgmtbuf[MGMTBUF_SIZE_MAX];
-    uipcp_rib *rib = nf->neigh->rib;
     int n;
 
-    n = read(nf->flow_fd, mgmtbuf, sizeof(mgmtbuf));
+    n = read(fd, mgmtbuf, sizeof(mgmtbuf));
     if (n < 0) {
         UPE(rib->uipcp, "read(mgmt_flow_fd) failed [%s]\n", strerror(errno));
         return;
     }
 
     std::lock_guard<std::mutex> guard(rib->mutex);
+    std::shared_ptr<Neighbor> neigh;
+    std::shared_ptr<NeighFlow> nf;
 
-    rib->recv_msg(mgmtbuf, n, nf);
+    if (rib->lookup_neigh_flow_by_flow_fd(fd, &nf, &neigh)) {
+        UPE(rib->uipcp, "Could not find neighbor flow for fd %d\n", fd);
+        return;
+    }
+
+    rib->recv_msg(mgmtbuf, n, nf, neigh);
 }
 
 uipcp_rib::uipcp_rib(struct uipcp *_u)
@@ -435,6 +440,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
 
 uipcp_rib::~uipcp_rib()
 {
+    // TODO take RIB lock
     /* We need to destroy all children objects that have raw backpointers to
      * us, otherwise they are destroyed after this destructor, so while the
      * backpointer is invalid. A better solution would be to use std::weak_ptr
@@ -442,6 +448,7 @@ uipcp_rib::~uipcp_rib()
     sync_timer.reset();
     age_incr_timer.reset();
     keepalive_timers.clear();
+    enrollment_resources.clear();
     neighbors.clear();
     addra.reset();
     dft.reset();
@@ -792,7 +799,7 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
 
     if (dst_addr == myaddr) {
         /* This is a message to be delivered to myself. */
-        int ret = cdap_dispatch(m.get(), nullptr, myaddr);
+        int ret = cdap_dispatch(m.get(), nullptr, nullptr, myaddr);
 
         return ret;
     }
@@ -866,7 +873,9 @@ uipcp_rib::send_to_myself(std::unique_ptr<CDAPMessage> m,
 /* To be called under RIB lock. This function does not take ownership
  * of 'rm'. */
 int
-uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf,
+uipcp_rib::cdap_dispatch(const CDAPMessage *rm,
+                         std::shared_ptr<NeighFlow> const &nf,
+                         std::shared_ptr<Neighbor> const &neigh,
                          rlm_addr_t src_addr)
 {
     /* Dispatch depending on the obj_name specified in the request. */
@@ -887,23 +896,24 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf,
         }
     }
 
-    if (nf && nf->neigh) {
-        nf->neigh->unheard_since =
-            std::chrono::system_clock::now(); /* update */
+    if (neigh) {
+        neigh->unheard_since = std::chrono::system_clock::now(); /* update */
     }
 
     if (hi == handlers.end()) {
         UPE(uipcp, "Unable to handle CDAP message\n");
         rm->dump();
     } else {
-        ret = (this->*(hi->second))(rm, nf, src_addr);
+        ret = (this->*(hi->second))(rm, nf, neigh, src_addr);
     }
 
     return ret;
 }
 
 int
-uipcp_rib::status_handler(const CDAPMessage *rm, NeighFlow *nf,
+uipcp_rib::status_handler(const CDAPMessage *rm,
+                          std::shared_ptr<NeighFlow> const &nf,
+                          std::shared_ptr<Neighbor> const &neigh,
                           rlm_addr_t src_addr)
 {
     if (rm->op_code != gpb::M_START) {
