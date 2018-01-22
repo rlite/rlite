@@ -1807,6 +1807,7 @@ normal_trigger_tasks(struct uipcp *uipcp)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
 
+    rib->enrollment_resources_cleanup();
     rib->trigger_re_enrollments();
     rib->allocate_n_flows();
     rib->check_for_address_conflicts();
