@@ -1661,6 +1661,21 @@ uipcp_rib::neigh_disconnect(const std::string &neigh_name)
 }
 
 void
+uipcp_rib::enrollment_resources_cleanup()
+{
+    std::lock_guard<std::mutex> guard(mutex);
+
+    for (auto mit = enrollment_resources.begin();
+         mit != enrollment_resources.end();) {
+        if (!mit->second || mit->second->is_terminated()) {
+            mit = enrollment_resources.erase(mit);
+        } else {
+            ++mit;
+        }
+    }
+}
+
+void
 uipcp_rib::trigger_re_enrollments()
 {
     list<pair<string, string> > re_enrollments;
