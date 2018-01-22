@@ -194,7 +194,7 @@ EnrollmentResources::enrollment_abort()
     stopped.notify_all();
 
     /* Remove the stored shared pointer. */
-    nf.reset();
+    set_terminated();
 }
 
 void
@@ -391,7 +391,7 @@ EnrollmentResources::enrollment_commit()
     }
 
     /* Remove the stored shared pointer. */
-    nf.reset();
+    set_terminated();
 }
 
 /* To be called with RIB lock held. */
@@ -906,12 +906,21 @@ err:
 }
 
 EnrollmentResources *
-uipcp_rib::enrollment_rsrc_get(std::shared_ptr<NeighFlow> nf,
-                               std::shared_ptr<Neighbor> neigh, bool initiator)
+uipcp_rib::enrollment_rsrc_get(std::shared_ptr<NeighFlow> const &nf,
+                               std::shared_ptr<Neighbor> const &neigh,
+                               bool initiator)
 {
-    if (enrollment_resources[nf->flow_fd] == nullptr) {
-        UPD(uipcp, "setup enrollment data for neigh %s\n",
-            neigh->ipcp_name.c_str());
+    EnrollmentResources *er = enrollment_resources[nf->flow_fd].get();
+
+    if (er && er->is_terminated()) {
+        /* The enrollment thread has terminated, we can destroy the resources.
+         */
+        enrollment_resources[nf->flow_fd].reset();
+        er = nullptr;
+    }
+    if (er == nullptr) {
+        UPD(uipcp, "setup enrollment data for neigh %s [flow_fd=%d]\n",
+            neigh->ipcp_name.c_str(), nf->flow_fd);
         nf->enroll_state_set(EnrollState::NEIGH_ENROLLING);
         enrollment_resources[nf->flow_fd] =
             make_unique<EnrollmentResources>(nf, neigh, initiator);
@@ -920,21 +929,23 @@ uipcp_rib::enrollment_rsrc_get(std::shared_ptr<NeighFlow> nf,
     return enrollment_resources[nf->flow_fd].get();
 }
 
-EnrollmentResources::EnrollmentResources(std::shared_ptr<NeighFlow> f,
-                                         std::shared_ptr<Neighbor> ng,
+EnrollmentResources::EnrollmentResources(std::shared_ptr<NeighFlow> const &f,
+                                         std::shared_ptr<Neighbor> const &ng,
                                          bool init)
     : nf(f), neigh(ng), initiator(init)
 {
-    th = std::thread(initiator ? &EnrollmentResources::enrollee_thread
+    flow_fd = nf->flow_fd;
+    th      = std::thread(initiator ? &EnrollmentResources::enrollee_thread
                                : &EnrollmentResources::enroller_thread,
                      this);
-    th.detach();
 }
 
 EnrollmentResources::~EnrollmentResources()
 {
-    UPD(neigh->rib->uipcp, "clean up enrollment data for neigh %s\n",
-        neigh->ipcp_name.c_str());
+    UPD(neigh->rib->uipcp,
+        "clean up enrollment data for neigh %s [flow_fd=%d]\n",
+        neigh->ipcp_name.c_str(), flow_fd);
+    th.join();
     if (!msgs.empty()) {
         UPW(neigh->rib->uipcp, "Discarding %u CDAP messages from neighbor %s\n",
             static_cast<unsigned int>(msgs.size()), neigh->ipcp_name.c_str());
@@ -1541,7 +1552,7 @@ int
 uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
                   int wait_for_completion)
 {
-    EnrollmentResources *rsrc;
+    EnrollmentResources *er;
     std::shared_ptr<Neighbor> neigh;
     std::shared_ptr<NeighFlow> nf;
     int ret;
@@ -1581,7 +1592,7 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
     }
 
     if (nf->enroll_state != EnrollState::NEIGH_ENROLLED) {
-        rsrc = enrollment_rsrc_get(nf, neigh, true);
+        er = enrollment_rsrc_get(nf, neigh, true);
         if (wait_for_completion) {
             /* Wait for the enrollment procedure to stop, either because of
              * successful completion (NEIGH_ENROLLED), or because of an abort
@@ -1589,7 +1600,7 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
              */
 
             while (nf->enroll_state == EnrollState::NEIGH_ENROLLING) {
-                rsrc->stopped.wait(lk);
+                er->stopped.wait(lk);
             }
 
             ret = nf->enroll_state == EnrollState::NEIGH_ENROLLED ? 0 : -1;
