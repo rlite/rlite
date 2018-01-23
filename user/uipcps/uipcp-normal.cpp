@@ -1215,7 +1215,7 @@ uipcp_rib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     UPD(uipcp, "N-flow allocated [neigh = %s, supp_dif = %s, port_id = %u]\n",
         req->remote_appl, req->dif_name, req->port_id);
 
-    nf = std::make_shared<NeighFlow>(neigh.get(), this, neigh->ipcp_name,
+    nf           = std::make_shared<NeighFlow>(this, neigh->ipcp_name,
                                      string(req->dif_name), req->port_id,
                                      mgmt_fd, RL_IPCP_ID_NONE);
     nf->reliable = true;
@@ -1262,9 +1262,8 @@ uipcp_rib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     assert(neigh->flows.count(neigh_port_id) == 0); /* kernel bug */
 
     /* Add the flow. */
-    nf = std::make_shared<NeighFlow>(neigh.get(), this, neigh->ipcp_name,
-                                     string(supp_dif), neigh_port_id, 0,
-                                     lower_ipcp_id);
+    nf = std::make_shared<NeighFlow>(this, neigh->ipcp_name, string(supp_dif),
+                                     neigh_port_id, 0, lower_ipcp_id);
     nf->initiator = false;
     nf->reliable  = is_reliable_spec(&req->flowspec);
 

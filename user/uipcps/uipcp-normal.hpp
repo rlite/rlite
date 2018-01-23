@@ -148,7 +148,6 @@ enum class EnrollState {
 /* Holds the information about an N-1 flow towards a neighbor IPCP. */
 struct NeighFlow {
     /* Backpointer to the parent data structure. */
-    Neighbor *neigh;
     uipcp_rib *rib;
 
     /* Name of the neighbor IPCP (same as Neighbor::ipcp_name of
@@ -192,7 +191,7 @@ struct NeighFlow {
     } stats;
 
     RL_NODEFAULT_NONCOPIABLE(NeighFlow);
-    NeighFlow(Neighbor *n, uipcp_rib *parent, const std::string &ipcp_name,
+    NeighFlow(uipcp_rib *parent, const std::string &ipcp_name,
               const std::string &supp_dif, rl_port_t pid, int ffd,
               rl_ipcp_id_t lid);
     ~NeighFlow();
