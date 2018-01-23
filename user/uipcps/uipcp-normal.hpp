@@ -174,10 +174,9 @@ struct NeighFlow {
     /* CDAP connection associated to this flow, if any. */
     std::unique_ptr<CDAPConn> conn;
 
-    std::chrono::system_clock::time_point last_activity;
-
     EnrollState enroll_state;
     int pending_keepalive_reqs;
+    std::chrono::system_clock::time_point last_activity;
 
     /* Did we initiate the enrollment procedure towards the neighbor
      * or were we the target? */
@@ -204,6 +203,10 @@ struct NeighFlow {
     void enroll_state_set(EnrollState st);
 
     int send_to_port_id(CDAPMessage *m, int invoke_id, const UipcpObject *obj);
+    int sync_obj(bool create, const std::string &obj_class,
+                 const std::string &obj_name,
+                 const UipcpObject *obj_value) const;
+    int sync_rib() const;
 };
 
 /* Holds the information about a neighbor IPCP. */
@@ -257,13 +260,6 @@ struct Neighbor {
     bool enrollment_complete() const;
     int flow_alloc(const char *supp_dif_name);
 
-    int neigh_sync_obj(const NeighFlow *nf, bool create,
-                       const std::string &obj_class,
-                       const std::string &obj_name,
-                       const UipcpObject *obj_value) const;
-
-    int neigh_sync_rib(NeighFlow *nf) const;
-
     /* Get a std::shared_ptr reference to the shared pointer object that stores
      * the specified NeighFlow object. The shared pointer itself is stored in
      * the associated Neighbor object. */
@@ -305,7 +301,7 @@ struct DFT {
                             std::shared_ptr<NeighFlow> const &nf,
                             std::shared_ptr<Neighbor> const &neigh,
                             rlm_addr_t src_addr)                          = 0;
-    virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const
+    virtual int sync_neigh(const NeighFlow *nf, unsigned int limit) const
     {
         return 0;
     }
@@ -373,9 +369,9 @@ struct LFDB {
                             std::shared_ptr<Neighbor> const &neigh,
                             rlm_addr_t src_addr) = 0;
 
-    virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
-    virtual int neighs_refresh(size_t limit)                        = 0;
-    virtual void age_incr()                                         = 0;
+    virtual int sync_neigh(const NeighFlow *nf, unsigned int limit) const = 0;
+    virtual int neighs_refresh(size_t limit)                              = 0;
+    virtual void age_incr()                                               = 0;
 };
 
 /* Address allocation for the members of the N-DIF. */
@@ -387,13 +383,13 @@ struct AddrAllocator {
     AddrAllocator(uipcp_rib *_ur) : rib(_ur) {}
     virtual ~AddrAllocator() {}
 
-    virtual void dump(std::stringstream &ss) const                  = 0;
-    virtual rlm_addr_t allocate()                                   = 0;
+    virtual void dump(std::stringstream &ss) const                        = 0;
+    virtual rlm_addr_t allocate()                                         = 0;
     virtual int rib_handler(const CDAPMessage *rm,
                             std::shared_ptr<NeighFlow> const &nf,
                             std::shared_ptr<Neighbor> const &neigh,
-                            rlm_addr_t src_addr)                    = 0;
-    virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
+                            rlm_addr_t src_addr)                          = 0;
+    virtual int sync_neigh(const NeighFlow *nf, unsigned int limit) const = 0;
 };
 
 /* Object used to store policy names and allocate/switch policies. */

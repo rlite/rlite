@@ -62,7 +62,7 @@ public:
     int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
                     std::shared_ptr<Neighbor> const &neigh,
                     rlm_addr_t src_addr) override;
-    int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
+    int sync_neigh(const NeighFlow *nf, unsigned int limit) const override;
     int neighs_refresh(size_t limit) override;
 
     /* Helper function shared with CentralizedFaultTolerantDFT::Replica. */
@@ -297,7 +297,7 @@ FullyReplicatedDFT::dump(stringstream &ss) const
 }
 
 int
-FullyReplicatedDFT::sync_neigh(NeighFlow *nf, unsigned int limit) const
+FullyReplicatedDFT::sync_neigh(const NeighFlow *nf, unsigned int limit) const
 {
     int ret = 0;
 
@@ -309,8 +309,7 @@ FullyReplicatedDFT::sync_neigh(NeighFlow *nf, unsigned int limit) const
             eit++;
         }
 
-        ret |= nf->neigh->neigh_sync_obj(nf, true, obj_class::dft,
-                                         obj_name::dft, &dft_slice);
+        ret |= nf->sync_obj(true, obj_class::dft, obj_name::dft, &dft_slice);
     }
 
     return ret;
