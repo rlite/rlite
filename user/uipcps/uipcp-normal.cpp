@@ -1019,7 +1019,13 @@ uipcp_rib::neighs_sync_obj_all(bool create, const string &obj_class,
 void
 uipcp_rib::neigh_flow_prune(NeighFlow *nf)
 {
-    Neighbor *neigh = nf->neigh;
+    if (neighbors.count(nf->neigh_name) == 0) {
+        UPW(uipcp, "Neighbor %s disappeared; cannot prune flow with fd %d\n",
+            nf->neigh_name.c_str(), nf->flow_fd);
+        return;
+    }
+
+    std::shared_ptr<Neighbor> neigh = neighbors[nf->neigh_name];
 
     if (nf == neigh->mgmt_only.get()) {
         neigh->mgmt_only_set(nullptr);
@@ -1035,7 +1041,8 @@ uipcp_rib::neigh_flow_prune(NeighFlow *nf)
     /* If there are no other N-1 flows, delete the neighbor. */
     if (neigh->flows.size() == 0 && neigh->mgmt_only == nullptr &&
         neigh->n_flow == nullptr) {
-        del_neighbor(neigh->ipcp_name, /*reconnect=*/true);
+        neigh.reset();
+        del_neighbor(nf->neigh_name, /*reconnect=*/true);
     }
 }
 
