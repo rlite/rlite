@@ -32,10 +32,12 @@
 
 using namespace std;
 
-NeighFlow::NeighFlow(Neighbor *n, uipcp_rib *parent, const string &supdif,
-                     rl_port_t pid, int ffd, rl_ipcp_id_t lid)
+NeighFlow::NeighFlow(Neighbor *n, uipcp_rib *parent, const string &ipcp_name,
+                     const string &supdif, rl_port_t pid, int ffd,
+                     rl_ipcp_id_t lid)
     : neigh(n),
       rib(parent),
+      neigh_name(ipcp_name),
       supp_dif(supdif),
       port_id(pid),
       lower_ipcp_id(lid),
@@ -212,7 +214,7 @@ NeighFlow::enroll_state_set(EnrollState st)
     if (old != EnrollState::NEIGH_ENROLLED &&
         st == EnrollState::NEIGH_ENROLLED) {
         rib->enrolled++;
-        rib->neighbors_deleted.erase(neigh->ipcp_name);
+        rib->neighbors_deleted.erase(neigh_name);
     } else if (old == EnrollState::NEIGH_ENROLLED &&
                st == EnrollState::NEIGH_NONE) {
         rib->enrolled--;
@@ -1091,7 +1093,7 @@ uipcp_rib::neighs_refresh()
 void
 uipcp_rib::keepalive_timeout(NeighFlow *nf)
 {
-    std::string neigh_name = nf->neigh->ipcp_name;
+    std::string neigh_name = nf->neigh_name;
     CDAPMessage m;
     int ret;
 
@@ -1519,8 +1521,9 @@ Neighbor::flow_alloc(const char *supp_dif)
      * out of the lock. */
     rib->lock();
     assert(flow_alloc_enabled == false);
-    flows[port_id_] = std::make_shared<NeighFlow>(
-        this, rib, string(supp_dif), port_id_, flow_fd_, lower_ipcp_id_);
+    flows[port_id_] =
+        std::make_shared<NeighFlow>(this, rib, ipcp_name, string(supp_dif),
+                                    port_id_, flow_fd_, lower_ipcp_id_);
     flows[port_id_]->reliable = false;
 
     UPD(rib->uipcp, "Unreliable N-1 flow allocated [fd=%d, port_id=%u]\n",
@@ -1549,9 +1552,9 @@ Neighbor::flow_alloc(const char *supp_dif)
         } else {
             std::shared_ptr<NeighFlow> nf;
 
-            nf = std::make_shared<NeighFlow>(this, rib, string(supp_dif),
-                                             RL_PORT_ID_NONE, mgmt_fd,
-                                             RL_IPCP_ID_NONE);
+            nf           = std::make_shared<NeighFlow>(this, rib, ipcp_name,
+                                             string(supp_dif), RL_PORT_ID_NONE,
+                                             mgmt_fd, RL_IPCP_ID_NONE);
             nf->reliable = true;
             UPD(rib->uipcp, "Management-only reliable N-1 flow allocated\n");
             mgmt_only_set(nf);
@@ -1848,8 +1851,9 @@ uipcp_rib::allocate_n_flows()
             std::shared_ptr<NeighFlow> nf;
 
             nf = std::make_shared<NeighFlow>(
-                neigh->second.get(), this, string(uipcp->dif_name),
-                RL_PORT_ID_NONE, pfd.fd, RL_IPCP_ID_NONE);
+                neigh->second.get(), this, neigh->second->ipcp_name,
+                string(uipcp->dif_name), RL_PORT_ID_NONE, pfd.fd,
+                RL_IPCP_ID_NONE);
             nf->reliable = true;
             neigh->second->n_flow_set(nf);
         } else {

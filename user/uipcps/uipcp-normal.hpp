@@ -151,6 +151,9 @@ struct NeighFlow {
     Neighbor *neigh;
     uipcp_rib *rib;
 
+    /* Name of the neighbor IPCP (same as Neighbor::ipcp_name of
+     * the parent Neighbor object. */
+    std::string neigh_name;
     std::string supp_dif;
 
     /* If this is a kernel-bound flow, port_id and lower_ipcp_id are
@@ -190,8 +193,9 @@ struct NeighFlow {
     } stats;
 
     RL_NODEFAULT_NONCOPIABLE(NeighFlow);
-    NeighFlow(Neighbor *n, uipcp_rib *parent, const std::string &supp_dif,
-              rl_port_t pid, int ffd, rl_ipcp_id_t lid);
+    NeighFlow(Neighbor *n, uipcp_rib *parent, const std::string &ipcp_name,
+              const std::string &supp_dif, rl_port_t pid, int ffd,
+              rl_ipcp_id_t lid);
     ~NeighFlow();
 
     void keepalive_tmr_start();
