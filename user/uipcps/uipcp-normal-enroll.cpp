@@ -32,9 +32,10 @@
 
 using namespace std;
 
-NeighFlow::NeighFlow(Neighbor *n, const string &supdif, rl_port_t pid, int ffd,
-                     rl_ipcp_id_t lid)
+NeighFlow::NeighFlow(Neighbor *n, uipcp_rib *parent, const string &supdif,
+                     rl_port_t pid, int ffd, rl_ipcp_id_t lid)
     : neigh(n),
+      rib(parent),
       supp_dif(supdif),
       port_id(pid),
       lower_ipcp_id(lid),
@@ -50,7 +51,7 @@ NeighFlow::NeighFlow(Neighbor *n, const string &supdif, rl_port_t pid, int ffd,
 
 NeighFlow::~NeighFlow()
 {
-    struct uipcp *uipcp = neigh->rib->uipcp;
+    struct uipcp *uipcp = rib->uipcp;
     const char *flowlev = "N-1";
     int ret;
 
@@ -59,7 +60,7 @@ NeighFlow::~NeighFlow()
         return;
     }
 
-    if (supp_dif == string(neigh->rib->uipcp->dif_name)) {
+    if (supp_dif == string(rib->uipcp->dif_name)) {
         flowlev = "N";
     }
 
@@ -104,7 +105,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
         objlen = obj->serialize(objbuf, sizeof(objbuf));
         if (objlen < 0) {
             errno = EINVAL;
-            UPE(neigh->rib->uipcp, "serialization failed\n");
+            UPE(rib->uipcp, "serialization failed\n");
             return objlen;
         }
 
@@ -130,7 +131,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
 
         if (ret) {
             errno = EINVAL;
-            UPE(neigh->rib->uipcp, "message serialization failed\n");
+            UPE(rib->uipcp, "message serialization failed\n");
             if (serbuf) {
                 delete[] serbuf;
             }
@@ -141,7 +142,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
         mhdr.type       = RLITE_MGMT_HDR_T_OUT_LOCAL_PORT;
         mhdr.local_port = port_id;
 
-        ret = neigh->rib->mgmt_bound_flow_write(&mhdr, serbuf, serlen);
+        ret = rib->mgmt_bound_flow_write(&mhdr, serbuf, serlen);
         if (ret == 0) {
             ret = serlen;
         }
@@ -205,19 +206,19 @@ NeighFlow::enroll_state_set(EnrollState st)
 
     enroll_state = st;
 
-    UPD(neigh->rib->uipcp, "switch state %s --> %s\n",
+    UPD(rib->uipcp, "switch state %s --> %s\n",
         Neighbor::enroll_state_repr(old), Neighbor::enroll_state_repr(st));
 
     if (old != EnrollState::NEIGH_ENROLLED &&
         st == EnrollState::NEIGH_ENROLLED) {
-        neigh->rib->enrolled++;
-        neigh->rib->neighbors_deleted.erase(neigh->ipcp_name);
+        rib->enrolled++;
+        rib->neighbors_deleted.erase(neigh->ipcp_name);
     } else if (old == EnrollState::NEIGH_ENROLLED &&
                st == EnrollState::NEIGH_NONE) {
-        neigh->rib->enrolled--;
+        rib->enrolled--;
     }
 
-    assert(neigh->rib->enrolled >= 0);
+    assert(rib->enrolled >= 0);
 }
 
 void
@@ -225,18 +226,18 @@ NeighFlow::keepalive_tmr_start()
 {
     /* Keepalive timeout is expressed in seconds. */
     unsigned int keepalive =
-        neigh->rib->get_param_value<int>("enrollment", "keepalive");
+        rib->get_param_value<int>("enrollment", "keepalive");
 
     if (keepalive == 0) {
         /* no keepalive */
         return;
     }
 
-    neigh->rib->keepalive_timers[flow_fd] = make_unique<TimeoutEvent>(
-        std::chrono::seconds(keepalive), neigh->rib->uipcp, this,
+    rib->keepalive_timers[flow_fd] = make_unique<TimeoutEvent>(
+        std::chrono::seconds(keepalive), rib->uipcp, this,
         [](struct uipcp *uipcp, void *arg) {
             NeighFlow *nf  = static_cast<NeighFlow *>(arg);
-            uipcp_rib *rib = nf->neigh->rib;
+            uipcp_rib *rib = nf->rib;
             std::lock_guard<std::mutex> guard(rib->mutex);
 
             rib->keepalive_timers[nf->flow_fd]->fired();
@@ -247,7 +248,7 @@ NeighFlow::keepalive_tmr_start()
 void
 NeighFlow::keepalive_tmr_stop()
 {
-    neigh->rib->keepalive_timers[flow_fd].reset();
+    rib->keepalive_timers[flow_fd].reset();
 }
 
 Neighbor::Neighbor(uipcp_rib *rib_, const string &name)
@@ -1519,7 +1520,7 @@ Neighbor::flow_alloc(const char *supp_dif)
     rib->lock();
     assert(flow_alloc_enabled == false);
     flows[port_id_] = std::make_shared<NeighFlow>(
-        this, string(supp_dif), port_id_, flow_fd_, lower_ipcp_id_);
+        this, rib, string(supp_dif), port_id_, flow_fd_, lower_ipcp_id_);
     flows[port_id_]->reliable = false;
 
     UPD(rib->uipcp, "Unreliable N-1 flow allocated [fd=%d, port_id=%u]\n",
@@ -1548,7 +1549,7 @@ Neighbor::flow_alloc(const char *supp_dif)
         } else {
             std::shared_ptr<NeighFlow> nf;
 
-            nf           = std::make_shared<NeighFlow>(this, string(supp_dif),
+            nf = std::make_shared<NeighFlow>(this, rib, string(supp_dif),
                                              RL_PORT_ID_NONE, mgmt_fd,
                                              RL_IPCP_ID_NONE);
             nf->reliable = true;
@@ -1847,8 +1848,8 @@ uipcp_rib::allocate_n_flows()
             std::shared_ptr<NeighFlow> nf;
 
             nf = std::make_shared<NeighFlow>(
-                neigh->second.get(), string(uipcp->dif_name), RL_PORT_ID_NONE,
-                pfd.fd, RL_IPCP_ID_NONE);
+                neigh->second.get(), this, string(uipcp->dif_name),
+                RL_PORT_ID_NONE, pfd.fd, RL_IPCP_ID_NONE);
             nf->reliable = true;
             neigh->second->n_flow_set(nf);
         } else {
