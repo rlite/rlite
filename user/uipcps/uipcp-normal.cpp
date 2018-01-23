@@ -1000,8 +1000,8 @@ uipcp_rib::neighs_sync_obj_excluding(const Neighbor *exclude, bool create,
             continue;
         }
 
-        kvn.second->neigh_sync_obj(nullptr, create, obj_class, obj_name,
-                                   obj_value);
+        kvn.second->mgmt_conn()->sync_obj(create, obj_class, obj_name,
+                                          obj_value);
     }
 
     return 0;
