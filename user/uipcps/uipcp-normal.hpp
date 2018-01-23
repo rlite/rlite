@@ -149,6 +149,7 @@ enum class EnrollState {
 struct NeighFlow {
     /* Backpointer to the parent data structure. */
     Neighbor *neigh;
+    uipcp_rib *rib;
 
     std::string supp_dif;
 
@@ -189,8 +190,8 @@ struct NeighFlow {
     } stats;
 
     RL_NODEFAULT_NONCOPIABLE(NeighFlow);
-    NeighFlow(Neighbor *n, const std::string &supp_dif, rl_port_t pid, int ffd,
-              rl_ipcp_id_t lid);
+    NeighFlow(Neighbor *n, uipcp_rib *parent, const std::string &supp_dif,
+              rl_port_t pid, int ffd, rl_ipcp_id_t lid);
     ~NeighFlow();
 
     void keepalive_tmr_start();
