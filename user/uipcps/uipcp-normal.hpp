@@ -435,6 +435,7 @@ struct EnrollmentResources {
     void enrollment_commit();
     void enrollment_abort();
 
+    /* Remove the stored shared pointer. */
     void set_terminated() { nf.reset(); }
     bool is_terminated() const { return nf == nullptr; }
 };
