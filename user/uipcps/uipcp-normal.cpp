@@ -440,7 +440,46 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
 
 uipcp_rib::~uipcp_rib()
 {
-    // TODO take RIB lock
+    /* The caller guarantees that the per-uipcp event loop is already
+     * terminated and that nobody can invoke this class again. However, we
+     * need to make sure that all the threads spawned by this class
+     * terminated before we proceed to destruction.
+     *
+     * For now we only have the enrollment threads, and we know that they
+     * always terminate after a finite period (timeout or successful
+     * termination); moreover, we know that once we see
+     * EnrollmentResources::is_terminated() as true (under RIB lock), the
+     * corresponding enrollment thread won't try to take the RIB lock again,
+     * so we can join them under RIB lock without deadlocking.
+     * Since we don't receive notifications from the enrollment threads, we
+     * we just wait for them to terminate, periodically sleeping (out of
+     * the RIB lock) if needed. */
+
+    auto num_enrollments_ongoing = [this]() -> unsigned int {
+        unsigned int cnt = 0;
+        for (const auto &kv : enrollment_resources) {
+            if (kv.second && !kv.second->is_terminated()) {
+                ++cnt;
+            }
+        }
+        return cnt;
+    };
+
+    lock();
+    for (;;) {
+        unsigned int num = num_enrollments_ongoing();
+
+        if (!num) {
+            break;
+        }
+        unlock();
+        /* We must sleep out of the lock, to give the threads the opportunity
+         * to go ahead and terminate. */
+        UPD(uipcp, "Waiting for %d enrollment threads to terminate...\n", num);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        lock();
+    }
+
     /* We need to destroy all children objects that have raw backpointers to
      * us, otherwise they are destroyed after this destructor, so while the
      * backpointer is invalid. A better solution would be to use std::weak_ptr
@@ -463,6 +502,7 @@ uipcp_rib::~uipcp_rib()
     uipcp_loop_fdh_del(uipcp, mgmtfd);
     close(mgmtfd);
     UPD(uipcp, "RIB %s destroyed\n", myname.c_str());
+    unlock();
 }
 
 #ifdef RL_USE_QOS_CUBES
@@ -707,6 +747,7 @@ uipcp_rib::update_lower_difs(int reg, string lower_dif)
     return 0;
 }
 
+/* This function must not take the RIB lock. */
 int
 uipcp_rib::register_to_lower_one(const char *lower_dif, bool reg)
 {

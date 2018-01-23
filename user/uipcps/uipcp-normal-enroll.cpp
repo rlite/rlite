@@ -193,7 +193,8 @@ EnrollmentResources::enrollment_abort()
     }
     stopped.notify_all();
 
-    /* Remove the stored shared pointer. */
+    /* Afther this call, the thread must release the RIB lock and never
+     * try to acquire it again. */
     set_terminated();
 }
 
@@ -389,9 +390,6 @@ EnrollmentResources::enrollment_commit()
         UPI(rib->uipcp, "Neighbor %s joined the DIF %s\n",
             neigh->ipcp_name.c_str(), rib->uipcp->dif_name);
     }
-
-    /* Remove the stored shared pointer. */
-    set_terminated();
 }
 
 /* To be called with RIB lock held. */
@@ -685,6 +683,13 @@ finish:
      * N-flows and free enrollment resources. */
     uipcps_loop_signal(rib->uipcp->uipcps);
 
+    lk.lock();
+    /* Afther this call, the thread must release the RIB lock and never
+     * try to acquire it again. This is necessary to synchronize with
+     * uipcp_rib::~uipcp_rib(). */
+    set_terminated();
+    lk.unlock();
+
     return;
 
 err:
@@ -898,6 +903,14 @@ finish:
     lk.unlock();
     rib->enroller_enable(true);
     uipcps_loop_signal(rib->uipcp->uipcps);
+
+    lk.lock();
+    /* Afther this call, the thread must release the RIB lock and never
+     * try to acquire it again. This is necessary to synchronize with
+     * uipcp_rib::~uipcp_rib(). */
+    set_terminated();
+    lk.unlock();
+
     return;
 
 err:
