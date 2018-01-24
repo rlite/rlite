@@ -664,10 +664,6 @@ uipcps_loop_signal(struct uipcps *uipcps)
     return eventfd_signal(uipcps->efd, 1);
 }
 
-/* Time interval (in seconds) between two consecutive run of
- * per-ipcp periodic tasks (e.g. re-enrollments). */
-#define PERIODIC_TASK_INTVAL 10
-
 static void
 periodic_tasks(struct uipcps *uipcps)
 {
@@ -722,7 +718,7 @@ uipcps_loop(void *opaque)
         pfd[1].fd     = uipcps->efd;
         pfd[1].events = POLLIN;
 
-        ret = poll(pfd, 2, PERIODIC_TASK_INTVAL * 1000);
+        ret = poll(pfd, 2, uipcps->periodic_tasks_interval * 1000);
         if (ret < 0) {
             PE("poll() failed [%s]\n", strerror(errno));
             break;
@@ -855,7 +851,8 @@ usage(void)
            "   -h : show this help\n"
            "   -v VERB_LEVEL : set verbosity LEVEL: QUIET, WARN, INFO, "
            "DBG (default), VERY\n"
-           "   -d : start as a daemon process\n");
+           "   -d : start as a daemon process\n"
+           "   -T PERIOD: for periodic tasks (in seconds)\n");
 }
 
 void normal_lib_init(void);
@@ -870,8 +867,9 @@ main(int argc, char **argv)
     int daemon            = 0;
     int pidfd             = -1;
     int ret, opt;
+    int period = 10; /* In seconds, for periodic tasks. */
 
-    while ((opt = getopt(argc, argv, "hv:d")) != -1) {
+    while ((opt = getopt(argc, argv, "hv:dT:")) != -1) {
         switch (opt) {
         case 'h':
             usage();
@@ -883,6 +881,15 @@ main(int argc, char **argv)
 
         case 'd':
             daemon = 1;
+            break;
+
+        case 'T':
+            period = atoi(optarg);
+            if (period < 2) {
+                printf("Invalid period '%d': it must be > 2 seconds\n", period);
+                usage();
+                return -1;
+            }
             break;
 
         default:
@@ -1101,6 +1108,9 @@ main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    /* Time interval (in seconds) between two consecutive run of
+     * per-ipcp periodic tasks (e.g. re-enrollments). */
+    uipcps->periodic_tasks_interval = period;
     ret = pthread_create(&uipcps->th, NULL, uipcps_loop, uipcps);
     if (ret) {
         PE("pthread_create() failed [%s]\n", strerror(errno));

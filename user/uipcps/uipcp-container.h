@@ -63,6 +63,9 @@ struct uipcps {
 
     /* Set when uipcps daemon is asked to terminate. */
     int terminate;
+
+    /* Interval for the uipcps loop to trigger periodic tasks. */
+    unsigned int periodic_tasks_interval;
 };
 
 int eventfd_signal(int efd, unsigned int value);
