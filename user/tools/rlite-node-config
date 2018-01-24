@@ -51,6 +51,9 @@ argparser.add_argument('-d', '--daemon', action = 'store_true',
 argparser.add_argument('-v', '--verbose',
                        help = "Be verbose",
                        action = 'store_true')
+argparser.add_argument('-o', '--once', action = 'store_true',
+                       help = "Terminate after successfully executing the"
+                       " initscript")
 
 args = argparser.parse_args()
 
@@ -169,3 +172,5 @@ while True:
     # Configuration is complete.
     configured = True
     print(">>> Initscript completed.")
+    if args.once:
+        break
