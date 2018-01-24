@@ -375,7 +375,7 @@ Neighbor::n_flow_set(std::shared_ptr<NeighFlow> nf)
             ipcp_name.c_str(), nf->flow_fd);
         n_flow = nf;
         uipcp_loop_fdh_add(rib->uipcp, nf->flow_fd, normal_mgmt_only_flow_ready,
-                           nf.get());
+                           rib);
     }
 }
 
