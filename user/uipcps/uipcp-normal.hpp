@@ -151,7 +151,7 @@ struct NeighFlow {
     uipcp_rib *rib;
 
     /* Name of the neighbor IPCP (same as Neighbor::ipcp_name of
-     * the parent Neighbor object. */
+     * the parent Neighbor object). */
     std::string neigh_name;
     std::string supp_dif;
 
@@ -226,7 +226,7 @@ struct Neighbor {
      * management purposes. */
     std::shared_ptr<NeighFlow> mgmt_only;
 
-    /* If not nullptr, a regular (non-kernel-bound) N flow used for
+    /* If not nullptr, a regular (non-kernel-bound) N-flow used for
      * management purposes. This may be used only if the N-1 DIFs
      * towards the neighbor do not support reliable flows. */
     std::shared_ptr<NeighFlow> n_flow;
