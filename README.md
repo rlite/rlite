@@ -13,10 +13,11 @@
     45. Other tools
     46. Python bindings
 5. Tutorials
-	51. Using the demonstrator
+    51. Using the demonstrator
     52. Hands-on tutorial #1: normal-over-shim-eth
     53. Hands-on tutorial #2: normal-over-shim-udp4
     54. Hands-on tutorial #3: normal-over-shim-wifi
+    55. Using configen
 6. Configuration of IPC Processes
 	61. shim-eth IPC Process
 	62. shim-udp4 IPC Process
@@ -744,6 +745,33 @@ while the other node runs the client in ping mode
 
     (node B)$ rinaperf
 
+
+## 5.5 Using configen
+
+The `configen.py` tool located in the same directory as the demonstrator
+serves to generate initscripts for `rlite-node-config` using similar
+configuration files as the demonstrator. Since it is meant to be used on
+physical machines, the `eth` directive has different syntax and semantics.
+It is now used to create an ethernet shim IPCP and bind it to an
+interface.
+
+The new syntax is:
+
+    eth NODE IPCP DIF NETDEV
+
+where `NODE` is the name of the node this directive belongs to, `IPCP` and
+`DIF` are the names of the IPCP and DIF for this ethernet shim and
+`NETDEV` is the interface name it will be bound to.
+
+An configuration corresponding to the example in **5.2** may look like this:
+
+    eth A ethAB ethAB eth0
+    eth B ethAB ethAB eth0
+    eth B ethBC ethBC eth1
+    eth C ethBC ethBC eth0
+    dif n A ethAB
+    dif n B ethAB ethBC
+    dif n C ethBC
 
 ## 6. Configuration of IPC Processes
 
