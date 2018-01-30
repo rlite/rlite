@@ -748,22 +748,23 @@ while the other node runs the client in ping mode
 
 ## 5.5 Using configen
 
-The `configen.py` tool located in the same directory as the demonstrator
-serves to generate initscripts for `rlite-node-config` using similar
-configuration files as the demonstrator. Since it is meant to be used on
-physical machines, the `eth` directive has different syntax and semantics.
-It is now used to create an ethernet shim IPCP and bind it to an
-interface.
+The `configen` tool, located in `demo/configen.py`, can generate initscripts
+for `rlite-node-config`, using similar configuration files as the
+demonstrator.
+However, this tool is meant to be used with physical machines, and so the
+`eth` directive has different syntax and semantics: it gives instructions
+to create a shim-eth IPCP and bind it to a given network interface.
 
-The new syntax is:
+The new syntax for the `eth` directive is the following:
 
     eth NODE IPCP DIF NETDEV
 
-where `NODE` is the name of the node this directive belongs to, `IPCP` and
-`DIF` are the names of the IPCP and DIF for this ethernet shim and
-`NETDEV` is the interface name it will be bound to.
+where `NODE` is the name of the node where the IPCP will be created, `IPCP`
+and `DIF` are the names of the shim-eth IPCP and DIF, and `NETDEV` is the
+name of the network interface to bind.
 
-An configuration corresponding to the example in **5.2** may look like this:
+An example of `configen` configuration (corresponding to the example
+reported in **5.2**) is the following:
 
     eth A ethAB ethAB eth0
     eth B ethAB ethAB eth0
