@@ -500,7 +500,10 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
         RPD(2, "No route to IPCP %lu, dropping packet\n",
             (long unsigned)remote_addr);
         rl_buf_free(rb);
-        return -EHOSTUNREACH;
+        /* Do not return -EHOSTUNREACH, this would break applications.
+         * We assume the unreachability is temporary, and due to routing
+         * rearrangements. */
+        return 0;
     }
 
     if (!lower_flow) {
