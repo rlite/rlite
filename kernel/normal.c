@@ -354,9 +354,9 @@ rtx_tmr_cb(long unsigned arg)
             } else {
                 rb_list_enq(crb, &rrbq);
             }
-
-        } else if (!next_exp_set ||
-                   time_before(RL_BUF_RTX(rb).rtx_jiffies, next_exp)) {
+        }
+        if (!next_exp_set ||
+            time_before(RL_BUF_RTX(rb).rtx_jiffies, next_exp)) {
             next_exp     = RL_BUF_RTX(rb).rtx_jiffies;
             next_exp_set = true;
         }
