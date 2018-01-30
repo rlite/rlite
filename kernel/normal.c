@@ -291,7 +291,7 @@ a_tmr_cb(long unsigned arg)
     struct dtp *dtp         = &flow->dtp;
     struct rl_buf *crb;
 
-    RPD(1, "A tmr callback\n");
+    RPV(1, "A tmr callback\n");
 
     spin_lock_bh(&dtp->lock);
     crb = sdu_rx_sv_update(ipcp, flow, true);
@@ -948,7 +948,7 @@ no_ack:
      * started) */
     if (a && !timer_pending(&flow->dtp.a_tmr)) {
         mod_timer(&flow->dtp.a_tmr, jiffies + msecs_to_jiffies(a));
-        RPD(1, "start A timer\n");
+        RPV(1, "start A timer\n");
     }
 
     return NULL;
