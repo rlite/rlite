@@ -97,6 +97,17 @@ extern int verbosity;
             PD(FMT, ##__VA_ARGS__);                                            \
     } while (0)
 
+#define RPV(LPS, FMT, ...)                                                     \
+    do {                                                                       \
+        static int t0, __cnt;                                                  \
+        if (t0 != time_sec_cur) {                                              \
+            t0    = time_sec_cur;                                              \
+            __cnt = 0;                                                         \
+        }                                                                      \
+        if (__cnt++ < LPS)                                                     \
+            PV(FMT, ##__VA_ARGS__);                                            \
+    } while (0)
+
 /*
  * Bit definitions for the PCI header.
  */
