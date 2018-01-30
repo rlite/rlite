@@ -421,7 +421,7 @@ FullyReplicatedLFDB::age_incr()
     unsigned int age_inc_intval =
         rib->get_param_value<int>("routing", "age-incr-intval");
     unsigned int age_max = rib->get_param_value<int>("routing", "age-max");
-    bool discarded       = false;
+    LowerFlowList prop_lfl;
 
     for (auto &kvi : db) {
         list<unordered_map<NodeId, LowerFlow>::iterator> discard_list;
@@ -438,18 +438,20 @@ FullyReplicatedLFDB::age_incr()
             if (jt->second.age > age_max) {
                 /* Insert this into the list of entries to be discarded. */
                 discard_list.push_back(jt);
-                discarded = true;
             }
         }
 
         for (const auto &dit : discard_list) {
             UPI(rib->uipcp, "Discarded lower-flow %s (age)\n",
                 static_cast<string>(dit->second).c_str());
+            prop_lfl.flows.push_back(dit->second);
             kvi.second.erase(dit);
         }
     }
 
-    if (discarded) {
+    if (!prop_lfl.flows.empty()) {
+        rib->neighs_sync_obj_all(/*create=*/false, obj_class::lfdb,
+                                 obj_name::lfdb, &prop_lfl);
         /* Update the routing table. */
         re.update_kernel_routing(rib->myname);
     }
@@ -461,7 +463,7 @@ FullyReplicatedLFDB::age_incr()
 void
 FullyReplicatedLFDB::neigh_disconnected(const std::string &neigh_name)
 {
-    bool discarded = false;
+    LowerFlowList prop_lfl;
 
     for (auto &kvi : db) {
         list<unordered_map<NodeId, LowerFlow>::iterator> discard_list;
@@ -471,18 +473,20 @@ FullyReplicatedLFDB::neigh_disconnected(const std::string &neigh_name)
                 (kvi.first == neigh_name && jt->first == rib->myname)) {
                 /* Insert this into the list of entries to be discarded. */
                 discard_list.push_back(jt);
-                discarded = true;
             }
         }
 
         for (const auto &dit : discard_list) {
             UPI(rib->uipcp, "Discarded lower-flow %s (neighbor disconnected)\n",
                 static_cast<string>(dit->second).c_str());
+            prop_lfl.flows.push_back(dit->second);
             kvi.second.erase(dit);
         }
     }
 
-    if (discarded) {
+    if (!prop_lfl.flows.empty()) {
+        rib->neighs_sync_obj_all(/*create=*/false, obj_class::lfdb,
+                                 obj_name::lfdb, &prop_lfl);
         /* Update the routing table. */
         re.update_kernel_routing(rib->myname);
     }
