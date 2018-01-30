@@ -165,7 +165,15 @@ FullyReplicatedLFDB::add(const LowerFlow &lf)
     lfz.age = 0;
 
     if (it == db.end() || it->second.count(lf.remote_node) == 0) {
-        /* Not there, we need to add the entry. */
+        /* Not there, we should add the entry. */
+        if (lf.local_node == rib->myname &&
+            rib->get_neighbor(lf.remote_node, /*create=*/false) == nullptr) {
+            /* Someone is telling us to add an entry where we are the local
+             * node, but there is no neighbor. Discard the update. */
+            UPD(rib->uipcp, "Lower flow %s not added (no such neighbor)\n",
+                repr.c_str());
+            return false;
+        }
         db[lf.local_node][lf.remote_node] = lfz;
         UPD(rib->uipcp, "Lower flow %s added\n", repr.c_str());
         return true;
@@ -435,7 +443,7 @@ FullyReplicatedLFDB::age_incr()
         }
 
         for (const auto &dit : discard_list) {
-            UPI(rib->uipcp, "Discarded lower-flow %s\n",
+            UPI(rib->uipcp, "Discarded lower-flow %s (age)\n",
                 static_cast<string>(dit->second).c_str());
             kvi.second.erase(dit);
         }
@@ -468,7 +476,7 @@ FullyReplicatedLFDB::neigh_disconnected(const std::string &neigh_name)
         }
 
         for (const auto &dit : discard_list) {
-            UPI(rib->uipcp, "Discarded lower-flow %s\n",
+            UPI(rib->uipcp, "Discarded lower-flow %s (neighbor disconnected)\n",
                 static_cast<string>(dit->second).c_str());
             kvi.second.erase(dit);
         }
