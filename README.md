@@ -116,7 +116,7 @@ List of required packages:
 * cmake
 * linux-headers-$(uname -r)
 * python, swig [optional, for python bindings]
-* wpa_supplicant, hostapd [optional, for shim-wifi]
+* wpasupplicant, hostapd [optional, for shim-wifi]
 
 ### Archlinux
 
