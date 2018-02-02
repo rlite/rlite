@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import re
+import os
+import sys
 import argparse
 from libdemo import Demo, prefix_is_valid
 
@@ -302,11 +304,25 @@ argparser.add_argument(
     "is specified for the ipcp-enroll command, so "
     "that N-1 flow allocation is issued using the "
     "N-DIF name as destination application")
+argparser.add_argument(
+        '-o',
+        '--output',
+        type=str,
+        help="Output directory for generated initscripts",
+        default="."
+        )
 args = argparser.parse_args()
 
 flavour_suffix = ''
 if args.flavour != '':
     flavour_suffix = '-' + args.flavour
+
+if not os.access(args.output, os.W_OK):
+    try:
+        os.makedirs(args.output)
+    except os.error:
+        sys.stderr.write("Cannot access or create output directory\n")
+        sys.exit(1)
 
 demo = Configen(
     flavour_suffix=flavour_suffix,
@@ -330,7 +346,7 @@ for vmname in sorted(demo.vms):
     pctrl_cmds, enroll_cmds, appl_cmds = demo.compute_enrollments(vmname)
     ctrl_cmds += pctrl_cmds
 
-    initscript_name = vm['name'] + '.initscript'
+    initscript_name = args.output + '/' + vm['name'] + '.initscript'
     initscript = open(initscript_name, 'w')
     initscript_outs = ''
     for cmd in ctrl_cmds:
