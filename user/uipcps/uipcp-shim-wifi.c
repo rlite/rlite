@@ -137,10 +137,33 @@ shim_wifi_config(struct uipcp *uipcp, const struct rl_cmsg_ipcp_config *cmsg)
     return ENOSYS;
 }
 
+static int
+shim_wifi_get_access_difs(struct uipcp *uipcp, struct list_head *networks)
+{
+    struct shim_wifi *shim = SHIM(uipcp);
+    struct wpa_ctrl *ctrl_conn;
+    int ret;
+
+    if (!shim->ifname) {
+        UPW(uipcp, "No interface name\n");
+        return 0;
+    }
+    ctrl_conn = wifi_init(shim->ifname);
+    if (!ctrl_conn) {
+        return -1;
+    }
+
+    ret = wifi_scan(ctrl_conn, networks);
+    wifi_close(ctrl_conn);
+
+    return ret;
+}
+
 struct uipcp_ops shim_wifi_ops = {
     .init            = shim_wifi_init,
     .enroll          = shim_wifi_enroll,
     .enroller_enable = shim_wifi_enroller_enable,
     .fini            = shim_wifi_fini,
     .config          = shim_wifi_config,
+    .get_access_difs = shim_wifi_get_access_difs,
 };

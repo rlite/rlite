@@ -35,6 +35,9 @@
 extern "C" {
 #endif
 
+struct uipcp;
+typedef int (*handover_manager_t)(struct uipcp *uipcp);
+
 /* User IPCP data model. */
 struct uipcps {
     /* Unix domain socket file descriptor used to accept request from
@@ -66,6 +69,9 @@ struct uipcps {
 
     /* Interval for the uipcps loop to trigger periodic tasks. */
     unsigned int periodic_tasks_interval;
+
+    /* Optional handover manager to handle mobility. */
+    handover_manager_t handover_manager;
 };
 
 int eventfd_signal(int efd, unsigned int value);
@@ -170,6 +176,7 @@ struct uipcp_ops {
      * lower flows. */
     int (*neigh_disconnect)(struct uipcp *uipcp,
                             const struct rl_cmsg_ipcp_neigh_disconnect *req);
+    int (*get_access_difs)(struct uipcp *uipcp, struct list_head *access_difs);
 };
 
 struct ipcp_node {
