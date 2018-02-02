@@ -747,7 +747,7 @@ ipcp_policy_param_mod(int argc, char **argv, struct cmd_descriptor *cd)
 }
 
 static int
-ipcp_enroller_enable(int argc, char **argv, struct cmd_descriptor *cd)
+ipcp_enroller_mod(int argc, char **argv, struct cmd_descriptor *cd, int enable)
 {
     struct rl_cmsg_ipcp_enroller_enable req;
     const char *ipcp_name;
@@ -765,9 +765,21 @@ ipcp_enroller_enable(int argc, char **argv, struct cmd_descriptor *cd)
 
     req.msg_type = RLITE_U_IPCP_ENROLLER_ENABLE;
     req.event_id = 0;
-    req.enable   = 1;
+    req.enable   = enable ? 1 : 0;
 
     return request_response(RLITE_MB(&req), NULL);
+}
+
+static int
+ipcp_enroller_enable(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    return ipcp_enroller_mod(argc, argv, cd, 1);
+}
+
+static int
+ipcp_enroller_disable(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    return ipcp_enroller_mod(argc, argv, cd, 0);
 }
 
 static int
@@ -1187,6 +1199,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage    = "IPCP_NAME",
         .num_args = 1,
         .func     = ipcp_enroller_enable,
+    },
+    {
+        .name     = "ipcp-enroller-disable",
+        .usage    = "IPCP_NAME",
+        .num_args = 1,
+        .func     = ipcp_enroller_disable,
     },
     {
         .name     = "probe",
