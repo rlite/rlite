@@ -755,13 +755,13 @@ uipcp_rib::register_to_lower_one(const char *lower_dif, bool reg)
 
     /* Perform the registration of the IPCP name. */
     if ((ret = uipcp_do_register(uipcp, lower_dif, uipcp->name, reg))) {
-        UPE(uipcp, "Registration of IPCP name %s into DIF %s failed\n",
-            uipcp->dif_name, lower_dif);
+        UPE(uipcp, "%segistration of IPCP name %s %s DIF %s failed\n",
+            reg ? "R" : "Unr", uipcp->name, reg ? "into" : "from", lower_dif);
         return ret;
     }
 
-    UPD(uipcp, "IPCP name %s registered into DIF %s\n", uipcp->dif_name,
-        lower_dif);
+    UPD(uipcp, "IPCP name %s %s DIF %s\n", uipcp->name,
+        reg ? "registered into" : "unregistered from", lower_dif);
 
     if (get_param_value<bool>("resource-allocator", "broadcast-enroller")) {
         /* Also register the N-DIF name, i.e. the name of the DIF that
@@ -769,13 +769,14 @@ uipcp_rib::register_to_lower_one(const char *lower_dif, bool reg)
          * However it is not an hard failure, as unicast enrollment is still
          * possible. */
         if ((ret = uipcp_do_register(uipcp, lower_dif, uipcp->dif_name, reg))) {
-            UPW(uipcp, "Registration of DAF name %s into DIF %s failed\n",
-                uipcp->dif_name, lower_dif);
+            UPW(uipcp, "%segistration of DAF name %s %s DIF %s failed\n",
+                reg ? "R" : "Unr", uipcp->dif_name, reg ? "into" : "from",
+                lower_dif);
             return ret;
         }
-        UPD(uipcp,
-            "DAF name %s registered into DIF %s for broadcast enrollment\n",
-            uipcp->dif_name, lower_dif);
+        UPD(uipcp, "DAF name %s %s DIF %s for broadcast enrollment\n",
+            uipcp->dif_name, reg ? "registered into" : "unregistered from",
+            lower_dif);
     }
 
     return 0;
