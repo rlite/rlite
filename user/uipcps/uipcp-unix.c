@@ -49,6 +49,7 @@
 #include "rlite/list.h"
 #include "rlite/conf.h"
 #include "rlite/uipcps-helpers.h"
+#include "rlite/wifi.h"
 #include "uipcp-container.h"
 
 struct registered_ipcp {
@@ -664,6 +665,19 @@ uipcps_loop_signal(struct uipcps *uipcps)
     return eventfd_signal(uipcps->efd, 1);
 }
 
+static int
+handover_signal_strength(struct uipcp *uipcp)
+{
+    if (uipcp->ops.get_access_difs) {
+        struct list_head networks;
+        list_init(&networks);
+        if (uipcp->ops.get_access_difs(uipcp, &networks) == 0) {
+            wifi_destroy_network_list(&networks);
+        }
+    }
+    return 0;
+}
+
 static void
 periodic_tasks(struct uipcps *uipcps)
 {
@@ -692,6 +706,9 @@ periodic_tasks(struct uipcps *uipcps)
     list_for_each_entry (uipcp, &uipcps->uipcps, node) {
         if (uipcp->ops.trigger_tasks) {
             uipcp->ops.trigger_tasks(uipcp);
+        }
+        if (uipcps->handover_manager) {
+            uipcps->handover_manager(uipcp);
         }
     }
 
@@ -852,7 +869,8 @@ usage(void)
            "   -v VERB_LEVEL : set verbosity LEVEL: QUIET, WARN, INFO, "
            "DBG (default), VERY\n"
            "   -d : start as a daemon process\n"
-           "   -T PERIOD: for periodic tasks (in seconds)\n");
+           "   -T PERIOD: for periodic tasks (in seconds)\n"
+           "   -H HANDOVER_MANAGER: (none, signal-strength)\n");
 }
 
 void normal_lib_init(void);
@@ -869,7 +887,7 @@ main(int argc, char **argv)
     int ret, opt;
     int period = 10; /* In seconds, for periodic tasks. */
 
-    while ((opt = getopt(argc, argv, "hv:dT:")) != -1) {
+    while ((opt = getopt(argc, argv, "hv:dT:H:")) != -1) {
         switch (opt) {
         case 'h':
             usage();
@@ -887,6 +905,18 @@ main(int argc, char **argv)
             period = atoi(optarg);
             if (period < 2) {
                 printf("Invalid period '%d': it must be > 2 seconds\n", period);
+                usage();
+                return -1;
+            }
+            break;
+
+        case 'H':
+            if (!strcmp(optarg, "none")) {
+                uipcps->handover_manager = NULL;
+            } else if (!strcmp(optarg, "signal-strength")) {
+                uipcps->handover_manager = handover_signal_strength;
+            } else {
+                printf("Unknown handover manager '%s'\n", optarg);
                 usage();
                 return -1;
             }
