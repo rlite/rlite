@@ -637,6 +637,7 @@ struct uipcp_rib {
     int enroll(const char *neigh_name, const char *supp_dif_name,
                int wait_for_completion);
     int neigh_disconnect(const std::string &neigh_name);
+    int lower_dif_detach(const std::string &lower_dif);
     void enrollment_resources_cleanup();
     void trigger_re_enrollments();
     void keepalive_timeout(NeighFlow *nf);

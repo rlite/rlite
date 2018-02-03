@@ -176,7 +176,14 @@ struct uipcp_ops {
      * lower flows. */
     int (*neigh_disconnect)(struct uipcp *uipcp,
                             const struct rl_cmsg_ipcp_neigh_disconnect *req);
+
+    /* For mobile shim DIFs, user wants to get the current list of access
+     * DIFs, with associated info (used by handover managers). */
     int (*get_access_difs)(struct uipcp *uipcp, struct list_head *access_difs);
+
+    /* User wants the uipcp to disconnect from the neighbor connected through
+     * a given lower DIF. */
+    int (*lower_dif_detach)(struct uipcp *uipcp, const char *lower_dif);
 };
 
 struct ipcp_node {
