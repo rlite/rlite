@@ -269,12 +269,12 @@ FullyReplicatedDFT::rib_handler(const CDAPMessage *rm,
     /* Propagate the DFT entries update to the other neighbors,
      * except for who told us. */
     if (prop_dft_add.entries.size()) {
-        rib->neighs_sync_obj_excluding(neigh.get(), true, obj_class::dft,
+        rib->neighs_sync_obj_excluding(neigh, true, obj_class::dft,
                                        obj_name::dft, &prop_dft_add);
     }
 
     if (prop_dft_del.entries.size()) {
-        rib->neighs_sync_obj_excluding(neigh.get(), false, obj_class::dft,
+        rib->neighs_sync_obj_excluding(neigh, false, obj_class::dft,
                                        obj_name::dft, &prop_dft_del);
     }
 

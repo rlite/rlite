@@ -240,7 +240,7 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
 
         if (propagate) {
             /* nf can be nullptr for M_DELETE messages */
-            rib->neighs_sync_obj_excluding(neigh.get(), create, rm->obj_class,
+            rib->neighs_sync_obj_excluding(neigh, create, rm->obj_class,
                                            rm->obj_name, &aar);
         }
 
@@ -278,7 +278,7 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
 
         if (prop_aal.entries.size() > 0) {
             assert(nf);
-            rib->neighs_sync_obj_excluding(neigh.get(), create, rm->obj_class,
+            rib->neighs_sync_obj_excluding(neigh, create, rm->obj_class,
                                            rm->obj_name, &prop_aal);
         }
 
