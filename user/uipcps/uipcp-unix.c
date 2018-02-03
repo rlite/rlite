@@ -668,12 +668,18 @@ uipcps_loop_signal(struct uipcps *uipcps)
 static int
 handover_signal_strength(struct uipcp *uipcp)
 {
-    if (uipcp->ops.get_access_difs) {
-        struct list_head networks;
-        list_init(&networks);
-        if (uipcp->ops.get_access_difs(uipcp, &networks) == 0) {
-            wifi_destroy_network_list(&networks);
+    struct list_head networks;
+    if (!uipcp->ops.get_access_difs) {
+        return 0;
+    }
+    list_init(&networks);
+    if (uipcp->ops.get_access_difs(uipcp, &networks) == 0) {
+        struct wifi_network *net;
+
+        list_for_each_entry (net, &networks, list) {
+            printf("network %s signal %d\n", net->bssid, net->signal);
         }
+        wifi_destroy_network_list(&networks);
     }
     return 0;
 }
