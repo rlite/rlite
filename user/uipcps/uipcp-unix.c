@@ -810,6 +810,10 @@ handover_signal_strength(struct uipcp *const uipcp)
     }
 out:
     if (tmplist) {
+        for (i = 0; i < n; i++) {
+            struct uipcp *upper = tmplist[i];
+            uipcp_put(upper);
+        }
         rl_free(tmplist, RL_MT_MISC);
     }
     wifi_destroy_network_list(&networks);
