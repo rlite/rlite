@@ -36,7 +36,7 @@ extern "C" {
 #endif
 
 struct uipcp;
-typedef int (*handover_manager_t)(struct uipcp *uipcp);
+typedef int (*handover_manager_t)(struct uipcp *const uipcp);
 
 /* User IPCP data model. */
 struct uipcps {

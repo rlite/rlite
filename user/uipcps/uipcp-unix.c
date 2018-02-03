@@ -333,7 +333,9 @@ rl_u_ipcp_config(struct uipcps *uipcps, int sfd,
 
     /* Try to grab the corresponding userspace IPCP. If there is one,
      * check if the uipcp can satisfy this request. */
+    pthread_mutex_lock(&uipcps->lock);
     uipcp = uipcp_get_by_id(uipcps, req->ipcp_id);
+    pthread_mutex_unlock(&uipcps->lock);
     if (uipcp && uipcp->ops.config) {
         ret = uipcp->ops.config(uipcp, req);
     }
@@ -666,19 +668,35 @@ uipcps_loop_signal(struct uipcps *uipcps)
     return eventfd_signal(uipcps->efd, 1);
 }
 
+/* Handover management for a given uipcp. Check if we can switch to
+ * a better access network; if this is the case, do the switch and
+ * notify the upper IPCPs. */
 static int
-handover_signal_strength(struct uipcp *uipcp)
+handover_signal_strength(struct uipcp *const uipcp)
 {
+    struct uipcps *uipcps         = uipcp->uipcps;
+    struct wifi_network *best_net = NULL;
+    struct wifi_network *cur_net  = NULL;
+    struct uipcp **tmplist        = NULL;
     struct list_head networks;
+    int n = 0, i;
+    int ret;
+
     if (!uipcp->ops.get_access_difs) {
+        /* Handover does not apply here. */
         return 0;
     }
-    list_init(&networks);
-    if (uipcp->ops.get_access_difs(uipcp, &networks) == 0) {
-        struct wifi_network *best_net = NULL;
-        struct wifi_network *cur_net  = NULL;
-        struct wifi_network *net;
 
+    /* Get the current access networks. */
+    list_init(&networks);
+    ret = uipcp->ops.get_access_difs(uipcp, &networks);
+    if (ret) {
+        return ret;
+    }
+
+    {
+        struct wifi_network *net;
+        /* Select the best access network. */
         list_for_each_entry (net, &networks, node) {
             PV("network %s signal %d associated %d\n", net->ssid, net->signal,
                net->associated);
@@ -689,28 +707,82 @@ handover_signal_strength(struct uipcp *uipcp)
                 cur_net = net;
             }
         }
+    }
 
-        if (best_net && !best_net->associated) {
-            struct rl_cmsg_ipcp_enroll cmsg;
-            /* No networks or we are not associated to the
-             * best network. Let's switch to the new network. */
-            PI("Trying to switch from SSID %s to SSID %s\n",
-               cur_net ? cur_net->ssid : "(none)", best_net->ssid);
-            memset(&cmsg, 0, sizeof(cmsg));
-            cmsg.msg_type      = RLITE_U_IPCP_ENROLL;
-            cmsg.event_id      = 0;
-            cmsg.ipcp_name     = uipcp->name;
-            cmsg.dif_name      = best_net->ssid;
-            cmsg.supp_dif_name = "null";
-            assert(uipcp->ops.enroll);
-            if (uipcp->ops.enroll(uipcp, &cmsg, /*wait_for_completion=*/1)) {
-                PE("Failed to enroll to SSID %s\n", best_net->ssid);
-            } else {
-                PI("Enrollment to SSID %s completed\n", best_net->ssid);
+    if (!best_net || best_net->associated) {
+        /* No networks or we are already associated to the best network.
+         * Nothing to do for now. */
+        goto out;
+    }
+    /* We are not associated to the best network. Let's switch to that. */
+    PI("Trying to switch from SSID %s to SSID %s\n",
+       cur_net ? cur_net->ssid : "(none)", best_net->ssid);
+
+    {
+        /* Collect all the uppers of 'uipcp', and put them in a temporary list.
+         */
+        struct ipcp_node *ipn;
+
+        pthread_mutex_lock(&uipcps->lock);
+        tmplist =
+            rl_alloc(uipcps->n_uipcps * sizeof(struct uipcp *), RL_MT_MISC);
+        if (!tmplist) {
+            pthread_mutex_unlock(&uipcps->lock);
+            PE("Out of memory\n");
+            goto out;
+        }
+
+        list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
+            struct flow_edge *e;
+            if (ipn->id != uipcp->id) {
+                continue; /* not me */
+            }
+
+            list_for_each_entry (e, &ipn->uppers, node) {
+                struct uipcp *u = uipcp_get_by_id(uipcps, e->ipcp->id);
+                if (u) {
+                    tmplist[n++] = u;
+                }
             }
         }
-        wifi_destroy_network_list(&networks);
+        assert(n <= uipcps->n_uipcps);
+        pthread_mutex_unlock(&uipcps->lock);
     }
+
+    for (i = 0; i < n; i++) {
+        PD("Have upper %s disconnect from lower %s\n", tmplist[i]->name,
+           uipcp->name);
+    }
+
+    {
+        struct rl_cmsg_ipcp_enroll cmsg;
+        memset(&cmsg, 0, sizeof(cmsg));
+        cmsg.msg_type      = RLITE_U_IPCP_ENROLL;
+        cmsg.event_id      = 0;
+        cmsg.ipcp_name     = uipcp->name;
+        cmsg.dif_name      = best_net->ssid;
+        cmsg.supp_dif_name = "null";
+        assert(uipcp->ops.enroll);
+        ret = uipcp->ops.enroll(uipcp, &cmsg, /*wait_for_completion=*/1);
+        if (ret) {
+            PE("Failed to enroll to SSID %s\n", best_net->ssid);
+        } else {
+            PI("Enrollment to SSID %s completed\n", best_net->ssid);
+        }
+    }
+
+    if (ret == 0) {
+        for (i = 0; i < n; i++) {
+            PD("Have upper %s rejoin through lower %s\n", tmplist[i]->name,
+               uipcp->name);
+        }
+    }
+out:
+    if (tmplist) {
+        rl_free(tmplist, RL_MT_MISC);
+    }
+    wifi_destroy_network_list(&networks);
+
     return 0;
 }
 
