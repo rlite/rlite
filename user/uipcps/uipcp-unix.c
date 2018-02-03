@@ -674,11 +674,26 @@ handover_signal_strength(struct uipcp *uipcp)
     }
     list_init(&networks);
     if (uipcp->ops.get_access_difs(uipcp, &networks) == 0) {
+        struct wifi_network *best_net = NULL;
+        struct wifi_network *cur_net  = NULL;
         struct wifi_network *net;
 
         list_for_each_entry (net, &networks, node) {
-            printf("network %s signal %d associated %d\n", net->ssid,
-                   net->signal, net->associated);
+            PV("network %s signal %d associated %d\n", net->ssid, net->signal,
+               net->associated);
+            if (!best_net || net->signal > best_net->signal) {
+                best_net = net;
+            }
+            if (net->associated) {
+                cur_net = net;
+            }
+        }
+
+        if (best_net && !best_net->associated) {
+            /* No networks or we are not associated to the
+             * best network. Let's switch to the new network. */
+            PI("Switching from SSID %s to SSID %s\n",
+               cur_net ? cur_net->ssid : "(none)", best_net->ssid);
         }
         wifi_destroy_network_list(&networks);
     }
