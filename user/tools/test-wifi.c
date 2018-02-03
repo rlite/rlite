@@ -119,7 +119,7 @@ int
 wifi_cmd_scan(int argc, char **argv, struct wpa_ctrl *ctrl_conn,
               struct list_head *networks)
 {
-    return wifi_scan(ctrl_conn, networks);
+    return wifi_scan(ctrl_conn, /*only_configured=*/0, networks);
 }
 
 int

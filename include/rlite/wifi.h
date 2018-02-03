@@ -118,9 +118,13 @@ int wifi_access_point_init(void);
 /*
  * Scans for available networks and stores information about them in the
  * 'result' list consisting of 'struct wifi_network' elements.
- * The list is cleared on each run and the previous contents are lost.
+ * The list is freed on each run and the previous contents are lost.
+ * If only_configured is 1, only WiFi networks that have a valid
+ * configuration entry in the wpa_supplicant configuration file are returned,
+ * while the other ones are filtered away.
  */
-int wifi_scan(struct wpa_ctrl *ctrl_conn, struct list_head *results);
+int wifi_scan(struct wpa_ctrl *ctrl_conn, int only_configured,
+              struct list_head *results);
 
 /*
  * Lists the known network configurations. Configurations are specified
