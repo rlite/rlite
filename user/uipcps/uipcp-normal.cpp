@@ -233,7 +233,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
             nf->conn = make_unique<CDAPConn>(nf->flow_fd);
         }
 
-        if (neigh->enrollment_complete() && nf.get() == neigh->mgmt_conn() &&
+        if (neigh->enrollment_complete() && nf == neigh->mgmt_conn() &&
             !nf->initiator && is_connect_attempt &&
             src_appl == neigh->ipcp_name) {
             /* We thought we were already enrolled to this neighbor, but
@@ -256,7 +256,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
 
         nf->last_activity = std::chrono::system_clock::now();
 
-        if (neigh->enrollment_complete() && nf.get() != neigh->mgmt_conn() &&
+        if (neigh->enrollment_complete() && nf != neigh->mgmt_conn() &&
             !neigh->mgmt_conn()->initiator && m->op_code == gpb::M_START &&
             m->obj_name == obj_name::enrollment &&
             m->obj_class == obj_class::enrollment) {
@@ -611,7 +611,7 @@ uipcp_rib::dump() const
 
         auto neigh = neighbors.find(neigh_name);
         if (neigh != neighbors.end() && neigh->second->has_flows()) {
-            NeighFlow *nf = neigh->second->mgmt_conn();
+            std::shared_ptr<NeighFlow> &nf = neigh->second->mgmt_conn();
 
             if (neigh->second->enrollment_complete()) {
                 ss << "[Enrolled, heard "
@@ -1018,7 +1018,7 @@ uipcp_rib::neighs_sync_obj_all(bool create, const string &obj_class,
 }
 
 void
-uipcp_rib::neigh_flow_prune(NeighFlow *nf)
+uipcp_rib::neigh_flow_prune(const std::shared_ptr<NeighFlow> &nf)
 {
     std::shared_ptr<Neighbor> neigh =
         get_neighbor(nf->neigh_name, /*create=*/false);
@@ -1034,9 +1034,9 @@ uipcp_rib::neigh_flow_prune(NeighFlow *nf)
     m.m_stop(obj_class::lowerflow, obj_name::lowerflow);
     nf->send_to_port_id(&m, 0, nullptr);
 
-    if (nf == neigh->mgmt_only.get()) {
+    if (nf == neigh->mgmt_only) {
         neigh->mgmt_only_set(nullptr);
-    } else if (nf == neigh->n_flow.get()) {
+    } else if (nf == neigh->n_flow) {
         neigh->n_flow_set(nullptr);
     } else {
         /* Remove the NeighFlow from the Neighbor and, if the

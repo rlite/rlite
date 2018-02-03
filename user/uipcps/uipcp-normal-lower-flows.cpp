@@ -124,7 +124,7 @@ public:
                     std::shared_ptr<Neighbor> const &neigh,
                     rlm_addr_t src_addr) override;
 
-    int sync_neigh(const NeighFlow *nf, unsigned int limit) const override;
+    int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
     int neighs_refresh(size_t limit) override;
     void age_incr() override;
 };
@@ -343,7 +343,7 @@ FullyReplicatedLFDB::dump_routing(std::stringstream &ss) const
 }
 
 int
-FullyReplicatedLFDB::sync_neigh(const NeighFlow *nf, unsigned int limit) const
+FullyReplicatedLFDB::sync_neigh(NeighFlow *nf, unsigned int limit) const
 {
     LowerFlowList lfl;
     auto func = std::bind(&NeighFlow::sync_obj, nf, true, obj_class::lfdb,
