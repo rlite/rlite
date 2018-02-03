@@ -554,6 +554,7 @@ out:
 
     if (wi->uipcps->terminate) {
         unlink(RLITE_UIPCPS_UNIX_NAME);
+        unlink(RLITE_UIPCPS_PIDFILE);
         PD("terminate command received, daemon is going to exit ...\n");
         exit(EXIT_SUCCESS);
     }
@@ -845,6 +846,7 @@ sigint_handler(int signum)
     assert(signum != SIGPIPE);
     print_backtrace();
     unlink(RLITE_UIPCPS_UNIX_NAME);
+    unlink(RLITE_UIPCPS_PIDFILE);
     PD("%s signal received, daemon is going to exit ...\n", strsignal(signum));
     exit(EXIT_SUCCESS);
 }
