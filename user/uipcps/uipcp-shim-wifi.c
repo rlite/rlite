@@ -34,8 +34,9 @@
 #include "uipcp-container.h"
 
 struct shim_wifi {
-    struct uipcp *uipcp;
-    char *ifname;
+    struct uipcp *uipcp; /* parent */
+    char *ifname;        /* name of the WiFi network interface */
+    char *cur_ssid;      /* SSID of the currently associated network, or NULL */
 };
 
 #define SHIM(_u) ((struct shim_wifi *)((_u)->priv))
@@ -51,9 +52,10 @@ shim_wifi_init(struct uipcp *uipcp)
         return -1;
     }
 
-    uipcp->priv  = shim;
-    shim->uipcp  = uipcp;
-    shim->ifname = NULL;
+    uipcp->priv    = shim;
+    shim->uipcp    = uipcp;
+    shim->ifname   = NULL;
+    shim->cur_ssid = NULL;
 
     return 0;
 }
@@ -65,6 +67,9 @@ shim_wifi_fini(struct uipcp *uipcp)
 
     if (shim->ifname) {
         rl_free(shim->ifname, RL_MT_SHIM);
+    }
+    if (shim->cur_ssid) {
+        rl_free(shim->cur_ssid, RL_MT_SHIM);
     }
     rl_free(shim, RL_MT_SHIM);
 
@@ -83,8 +88,18 @@ shim_wifi_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *cmsg,
         UPE(uipcp, "No interface name\n");
         return -1;
     }
+
+    if (shim->cur_ssid) {
+        rl_free(shim->cur_ssid, RL_MT_SHIM);
+    }
+    shim->cur_ssid = rl_strdup(cmsg->dif_name, RL_MT_SHIM);
+    if (!shim->cur_ssid) {
+        return -1;
+    }
+
     ctrl_conn = wifi_init(shim->ifname);
     if (!ctrl_conn) {
+        rl_free(shim->cur_ssid, RL_MT_SHIM);
         return -1;
     }
 
