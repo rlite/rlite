@@ -290,14 +290,19 @@ NeighFlow::keepalive_tmr_start()
     }
 
     rib->keepalive_timers[flow_fd] = make_unique<TimeoutEvent>(
-        std::chrono::seconds(keepalive), rib->uipcp, this,
+        std::chrono::seconds(keepalive), rib->uipcp,
+        reinterpret_cast<void *>(static_cast<uintptr_t>(flow_fd)),
         [](struct uipcp *uipcp, void *arg) {
-            NeighFlow *nf  = static_cast<NeighFlow *>(arg);
-            uipcp_rib *rib = nf->rib;
+            int flow_fd    = reinterpret_cast<uintptr_t>(arg);
+            uipcp_rib *rib = UIPCP_RIB(uipcp);
             std::lock_guard<std::mutex> guard(rib->mutex);
+            std::shared_ptr<Neighbor> neigh;
+            std::shared_ptr<NeighFlow> nf;
 
-            rib->keepalive_timers[nf->flow_fd]->fired();
-            rib->keepalive_timeout(nf);
+            rib->keepalive_timers[flow_fd]->fired();
+            if (rib->lookup_neigh_flow_by_flow_fd(flow_fd, &nf, &neigh) == 0) {
+                rib->keepalive_timeout(nf.get());
+            }
         });
 }
 
