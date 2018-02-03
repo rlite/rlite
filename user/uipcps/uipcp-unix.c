@@ -691,10 +691,23 @@ handover_signal_strength(struct uipcp *uipcp)
         }
 
         if (best_net && !best_net->associated) {
+            struct rl_cmsg_ipcp_enroll cmsg;
             /* No networks or we are not associated to the
              * best network. Let's switch to the new network. */
-            PI("Switching from SSID %s to SSID %s\n",
+            PI("Trying to switch from SSID %s to SSID %s\n",
                cur_net ? cur_net->ssid : "(none)", best_net->ssid);
+            memset(&cmsg, 0, sizeof(cmsg));
+            cmsg.msg_type      = RLITE_U_IPCP_ENROLL;
+            cmsg.event_id      = 0;
+            cmsg.ipcp_name     = uipcp->name;
+            cmsg.dif_name      = best_net->ssid;
+            cmsg.supp_dif_name = "null";
+            assert(uipcp->ops.enroll);
+            if (uipcp->ops.enroll(uipcp, &cmsg, /*wait_for_completion=*/1)) {
+                PE("Failed to enroll to SSID %s\n", best_net->ssid);
+            } else {
+                PI("Enrollment to SSID %s completed\n", best_net->ssid);
+            }
         }
         wifi_destroy_network_list(&networks);
     }
