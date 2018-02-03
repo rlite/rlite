@@ -749,13 +749,17 @@ handover_signal_strength(struct uipcp *const uipcp)
         pthread_mutex_unlock(&uipcps->lock);
     }
 
+    /* Ask the uppers to close any flow provided by us ('uipcp'). */
     for (i = 0; i < n; i++) {
-        PD("Asking upper IPCP %s to disconnect from lower %s\n",
-           tmplist[i]->name, uipcp->dif_name);
-        assert(tmplist[i]->ops.lower_dif_detach);
-        tmplist[i]->ops.lower_dif_detach(tmplist[i], uipcp->dif_name);
+        struct uipcp *upper = tmplist[i];
+
+        PD("Asking upper IPCP %s to detach from lower DIF %s\n", upper->name,
+           uipcp->dif_name);
+        assert(upper->ops.lower_dif_detach);
+        upper->ops.lower_dif_detach(upper, uipcp->dif_name);
     }
 
+    /* Switch access DIF. */
     {
         struct rl_cmsg_ipcp_enroll cmsg;
         memset(&cmsg, 0, sizeof(cmsg));
@@ -773,10 +777,29 @@ handover_signal_strength(struct uipcp *const uipcp)
         }
     }
 
+    /* If everything is ok, ask the uppers to enroll again through us. */
     if (ret == 0) {
         for (i = 0; i < n; i++) {
-            PD("Have upper %s rejoin through lower %s\n", tmplist[i]->name,
-               uipcp->name);
+            struct uipcp *upper = tmplist[i];
+            struct rl_cmsg_ipcp_enroll cmsg;
+
+            PD("Asking upper IPCP %s to re-enroll through lower DIF %s\n",
+               upper->name, uipcp->dif_name);
+
+            memset(&cmsg, 0, sizeof(cmsg));
+            cmsg.msg_type      = RLITE_U_IPCP_ENROLL;
+            cmsg.event_id      = 0;
+            cmsg.ipcp_name     = upper->name;
+            cmsg.dif_name      = upper->dif_name;
+            cmsg.supp_dif_name = uipcp->dif_name;
+            cmsg.neigh_name    = NULL; /* broadcast enrollment */
+            assert(upper->ops.enroll);
+            ret = upper->ops.enroll(upper, &cmsg, /*wait_for_completion=*/1);
+            PI("Broadcast enrollment of upper IPCP %s to upper DIF %s through "
+               "DIF %s "
+               "%s\n",
+               upper->name, upper->dif_name, uipcp->dif_name,
+               ret ? "failed" : "completed");
         }
     }
 out:
