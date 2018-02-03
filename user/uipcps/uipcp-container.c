@@ -584,7 +584,7 @@ uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
         UPE(uipcp, "Max number of timers reached [%u]\n",
             uipcp->timer_events_cnt);
         pthread_mutex_unlock(&uipcp->lock);
-        free(e);
+        rl_free(e, RL_MT_EVLOOP);
         return -1;
     }
 
