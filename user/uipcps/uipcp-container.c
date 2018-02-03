@@ -786,23 +786,20 @@ uipcp_get_by_name(struct uipcps *uipcps, const char *ipcp_name)
     return NULL;
 }
 
-/* This function takes the uipcps lock and does not take into
+/* This function must be called under uipcps lock, and does not take into
  * account kernel-space IPCPs. */
 struct uipcp *
 uipcp_get_by_id(struct uipcps *uipcps, const rl_ipcp_id_t ipcp_id)
 {
     struct uipcp *uipcp;
 
-    pthread_mutex_lock(&uipcps->lock);
     list_for_each_entry (uipcp, &uipcps->uipcps, node) {
         if (uipcp->id == ipcp_id && !uipcp_is_kernelspace(uipcp)) {
             uipcp->refcnt++;
-            pthread_mutex_unlock(&uipcps->lock);
 
             return uipcp;
         }
     }
-    pthread_mutex_unlock(&uipcps->lock);
 
     return NULL;
 }
