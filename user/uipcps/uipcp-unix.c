@@ -52,6 +52,14 @@
 #include "rlite/wifi.h"
 #include "uipcp-container.h"
 
+static void
+unlink_and_exit(int exit_code)
+{
+    unlink(RLITE_UIPCPS_UNIX_NAME);
+    unlink(RLITE_UIPCPS_PIDFILE);
+    exit(exit_code);
+}
+
 struct registered_ipcp {
     rl_ipcp_id_t id;
     char *name;
@@ -555,10 +563,8 @@ out:
     PV("Worker %p stopped\n", wi);
 
     if (wi->uipcps->terminate) {
-        unlink(RLITE_UIPCPS_UNIX_NAME);
-        unlink(RLITE_UIPCPS_PIDFILE);
         PD("terminate command received, daemon is going to exit ...\n");
-        exit(EXIT_SUCCESS);
+        unlink_and_exit(EXIT_SUCCESS);
     }
 
     return NULL;
@@ -955,10 +961,8 @@ sigint_handler(int signum)
 {
     assert(signum != SIGPIPE);
     print_backtrace();
-    unlink(RLITE_UIPCPS_UNIX_NAME);
-    unlink(RLITE_UIPCPS_PIDFILE);
     PD("%s signal received, daemon is going to exit ...\n", strsignal(signum));
-    exit(EXIT_SUCCESS);
+    unlink_and_exit(EXIT_SUCCESS);
 }
 
 static int
@@ -978,7 +982,7 @@ daemonize(void)
 
     if (pid < 0) {
         perror("fork(daemonize)");
-        exit(EXIT_FAILURE);
+        unlink_and_exit(EXIT_FAILURE);
     }
 
     if (pid > 0) {
@@ -989,7 +993,7 @@ daemonize(void)
     /* Execution continues only in the child's context. */
     sid = setsid();
     if (sid < 0) {
-        exit(EXIT_FAILURE);
+        unlink_and_exit(EXIT_FAILURE);
     }
 
     chdir("/");
@@ -1129,6 +1133,7 @@ main(int argc, char **argv)
     uipcps->lfd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (uipcps->lfd < 0) {
         perror("socket(AF_UNIX)");
+        unlink(RLITE_UIPCPS_PIDFILE);
         exit(EXIT_FAILURE);
     }
     memset(&server_address, 0, sizeof(server_address));
@@ -1147,12 +1152,13 @@ main(int argc, char **argv)
                sizeof(server_address));
     if (ret) {
         perror("bind(AF_UNIX, path)");
+        unlink(RLITE_UIPCPS_PIDFILE);
         exit(EXIT_FAILURE);
     }
     ret = listen(uipcps->lfd, 50);
     if (ret) {
         perror("listen(AF_UNIX)");
-        exit(EXIT_FAILURE);
+        unlink_and_exit(EXIT_FAILURE);
     }
 
     /* Change permissions to rlite control and I/O device and uipcp
@@ -1219,18 +1225,18 @@ main(int argc, char **argv)
     ret         = sigaction(SIGINT, &sa, NULL);
     if (ret) {
         perror("sigaction(SIGINT)");
-        exit(EXIT_FAILURE);
+        unlink_and_exit(EXIT_FAILURE);
     }
     ret = sigaction(SIGTERM, &sa, NULL);
     if (ret) {
         perror("sigaction(SIGTERM)");
-        exit(EXIT_FAILURE);
+        unlink_and_exit(EXIT_FAILURE);
     }
 #ifdef RL_UIPCPS_BACKTRACE
     ret = sigaction(SIGSEGV, &sa, NULL);
     if (ret) {
         perror("sigaction(SIGINT)");
-        exit(EXIT_FAILURE);
+        unlink_and_exit(EXIT_FAILURE);
     }
 #endif
     /* Ignore the SIGPIPE signal, which is received when
@@ -1240,7 +1246,7 @@ main(int argc, char **argv)
     ret           = sigaction(SIGPIPE, &sa, NULL);
     if (ret) {
         perror("sigaction(SIGPIPE)");
-        exit(EXIT_FAILURE);
+        unlink_and_exit(EXIT_FAILURE);
     }
 
     srand(time(NULL));
@@ -1255,7 +1261,7 @@ main(int argc, char **argv)
     uipcps->cfd = rina_open();
     if (uipcps->cfd < 0) {
         PE("rina_open() failed [%s]\n", strerror(errno));
-        exit(EXIT_FAILURE);
+        unlink_and_exit(EXIT_FAILURE);
     }
 
     /* The main control loop need to receive IPCP updates (creation, removal
@@ -1263,13 +1269,13 @@ main(int argc, char **argv)
     ret = ioctl(uipcps->cfd, RLITE_IOCTL_CHFLAGS, RL_F_IPCPS);
     if (ret) {
         PE("ioctl() failed [%s]\n", strerror(errno));
-        exit(EXIT_FAILURE);
+        unlink_and_exit(EXIT_FAILURE);
     }
 
     uipcps->efd = eventfd(0, 0);
     if (uipcps->efd < 0) {
         PE("eventfd() failed [%s]\n", strerror(errno));
-        exit(EXIT_FAILURE);
+        unlink_and_exit(EXIT_FAILURE);
     }
 
     /* Time interval (in seconds) between two consecutive run of
@@ -1278,7 +1284,7 @@ main(int argc, char **argv)
     ret = pthread_create(&uipcps->th, NULL, uipcps_loop, uipcps);
     if (ret) {
         PE("pthread_create() failed [%s]\n", strerror(errno));
-        exit(EXIT_FAILURE);
+        unlink_and_exit(EXIT_FAILURE);
     }
 
     /* Start the unix server. */
