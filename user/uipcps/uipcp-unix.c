@@ -750,8 +750,10 @@ handover_signal_strength(struct uipcp *const uipcp)
     }
 
     for (i = 0; i < n; i++) {
-        PD("Have upper %s disconnect from lower %s\n", tmplist[i]->name,
-           uipcp->name);
+        PD("Asking upper IPCP %s to disconnect from lower %s\n",
+           tmplist[i]->name, uipcp->dif_name);
+        assert(tmplist[i]->ops.lower_dif_detach);
+        tmplist[i]->ops.lower_dif_detach(tmplist[i], uipcp->dif_name);
     }
 
     {

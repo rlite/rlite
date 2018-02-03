@@ -1651,7 +1651,7 @@ uipcp_rib::neigh_disconnect(const std::string &neigh_name)
 
     /* Stop all the lower flows to trigger deallocation on the remote side. */
     for (auto &kv : neigh->flows) {
-        std::shared_ptr<NeighFlow> nf = kv.second;
+        const std::shared_ptr<NeighFlow> &nf = kv.second;
         CDAPMessage m;
 
         m.m_stop(obj_class::lowerflow, obj_name::lowerflow);
@@ -1659,6 +1659,26 @@ uipcp_rib::neigh_disconnect(const std::string &neigh_name)
     }
 
     del_neighbor(neigh_name);
+
+    return 0;
+}
+
+int
+uipcp_rib::lower_dif_detach(const std::string &lower_dif)
+{
+    std::list<std::shared_ptr<NeighFlow>> to_prune;
+
+    for (const auto &kvn : neighbors) {
+        for (auto &kvf : kvn.second->flows) {
+            if (kvf.second->supp_dif == lower_dif) {
+                to_prune.push_back(kvf.second);
+            }
+        }
+    }
+
+    for (const auto &f : to_prune) {
+        neigh_flow_prune(f.get());
+    }
 
     return 0;
 }
@@ -1681,7 +1701,7 @@ uipcp_rib::enrollment_resources_cleanup()
 void
 uipcp_rib::trigger_re_enrollments()
 {
-    list<pair<string, string> > re_enrollments;
+    list<pair<string, string>> re_enrollments;
 
     if (get_param_value<int>("enrollment", "keepalive") == 0) {
         /* Keepalive mechanism disabled, don't trigger re-enrollments. */

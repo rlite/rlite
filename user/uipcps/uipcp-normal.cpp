@@ -1022,12 +1022,17 @@ uipcp_rib::neigh_flow_prune(NeighFlow *nf)
 {
     std::shared_ptr<Neighbor> neigh =
         get_neighbor(nf->neigh_name, /*create=*/false);
+    CDAPMessage m;
 
     if (!neigh) {
         UPW(uipcp, "Neighbor %s disappeared; cannot prune flow with fd %d\n",
             nf->neigh_name.c_str(), nf->flow_fd);
         return;
     }
+
+    /* Stop this lower flow to trigger deallocation on the remote side. */
+    m.m_stop(obj_class::lowerflow, obj_name::lowerflow);
+    nf->send_to_port_id(&m, 0, nullptr);
 
     if (nf == neigh->mgmt_only.get()) {
         neigh->mgmt_only_set(nullptr);
@@ -1869,6 +1874,7 @@ normal_neigh_disconnect(struct uipcp *uipcp,
                         const struct rl_cmsg_ipcp_neigh_disconnect *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     if (!req->neigh_name) {
         UPE(uipcp, "No neighbor name specified\n");
@@ -1876,6 +1882,15 @@ normal_neigh_disconnect(struct uipcp *uipcp,
     }
 
     return rib->neigh_disconnect(req->neigh_name);
+}
+
+static int
+normal_lower_dif_detach(struct uipcp *uipcp, const char *lower_dif)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    std::lock_guard<std::mutex> guard(rib->mutex);
+
+    return rib->lower_dif_detach(string(lower_dif));
 }
 
 extern "C" void
@@ -1912,4 +1927,6 @@ struct uipcp_ops normal_ops = {
     .policy_param_list    = normal_policy_param_list,
     .config               = nullptr,
     .neigh_disconnect     = normal_neigh_disconnect,
+    .get_access_difs      = nullptr,
+    .lower_dif_detach     = normal_lower_dif_detach,
 };
