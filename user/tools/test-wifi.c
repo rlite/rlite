@@ -90,7 +90,7 @@ wifi_networks_print(const struct list_head *networks)
 {
     struct wifi_network *cur;
     PD_S("bssid / frequency / signal level / flags / ssid\n");
-    list_for_each_entry (cur, networks, list) {
+    list_for_each_entry (cur, networks, node) {
         PD_S("%s\t%u\t%d\t", cur->bssid, cur->freq, cur->signal);
         if (cur->wpa1_flags & RL_WPA_F_ACTIVE) {
             PD_S("[WPA");
