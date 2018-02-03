@@ -151,7 +151,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
 
 int
 NeighFlow::sync_obj(bool create, const string &obj_class,
-                    const string &obj_name, const UipcpObject *obj_value) const
+                    const string &obj_name, const UipcpObject *obj_value)
 {
     CDAPMessage m;
     int ret;
@@ -163,7 +163,7 @@ NeighFlow::sync_obj(bool create, const string &obj_class,
         m.m_delete(obj_class, obj_name);
     }
 
-    ret = const_cast<NeighFlow *>(this)->send_to_port_id(&m, 0, obj_value);
+    ret = send_to_port_id(&m, 0, obj_value);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
     }
@@ -172,7 +172,7 @@ NeighFlow::sync_obj(bool create, const string &obj_class,
 }
 
 int
-NeighFlow::sync_rib() const
+NeighFlow::sync_rib()
 {
     unsigned int limit = 10; /* Hardwired for now, but at least we limit. */
     int ret            = 0;
@@ -301,7 +301,7 @@ NeighFlow::keepalive_tmr_start()
 
             rib->keepalive_timers[flow_fd]->fired();
             if (rib->lookup_neigh_flow_by_flow_fd(flow_fd, &nf, &neigh) == 0) {
-                rib->keepalive_timeout(nf.get());
+                rib->keepalive_timeout(nf);
             }
         });
 }
@@ -404,40 +404,20 @@ Neighbor::enroll_state_repr(EnrollState s)
     return nullptr;
 }
 
-const NeighFlow *
-Neighbor::_mgmt_conn() const
+std::shared_ptr<NeighFlow> &
+Neighbor::mgmt_conn()
 {
     if (mgmt_only) {
-        return mgmt_only.get();
+        return mgmt_only;
     }
 
     if (n_flow) {
-        return n_flow.get();
+        return n_flow;
     }
 
     assert(!flows.empty());
 
-    return flows.begin()->second.get();
-}
-
-NeighFlow *
-Neighbor::mgmt_conn()
-{
-    const NeighFlow *nf = _mgmt_conn();
-    return const_cast<NeighFlow *>(nf);
-}
-
-std::shared_ptr<NeighFlow>
-Neighbor::getref(NeighFlow *nf)
-{
-    if (nf == mgmt_only.get()) {
-        return mgmt_only;
-    } else if (nf == n_flow.get()) {
-        return n_flow;
-    }
-    assert(flows.count(nf->port_id));
-
-    return flows[nf->port_id];
+    return flows.begin()->second;
 }
 
 void
@@ -1043,7 +1023,7 @@ EnrollmentResources::~EnrollmentResources()
 
 /* Did we complete the enrollment procedure with the neighbor? */
 bool
-Neighbor::enrollment_complete() const
+Neighbor::enrollment_complete()
 {
     return has_flows() &&
            mgmt_conn()->enroll_state == EnrollState::NEIGH_ENROLLED;
@@ -1083,7 +1063,7 @@ uipcp_rib::neighs_refresh()
 }
 
 void
-uipcp_rib::keepalive_timeout(NeighFlow *nf)
+uipcp_rib::keepalive_timeout(const std::shared_ptr<NeighFlow> &nf)
 {
     std::string neigh_name = nf->neigh_name;
     CDAPMessage m;
@@ -1592,7 +1572,7 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
     }
 
     assert(neigh->has_flows());
-    nf            = neigh->getref(neigh->mgmt_conn());
+    nf            = neigh->mgmt_conn();
     nf->initiator = true;
     if (nf->enroll_state != EnrollState::NEIGH_NONE) {
         UPI(uipcp, "Enrollment already in progress [state=%s]\n",
@@ -1682,7 +1662,7 @@ uipcp_rib::lower_dif_detach(const std::string &lower_dif)
     }
 
     for (const auto &f : to_prune) {
-        neigh_flow_prune(f.get());
+        neigh_flow_prune(f);
     }
 
     return 0;
@@ -1719,7 +1699,7 @@ uipcp_rib::trigger_re_enrollments()
     for (const string &nc : neighbors_cand) {
         auto mit = neighbors_seen.find(nc);
         string common_dif;
-        NeighFlow *nf = nullptr;
+        std::shared_ptr<NeighFlow> nf;
 
         assert(mit != neighbors_seen.end());
         if (neighbors_deleted.count(nc) == 0) {

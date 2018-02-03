@@ -203,9 +203,8 @@ struct NeighFlow {
 
     int send_to_port_id(CDAPMessage *m, int invoke_id, const UipcpObject *obj);
     int sync_obj(bool create, const std::string &obj_class,
-                 const std::string &obj_name,
-                 const UipcpObject *obj_value) const;
-    int sync_rib() const;
+                 const std::string &obj_name, const UipcpObject *obj_value);
+    int sync_rib();
 };
 
 /* Holds the information about a neighbor IPCP. */
@@ -253,19 +252,15 @@ struct Neighbor {
 
     void mgmt_only_set(std::shared_ptr<NeighFlow> nf);
     void n_flow_set(std::shared_ptr<NeighFlow> nf);
-    NeighFlow *mgmt_conn();
-    const NeighFlow *mgmt_conn() const { return _mgmt_conn(); };
+    std::shared_ptr<NeighFlow> &mgmt_conn();
     bool has_flows() const { return !flows.empty(); }
-    bool enrollment_complete() const;
+    bool enrollment_complete();
     int flow_alloc(const char *supp_dif_name);
 
     /* Get a std::shared_ptr reference to the shared pointer object that stores
      * the specified NeighFlow object. The shared pointer itself is stored in
      * the associated Neighbor object. */
     std::shared_ptr<NeighFlow> getref(NeighFlow *nf);
-
-private:
-    const NeighFlow *_mgmt_conn() const;
 };
 
 #ifdef RL_DEBUG
@@ -300,7 +295,7 @@ struct DFT {
                             std::shared_ptr<NeighFlow> const &nf,
                             std::shared_ptr<Neighbor> const &neigh,
                             rlm_addr_t src_addr)                          = 0;
-    virtual int sync_neigh(const NeighFlow *nf, unsigned int limit) const
+    virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const
     {
         return 0;
     }
@@ -368,9 +363,9 @@ struct LFDB {
                             std::shared_ptr<Neighbor> const &neigh,
                             rlm_addr_t src_addr) = 0;
 
-    virtual int sync_neigh(const NeighFlow *nf, unsigned int limit) const = 0;
-    virtual int neighs_refresh(size_t limit)                              = 0;
-    virtual void age_incr()                                               = 0;
+    virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
+    virtual int neighs_refresh(size_t limit)                        = 0;
+    virtual void age_incr()                                         = 0;
 };
 
 /* Address allocation for the members of the N-DIF. */
@@ -382,13 +377,13 @@ struct AddrAllocator {
     AddrAllocator(uipcp_rib *_ur) : rib(_ur) {}
     virtual ~AddrAllocator() {}
 
-    virtual void dump(std::stringstream &ss) const                        = 0;
-    virtual rlm_addr_t allocate()                                         = 0;
+    virtual void dump(std::stringstream &ss) const                  = 0;
+    virtual rlm_addr_t allocate()                                   = 0;
     virtual int rib_handler(const CDAPMessage *rm,
                             std::shared_ptr<NeighFlow> const &nf,
                             std::shared_ptr<Neighbor> const &neigh,
-                            rlm_addr_t src_addr)                          = 0;
-    virtual int sync_neigh(const NeighFlow *nf, unsigned int limit) const = 0;
+                            rlm_addr_t src_addr)                    = 0;
+    virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
 };
 
 /* Object used to store policy names and allocate/switch policies. */
@@ -633,14 +628,14 @@ struct uipcp_rib {
     int lookup_neigh_flow_by_flow_fd(int flow_fd,
                                      std::shared_ptr<NeighFlow> *pnf,
                                      std::shared_ptr<Neighbor> *pneigh);
-    void neigh_flow_prune(NeighFlow *nf);
+    void neigh_flow_prune(const std::shared_ptr<NeighFlow> &nf);
     int enroll(const char *neigh_name, const char *supp_dif_name,
                int wait_for_completion);
     int neigh_disconnect(const std::string &neigh_name);
     int lower_dif_detach(const std::string &lower_dif);
     void enrollment_resources_cleanup();
     void trigger_re_enrollments();
-    void keepalive_timeout(NeighFlow *nf);
+    void keepalive_timeout(const std::shared_ptr<NeighFlow> &nf);
 
     int fa_req(struct rl_kmsg_fa_req *req);
 
