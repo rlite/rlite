@@ -375,8 +375,10 @@ parse_wifi_flags(struct wifi_network *elem, char *flagstr)
         }
     }
 }
+
 static int
-parse_networks(struct list_head *list, const char *networks)
+parse_networks(struct wpa_ctrl *ctrl_conn, int only_configured,
+               const char *networks, struct list_head *list)
 {
     const char *p = networks;
     struct wifi_network *elem;
@@ -387,6 +389,8 @@ parse_networks(struct list_head *list, const char *networks)
     }
 
     while (*p != '\0') {
+        int filter = 0;
+
         elem = rl_alloc(sizeof(struct wifi_network), RL_MT_SHIM);
         memset(elem, 0, sizeof(*elem)); /* also adds string terminators */
         if (!elem) {
@@ -397,8 +401,22 @@ parse_networks(struct list_head *list, const char *networks)
             rl_free(elem, RL_MT_SHIM);
             return -1;
         }
-        parse_wifi_flags(elem, flagstr);
-        list_add_tail(&elem->node, list);
+        if (only_configured) {
+            /* Check if we have a configuration entry for elem->ssid. */
+            char *tmpid = wifi_ssid_to_id(ctrl_conn, elem->ssid);
+            if (tmpid == NULL) {
+                filter = 1;
+            } else {
+                rl_free(tmpid, RL_MT_SHIM);
+            }
+        }
+
+        if (filter) {
+            rl_free(elem, RL_MT_SHIM);
+        } else {
+            parse_wifi_flags(elem, flagstr);
+            list_add_tail(&elem->node, list);
+        }
         while (*p != '\0' && *(p++) != '\n') {
         }
     }
@@ -520,7 +538,8 @@ wifi_access_point_init(void)
 }
 
 int
-wifi_scan(struct wpa_ctrl *ctrl_conn, struct list_head *result)
+wifi_scan(struct wpa_ctrl *ctrl_conn, int only_configured,
+          struct list_head *result)
 {
     char *networks;
 
@@ -543,7 +562,7 @@ wifi_scan(struct wpa_ctrl *ctrl_conn, struct list_head *result)
         return -1;
     }
 
-    if (parse_networks(result, networks)) {
+    if (parse_networks(ctrl_conn, only_configured, networks, result)) {
         perror("Failed to parse networks");
     }
     rl_free(networks, RL_MT_SHIM);

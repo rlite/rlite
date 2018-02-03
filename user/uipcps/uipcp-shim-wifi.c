@@ -172,7 +172,7 @@ shim_wifi_get_access_difs(struct uipcp *uipcp, struct list_head *networks)
         return -1;
     }
 
-    ret = wifi_scan(ctrl_conn, networks);
+    ret = wifi_scan(ctrl_conn, /*only_configured=*/1, networks);
     wifi_close(ctrl_conn);
     if (ret == 0 && shim->cur_ssid != NULL) {
         /* If we are currently associated with an SSID, set the 'associated'
