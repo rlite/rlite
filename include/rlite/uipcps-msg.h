@@ -75,7 +75,8 @@ struct rl_cmsg_ipcp_register {
 } __attribute__((packed));
 
 /* rlite-ctl --> uipcps message to enroll an IPC process
- * to another IPC process, or to only alloc a flow. */
+ * to another IPC process, or to only alloc a flow.
+ * If neigh_name is NULL, this is a broadcast enrollment. */
 struct rl_cmsg_ipcp_enroll {
     rl_msg_t msg_type;
     uint32_t event_id;
