@@ -51,7 +51,7 @@ wpasup_create_ctrl_path(const char *ctrl_dir, const char *inf)
     const size_t len_dir = strlen(ctrl_dir);
     const size_t len_inf = strlen(inf);
     const size_t len     = len_dir + len_inf + 2;
-    char *ctrl_path      = malloc(len);
+    char *ctrl_path      = rl_alloc(len, RL_MT_SHIM);
     if (!ctrl_path) {
         PE("Out of memory\n");
         return NULL;
@@ -124,7 +124,7 @@ wpasup_start_daemon(const char *config, const char *pid_file, const char *inf,
     sleep(2);
 
     *ctrl_path = wpasup_create_ctrl_path(ctrl_dir, inf);
-    free(ctrl_dir);
+    rl_free(ctrl_dir, RL_MT_SHIM);
     if (!*ctrl_path) {
         return -1;
     }
@@ -155,7 +155,7 @@ static char *
 wpasup_send_cmd_get_resp(struct wpa_ctrl *ctrl_conn, const char *cmd)
 {
     size_t len = RL_WPA_SUPPLICANT_MAX_MSG_LEN;
-    char *buf  = malloc(len);
+    char *buf  = rl_alloc(len, RL_MT_SHIM);
     if (!buf) {
         PE("Out of memory\n");
         return NULL;
@@ -163,7 +163,7 @@ wpasup_send_cmd_get_resp(struct wpa_ctrl *ctrl_conn, const char *cmd)
     len--;
 
     if (wpa_ctrl_request(ctrl_conn, cmd, strlen(cmd), buf, &len, NULL)) {
-        free(buf);
+        rl_free(buf, RL_MT_SHIM);
         PE("wpa_ctrl_request() failed: %s.\n", strerror(errno));
         return NULL;
     }
@@ -245,7 +245,7 @@ wifi_mod_network(struct wpa_ctrl *ctrl_conn, const char *cmd, const char *id)
     /* a space + null terminator */
     len = cmd_len + id_len + 2;
 
-    msg = malloc(len);
+    msg = rl_alloc(len, RL_MT_SHIM);
     if (!msg) {
         PE("Out of memory\n");
         return -1;
@@ -254,7 +254,7 @@ wifi_mod_network(struct wpa_ctrl *ctrl_conn, const char *cmd, const char *id)
     snprintf(msg, len, "%s %s", cmd, id);
     wpasup_send_cmd(ctrl_conn, msg);
 
-    free(msg);
+    rl_free(msg, RL_MT_SHIM);
 
     return 0;
 }
@@ -275,7 +275,7 @@ wifi_ssid_to_id(struct wpa_ctrl *ctrl_conn, const char *ssid)
     }
 
     while (*p != '\0') {
-        if (sscanf(p, "%s\t%128[^\t]c\t%*s\t%*s\n", id_conf, ssid_conf) ==
+        if (sscanf(p, "%s\t%127[^\t]c\t%*s\t%*s\n", id_conf, ssid_conf) ==
             EOF) {
             return NULL;
         }
@@ -297,9 +297,9 @@ void
 wifi_destroy_network_list(struct list_head *list)
 {
     struct wifi_network *cur, *tmp;
-    list_for_each_entry_safe (cur, tmp, list, list) {
-        list_del_init(&cur->list);
-        free(cur);
+    list_for_each_entry_safe (cur, tmp, list, node) {
+        list_del_init(&cur->node);
+        rl_free(cur, RL_MT_SHIM);
     }
 }
 
@@ -387,17 +387,18 @@ parse_networks(struct list_head *list, const char *networks)
     }
 
     while (*p != '\0') {
-        elem = malloc(sizeof(struct wifi_network));
+        elem = rl_alloc(sizeof(struct wifi_network), RL_MT_SHIM);
+        memset(elem, 0, sizeof(*elem)); /* also adds string terminators */
         if (!elem) {
             return -1;
         }
-        if (sscanf(p, "%17c %u %d %s %128[^\n]c\n", elem->bssid, &elem->freq,
+        if (sscanf(p, "%17c %u %d %s %127[^\n]c\n", elem->bssid, &elem->freq,
                    &elem->signal, flagstr, elem->ssid) == EOF) {
-            free(elem);
+            rl_free(elem, RL_MT_SHIM);
             return -1;
         }
         parse_wifi_flags(elem, flagstr);
-        list_add_tail(&elem->list, list);
+        list_add_tail(&elem->node, list);
         while (*p != '\0' && *(p++) != '\n') {
         }
     }
@@ -440,7 +441,7 @@ wifi_init(const char *inf)
             return NULL;
         }
         ctrl_path = wpasup_create_ctrl_path(ctrl_dir, inf);
-        free(ctrl_dir);
+        rl_free(ctrl_dir, RL_MT_SHIM);
         if (!ctrl_path) {
             return NULL;
         }
@@ -453,7 +454,7 @@ wifi_init(const char *inf)
         return NULL;
     }
 
-    free(ctrl_path);
+    rl_free(ctrl_path, RL_MT_SHIM);
 
     /* Attach to the child so that we can send control messages. */
     wpa_ctrl_attach(ctrl_conn);
@@ -545,7 +546,7 @@ wifi_scan(struct wpa_ctrl *ctrl_conn, struct list_head *result)
     if (parse_networks(result, networks)) {
         perror("Failed to parse networks");
     }
-    free(networks);
+    rl_free(networks, RL_MT_SHIM);
 
     return 0;
 }
@@ -580,7 +581,7 @@ wifi_assoc(struct wpa_ctrl *ctrl_conn, const char *ssid)
                                   RL_WIFI_TIMEOUT_ASSOC);
     }
 
-    free(id);
+    rl_free(id, RL_MT_SHIM);
     return ret;
 }
 

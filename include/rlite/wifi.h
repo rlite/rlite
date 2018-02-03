@@ -61,7 +61,7 @@
  * 32 bytes (IEEE 802.11 - 7.3.2.1) * 4 (to handle unprintable characters)
  * + null terminator
  */
-#define RL_WIFI_SSID_LEN 129
+#define RL_WIFI_SSID_LEN 128
 
 /* clang-format off */
 /*
@@ -86,7 +86,7 @@ network={
 struct wpa_ctrl;
 
 struct wifi_network {
-    struct list_head list;
+    struct list_head node;
     char bssid[18];
     unsigned int freq;
     int signal;

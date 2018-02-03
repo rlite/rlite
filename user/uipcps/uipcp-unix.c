@@ -676,7 +676,7 @@ handover_signal_strength(struct uipcp *uipcp)
     if (uipcp->ops.get_access_difs(uipcp, &networks) == 0) {
         struct wifi_network *net;
 
-        list_for_each_entry (net, &networks, list) {
+        list_for_each_entry (net, &networks, node) {
             printf("network %s signal %d\n", net->bssid, net->signal);
         }
         wifi_destroy_network_list(&networks);
