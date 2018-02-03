@@ -105,6 +105,10 @@ shim_wifi_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *cmsg,
 
     wifi_deassoc(ctrl_conn);
     ret = wifi_assoc(ctrl_conn, cmsg->dif_name);
+    if (ret) {
+        rl_free(shim->cur_ssid, RL_MT_SHIM);
+        shim->cur_ssid = NULL;
+    }
 
     wifi_close(ctrl_conn);
 
@@ -170,6 +174,17 @@ shim_wifi_get_access_difs(struct uipcp *uipcp, struct list_head *networks)
 
     ret = wifi_scan(ctrl_conn, networks);
     wifi_close(ctrl_conn);
+    if (ret == 0 && shim->cur_ssid != NULL) {
+        /* If we are currently associated with an SSID, set the 'associated'
+         * flag in the corresponding entry. */
+        struct wifi_network *net;
+        list_for_each_entry (net, networks, node) {
+            if (!strcmp(net->ssid, shim->cur_ssid)) {
+                net->associated = 1;
+                break;
+            }
+        }
+    }
 
     return ret;
 }
