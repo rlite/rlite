@@ -94,6 +94,7 @@ struct wifi_network {
     uint32_t wpa1_flags;
     uint32_t wpa2_flags;
     char ssid[RL_WIFI_SSID_LEN];
+    int associated; /* 1 if currently associated with this SSID, 0 otherwise */
 };
 
 /*

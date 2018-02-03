@@ -677,7 +677,8 @@ handover_signal_strength(struct uipcp *uipcp)
         struct wifi_network *net;
 
         list_for_each_entry (net, &networks, node) {
-            printf("network %s signal %d\n", net->bssid, net->signal);
+            printf("network %s signal %d associated %d\n", net->ssid,
+                   net->signal, net->associated);
         }
         wifi_destroy_network_list(&networks);
     }
