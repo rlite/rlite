@@ -983,13 +983,13 @@ string2int(const string &s, int &ret)
 }
 
 int
-uipcp_rib::neighs_sync_obj_excluding(const Neighbor *exclude, bool create,
-                                     const string &obj_class,
+uipcp_rib::neighs_sync_obj_excluding(const std::shared_ptr<Neighbor> &exclude,
+                                     bool create, const string &obj_class,
                                      const string &obj_name,
                                      const UipcpObject *obj_value) const
 {
     for (const auto &kvn : neighbors) {
-        if (exclude && kvn.second.get() == exclude) {
+        if (exclude && kvn.second == exclude) {
             continue;
         }
 

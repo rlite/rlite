@@ -645,8 +645,8 @@ struct uipcp_rib {
     int send_to_myself(std::unique_ptr<CDAPMessage> m, const UipcpObject *obj);
 
     /* Synchronize with neighbors. */
-    int neighs_sync_obj_excluding(const Neighbor *exclude, bool create,
-                                  const std::string &obj_class,
+    int neighs_sync_obj_excluding(const std::shared_ptr<Neighbor> &exclude,
+                                  bool create, const std::string &obj_class,
                                   const std::string &obj_name,
                                   const UipcpObject *obj_value) const;
     int neighs_sync_obj_all(bool create, const std::string &obj_class,

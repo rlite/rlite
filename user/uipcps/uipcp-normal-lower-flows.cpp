@@ -290,7 +290,7 @@ FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm,
 
     if (modified) {
         /* Send the received lower flows to the other neighbors. */
-        rib->neighs_sync_obj_excluding(neigh.get(), add_f, obj_class::lfdb,
+        rib->neighs_sync_obj_excluding(neigh, add_f, obj_class::lfdb,
                                        obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */
