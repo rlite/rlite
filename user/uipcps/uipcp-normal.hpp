@@ -256,11 +256,6 @@ struct Neighbor {
     bool has_flows() const { return !flows.empty(); }
     bool enrollment_complete();
     int flow_alloc(const char *supp_dif_name);
-
-    /* Get a std::shared_ptr reference to the shared pointer object that stores
-     * the specified NeighFlow object. The shared pointer itself is stored in
-     * the associated Neighbor object. */
-    std::shared_ptr<NeighFlow> getref(NeighFlow *nf);
 };
 
 #ifdef RL_DEBUG
