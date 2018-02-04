@@ -195,7 +195,10 @@ struct CDAPMessage {
     void set_obj_value(const std::string &v);
     void set_obj_value(const char *v);
     void get_obj_value(const char *&p, size_t &l) const;
-    void set_obj_value(const char *buf, size_t len);
+    void set_obj_value(const char *buf, size_t len); /* borrow */
+#ifndef SWIG
+    void set_obj_value(std::unique_ptr<char[]> buf, size_t len); /* ownership */
+#endif
 
     int m_connect(gpb::authTypes_t auth_mech,
                   const struct CDAPAuthValue *auth_value,

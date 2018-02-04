@@ -610,6 +610,7 @@ CDAPMessage::get_obj_value(const char *&p, size_t &l) const
     }
 }
 
+/* No ownership passing. */
 void
 CDAPMessage::set_obj_value(const char *buf, size_t len)
 {
@@ -617,6 +618,16 @@ CDAPMessage::set_obj_value(const char *buf, size_t len)
     obj_value.u.buf.ptr   = const_cast<char *>(buf);
     obj_value.u.buf.len   = len;
     obj_value.u.buf.owned = false;
+}
+
+/* Ownership passing. */
+void
+CDAPMessage::set_obj_value(std::unique_ptr<char[]> buf, size_t len)
+{
+    obj_value.ty          = ObjValType::BYTES;
+    obj_value.u.buf.ptr   = buf.release();
+    obj_value.u.buf.len   = len;
+    obj_value.u.buf.owned = true;
 }
 
 CDAPMessage::CDAPMessage(const gpb::CDAPMessage &gm)
