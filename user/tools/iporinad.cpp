@@ -283,7 +283,7 @@ RouteObj::serialize(char *buf, unsigned int size) const
 static int
 cdap_obj_send(CDAPConn *conn, CDAPMessage *m, int invoke_id, const Obj *obj)
 {
-    char objbuf[4096];
+    char objbuf[4096]; /* Don't change the scope of this buffer. */
     int objlen;
 
     if (obj) {
@@ -294,7 +294,7 @@ cdap_obj_send(CDAPConn *conn, CDAPMessage *m, int invoke_id, const Obj *obj)
             return objlen;
         }
 
-        m->set_obj_value(objbuf, objlen);
+        m->set_obj_value(objbuf, objlen); /* no ownership passing */
     }
 
     return conn->msg_send(m, invoke_id);
