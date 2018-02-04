@@ -640,6 +640,7 @@ struct uipcp_rib {
                  std::shared_ptr<Neighbor> neigh);
     int mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
                               size_t buflen);
+    int uipcp_obj_serialize(CDAPMessage *m, const UipcpObject *obj);
     int send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
                          const UipcpObject *obj, int *invoke_id = nullptr);
     int send_to_dst_node(std::unique_ptr<CDAPMessage> m, std::string node_name,
