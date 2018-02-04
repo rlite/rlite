@@ -204,7 +204,6 @@ struct NeighFlow {
     int send_to_port_id(CDAPMessage *m, int invoke_id, const UipcpObject *obj);
     int sync_obj(bool create, const std::string &obj_class,
                  const std::string &obj_name, const UipcpObject *obj_value);
-    int sync_rib();
 };
 
 /* Holds the information about a neighbor IPCP. */
@@ -290,7 +289,8 @@ struct DFT {
                             std::shared_ptr<NeighFlow> const &nf,
                             std::shared_ptr<Neighbor> const &neigh,
                             rlm_addr_t src_addr)                          = 0;
-    virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const
+    virtual int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
+                           unsigned int limit) const
     {
         return 0;
     }
@@ -358,9 +358,10 @@ struct LFDB {
                             std::shared_ptr<Neighbor> const &neigh,
                             rlm_addr_t src_addr) = 0;
 
-    virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
-    virtual int neighs_refresh(size_t limit)                        = 0;
-    virtual void age_incr()                                         = 0;
+    virtual int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
+                           unsigned int limit) const = 0;
+    virtual int neighs_refresh(size_t limit)         = 0;
+    virtual void age_incr()                          = 0;
 };
 
 /* Address allocation for the members of the N-DIF. */
@@ -372,13 +373,14 @@ struct AddrAllocator {
     AddrAllocator(uipcp_rib *_ur) : rib(_ur) {}
     virtual ~AddrAllocator() {}
 
-    virtual void dump(std::stringstream &ss) const                  = 0;
-    virtual rlm_addr_t allocate()                                   = 0;
+    virtual void dump(std::stringstream &ss) const   = 0;
+    virtual rlm_addr_t allocate()                    = 0;
     virtual int rib_handler(const CDAPMessage *rm,
                             std::shared_ptr<NeighFlow> const &nf,
                             std::shared_ptr<Neighbor> const &neigh,
-                            rlm_addr_t src_addr)                    = 0;
-    virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
+                            rlm_addr_t src_addr)     = 0;
+    virtual int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
+                           unsigned int limit) const = 0;
 };
 
 /* Object used to store policy names and allocate/switch policies. */
@@ -652,6 +654,7 @@ struct uipcp_rib {
     int neighs_sync_obj_all(bool create, const std::string &obj_class,
                             const std::string &obj_name,
                             const UipcpObject *obj_value) const;
+    int sync_rib(const std::shared_ptr<NeighFlow> &nf);
 
     /* Receive info from neighbors. */
     int cdap_dispatch(const CDAPMessage *rm,

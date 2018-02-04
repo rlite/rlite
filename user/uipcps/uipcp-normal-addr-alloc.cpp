@@ -21,7 +21,8 @@ public:
     int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
                     std::shared_ptr<Neighbor> const &neigh,
                     rlm_addr_t src_addr) override;
-    int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
+    int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
+                   unsigned int limit) const override;
 };
 
 void
@@ -37,7 +38,8 @@ DistributedAddrAllocator::dump(std::stringstream &ss) const
 }
 
 int
-DistributedAddrAllocator::sync_neigh(NeighFlow *nf, unsigned int limit) const
+DistributedAddrAllocator::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
+                                     unsigned int limit) const
 {
     int ret = 0;
 

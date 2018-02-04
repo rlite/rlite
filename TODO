@@ -1,11 +1,5 @@
 Open tasks, in decreasing order of priority:
 
-* implement a simple handover procedure to handle mobility
-  over shim-wifi
-    * the handover manager should periodically scan the available
-      SSIDs and switch to the SSID that has the strongest signal
-      (with hysteresis)
-
 * implement a distributed and fault-tolerant DFT by means of a
   Kademlia DHT
 
