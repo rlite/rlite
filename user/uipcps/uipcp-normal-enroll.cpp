@@ -375,6 +375,10 @@ EnrollmentResources::enrollment_commit()
         msgs.pop_front();
     }
 
+    /* A new N-1 flow has been allocated. We may need to update or LFDB w.r.t
+     * the local entries. */
+    rib->lfdb->update_local(neigh->ipcp_name);
+
     /* Sync with the neighbor. */
     rib->sync_rib(nf);
     stopped.notify_all();
@@ -1505,10 +1509,6 @@ Neighbor::flow_alloc(const char *supp_dif)
         flows[port_id_]->flow_fd, flows[port_id_]->port_id);
 
     topo_lower_flow_added(rib->uipcp->uipcps, rib->uipcp->id, lower_ipcp_id_);
-
-    /* A new N-1 flow has been allocated. We may need to update or LFDB w.r.t
-     * the local entries. */
-    rib->lfdb->update_local(ipcp_name);
 
     if (mgmt_only == nullptr && use_reliable_flow) {
         int mgmt_fd;
