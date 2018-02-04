@@ -835,7 +835,7 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
     size_t serlen;
     int ret;
 
-    uipcp_obj_serialize(m.get(), obj);
+    assert(!obj);
 
     if (!m->invoke_id_valid()) {
         if (m->is_response()) {

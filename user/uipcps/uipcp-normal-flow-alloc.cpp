@@ -339,7 +339,10 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
     freq.flags     = RL_FLOWREQ_INITIATOR | RL_FLOWREQ_SEND_DEL;
     flow_reqs[obj_name.str() + string("L")] = freq;
 
-    return rib->send_to_dst_addr(std::move(m), freq.dst_addr, &freq);
+    if (rib->uipcp_obj_serialize(m.get(), &freq)) {
+        return -1;
+    }
+    return rib->send_to_dst_addr(std::move(m), freq.dst_addr, nullptr);
 }
 
 /* (3) Slave FA <-- Slave application : FA_RESP */
@@ -383,7 +386,10 @@ LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
                   reason);
     m->invoke_id = freq.invoke_id;
 
-    ret = rib->send_to_dst_addr(std::move(m), freq.src_addr, &freq);
+    ret = rib->uipcp_obj_serialize(m.get(), &freq);
+    if (ret == 0) {
+        ret = rib->send_to_dst_addr(std::move(m), freq.src_addr, nullptr);
+    }
 
     flow_reqs_tmp.erase(f);
 
@@ -416,7 +422,10 @@ LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm)
                       "Cannot find DFT entry");
         m->invoke_id = rm->invoke_id;
 
-        return rib->send_to_dst_addr(std::move(m), freq.src_addr, &freq);
+        if (rib->uipcp_obj_serialize(m.get(), &freq)) {
+            return -1;
+        }
+        return rib->send_to_dst_addr(std::move(m), freq.src_addr, nullptr);
     }
 
     /* freq.dst_app is registered with us, let's go ahead. */

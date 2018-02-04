@@ -677,8 +677,11 @@ CentralizedFaultTolerantDFT::Client::appl_register(
                 parent->rib->invoke_id_mgr.get_invoke_id();
             pending[invoke_id] =
                 std::move(PendingReq(op_code, appl_name, r, req->event_id));
-            ret = parent->rib->send_to_dst_node(std::move(m), r, &dft_entry,
-                                                nullptr);
+            ret = parent->rib->uipcp_obj_serialize(m.get(), &dft_entry);
+            if (ret == 0) {
+                ret = parent->rib->send_to_dst_node(std::move(m), r, nullptr,
+                                                    nullptr);
+            }
             if (ret) {
                 pending.erase(invoke_id);
                 return ret;
@@ -835,8 +838,9 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
         }
 
         m->m_write(obj_class, obj_name::dft);
-        ret |= parent->rib->send_to_dst_node(std::move(m), pair.first,
-                                             obj.get(), nullptr);
+        parent->rib->uipcp_obj_serialize(m.get(), obj.get());
+        ret |= parent->rib->send_to_dst_node(std::move(m), pair.first, nullptr,
+                                             nullptr);
     }
 
     /* Here we make an assumption about the raft library, that is one
