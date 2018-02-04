@@ -1320,9 +1320,6 @@ uipcp_rib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     /* Add the flow to the datapath topology if it's not management-only. */
     if (!nf->reliable) {
         topo_lower_flow_added(uipcp->uipcps, uipcp->id, req->ipcp_id);
-        /* A new N-1 flow has been allocated. We may need to update or LFDB
-         * w.r.t the local entries. */
-        lfdb->update_local(neigh->ipcp_name);
     }
 
     return 0;
