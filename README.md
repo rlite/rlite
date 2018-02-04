@@ -977,7 +977,8 @@ of a normal IPCP process:
 | dft                 | centralized-fault-tolerant | replicas  | Name of the IPCPs that constitute the fault-tolerant cluster. |
 | enrollment          | *                 | timeout            | Enrollment timeout in milliseconds. |
 | enrollment          | *                 | keepalive          | Neighbor keepalive timeout in seconds (0 to disable). |
-| enrollment          | *                 | keepalive-thresh   | Number of allowed pending keepalive requests. If exceeded, the N-1 low is pruned. |
+| enrollment          | *                 | keepalive-thresh   | Number of allowed unacked keepalive requests. If exceeded, the N-1 low is pruned. |
+| enrollment          | *                 | auto-reconnect     | Automatically re-enroll to neighbors pruned because unresponsive. |
 | flow-allocator      | local             | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
 | flow-allocator      | local             | max-rtxq-len       | Maximum size of the retransmission queue (in PDUs). |
 | flow-allocator      | local             | initial-tr         | Initial value for the DTCP retransmission timer (in milliseconds). |

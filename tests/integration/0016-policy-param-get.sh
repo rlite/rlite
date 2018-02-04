@@ -6,10 +6,10 @@ rlite-ctl ipcp-enroller-enable x || exit 1
 
 # List per-component parameters, checking that the number of lines is correct
 rlite-ctl dif-policy-param-list dd
-rlite-ctl dif-policy-param-list dd | wc -l | grep -q "\<17\>" || exit 1
+rlite-ctl dif-policy-param-list dd | wc -l | grep -q "\<18\>" || exit 1
 rlite-ctl dif-policy-param-list dd address-allocator | wc -l | grep -q "\<1\>" || exit 1
 rlite-ctl dif-policy-param-list dd dft | wc -l | grep -q "\<1\>" || exit 1
-rlite-ctl dif-policy-param-list dd enrollment | wc -l | grep -q "\<3\>" || exit 1
+rlite-ctl dif-policy-param-list dd enrollment | wc -l | grep -q "\<4\>" || exit 1
 rlite-ctl dif-policy-param-list dd flow-allocator | wc -l | grep -q "\<6\>" || exit 1
 rlite-ctl dif-policy-param-list dd resource-allocator | wc -l | grep -q "\<3\>" || exit 1
 rlite-ctl dif-policy-param-list dd routing | wc -l | grep -q "\<2\>" || exit 1
@@ -27,6 +27,8 @@ rlite-ctl dif-policy-param-mod dd enrollment keepalive 478 || exit 1
 rlite-ctl dif-policy-param-list dd enrollment keepalive | grep 478 || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment keepalive-thresh 21 || exit 1
 rlite-ctl dif-policy-param-list dd enrollment keepalive-thresh | grep 21 || exit 1
+rlite-ctl dif-policy-param-mod dd enrollment auto-reconnect false || exit 1
+rlite-ctl dif-policy-param-list dd enrollment auto-reconnect | grep false || exit 1
 rlite-ctl dif-policy-param-mod dd flow-allocator force-flow-control true || exit 1
 rlite-ctl dif-policy-param-list dd flow-allocator force-flow-control | grep true || exit 1
 rlite-ctl dif-policy-param-mod dd flow-allocator initial-a 41 || exit 1

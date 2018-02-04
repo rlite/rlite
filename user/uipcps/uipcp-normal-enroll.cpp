@@ -1687,8 +1687,9 @@ uipcp_rib::trigger_re_enrollments()
 {
     list<pair<string, string>> re_enrollments;
 
-    if (get_param_value<int>("enrollment", "keepalive") == 0) {
-        /* Keepalive mechanism disabled, don't trigger re-enrollments. */
+    if (!get_param_value<bool>("enrollment", "auto-reconnect")) {
+        /* Don't try to re-enroll automatically to neighbors
+         * listed in uipcp_rib::neighbors_deleted. */
         return;
     }
 
