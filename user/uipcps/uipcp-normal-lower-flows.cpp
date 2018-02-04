@@ -241,7 +241,8 @@ FullyReplicatedLFDB::update_local(const string &node_name)
 
     sm = make_unique<CDAPMessage>();
     sm->m_create(obj_class::lfdb, obj_name::lfdb);
-    rib->send_to_myself(std::move(sm), &lfl);
+    rib->uipcp_obj_serialize(sm.get(), &lfl);
+    rib->send_to_myself(std::move(sm), nullptr);
 }
 
 int
