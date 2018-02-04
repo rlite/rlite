@@ -809,7 +809,6 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
     struct rl_mgmt_hdr mhdr;
     AData adata;
     CDAPMessage am;
-    char objbuf[4096]; /* Don't change the scope of this buffer. */
     char aobjbuf[4096];
     char *serbuf = nullptr;
     int aobjlen;
@@ -817,16 +816,17 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
     int ret;
 
     if (obj) {
+        auto objbuf = std::unique_ptr<char[]>(new char[2000]);
         int objlen;
 
-        objlen = obj->serialize(objbuf, sizeof(objbuf));
+        objlen = obj->serialize(objbuf.get(), 2000);
         if (objlen < 0) {
             UPE(uipcp, "serialization failed\n");
 
             return -1;
         }
 
-        m->set_obj_value(objbuf, objlen);
+        m->set_obj_value(std::move(objbuf), objlen);
     }
 
     if (!m->invoke_id_valid()) {
@@ -860,7 +860,7 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
         return -1;
     }
 
-    am.set_obj_value(aobjbuf, aobjlen);
+    am.set_obj_value(aobjbuf, aobjlen); /* no ownership passing */
 
     try {
         ret = msg_ser_stateless(&am, &serbuf, &serlen);
