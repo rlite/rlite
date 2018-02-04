@@ -171,58 +171,6 @@ NeighFlow::sync_obj(bool create, const string &obj_class,
     return ret;
 }
 
-int
-NeighFlow::sync_rib()
-{
-    unsigned int limit = 10; /* Hardwired for now, but at least we limit. */
-    int ret            = 0;
-
-    UPD(rib->uipcp, "Starting RIB sync with neighbor '%s'\n",
-        static_cast<string>(neigh_name).c_str());
-
-    /* Synchronize neighbors first. */
-    {
-        NeighborCandidate cand = rib->neighbor_cand_get();
-        string my_name         = rib->myname;
-
-        /* Temporarily insert a neighbor representing myself,
-         * to simplify the loop below. */
-        rib->neighbors_seen[my_name] = cand;
-
-        /* Scan all the neighbors I know about. */
-        for (auto cit = rib->neighbors_seen.begin();
-             cit != rib->neighbors_seen.end();) {
-            NeighborCandidateList ncl;
-
-            while (ncl.candidates.size() < limit &&
-                   cit != rib->neighbors_seen.end()) {
-                ncl.candidates.push_back(cit->second);
-                cit++;
-            }
-
-            ret |=
-                sync_obj(true, obj_class::neighbors, obj_name::neighbors, &ncl);
-        }
-
-        /* Remove myself. */
-        rib->neighbors_seen.erase(my_name);
-    }
-
-    /* Synchronize lower flow database. */
-    ret |= rib->lfdb->sync_neigh(this, limit);
-
-    /* Synchronize Directory Forwarding Table. */
-    ret |= rib->dft->sync_neigh(this, limit);
-
-    /* Synchronize address allocation table. */
-    ret |= rib->addra->sync_neigh(this, limit);
-
-    UPD(rib->uipcp, "Finished RIB sync with neighbor '%s'\n",
-        static_cast<string>(neigh_name).c_str());
-
-    return ret;
-}
-
 void
 EnrollmentResources::enrollment_abort()
 {
@@ -435,7 +383,7 @@ EnrollmentResources::enrollment_commit()
     }
 
     /* Sync with the neighbor. */
-    nf->sync_rib();
+    rib->sync_rib(nf);
     stopped.notify_all();
 
     if (initiator) {
@@ -1027,6 +975,57 @@ Neighbor::enrollment_complete()
 {
     return has_flows() &&
            mgmt_conn()->enroll_state == EnrollState::NEIGH_ENROLLED;
+}
+
+int
+uipcp_rib::sync_rib(const std::shared_ptr<NeighFlow> &nf)
+{
+    unsigned int limit = 10; /* Hardwired for now, but at least we limit. */
+    int ret            = 0;
+
+    UPD(uipcp, "Starting RIB sync with neighbor '%s'\n",
+        static_cast<string>(nf->neigh_name).c_str());
+
+    /* Synchronize neighbors first. */
+    {
+        NeighborCandidate cand = neighbor_cand_get();
+        string my_name         = myname;
+
+        /* Temporarily insert a neighbor representing myself,
+         * to simplify the loop below. */
+        neighbors_seen[my_name] = cand;
+
+        /* Scan all the neighbors I know about. */
+        for (auto cit = neighbors_seen.begin(); cit != neighbors_seen.end();) {
+            NeighborCandidateList ncl;
+
+            while (ncl.candidates.size() < limit &&
+                   cit != neighbors_seen.end()) {
+                ncl.candidates.push_back(cit->second);
+                cit++;
+            }
+
+            ret |= nf->sync_obj(true, obj_class::neighbors, obj_name::neighbors,
+                                &ncl);
+        }
+
+        /* Remove myself. */
+        neighbors_seen.erase(my_name);
+    }
+
+    /* Synchronize lower flow database. */
+    ret |= lfdb->sync_neigh(nf, limit);
+
+    /* Synchronize Directory Forwarding Table. */
+    ret |= dft->sync_neigh(nf, limit);
+
+    /* Synchronize address allocation table. */
+    ret |= addra->sync_neigh(nf, limit);
+
+    UPD(uipcp, "Finished RIB sync with neighbor '%s'\n",
+        static_cast<string>(nf->neigh_name).c_str());
+
+    return ret;
 }
 
 void
