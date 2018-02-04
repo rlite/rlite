@@ -188,6 +188,7 @@ EnrollmentResources::enrollment_abort()
     if (nf->conn) {
         nf->conn->reset();
     }
+    neigh->rib->neigh_flow_prune(nf);
     stopped.notify_all();
 
     /* Afther this call, the thread must release the RIB lock and never
