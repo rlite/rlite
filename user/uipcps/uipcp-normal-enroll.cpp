@@ -1555,6 +1555,7 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
     /* Create an N-1 flow, if needed. */
     if (!neigh->has_flows()) {
         if (!neigh->flow_alloc_enabled) {
+            del_neighbor(string(neigh_name));
             UPW(uipcp, "Allocation of N-1-flow is not available right now\n");
             return -1;
         }
@@ -1571,6 +1572,7 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
         /* Enable N-1-flow allocation again. */
         neigh->flow_alloc_enabled = true;
         if (ret) {
+            del_neighbor(string(neigh_name));
             return ret;
         }
     }
