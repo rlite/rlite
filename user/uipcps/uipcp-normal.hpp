@@ -201,7 +201,8 @@ struct NeighFlow {
 
     void enroll_state_set(EnrollState st);
 
-    int send_to_port_id(CDAPMessage *m, int invoke_id, const UipcpObject *obj);
+    int send_to_port_id(CDAPMessage *m, int invoke_id,
+                        const ::google::protobuf::MessageLite *obj);
     int sync_obj(bool create, const std::string &obj_class,
                  const std::string &obj_name, const UipcpObject *obj_value);
 };
@@ -642,10 +643,13 @@ struct uipcp_rib {
                               size_t buflen);
     int uipcp_obj_serialize(CDAPMessage *m, const UipcpObject *obj);
     int send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
-                         const UipcpObject *obj, int *invoke_id = nullptr);
+                         const ::google::protobuf::MessageLite *obj,
+                         int *invoke_id = nullptr);
     int send_to_dst_node(std::unique_ptr<CDAPMessage> m, std::string node_name,
-                         const UipcpObject *obj, int *invoke_id = nullptr);
-    int send_to_myself(std::unique_ptr<CDAPMessage> m, const UipcpObject *obj);
+                         const ::google::protobuf::MessageLite *obj,
+                         int *invoke_id = nullptr);
+    int send_to_myself(std::unique_ptr<CDAPMessage> m,
+                       const ::google::protobuf::MessageLite *obj);
 
     /* Synchronize with neighbors. */
     int neighs_sync_obj_excluding(const std::shared_ptr<Neighbor> &exclude,

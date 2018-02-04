@@ -824,7 +824,8 @@ uipcp_rib::uipcp_obj_serialize(CDAPMessage *m, const UipcpObject *obj)
 /* Takes ownership of 'm'. */
 int
 uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
-                            const UipcpObject *obj, int *invoke_id)
+                            const ::google::protobuf::MessageLite *obj,
+                            int *invoke_id)
 {
     struct rl_mgmt_hdr mhdr;
     AData adata;
@@ -835,7 +836,7 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
     size_t serlen;
     int ret;
 
-    assert(!obj);
+    assert(!obj); /* it will be used once we get rid of codecs */
 
     if (!m->invoke_id_valid()) {
         if (m->is_response()) {
@@ -901,7 +902,8 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
 
 int
 uipcp_rib::send_to_dst_node(std::unique_ptr<CDAPMessage> m,
-                            std::string node_name, const UipcpObject *obj,
+                            std::string node_name,
+                            const ::google::protobuf::MessageLite *obj,
                             int *invoke_id)
 {
     rlm_addr_t dst_addr = lookup_node_address(node_name);
@@ -916,7 +918,7 @@ uipcp_rib::send_to_dst_node(std::unique_ptr<CDAPMessage> m,
 
 int
 uipcp_rib::send_to_myself(std::unique_ptr<CDAPMessage> m,
-                          const UipcpObject *obj)
+                          const ::google::protobuf::MessageLite *obj)
 {
     return send_to_dst_addr(std::move(m), myaddr, obj);
 }

@@ -76,11 +76,11 @@ NeighFlow::~NeighFlow()
 /* Does not take ownership of m. */
 int
 NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
-                           const UipcpObject *obj)
+                           const ::google::protobuf::MessageLite *obj)
 {
     int ret = 0;
 
-    assert(!obj);
+    assert(!obj); /* it will be used once we get rid of codecs */
 
     assert(conn);
     if (reliable) {
