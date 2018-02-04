@@ -80,19 +80,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
 {
     int ret = 0;
 
-    if (obj) {
-        auto objbuf = std::unique_ptr<char[]>(new char[2000]);
-        int objlen;
-
-        objlen = obj->serialize(objbuf.get(), 2000);
-        if (objlen < 0) {
-            errno = EINVAL;
-            UPE(rib->uipcp, "serialization failed\n");
-            return objlen;
-        }
-
-        m->set_obj_value(std::move(objbuf), objlen);
-    }
+    rib->uipcp_obj_serialize(m, obj);
 
     assert(conn);
     if (reliable) {

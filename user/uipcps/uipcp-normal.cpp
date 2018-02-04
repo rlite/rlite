@@ -801,6 +801,26 @@ uipcp_rib::realize_registrations(bool reg)
     return 0;
 }
 
+int
+uipcp_rib::uipcp_obj_serialize(CDAPMessage *m, const UipcpObject *obj)
+{
+    if (obj) {
+        auto objbuf = std::unique_ptr<char[]>(new char[2000]);
+        int objlen;
+
+        objlen = obj->serialize(objbuf.get(), 2000);
+        if (objlen < 0) {
+            UPE(uipcp, "serialization failed\n");
+
+            return -1;
+        }
+
+        m->set_obj_value(std::move(objbuf), objlen);
+    }
+
+    return 0;
+}
+
 /* Takes ownership of 'm'. */
 int
 uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
@@ -815,19 +835,7 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
     size_t serlen;
     int ret;
 
-    if (obj) {
-        auto objbuf = std::unique_ptr<char[]>(new char[2000]);
-        int objlen;
-
-        objlen = obj->serialize(objbuf.get(), 2000);
-        if (objlen < 0) {
-            UPE(uipcp, "serialization failed\n");
-
-            return -1;
-        }
-
-        m->set_obj_value(std::move(objbuf), objlen);
-    }
+    uipcp_obj_serialize(m.get(), obj);
 
     if (!m->invoke_id_valid()) {
         if (m->is_response()) {
