@@ -829,6 +829,12 @@ periodic_task_register(struct uipcp *uipcp, periodic_task_func_t func,
     struct periodic_task *task;
 
     if (!func || period == 0) {
+        PE("Invalid parameters (%p, %u)\n", func, period);
+        return NULL;
+    }
+
+    if (uipcps->num_periodic_tasks > 2048) {
+        PE("Too many periodic tasks (max=%u)\n", uipcps->num_periodic_tasks);
         return NULL;
     }
 
@@ -841,6 +847,7 @@ periodic_task_register(struct uipcp *uipcp, periodic_task_func_t func,
 
     pthread_mutex_lock(&uipcps->lock);
     list_add_tail(&task->node, &uipcps->periodic_tasks);
+    uipcps->num_periodic_tasks++;
     pthread_mutex_unlock(&uipcps->lock);
 
     return task;
@@ -853,6 +860,8 @@ periodic_task_unregister(struct periodic_task *task)
 
     pthread_mutex_lock(&uipcps->lock);
     list_del(&task->node);
+    assert(uipcps->num_periodic_tasks > 0);
+    uipcps->num_periodic_tasks--;
     pthread_mutex_unlock(&uipcps->lock);
     rl_free(task, RL_MT_EVLOOP);
 }
@@ -1233,7 +1242,8 @@ main(int argc, char **argv)
     pthread_mutex_init(&uipcps->lock, NULL);
     list_init(&uipcps->ipcp_nodes);
     list_init(&uipcps->periodic_tasks);
-    uipcps->n_uipcps = 0;
+    uipcps->num_periodic_tasks = 0;
+    uipcps->n_uipcps           = 0;
 
     if (daemon) {
         /* The daemonizing function must be called before catching signals. */
