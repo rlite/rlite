@@ -357,6 +357,19 @@ normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
     rib->recv_msg(mgmtbuf, n, nf, neigh);
 }
 
+static int
+normal_periodic_tasks(struct uipcp *const uipcp)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+
+    rib->enrollment_resources_cleanup();
+    rib->trigger_re_enrollments();
+    rib->allocate_n_flows();
+    rib->check_for_address_conflicts();
+
+    return 0;
+}
+
 uipcp_rib::uipcp_rib(struct uipcp *_u)
     : uipcp(_u),
       myname(_u->name),
@@ -383,6 +396,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
 #ifdef RL_USE_QOS_CUBES
     if (load_qos_cubes("/etc/rina/uipcp-qoscubes.qos")) {
         close(mgmtfd);
+        uipcp_loop_fdh_del(uipcp, mgmtfd);
         throw std::exception();
     }
 #endif /* RL_USE_QOS_CUBES */
@@ -437,6 +451,15 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
 
     /* Set a valid address, 0 is the null address. */
     set_address(1);
+
+    tasks =
+        periodic_task_register(uipcp, normal_periodic_tasks, 10 /*seconds*/);
+    if (tasks == nullptr) {
+        UPE(uipcp, "Failed to register periodic tasks\n");
+        close(mgmtfd);
+        uipcp_loop_fdh_del(uipcp, mgmtfd);
+        throw std::exception();
+    }
 }
 
 uipcp_rib::~uipcp_rib()
@@ -465,6 +488,9 @@ uipcp_rib::~uipcp_rib()
         }
         return cnt;
     };
+
+    periodic_task_unregister(tasks);
+    tasks = nullptr;
 
     lock();
     for (;;) {
@@ -1866,17 +1892,6 @@ normal_enroller_enable(struct uipcp *uipcp,
     return rib->enroller_enable(!!req->enable);
 }
 
-static void
-normal_trigger_tasks(struct uipcp *uipcp)
-{
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-
-    rib->enrollment_resources_cleanup();
-    rib->trigger_re_enrollments();
-    rib->allocate_n_flows();
-    rib->check_for_address_conflicts();
-}
-
 static int
 normal_neigh_disconnect(struct uipcp *uipcp,
                         const struct rl_cmsg_ipcp_neigh_disconnect *req)
@@ -1928,7 +1943,6 @@ struct uipcp_ops normal_ops = {
     .neigh_fa_req_arrived = normal_neigh_fa_req_arrived,
     .update_address       = normal_update_address,
     .flow_state_update    = normal_flow_state_update,
-    .trigger_tasks        = normal_trigger_tasks,
     .policy_mod           = normal_policy_mod,
     .policy_list          = normal_policy_list,
     .policy_param_mod     = normal_policy_param_mod,
