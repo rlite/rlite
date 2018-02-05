@@ -309,11 +309,8 @@ parse_wpa_flags(u_int32_t *flags, const char *flagstr)
     const char *p = flagstr;
     int len       = index(flagstr, ']') - flagstr;
 
-    while (*p != ']') {
-        if (*p == '-' || *p == '+') {
-            p++;
-            len--;
-        } else if ((len >= 3) && (!strncmp(p, "PSK", 3))) {
+    while (len > 0) {
+        if ((len >= 3) && (!strncmp(p, "PSK", 3))) {
             *flags |= RL_WPA_F_PSK;
             p += 3;
             len -= 3;
@@ -329,6 +326,9 @@ parse_wpa_flags(u_int32_t *flags, const char *flagstr)
             *flags |= RL_WPA_F_PREAUTH;
             p += 7;
             len -= 7;
+        } else {
+            p++;
+            len--;
         }
     }
 
