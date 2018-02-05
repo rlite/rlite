@@ -821,46 +821,40 @@ out:
     return 0;
 }
 
-static void
-periodic_tasks(struct uipcps *uipcps)
+struct periodic_task *
+periodic_task_register(struct uipcp *uipcp, periodic_task_func_t func,
+                       unsigned period)
 {
-    struct uipcp *uipcp;
-    struct uipcp **tmplist;
-    int n, i = 0;
+    struct uipcps *uipcps = uipcp->uipcps;
+    struct periodic_task *task;
 
-    /* Get a reference to each uipcp. */
+    if (!func || period == 0) {
+        return NULL;
+    }
+
+    task = rl_alloc(sizeof(*task), RL_MT_EVLOOP);
+    memset(task, 0, sizeof(*task));
+    task->uipcp    = uipcp;
+    task->func     = func;
+    task->period   = period;
+    task->next_exp = time(NULL) + task->period;
+
     pthread_mutex_lock(&uipcps->lock);
-    n       = uipcps->n_uipcps;
-    tmplist = rl_alloc(n * sizeof(struct uipcp *), RL_MT_MISC);
-    if (!tmplist) {
-        pthread_mutex_unlock(&uipcps->lock);
-        PE("Out of memory\n");
-        return;
-    }
-
-    list_for_each_entry (uipcp, &uipcps->uipcps, node) {
-        uipcp->refcnt++;
-        tmplist[i++] = uipcp;
-    }
-    assert(i == n);
+    list_add_tail(&task->node, &uipcps->periodic_tasks);
     pthread_mutex_unlock(&uipcps->lock);
 
-    /* Carry out tasks outside the uipcps lock. */
-    list_for_each_entry (uipcp, &uipcps->uipcps, node) {
-        if (uipcp->ops.trigger_tasks) {
-            uipcp->ops.trigger_tasks(uipcp);
-        }
-        if (uipcps->handover_manager) {
-            uipcps->handover_manager(uipcp);
-        }
-    }
+    return task;
+}
 
-    /* Drop the references. */
-    for (i = 0; i < n; i++) {
-        uipcp_put(tmplist[i]);
-    }
+void
+periodic_task_unregister(struct periodic_task *task)
+{
+    struct uipcps *uipcps = task->uipcp->uipcps;
 
-    rl_free(tmplist, RL_MT_MISC);
+    pthread_mutex_lock(&uipcps->lock);
+    list_del(&task->node);
+    pthread_mutex_unlock(&uipcps->lock);
+    rl_free(task, RL_MT_EVLOOP);
 }
 
 static void *
@@ -871,25 +865,83 @@ uipcps_loop(void *opaque)
     for (;;) {
         struct rl_kmsg_ipcp_update *upd;
         struct pollfd pfd[2];
-        int ret = 0;
+        int timeout_ms = -1;
+        int ret        = 0;
 
         pfd[0].fd     = uipcps->cfd;
         pfd[0].events = POLLIN;
         pfd[1].fd     = uipcps->efd;
         pfd[1].events = POLLIN;
 
-        ret = poll(pfd, 2, uipcps->periodic_tasks_interval * 1000);
+        /* Compute next timeout for periodic tasks, if any. */
+        {
+            struct periodic_task *task;
+            time_t now      = time(NULL);
+            time_t next_exp = now + 10000;
+
+            pthread_mutex_lock(&uipcps->lock);
+            list_for_each_entry (task, &uipcps->periodic_tasks, node) {
+                if (now >= task->next_exp) {
+                    /* Something expired, set timeout to 0. */
+                    timeout_ms = 0;
+                    break;
+                } else if (task->next_exp < next_exp) {
+                    next_exp   = task->next_exp;
+                    timeout_ms = (next_exp - now) * 1000;
+                }
+            }
+            pthread_mutex_unlock(&uipcps->lock);
+        }
+
+        ret = poll(pfd, 2, timeout_ms);
         if (ret < 0) {
             PE("poll() failed [%s]\n", strerror(errno));
             break;
         }
 
-        if (ret == 0 || pfd[1].revents & POLLIN) {
+        /* Drain notification, if any. */
+        if (pfd[1].revents & POLLIN) {
+            eventfd_drain(uipcps->efd);
+        }
+
+        if ((pfd[0].revents & POLLIN) == 0) {
             /* Timeout or notification, run the periodic tasks. */
-            if (pfd[1].revents & POLLIN) {
-                eventfd_drain(uipcps->efd);
+            struct list_head expired;
+            struct periodic_task *task, *tmp;
+            time_t now = time(NULL);
+
+            /* Collect expired tasks (under the lock). Take a reference to
+             * the involved uipcps. */
+            pthread_mutex_lock(&uipcps->lock);
+            list_init(&expired);
+            list_for_each_entry (task, &uipcps->periodic_tasks, node) {
+                if (now >= task->next_exp) {
+                    struct periodic_task *copy =
+                        rl_alloc(sizeof(*copy), RL_MT_EVLOOP);
+
+                    if (!copy) {
+                        PE("Out of memory: cannot process periodic task\n");
+                    } else {
+                        memset(copy, 0, sizeof(*copy));
+                        copy->func  = task->func;
+                        copy->uipcp = task->uipcp;
+                        list_add_tail(&copy->node, &expired);
+                        task->uipcp->refcnt++;
+                    }
+                    task->next_exp += task->period; /* set next expiration */
+                }
             }
-            periodic_tasks(uipcps);
+            pthread_mutex_unlock(&uipcps->lock);
+
+            /* Invoke the expired tasks out of the lock, dropping the
+             * uipcp reference counter. */
+            list_for_each_entry_safe (task, tmp, &expired, node) {
+                task->func(task->uipcp);
+                list_del(&task->node);
+                uipcp_put(task->uipcp);
+                rl_free(task, RL_MT_EVLOOP);
+            }
+
             continue;
         }
 
@@ -1027,7 +1079,6 @@ main(int argc, char **argv)
     int daemon            = 0;
     int pidfd             = -1;
     int ret, opt;
-    int period = 10; /* In seconds, for periodic tasks. */
 
     while ((opt = getopt(argc, argv, "hv:dT:H:")) != -1) {
         switch (opt) {
@@ -1041,15 +1092,6 @@ main(int argc, char **argv)
 
         case 'd':
             daemon = 1;
-            break;
-
-        case 'T':
-            period = atoi(optarg);
-            if (period < 2) {
-                printf("Invalid period '%d': it must be > 2 seconds\n", period);
-                usage();
-                return -1;
-            }
             break;
 
         case 'H':
@@ -1190,6 +1232,7 @@ main(int argc, char **argv)
     list_init(&uipcps->uipcps);
     pthread_mutex_init(&uipcps->lock, NULL);
     list_init(&uipcps->ipcp_nodes);
+    list_init(&uipcps->periodic_tasks);
     uipcps->n_uipcps = 0;
 
     if (daemon) {
@@ -1282,9 +1325,6 @@ main(int argc, char **argv)
         unlink_and_exit(EXIT_FAILURE);
     }
 
-    /* Time interval (in seconds) between two consecutive run of
-     * per-ipcp periodic tasks (e.g. re-enrollments). */
-    uipcps->periodic_tasks_interval = period;
     ret = pthread_create(&uipcps->th, NULL, uipcps_loop, uipcps);
     if (ret) {
         PE("pthread_create() failed [%s]\n", strerror(errno));

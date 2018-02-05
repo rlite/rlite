@@ -436,7 +436,7 @@ struct EnrollmentResources {
 /* Main class representing an IPCP. */
 struct uipcp_rib {
     /* Backpointer to parent data structure. */
-    struct uipcp *uipcp;
+    struct uipcp *uipcp = nullptr;
 
     /* std::string cache for uipcp->name. */
     std::string myname;
@@ -447,6 +447,8 @@ struct uipcp_rib {
 
     /* RIB lock. */
     std::mutex mutex;
+
+    struct periodic_task *tasks = nullptr;
 
     typedef int (uipcp_rib::*rib_handler_t)(
         const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
@@ -780,6 +782,6 @@ int uipcp_do_register(struct uipcp *uipcp, const char *dif_name,
 
 void normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque);
 
-#define UIPCP_RIB(_u) static_cast<uipcp_rib *>((_u)->priv)
+#define UIPCP_RIB(_u) (static_cast<uipcp_rib *>((_u)->priv))
 
 #endif /* __UIPCP_RIB_H__ */

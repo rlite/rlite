@@ -36,7 +36,7 @@ extern "C" {
 #endif
 
 struct uipcp;
-typedef int (*handover_manager_t)(struct uipcp *const uipcp);
+typedef int (*periodic_task_func_t)(struct uipcp *const uipcp);
 
 /* User IPCP data model. */
 struct uipcps {
@@ -67,11 +67,11 @@ struct uipcps {
     /* Set when uipcps daemon is asked to terminate. */
     int terminate;
 
-    /* Interval for the uipcps loop to trigger periodic tasks. */
-    unsigned int periodic_tasks_interval;
+    /* List of periodic tasks to run in the context of the uipcps loop. */
+    struct list_head periodic_tasks;
 
     /* Optional handover manager to handle mobility. */
-    handover_manager_t handover_manager;
+    periodic_task_func_t handover_manager;
 };
 
 int eventfd_signal(int efd, unsigned int value);
@@ -86,8 +86,6 @@ struct enrolled_neigh {
 
     struct list_head node;
 };
-
-struct uipcp;
 
 struct uipcp_ops {
     int (*init)(struct uipcp *);
@@ -146,10 +144,6 @@ struct uipcp_ops {
     int (*flow_state_update)(struct uipcp *uipcp,
                              const struct rl_msg_base *msg);
 
-    /* For periodic tasks to be executed in the context of the uipcps
-     * (main) event loop. */
-    void (*trigger_tasks)(struct uipcp *);
-
     /* User wants to change a policy of this uipcp. */
     int (*policy_mod)(struct uipcp *uipcp,
                       const struct rl_cmsg_ipcp_policy_mod *req);
@@ -185,6 +179,20 @@ struct uipcp_ops {
      * a given lower DIF. */
     int (*lower_dif_detach)(struct uipcp *uipcp, const char *lower_dif);
 };
+
+struct periodic_task {
+    struct uipcp *uipcp;
+    periodic_task_func_t func;
+    unsigned period; /* in seconds */
+    time_t next_exp; /* next expiration */
+    struct list_head node;
+};
+
+struct periodic_task *periodic_task_register(struct uipcp *uipcp,
+                                             periodic_task_func_t func,
+                                             unsigned period);
+
+void periodic_task_unregister(struct periodic_task *task);
 
 struct ipcp_node {
     rl_ipcp_id_t id;

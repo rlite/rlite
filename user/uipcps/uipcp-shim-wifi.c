@@ -37,6 +37,7 @@ struct shim_wifi {
     struct uipcp *uipcp; /* parent */
     char *ifname;        /* name of the WiFi network interface */
     char *cur_ssid;      /* SSID of the currently associated network, or NULL */
+    struct periodic_task *task; /* periodic task to handle handover */
 };
 
 #define SHIM(_u) ((struct shim_wifi *)((_u)->priv))
@@ -57,6 +58,17 @@ shim_wifi_init(struct uipcp *uipcp)
     shim->ifname   = NULL;
     shim->cur_ssid = NULL;
 
+    shim->task = NULL;
+    if (uipcp->uipcps->handover_manager) {
+        shim->task = periodic_task_register(
+            uipcp, uipcp->uipcps->handover_manager, 30 /* seconds */);
+        if (shim->task == NULL) {
+            UPE(uipcp, "Failed to allocate periodic task\n");
+            rl_free(shim, RL_MT_SHIM);
+            return -1;
+        }
+    }
+
     return 0;
 }
 
@@ -64,6 +76,10 @@ static int
 shim_wifi_fini(struct uipcp *uipcp)
 {
     struct shim_wifi *shim = SHIM(uipcp);
+
+    if (shim->task) {
+        periodic_task_unregister(shim->task);
+    }
 
     if (shim->ifname) {
         rl_free(shim->ifname, RL_MT_SHIM);
