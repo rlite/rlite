@@ -460,6 +460,11 @@ uipcp_loop(void *opaque)
                     break;
                 }
 
+                /* This event has expired. Move it to the list of expired
+                 * events. We don't need to take a reference to the uipcp
+                 * to execute the callback out of the lock, because this
+                 * event loop is always stopped before the uipcp gets
+                 * destroyed (see uipcp_del). */
                 list_del(&te->node);
                 uipcp->timer_events_cnt--;
                 list_add_tail(&te->node, &expired);
@@ -467,6 +472,7 @@ uipcp_loop(void *opaque)
 
             pthread_mutex_unlock(&uipcp->lock);
 
+            /* Run the callbacks out of the lock. */
             while ((elem = list_pop_front(&expired))) {
                 te = container_of(elem, struct uipcp_loop_tmr, node);
                 NPD("Exec timer callback [%d]\n", te->id);
