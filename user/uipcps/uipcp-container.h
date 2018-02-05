@@ -69,6 +69,7 @@ struct uipcps {
 
     /* List of periodic tasks to run in the context of the uipcps loop. */
     struct list_head periodic_tasks;
+    unsigned int num_periodic_tasks;
 
     /* Optional handover manager to handle mobility. */
     periodic_task_func_t handover_manager;
