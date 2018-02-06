@@ -1949,6 +1949,5 @@ struct uipcp_ops normal_ops = {
     .policy_param_list    = normal_policy_param_list,
     .config               = nullptr,
     .neigh_disconnect     = normal_neigh_disconnect,
-    .get_access_difs      = nullptr,
     .lower_dif_detach     = normal_lower_dif_detach,
 };

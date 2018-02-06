@@ -35,9 +35,6 @@
 extern "C" {
 #endif
 
-struct uipcp;
-typedef int (*periodic_task_func_t)(struct uipcp *const uipcp);
-
 /* User IPCP data model. */
 struct uipcps {
     /* Unix domain socket file descriptor used to accept request from
@@ -72,7 +69,7 @@ struct uipcps {
     unsigned int num_periodic_tasks;
 
     /* Optional handover manager to handle mobility. */
-    periodic_task_func_t handover_manager;
+    const char *handover_manager;
 };
 
 int eventfd_signal(int efd, unsigned int value);
@@ -87,6 +84,8 @@ struct enrolled_neigh {
 
     struct list_head node;
 };
+
+struct uipcp;
 
 struct uipcp_ops {
     int (*init)(struct uipcp *);
@@ -172,14 +171,12 @@ struct uipcp_ops {
     int (*neigh_disconnect)(struct uipcp *uipcp,
                             const struct rl_cmsg_ipcp_neigh_disconnect *req);
 
-    /* For mobile shim DIFs, user wants to get the current list of access
-     * DIFs, with associated info (used by handover managers). */
-    int (*get_access_difs)(struct uipcp *uipcp, struct list_head *access_difs);
-
     /* User wants the uipcp to disconnect from the neighbor connected through
      * a given lower DIF. */
     int (*lower_dif_detach)(struct uipcp *uipcp, const char *lower_dif);
 };
+
+typedef int (*periodic_task_func_t)(struct uipcp *const uipcp);
 
 struct periodic_task {
     struct uipcp *uipcp;

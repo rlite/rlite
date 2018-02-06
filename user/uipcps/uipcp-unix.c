@@ -49,7 +49,6 @@
 #include "rlite/list.h"
 #include "rlite/conf.h"
 #include "rlite/uipcps-helpers.h"
-#include "rlite/wifi.h"
 #include "uipcp-container.h"
 
 static void
@@ -674,153 +673,6 @@ uipcps_loop_signal(struct uipcps *uipcps)
     return eventfd_signal(uipcps->efd, 1);
 }
 
-/* Handover management for a given uipcp. Check if we can switch to
- * a better access network; if this is the case, do the switch and
- * notify the upper IPCPs. */
-static int
-handover_signal_strength(struct uipcp *const uipcp)
-{
-    struct uipcps *uipcps         = uipcp->uipcps;
-    struct wifi_network *best_net = NULL;
-    struct wifi_network *cur_net  = NULL;
-    struct uipcp **tmplist        = NULL;
-    struct list_head networks;
-    int n = 0, i;
-    int ret;
-
-    if (!uipcp->ops.get_access_difs) {
-        /* Handover does not apply here. */
-        return 0;
-    }
-
-    /* Get the current access networks. */
-    list_init(&networks);
-    ret = uipcp->ops.get_access_difs(uipcp, &networks);
-    if (ret) {
-        return ret;
-    }
-
-    {
-        struct wifi_network *net;
-        /* Select the best access network. */
-        list_for_each_entry (net, &networks, node) {
-            PV("network %s signal %d associated %d\n", net->ssid, net->signal,
-               net->associated);
-            if (!best_net || net->signal > best_net->signal) {
-                best_net = net;
-            }
-            if (net->associated) {
-                cur_net = net;
-            }
-        }
-    }
-
-    if (!best_net || best_net->associated) {
-        /* No networks or we are already associated to the best network.
-         * Nothing to do for now. */
-        goto out;
-    }
-    /* We are not associated to the best network. Let's switch to that. */
-    PI("Trying to switch from SSID %s to SSID %s\n",
-       cur_net ? cur_net->ssid : "(none)", best_net->ssid);
-
-    {
-        /* Collect all the uppers of 'uipcp', and put them in a temporary list.
-         */
-        struct ipcp_node *ipn;
-
-        pthread_mutex_lock(&uipcps->lock);
-        tmplist =
-            rl_alloc(uipcps->n_uipcps * sizeof(struct uipcp *), RL_MT_MISC);
-        if (!tmplist) {
-            pthread_mutex_unlock(&uipcps->lock);
-            PE("Out of memory\n");
-            goto out;
-        }
-
-        list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
-            struct flow_edge *e;
-            if (ipn->id != uipcp->id) {
-                continue; /* not me */
-            }
-
-            list_for_each_entry (e, &ipn->uppers, node) {
-                struct uipcp *u = uipcp_get_by_id(uipcps, e->ipcp->id);
-                if (u) {
-                    tmplist[n++] = u;
-                }
-            }
-        }
-        assert(n <= uipcps->n_uipcps);
-        pthread_mutex_unlock(&uipcps->lock);
-    }
-
-    /* Ask the uppers to close any flow provided by us ('uipcp'). */
-    for (i = 0; i < n; i++) {
-        struct uipcp *upper = tmplist[i];
-
-        PD("Asking upper IPCP %s to detach from lower DIF %s\n", upper->name,
-           uipcp->dif_name);
-        assert(upper->ops.lower_dif_detach);
-        upper->ops.lower_dif_detach(upper, uipcp->dif_name);
-    }
-
-    /* Switch access DIF. */
-    {
-        struct rl_cmsg_ipcp_enroll cmsg;
-        memset(&cmsg, 0, sizeof(cmsg));
-        cmsg.msg_type      = RLITE_U_IPCP_ENROLL;
-        cmsg.event_id      = 0;
-        cmsg.ipcp_name     = uipcp->name;
-        cmsg.dif_name      = best_net->ssid;
-        cmsg.supp_dif_name = "null";
-        assert(uipcp->ops.enroll);
-        ret = uipcp->ops.enroll(uipcp, &cmsg, /*wait_for_completion=*/1);
-        if (ret) {
-            PE("Failed to enroll to SSID %s\n", best_net->ssid);
-        } else {
-            PI("Enrollment to SSID %s completed\n", best_net->ssid);
-        }
-    }
-
-    /* If everything is ok, ask the uppers to enroll again through us. */
-    if (ret == 0) {
-        for (i = 0; i < n; i++) {
-            struct uipcp *upper = tmplist[i];
-            struct rl_cmsg_ipcp_enroll cmsg;
-
-            PD("Asking upper IPCP %s to re-enroll through lower DIF %s\n",
-               upper->name, uipcp->dif_name);
-
-            memset(&cmsg, 0, sizeof(cmsg));
-            cmsg.msg_type      = RLITE_U_IPCP_ENROLL;
-            cmsg.event_id      = 0;
-            cmsg.ipcp_name     = upper->name;
-            cmsg.dif_name      = upper->dif_name;
-            cmsg.supp_dif_name = uipcp->dif_name;
-            cmsg.neigh_name    = NULL; /* broadcast enrollment */
-            assert(upper->ops.enroll);
-            ret = upper->ops.enroll(upper, &cmsg, /*wait_for_completion=*/1);
-            PI("Broadcast enrollment of upper IPCP %s to upper DIF %s through "
-               "DIF %s "
-               "%s\n",
-               upper->name, upper->dif_name, uipcp->dif_name,
-               ret ? "failed" : "completed");
-        }
-    }
-out:
-    if (tmplist) {
-        for (i = 0; i < n; i++) {
-            struct uipcp *upper = tmplist[i];
-            uipcp_put(upper);
-        }
-        rl_free(tmplist, RL_MT_MISC);
-    }
-    wifi_destroy_network_list(&networks);
-
-    return 0;
-}
-
 struct periodic_task *
 periodic_task_register(struct uipcp *uipcp, periodic_task_func_t func,
                        unsigned period)
@@ -1107,7 +959,7 @@ main(int argc, char **argv)
             if (!strcmp(optarg, "none")) {
                 uipcps->handover_manager = NULL;
             } else if (!strcmp(optarg, "signal-strength")) {
-                uipcps->handover_manager = handover_signal_strength;
+                uipcps->handover_manager = optarg;
             } else {
                 printf("Unknown handover manager '%s'\n", optarg);
                 usage();
