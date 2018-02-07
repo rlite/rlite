@@ -572,9 +572,8 @@ uipcp_rib::dump() const
                << static_cast<unsigned int>(c.dtcp.fc.cfg.w.initial_credit)
                << endl;
         } else if (c.dtcp.fc.fc_type == RLITE_FC_T_RATE) {
-            ss << "   dtcp.fc.sending_rate="
-               << static_cast<unsigned int>(c.dtcp.fc.cfg.r.sending_rate)
-               << endl
+            ss << "   dtcp.fc.sender_rate="
+               << static_cast<unsigned int>(c.dtcp.fc.cfg.r.sender_rate) << endl
                << "   dtcp.fc.time_period="
                << static_cast<unsigned int>(c.dtcp.fc.cfg.r.time_period)
                << endl;
@@ -584,8 +583,8 @@ uipcp_rib::dump() const
            << static_cast<unsigned int>(c.dtcp.rtx.max_time_to_retry) << endl
            << "   dtcp.rtx.data_rxms_max="
            << static_cast<unsigned int>(c.dtcp.rtx.data_rxms_max) << endl
-           << "   dtcp.rtx.initial_tr="
-           << static_cast<unsigned int>(c.dtcp.rtx.initial_tr) << endl;
+           << "   dtcp.rtx.initial_rtx_timeout="
+           << static_cast<unsigned int>(c.dtcp.rtx.initial_rtx_timeout) << endl;
         ss << "}" << endl;
     }
 #endif /* RL_USE_QOS_CUBES */

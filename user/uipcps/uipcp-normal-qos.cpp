@@ -130,11 +130,11 @@ update_qos_cube(struct rl_flow_config &flowcfg, const string &param,
         return 0;
     }
 
-    if (!parse_flowcfg_int(param, value, &field_int, "dtcp.fc.sending_rate")) {
-        flowcfg.dtcp.fc.fc_type            = RLITE_FC_T_RATE;
-        flowcfg.dtcp.flow_control          = 1;
-        flowcfg.dtcp_present               = 1;
-        flowcfg.dtcp.fc.cfg.r.sending_rate = field_int;
+    if (!parse_flowcfg_int(param, value, &field_int, "dtcp.fc.sender_rate")) {
+        flowcfg.dtcp.fc.fc_type           = RLITE_FC_T_RATE;
+        flowcfg.dtcp.flow_control         = 1;
+        flowcfg.dtcp_present              = 1;
+        flowcfg.dtcp.fc.cfg.r.sender_rate = field_int;
         return 0;
     }
 
@@ -179,10 +179,11 @@ update_qos_cube(struct rl_flow_config &flowcfg, const string &param,
         return 0;
     }
 
-    if (!parse_flowcfg_int(param, value, &field_int, "dtcp.rtx.initial_tr")) {
-        flowcfg.dtcp.rtx_control    = 1;
-        flowcfg.dtcp_present        = 1;
-        flowcfg.dtcp.rtx.initial_tr = field_int;
+    if (!parse_flowcfg_int(param, value, &field_int,
+                           "dtcp.rtx.initial_rtx_timeout")) {
+        flowcfg.dtcp.rtx_control             = 1;
+        flowcfg.dtcp_present                 = 1;
+        flowcfg.dtcp.rtx.initial_rtx_timeout = field_int;
         return 0;
     }
 

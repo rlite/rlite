@@ -25,7 +25,7 @@ relrtx.dtcp.flow_control = false
 relrtx.dtcp.rtx_control = true
 relrtx.dtcp.rtx.max_time_to_retry = 15
 relrtx.dtcp.rtx.data_rxms_max = 15
-relrtx.dtcp.rtx.initial_tr = 10
+relrtx.dtcp.rtx.initial_rtx_timeout = 10
 
 rel.partial_delivery = false
 rel.incomplete_delivery = false
@@ -39,7 +39,7 @@ rel.dtcp.fc.max_cwq_len = 100
 rel.dtcp.fc.initial_credit = 50
 rel.dtcp.rtx.max_time_to_retry = 15
 rel.dtcp.rtx.data_rxms_max = 15
-rel.dtcp.rtx.initial_tr = 10
+rel.dtcp.rtx.initial_rtx_timeout = 10
 
 unrel20M.partial_delivery = false
 unrel20M.incomplete_delivery = false
