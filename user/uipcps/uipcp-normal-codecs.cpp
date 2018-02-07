@@ -107,80 +107,79 @@ RinaName::rina_name_fill(struct rina_name *rn)
 }
 
 static void
-gpb2RinaName(RinaName &name, const gpb::applicationProcessNamingInfo_t &gname)
+gpb2RinaName(RinaName &name, const gpb::APName &gname)
 {
-    name.apn = gname.applicationprocessname();
-    name.api = gname.applicationprocessinstance();
-    name.aen = gname.applicationentityname();
-    name.aei = gname.applicationentityinstance();
+    name.apn = gname.ap_name();
+    name.api = gname.ap_instance();
+    name.aen = gname.ae_name();
+    name.aei = gname.ae_instance();
 }
 
-static gpb::applicationProcessNamingInfo_t *
+static gpb::APName *
 RinaName2gpb(const RinaName &name)
 {
-    gpb::applicationProcessNamingInfo_t *gan =
-        new gpb::applicationProcessNamingInfo_t();
+    gpb::APName *gan = new gpb::APName();
 
-    gan->set_applicationprocessname(name.apn);
-    gan->set_applicationprocessinstance(name.api);
-    gan->set_applicationentityname(name.aen);
-    gan->set_applicationentityinstance(name.aei);
+    gan->set_ap_name(name.apn);
+    gan->set_ap_instance(name.api);
+    gan->set_ae_name(name.aen);
+    gan->set_ae_instance(name.aei);
 
     return gan;
 }
 
 EnrollmentInfo::EnrollmentInfo(const char *buf, unsigned int size)
 {
-    gpb::enrollmentInformation_t gm;
+    gpb::EnrollmentInfo gm;
 
     gm.ParseFromArray(buf, size);
 
     address = gm.address();
 #if 0
-    start_early = gm.startearly();
+    start_early = gm.start_early();
 #else
     start_early = true;
 #endif
 
-    for (int i = 0; i < gm.supportingdifs_size(); i++) {
-        lower_difs.push_back(gm.supportingdifs(i));
+    for (int i = 0; i < gm.supp_difs_size(); i++) {
+        lower_difs.push_back(gm.supp_difs(i));
     }
 }
 
 int
 EnrollmentInfo::serialize(char *buf, unsigned int size) const
 {
-    gpb::enrollmentInformation_t gm;
+    gpb::EnrollmentInfo gm;
 
     gm.set_address(address);
-    gm.set_startearly(start_early);
+    gm.set_start_early(start_early);
 
     for (const string &dif : lower_difs) {
-        gm.add_supportingdifs(dif);
+        gm.add_supp_difs(dif);
     }
 
     return ser_common(gm, buf, size);
 }
 
 static void
-gpb2DFTEntry(DFTEntry &entry, const gpb::directoryForwardingTableEntry_t &gm)
+gpb2DFTEntry(DFTEntry &entry, const gpb::DFTEntry &gm)
 {
-    gpb2RinaName(entry.appl_name, gm.applicationname());
+    gpb2RinaName(entry.appl_name, gm.appl_name());
     entry.ipcp_name = gm.ipcp_name();
     entry.timestamp = gm.timestamp();
 }
 
 static int
-DFTEntry2gpb(const DFTEntry &entry, gpb::directoryForwardingTableEntry_t &gm)
+DFTEntry2gpb(const DFTEntry &entry, gpb::DFTEntry &gm)
 {
-    gpb::applicationProcessNamingInfo_t *gan = RinaName2gpb(entry.appl_name);
+    gpb::APName *gan = RinaName2gpb(entry.appl_name);
 
     if (!gan) {
         PE("Out of memory\n");
         return -1;
     }
 
-    gm.set_allocated_applicationname(gan);
+    gm.set_allocated_appl_name(gan);
     gm.set_ipcp_name(entry.ipcp_name);
     gm.set_timestamp(entry.timestamp);
 
@@ -189,7 +188,7 @@ DFTEntry2gpb(const DFTEntry &entry, gpb::directoryForwardingTableEntry_t &gm)
 
 DFTEntry::DFTEntry(const char *buf, unsigned int size) : local(false)
 {
-    gpb::directoryForwardingTableEntry_t gm;
+    gpb::DFTEntry gm;
 
     gm.ParseFromArray(buf, size);
 
@@ -199,7 +198,7 @@ DFTEntry::DFTEntry(const char *buf, unsigned int size) : local(false)
 int
 DFTEntry::serialize(char *buf, unsigned int size) const
 {
-    gpb::directoryForwardingTableEntry_t gm;
+    gpb::DFTEntry gm;
     int ret = DFTEntry2gpb(*this, gm);
 
     if (ret) {
@@ -211,26 +210,26 @@ DFTEntry::serialize(char *buf, unsigned int size) const
 
 DFTSlice::DFTSlice(const char *buf, unsigned int size)
 {
-    gpb::directoryForwardingTableEntrySet_t gm;
+    gpb::DFTSlice gm;
 
     gm.ParseFromArray(buf, size);
 
-    for (int i = 0; i < gm.directoryforwardingtableentry_size(); i++) {
+    for (int i = 0; i < gm.entries_size(); i++) {
         entries.emplace_back();
-        gpb2DFTEntry(entries.back(), gm.directoryforwardingtableentry(i));
+        gpb2DFTEntry(entries.back(), gm.entries(i));
     }
 }
 
 int
 DFTSlice::serialize(char *buf, unsigned int size) const
 {
-    gpb::directoryForwardingTableEntrySet_t gm;
+    gpb::DFTSlice gm;
 
     for (const DFTEntry &e : entries) {
-        gpb::directoryForwardingTableEntry_t *gentry;
+        gpb::DFTEntry *gentry;
         int ret;
 
-        gentry = gm.add_directoryforwardingtableentry();
+        gentry = gm.add_entries();
         ret    = DFTEntry2gpb(e, *gentry);
         if (ret) {
             return ret;
@@ -241,26 +240,26 @@ DFTSlice::serialize(char *buf, unsigned int size) const
 }
 
 static void
-gpb2NeighborCandidate(NeighborCandidate &cand, const gpb::neighbor_t &gm)
+gpb2NeighborCandidate(NeighborCandidate &cand, const gpb::NeighborCandidate &gm)
 {
-    cand.apn     = gm.applicationprocessname();
-    cand.api     = gm.applicationprocessinstance();
+    cand.apn     = gm.ap_name();
+    cand.api     = gm.ap_instance();
     cand.address = gm.address();
 
-    for (int i = 0; i < gm.supportingdifs_size(); i++) {
-        cand.lower_difs.push_back(gm.supportingdifs(i));
+    for (int i = 0; i < gm.supp_difs_size(); i++) {
+        cand.lower_difs.push_back(gm.supp_difs(i));
     }
 }
 
 static int
-NeighborCandidate2gpb(const NeighborCandidate &cand, gpb::neighbor_t &gm)
+NeighborCandidate2gpb(const NeighborCandidate &cand, gpb::NeighborCandidate &gm)
 {
-    gm.set_applicationprocessname(cand.apn);
-    gm.set_applicationprocessinstance(cand.api);
+    gm.set_ap_name(cand.apn);
+    gm.set_ap_instance(cand.api);
     gm.set_address(cand.address);
 
     for (const string &dif : cand.lower_difs) {
-        gm.add_supportingdifs(dif);
+        gm.add_supp_difs(dif);
     }
 
     return 0;
@@ -268,7 +267,7 @@ NeighborCandidate2gpb(const NeighborCandidate &cand, gpb::neighbor_t &gm)
 
 NeighborCandidate::NeighborCandidate(const char *buf, unsigned int size)
 {
-    gpb::neighbor_t gm;
+    gpb::NeighborCandidate gm;
 
     gm.ParseFromArray(buf, size);
 
@@ -278,7 +277,7 @@ NeighborCandidate::NeighborCandidate(const char *buf, unsigned int size)
 int
 NeighborCandidate::serialize(char *buf, unsigned int size) const
 {
-    gpb::neighbor_t gm;
+    gpb::NeighborCandidate gm;
 
     NeighborCandidate2gpb(*this, gm);
 
@@ -307,26 +306,26 @@ NeighborCandidate::operator==(const NeighborCandidate &o) const
 
 NeighborCandidateList::NeighborCandidateList(const char *buf, unsigned int size)
 {
-    gpb::neighbors_t gm;
+    gpb::NeighborCandidateList gm;
 
     gm.ParseFromArray(buf, size);
 
-    for (int i = 0; i < gm.neighbor_size(); i++) {
+    for (int i = 0; i < gm.neighbors_size(); i++) {
         candidates.emplace_back();
-        gpb2NeighborCandidate(candidates.back(), gm.neighbor(i));
+        gpb2NeighborCandidate(candidates.back(), gm.neighbors(i));
     }
 }
 
 int
 NeighborCandidateList::serialize(char *buf, unsigned int size) const
 {
-    gpb::neighbors_t gm;
+    gpb::NeighborCandidateList gm;
 
     for (const NeighborCandidate &cand : candidates) {
-        gpb::neighbor_t *neigh;
+        gpb::NeighborCandidate *neigh;
         int ret;
 
-        neigh = gm.add_neighbor();
+        neigh = gm.add_neighbors();
         ret   = NeighborCandidate2gpb(cand, *neigh);
         if (ret) {
             return ret;
@@ -337,7 +336,7 @@ NeighborCandidateList::serialize(char *buf, unsigned int size) const
 }
 
 static void
-gpb2LowerFlow(LowerFlow &lf, const gpb::flowStateObject_t &gm)
+gpb2LowerFlow(LowerFlow &lf, const gpb::LowerFlow &gm)
 {
     lf.local_node  = gm.name();
     lf.remote_node = gm.neighbor_name();
@@ -348,7 +347,7 @@ gpb2LowerFlow(LowerFlow &lf, const gpb::flowStateObject_t &gm)
 }
 
 static int
-LowerFlow2gpb(const LowerFlow &lf, gpb::flowStateObject_t &gm)
+LowerFlow2gpb(const LowerFlow &lf, gpb::LowerFlow &gm)
 {
     gm.set_name(lf.local_node);
     gm.set_neighbor_name(lf.remote_node);
@@ -362,7 +361,7 @@ LowerFlow2gpb(const LowerFlow &lf, gpb::flowStateObject_t &gm)
 
 LowerFlow::LowerFlow(const char *buf, unsigned int size)
 {
-    gpb::flowStateObject_t gm;
+    gpb::LowerFlow gm;
 
     gm.ParseFromArray(buf, size);
 
@@ -372,7 +371,7 @@ LowerFlow::LowerFlow(const char *buf, unsigned int size)
 int
 LowerFlow::serialize(char *buf, unsigned int size) const
 {
-    gpb::flowStateObject_t gm;
+    gpb::LowerFlow gm;
 
     LowerFlow2gpb(*this, gm);
 
@@ -390,26 +389,26 @@ LowerFlow::operator std::string() const
 
 LowerFlowList::LowerFlowList(const char *buf, unsigned int size)
 {
-    gpb::flowStateObjectGroup_t gm;
+    gpb::LowerFlowList gm;
 
     gm.ParseFromArray(buf, size);
 
-    for (int i = 0; i < gm.flow_state_objects_size(); i++) {
+    for (int i = 0; i < gm.flows_size(); i++) {
         flows.emplace_back();
-        gpb2LowerFlow(flows.back(), gm.flow_state_objects(i));
+        gpb2LowerFlow(flows.back(), gm.flows(i));
     }
 }
 
 int
 LowerFlowList::serialize(char *buf, unsigned int size) const
 {
-    gpb::flowStateObjectGroup_t gm;
+    gpb::LowerFlowList gm;
 
     for (const LowerFlow &f : flows) {
-        gpb::flowStateObject_t *flow;
+        gpb::LowerFlow *flow;
         int ret;
 
-        flow = gm.add_flow_state_objects();
+        flow = gm.add_flows();
         ret  = LowerFlow2gpb(f, *flow);
         if (ret) {
             return ret;
@@ -420,14 +419,14 @@ LowerFlowList::serialize(char *buf, unsigned int size) const
 }
 
 static void
-gpb2Property(Property &p, const gpb::property_t &gm)
+gpb2Property(Property &p, const gpb::Property &gm)
 {
     p.name  = gm.name();
     p.value = gm.value();
 }
 
 static int
-Property2gpb(const Property &p, gpb::property_t &gm)
+Property2gpb(const Property &p, gpb::Property &gm)
 {
     gm.set_name(p.name);
     gm.set_value(p.value);
@@ -437,7 +436,7 @@ Property2gpb(const Property &p, gpb::property_t &gm)
 
 Property::Property(const char *buf, unsigned int size)
 {
-    gpb::property_t gm;
+    gpb::Property gm;
 
     gm.ParseFromArray(buf, size);
 
@@ -447,7 +446,7 @@ Property::Property(const char *buf, unsigned int size)
 int
 Property::serialize(char *buf, unsigned int size) const
 {
-    gpb::property_t gm;
+    gpb::Property gm;
 
     Property2gpb(*this, gm);
 
@@ -455,36 +454,36 @@ Property::serialize(char *buf, unsigned int size) const
 }
 
 static void
-gpb2QosSpec(QosSpec &q, const gpb::qosSpecification_t &gm)
+gpb2QosSpec(QosSpec &q, const gpb::QosSpec &gm)
 {
     q.name                      = gm.name();
-    q.qos_id                    = gm.qosid();
-    q.avg_bw                    = gm.averagebandwidth();
-    q.avg_sdu_bw                = gm.averagesdubandwidth();
-    q.peak_bw_duration          = gm.peakbandwidthduration();
-    q.peak_sdu_bw_duration      = gm.peaksdubandwidthduration();
-    q.undetected_bit_error_rate = gm.undetectedbiterrorrate();
-    q.partial_delivery          = gm.partialdelivery();
-    q.in_order_delivery         = gm.order();
-    q.max_sdu_gap               = gm.maxallowablegapsdu();
+    q.qosid                     = gm.qosid();
+    q.avg_bw                    = gm.avg_bw();
+    q.avg_sdu_rate              = gm.avg_sdu_rate();
+    q.peak_bw_duration          = gm.peak_bw_duration();
+    q.peak_sdu_bw_duration      = gm.peak_sdu_rate_duration();
+    q.undetected_bit_error_rate = gm.undetected_bit_error_rate();
+    q.partial_delivery          = gm.partial_delivery();
+    q.in_order_delivery         = gm.in_order_delivery();
+    q.max_sdu_gap               = gm.max_sdu_gap();
     q.delay                     = gm.delay();
     q.jitter                    = gm.jitter();
     /* missing extra_parameters */
 }
 
 static int
-QosSpec2gpb(const QosSpec &q, gpb::qosSpecification_t &gm)
+QosSpec2gpb(const QosSpec &q, gpb::QosSpec &gm)
 {
     gm.set_name(q.name);
-    gm.set_qosid(q.qos_id);
-    gm.set_averagebandwidth(q.avg_bw);
-    gm.set_averagesdubandwidth(q.avg_sdu_bw);
-    gm.set_peakbandwidthduration(q.peak_bw_duration);
-    gm.set_peaksdubandwidthduration(q.peak_sdu_bw_duration);
-    gm.set_undetectedbiterrorrate(q.undetected_bit_error_rate);
-    gm.set_partialdelivery(q.partial_delivery);
-    gm.set_order(q.in_order_delivery);
-    gm.set_maxallowablegapsdu(q.max_sdu_gap);
+    gm.set_qosid(q.qosid);
+    gm.set_avg_bw(q.avg_bw);
+    gm.set_avg_sdu_rate(q.avg_sdu_rate);
+    gm.set_peak_bw_duration(q.peak_bw_duration);
+    gm.set_peak_sdu_rate_duration(q.peak_sdu_bw_duration);
+    gm.set_undetected_bit_error_rate(q.undetected_bit_error_rate);
+    gm.set_partial_delivery(q.partial_delivery);
+    gm.set_in_order_delivery(q.in_order_delivery);
+    gm.set_max_sdu_gap(q.max_sdu_gap);
     gm.set_delay(q.delay);
     gm.set_jitter(q.jitter);
     /* missing extra_parameters */
@@ -494,7 +493,7 @@ QosSpec2gpb(const QosSpec &q, gpb::qosSpecification_t &gm)
 
 QosSpec::QosSpec(const char *buf, unsigned int size)
 {
-    gpb::qosSpecification_t gm;
+    gpb::QosSpec gm;
 
     gm.ParseFromArray(buf, size);
 
@@ -504,7 +503,7 @@ QosSpec::QosSpec(const char *buf, unsigned int size)
 int
 QosSpec::serialize(char *buf, unsigned int size) const
 {
-    gpb::qosSpecification_t gm;
+    gpb::QosSpec gm;
 
     QosSpec2gpb(*this, gm);
 
@@ -512,29 +511,29 @@ QosSpec::serialize(char *buf, unsigned int size) const
 }
 
 static void
-gpb2PolicyDescr(PolicyDescr &p, const gpb::policyDescriptor_t &gm)
+gpb2PolicyDescr(PolicyDescr &p, const gpb::PolicyDescr &gm)
 {
-    p.name      = gm.policyname();
-    p.impl_name = gm.policyimplname();
+    p.name      = gm.name();
+    p.impl_name = gm.impl_name();
     p.version   = gm.version();
 
-    for (int i = 0; i < gm.policyparameters_size(); i++) {
+    for (int i = 0; i < gm.parameters_size(); i++) {
         p.parameters.emplace_back();
-        gpb2Property(p.parameters.back(), gm.policyparameters(i));
+        gpb2Property(p.parameters.back(), gm.parameters(i));
     }
 }
 
 static int
-PolicyDescr2gpb(const PolicyDescr &p, gpb::policyDescriptor_t &gm)
+PolicyDescr2gpb(const PolicyDescr &p, gpb::PolicyDescr &gm)
 {
-    gm.set_policyname(p.name);
-    gm.set_policyimplname(p.impl_name);
+    gm.set_name(p.name);
+    gm.set_impl_name(p.impl_name);
     gm.set_version(p.version);
 
     for (const Property &pr : p.parameters) {
-        gpb::property_t *param;
+        gpb::Property *param;
 
-        param = gm.add_policyparameters();
+        param = gm.add_parameters();
         Property2gpb(pr, *param);
     }
 
@@ -543,7 +542,7 @@ PolicyDescr2gpb(const PolicyDescr &p, gpb::policyDescriptor_t &gm)
 
 PolicyDescr::PolicyDescr(const char *buf, unsigned int size)
 {
-    gpb::policyDescriptor_t gm;
+    gpb::PolicyDescr gm;
 
     gm.ParseFromArray(buf, size);
 
@@ -553,7 +552,7 @@ PolicyDescr::PolicyDescr(const char *buf, unsigned int size)
 int
 PolicyDescr::serialize(char *buf, unsigned int size) const
 {
-    gpb::policyDescriptor_t gm;
+    gpb::PolicyDescr gm;
 
     PolicyDescr2gpb(*this, gm);
 
@@ -562,30 +561,30 @@ PolicyDescr::serialize(char *buf, unsigned int size) const
 
 static void
 gpb2WindowBasedFlowCtrlConfig(WindowBasedFlowCtrlConfig &cfg,
-                              const gpb::dtcpWindowBasedFlowControlConfig_t &gm)
+                              const gpb::WindowBasedFlowCtrlConfig &gm)
 {
-    cfg.max_cwq_len    = gm.maxclosedwindowqueuelength();
-    cfg.initial_credit = gm.initialcredit();
-    gpb2PolicyDescr(cfg.rcvr_flow_ctrl, gm.rcvrflowcontrolpolicy());
-    gpb2PolicyDescr(cfg.tx_ctrl, gm.txcontrolpolicy());
+    cfg.max_cwq_len    = gm.max_cwq_len();
+    cfg.initial_credit = gm.initial_credit();
+    gpb2PolicyDescr(cfg.rcvr_flow_ctrl, gm.rcvr_flow_ctrl());
+    gpb2PolicyDescr(cfg.tx_ctrl, gm.tx_ctrl());
 }
 
 static int
 WindowBasedFlowCtrlConfig2gpb(const WindowBasedFlowCtrlConfig &cfg,
-                              gpb::dtcpWindowBasedFlowControlConfig_t &gm)
+                              gpb::WindowBasedFlowCtrlConfig &gm)
 {
-    gpb::policyDescriptor_t *p;
+    gpb::PolicyDescr *p;
 
-    gm.set_maxclosedwindowqueuelength(cfg.max_cwq_len);
-    gm.set_initialcredit(cfg.initial_credit);
+    gm.set_max_cwq_len(cfg.max_cwq_len);
+    gm.set_initial_credit(cfg.initial_credit);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.rcvr_flow_ctrl, *p);
-    gm.set_allocated_rcvrflowcontrolpolicy(p);
+    gm.set_allocated_rcvr_flow_ctrl(p);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.tx_ctrl, *p);
-    gm.set_allocated_txcontrolpolicy(p);
+    gm.set_allocated_tx_ctrl(p);
 
     return 0;
 }
@@ -593,7 +592,7 @@ WindowBasedFlowCtrlConfig2gpb(const WindowBasedFlowCtrlConfig &cfg,
 WindowBasedFlowCtrlConfig::WindowBasedFlowCtrlConfig(const char *buf,
                                                      unsigned int size)
 {
-    gpb::dtcpWindowBasedFlowControlConfig_t gm;
+    gpb::WindowBasedFlowCtrlConfig gm;
 
     gm.ParseFromArray(buf, size);
 
@@ -603,7 +602,7 @@ WindowBasedFlowCtrlConfig::WindowBasedFlowCtrlConfig(const char *buf,
 int
 WindowBasedFlowCtrlConfig::serialize(char *buf, unsigned int size) const
 {
-    gpb::dtcpWindowBasedFlowControlConfig_t gm;
+    gpb::WindowBasedFlowCtrlConfig gm;
 
     WindowBasedFlowCtrlConfig2gpb(*this, gm);
 
@@ -612,36 +611,36 @@ WindowBasedFlowCtrlConfig::serialize(char *buf, unsigned int size) const
 
 static void
 gpb2RateBasedFlowCtrlConfig(RateBasedFlowCtrlConfig &cfg,
-                            const gpb::dtcpRateBasedFlowControlConfig_t &gm)
+                            const gpb::RateBasedFlowCtrlConfig &gm)
 {
-    cfg.sending_rate = gm.sendingrate();
-    cfg.time_period  = gm.timeperiod();
-    gpb2PolicyDescr(cfg.no_rate_slow_down, gm.norateslowdownpolicy());
+    cfg.sender_rate = gm.sender_rate();
+    cfg.time_period = gm.time_period();
+    gpb2PolicyDescr(cfg.no_rate_slow_down, gm.no_rate_slow_down());
     gpb2PolicyDescr(cfg.no_override_default_peak,
-                    gm.nooverridedefaultpeakpolicy());
-    gpb2PolicyDescr(cfg.rate_reduction, gm.ratereductionpolicy());
+                    gm.no_override_default_peak());
+    gpb2PolicyDescr(cfg.rate_reduction, gm.rate_reduction());
 }
 
 static int
 RateBasedFlowCtrlConfig2gpb(const RateBasedFlowCtrlConfig &cfg,
-                            gpb::dtcpRateBasedFlowControlConfig_t &gm)
+                            gpb::RateBasedFlowCtrlConfig &gm)
 {
-    gpb::policyDescriptor_t *p;
+    gpb::PolicyDescr *p;
 
-    gm.set_sendingrate(cfg.sending_rate);
-    gm.set_timeperiod(cfg.time_period);
+    gm.set_sender_rate(cfg.sender_rate);
+    gm.set_time_period(cfg.time_period);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.no_rate_slow_down, *p);
-    gm.set_allocated_norateslowdownpolicy(p);
+    gm.set_allocated_no_rate_slow_down(p);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.no_override_default_peak, *p);
-    gm.set_allocated_nooverridedefaultpeakpolicy(p);
+    gm.set_allocated_no_override_default_peak(p);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.rate_reduction, *p);
-    gm.set_allocated_ratereductionpolicy(p);
+    gm.set_allocated_rate_reduction(p);
 
     return 0;
 }
@@ -649,7 +648,7 @@ RateBasedFlowCtrlConfig2gpb(const RateBasedFlowCtrlConfig &cfg,
 RateBasedFlowCtrlConfig::RateBasedFlowCtrlConfig(const char *buf,
                                                  unsigned int size)
 {
-    gpb::dtcpRateBasedFlowControlConfig_t gm;
+    gpb::RateBasedFlowCtrlConfig gm;
 
     gm.ParseFromArray(buf, size);
 
@@ -659,7 +658,7 @@ RateBasedFlowCtrlConfig::RateBasedFlowCtrlConfig(const char *buf,
 int
 RateBasedFlowCtrlConfig::serialize(char *buf, unsigned int size) const
 {
-    gpb::dtcpRateBasedFlowControlConfig_t gm;
+    gpb::RateBasedFlowCtrlConfig gm;
 
     RateBasedFlowCtrlConfig2gpb(*this, gm);
 
@@ -667,74 +666,74 @@ RateBasedFlowCtrlConfig::serialize(char *buf, unsigned int size) const
 }
 
 static void
-gpb2FlowCtrlConfig(FlowCtrlConfig &cfg, const gpb::dtcpFlowControlConfig_t &gm)
+gpb2FlowCtrlConfig(FlowCtrlConfig &cfg, const gpb::FlowCtrlConfig &gm)
 {
-    if (gm.windowbased()) {
+    if (gm.window_based()) {
         cfg.fc_type = RLITE_FC_T_WIN;
-    } else if (gm.ratebased()) {
+    } else if (gm.rate_based()) {
         cfg.fc_type = RLITE_FC_T_RATE;
     }
-    gpb2WindowBasedFlowCtrlConfig(cfg.win, gm.windowbasedconfig());
-    gpb2RateBasedFlowCtrlConfig(cfg.rate, gm.ratebasedconfig());
-    cfg.sent_bytes_th      = gm.sentbytesthreshold();
-    cfg.sent_bytes_perc_th = gm.sentbytespercentthreshold();
-    cfg.sent_buffer_th     = gm.sentbuffersthreshold();
-    cfg.rcv_bytes_th       = gm.rcvbytesthreshold();
-    cfg.rcv_bytes_perc_th  = gm.rcvbytespercentthreshold();
-    cfg.rcv_buffers_th     = gm.rcvbuffersthreshold();
-    gpb2PolicyDescr(cfg.closed_win, gm.closedwindowpolicy());
-    gpb2PolicyDescr(cfg.flow_ctrl_overrun, gm.flowcontroloverrunpolicy());
-    gpb2PolicyDescr(cfg.reconcile_flow_ctrl, gm.reconcileflowcontrolpolicy());
-    gpb2PolicyDescr(cfg.receiving_flow_ctrl, gm.receivingflowcontrolpolicy());
+    gpb2WindowBasedFlowCtrlConfig(cfg.win, gm.window_based_config());
+    gpb2RateBasedFlowCtrlConfig(cfg.rate, gm.rate_based_config());
+    cfg.sent_bytes_th      = gm.send_bytes_th();
+    cfg.sent_bytes_perc_th = gm.sent_bytes_perc_th();
+    cfg.sent_buffers_th    = gm.sent_buffers_th();
+    cfg.rcv_bytes_th       = gm.rcv_bytes_th();
+    cfg.rcv_bytes_perc_th  = gm.rcv_bytes_perc_th();
+    cfg.rcv_buffers_th     = gm.rcv_buffers_th();
+    gpb2PolicyDescr(cfg.closed_win, gm.closed_win());
+    gpb2PolicyDescr(cfg.flow_ctrl_overrun, gm.flow_ctrl_overrun());
+    gpb2PolicyDescr(cfg.reconcile_flow_ctrl, gm.reconcile_flow_ctrl());
+    gpb2PolicyDescr(cfg.receiving_flow_ctrl, gm.receiving_flow_ctrl());
 }
 
 static int
-FlowCtrlConfig2gpb(const FlowCtrlConfig &cfg, gpb::dtcpFlowControlConfig_t &gm)
+FlowCtrlConfig2gpb(const FlowCtrlConfig &cfg, gpb::FlowCtrlConfig &gm)
 {
-    gpb::dtcpWindowBasedFlowControlConfig_t *w;
-    gpb::dtcpRateBasedFlowControlConfig_t *r;
-    gpb::policyDescriptor_t *p;
+    gpb::WindowBasedFlowCtrlConfig *w;
+    gpb::RateBasedFlowCtrlConfig *r;
+    gpb::PolicyDescr *p;
 
-    gm.set_windowbased(cfg.fc_type == RLITE_FC_T_WIN);
-    gm.set_ratebased(cfg.fc_type == RLITE_FC_T_RATE);
+    gm.set_window_based(cfg.fc_type == RLITE_FC_T_WIN);
+    gm.set_rate_based(cfg.fc_type == RLITE_FC_T_RATE);
 
-    w = new gpb::dtcpWindowBasedFlowControlConfig_t;
+    w = new gpb::WindowBasedFlowCtrlConfig;
     WindowBasedFlowCtrlConfig2gpb(cfg.win, *w);
-    gm.set_allocated_windowbasedconfig(w);
+    gm.set_allocated_window_based_config(w);
 
-    r = new gpb::dtcpRateBasedFlowControlConfig_t;
+    r = new gpb::RateBasedFlowCtrlConfig;
     RateBasedFlowCtrlConfig2gpb(cfg.rate, *r);
-    gm.set_allocated_ratebasedconfig(r);
+    gm.set_allocated_rate_based_config(r);
 
-    gm.set_sentbytesthreshold(cfg.sent_bytes_th);
-    gm.set_sentbytespercentthreshold(cfg.sent_bytes_perc_th);
-    gm.set_sentbuffersthreshold(cfg.sent_buffer_th);
-    gm.set_rcvbytesthreshold(cfg.rcv_bytes_th);
-    gm.set_rcvbytespercentthreshold(cfg.rcv_bytes_perc_th);
-    gm.set_rcvbuffersthreshold(cfg.rcv_buffers_th);
+    gm.set_send_bytes_th(cfg.sent_bytes_th);
+    gm.set_sent_bytes_perc_th(cfg.sent_bytes_perc_th);
+    gm.set_sent_buffers_th(cfg.sent_buffers_th);
+    gm.set_rcv_bytes_th(cfg.rcv_bytes_th);
+    gm.set_rcv_bytes_perc_th(cfg.rcv_bytes_perc_th);
+    gm.set_rcv_buffers_th(cfg.rcv_buffers_th);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.closed_win, *p);
-    gm.set_allocated_closedwindowpolicy(p);
+    gm.set_allocated_closed_win(p);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.flow_ctrl_overrun, *p);
-    gm.set_allocated_flowcontroloverrunpolicy(p);
+    gm.set_allocated_flow_ctrl_overrun(p);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.reconcile_flow_ctrl, *p);
-    gm.set_allocated_reconcileflowcontrolpolicy(p);
+    gm.set_allocated_reconcile_flow_ctrl(p);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.receiving_flow_ctrl, *p);
-    gm.set_allocated_receivingflowcontrolpolicy(p);
+    gm.set_allocated_receiving_flow_ctrl(p);
 
     return 0;
 }
 
 FlowCtrlConfig::FlowCtrlConfig(const char *buf, unsigned int size)
 {
-    gpb::dtcpFlowControlConfig_t gm;
+    gpb::FlowCtrlConfig gm;
 
     gm.ParseFromArray(buf, size);
 
@@ -744,7 +743,7 @@ FlowCtrlConfig::FlowCtrlConfig(const char *buf, unsigned int size)
 int
 FlowCtrlConfig::serialize(char *buf, unsigned int size) const
 {
-    gpb::dtcpFlowControlConfig_t gm;
+    gpb::FlowCtrlConfig gm;
 
     FlowCtrlConfig2gpb(*this, gm);
 
@@ -752,58 +751,58 @@ FlowCtrlConfig::serialize(char *buf, unsigned int size) const
 }
 
 static void
-gpb2RtxCtrlConfig(RtxCtrlConfig &cfg, const gpb::dtcpRtxControlConfig_t &gm)
+gpb2RtxCtrlConfig(RtxCtrlConfig &cfg, const gpb::RtxCtrlConfig &gm)
 {
-    cfg.max_time_to_retry = gm.maxtimetoretry();
-    cfg.data_rxmsn_max    = gm.datarxmsnmax();
-    cfg.initial_tr        = gm.initialrtxtime();
-    gpb2PolicyDescr(cfg.rtx_timer_expiry, gm.rtxtimerexpirypolicy());
-    gpb2PolicyDescr(cfg.sender_ack, gm.senderackpolicy());
-    gpb2PolicyDescr(cfg.receiving_ack_list, gm.recvingacklistpolicy());
-    gpb2PolicyDescr(cfg.rcvr_ack, gm.rcvrackpolicy());
-    gpb2PolicyDescr(cfg.sending_ack, gm.sendingackpolicy());
-    gpb2PolicyDescr(cfg.rcvr_ctrl_ack, gm.rcvrcontrolackpolicy());
+    cfg.max_time_to_retry   = gm.max_time_to_retry();
+    cfg.data_rxmsn_max      = gm.data_rxmsn_max();
+    cfg.initial_rtx_timeout = gm.initial_rtx_timeout();
+    gpb2PolicyDescr(cfg.rtx_timer_expiry, gm.rtx_timer_expiry());
+    gpb2PolicyDescr(cfg.sender_ack, gm.sender_ack());
+    gpb2PolicyDescr(cfg.receiving_ack_list, gm.receiving_ack_list());
+    gpb2PolicyDescr(cfg.rcvr_ack, gm.rcvr_ack());
+    gpb2PolicyDescr(cfg.sending_ack, gm.sending_ack());
+    gpb2PolicyDescr(cfg.rcvr_ctrl_ack, gm.rcvr_ctrl_ack());
 }
 
 static int
-RtxCtrlConfig2gpb(const RtxCtrlConfig &cfg, gpb::dtcpRtxControlConfig_t &gm)
+RtxCtrlConfig2gpb(const RtxCtrlConfig &cfg, gpb::RtxCtrlConfig &gm)
 {
-    gpb::policyDescriptor_t *p;
+    gpb::PolicyDescr *p;
 
-    gm.set_maxtimetoretry(cfg.max_time_to_retry);
-    gm.set_datarxmsnmax(cfg.data_rxmsn_max);
-    gm.set_initialrtxtime(cfg.initial_tr);
+    gm.set_max_time_to_retry(cfg.max_time_to_retry);
+    gm.set_data_rxmsn_max(cfg.data_rxmsn_max);
+    gm.set_initial_rtx_timeout(cfg.initial_rtx_timeout);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.rtx_timer_expiry, *p);
-    gm.set_allocated_rtxtimerexpirypolicy(p);
+    gm.set_allocated_rtx_timer_expiry(p);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.sender_ack, *p);
-    gm.set_allocated_senderackpolicy(p);
+    gm.set_allocated_sender_ack(p);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.receiving_ack_list, *p);
-    gm.set_allocated_recvingacklistpolicy(p);
+    gm.set_allocated_receiving_ack_list(p);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.rcvr_ack, *p);
-    gm.set_allocated_rcvrackpolicy(p);
+    gm.set_allocated_rcvr_ack(p);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.sending_ack, *p);
-    gm.set_allocated_sendingackpolicy(p);
+    gm.set_allocated_sending_ack(p);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.rcvr_ctrl_ack, *p);
-    gm.set_allocated_rcvrcontrolackpolicy(p);
+    gm.set_allocated_rcvr_ctrl_ack(p);
 
     return 0;
 }
 
 RtxCtrlConfig::RtxCtrlConfig(const char *buf, unsigned int size)
 {
-    gpb::dtcpRtxControlConfig_t gm;
+    gpb::RtxCtrlConfig gm;
 
     gm.ParseFromArray(buf, size);
 
@@ -813,7 +812,7 @@ RtxCtrlConfig::RtxCtrlConfig(const char *buf, unsigned int size)
 int
 RtxCtrlConfig::serialize(char *buf, unsigned int size) const
 {
-    gpb::dtcpRtxControlConfig_t gm;
+    gpb::RtxCtrlConfig gm;
 
     RtxCtrlConfig2gpb(*this, gm);
 
@@ -821,48 +820,48 @@ RtxCtrlConfig::serialize(char *buf, unsigned int size) const
 }
 
 static void
-gpb2DtcpConfig(DtcpConfig &cfg, const gpb::dtcpConfig_t &gm)
+gpb2DtcpConfig(DtcpConfig &cfg, const gpb::DtcpConfig &gm)
 {
-    cfg.flow_ctrl = gm.flowcontrol();
-    cfg.rtx_ctrl  = gm.rtxcontrol();
-    gpb2FlowCtrlConfig(cfg.flow_ctrl_cfg, gm.flowcontrolconfig());
-    gpb2RtxCtrlConfig(cfg.rtx_ctrl_cfg, gm.rtxcontrolconfig());
-    gpb2PolicyDescr(cfg.lost_ctrl_pdu, gm.lostcontrolpdupolicy());
-    gpb2PolicyDescr(cfg.rtt_estimator, gm.rttestimatorpolicy());
+    cfg.flow_ctrl = gm.flow_ctrl();
+    cfg.rtx_ctrl  = gm.rtx_ctrl();
+    gpb2FlowCtrlConfig(cfg.flow_ctrl_cfg, gm.flow_ctrl_cfg());
+    gpb2RtxCtrlConfig(cfg.rtx_ctrl_cfg, gm.rtx_ctrl_cfg());
+    gpb2PolicyDescr(cfg.lost_ctrl_pdu, gm.lost_ctrl_pdu());
+    gpb2PolicyDescr(cfg.rtt_estimator, gm.rtt_estimator());
 }
 
 static int
-DtcpConfig2gpb(const DtcpConfig &cfg, gpb::dtcpConfig_t &gm)
+DtcpConfig2gpb(const DtcpConfig &cfg, gpb::DtcpConfig &gm)
 {
-    gpb::policyDescriptor_t *p;
-    gpb::dtcpFlowControlConfig_t *f;
-    gpb::dtcpRtxControlConfig_t *r;
+    gpb::PolicyDescr *p;
+    gpb::FlowCtrlConfig *f;
+    gpb::RtxCtrlConfig *r;
 
-    gm.set_flowcontrol(cfg.flow_ctrl);
-    gm.set_rtxcontrol(cfg.rtx_ctrl);
+    gm.set_flow_ctrl(cfg.flow_ctrl);
+    gm.set_rtx_ctrl(cfg.rtx_ctrl);
 
-    f = new gpb::dtcpFlowControlConfig_t;
+    f = new gpb::FlowCtrlConfig;
     FlowCtrlConfig2gpb(cfg.flow_ctrl_cfg, *f);
-    gm.set_allocated_flowcontrolconfig(f);
+    gm.set_allocated_flow_ctrl_cfg(f);
 
-    r = new gpb::dtcpRtxControlConfig_t;
+    r = new gpb::RtxCtrlConfig;
     RtxCtrlConfig2gpb(cfg.rtx_ctrl_cfg, *r);
-    gm.set_allocated_rtxcontrolconfig(r);
+    gm.set_allocated_rtx_ctrl_cfg(r);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.lost_ctrl_pdu, *p);
-    gm.set_allocated_lostcontrolpdupolicy(p);
+    gm.set_allocated_lost_ctrl_pdu(p);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.rtt_estimator, *p);
-    gm.set_allocated_rttestimatorpolicy(p);
+    gm.set_allocated_rtt_estimator(p);
 
     return 0;
 }
 
 DtcpConfig::DtcpConfig(const char *buf, unsigned int size)
 {
-    gpb::dtcpConfig_t gm;
+    gpb::DtcpConfig gm;
 
     gm.ParseFromArray(buf, size);
 
@@ -872,7 +871,7 @@ DtcpConfig::DtcpConfig(const char *buf, unsigned int size)
 int
 DtcpConfig::serialize(char *buf, unsigned int size) const
 {
-    gpb::dtcpConfig_t gm;
+    gpb::DtcpConfig gm;
 
     DtcpConfig2gpb(*this, gm);
 
@@ -880,49 +879,49 @@ DtcpConfig::serialize(char *buf, unsigned int size) const
 }
 
 static void
-gpb2ConnPolicies(ConnPolicies &cfg, const gpb::connectionPolicies_t &gm)
+gpb2ConnPolicies(ConnPolicies &cfg, const gpb::ConnPolicies &gm)
 {
-    cfg.dtcp_present        = gm.dtcppresent();
-    cfg.seq_num_rollover_th = gm.seqnumrolloverthreshold();
-    cfg.initial_a_timer     = gm.initialatimer();
-    gpb2DtcpConfig(cfg.dtcp_cfg, gm.dtcpconfiguration());
-    gpb2PolicyDescr(cfg.rcvr_timer_inact, gm.rcvrtimerinactivitypolicy());
-    gpb2PolicyDescr(cfg.sender_timer_inact, gm.sendertimerinactiviypolicy());
-    gpb2PolicyDescr(cfg.init_seq_num, gm.initialseqnumpolicy());
+    cfg.dtcp_present        = gm.dtcp_present();
+    cfg.seq_num_rollover_th = gm.seq_num_rollover_th();
+    cfg.initial_a_timer     = gm.initial_a_timer();
+    gpb2DtcpConfig(cfg.dtcp_cfg, gm.dtcp_cfg());
+    gpb2PolicyDescr(cfg.rcvr_timer_inact, gm.rcvr_timer_inact());
+    gpb2PolicyDescr(cfg.sender_timer_inact, gm.sender_timer_inact());
+    gpb2PolicyDescr(cfg.init_seq_num, gm.init_seq_num());
 }
 
 static int
-ConnPolicies2gpb(const ConnPolicies &cfg, gpb::connectionPolicies_t &gm)
+ConnPolicies2gpb(const ConnPolicies &cfg, gpb::ConnPolicies &gm)
 {
-    gpb::policyDescriptor_t *p;
-    gpb::dtcpConfig_t *d;
+    gpb::PolicyDescr *p;
+    gpb::DtcpConfig *d;
 
-    gm.set_dtcppresent(cfg.dtcp_present);
-    gm.set_seqnumrolloverthreshold(cfg.seq_num_rollover_th);
-    gm.set_initialatimer(cfg.initial_a_timer);
+    gm.set_dtcp_present(cfg.dtcp_present);
+    gm.set_seq_num_rollover_th(cfg.seq_num_rollover_th);
+    gm.set_initial_a_timer(cfg.initial_a_timer);
 
-    d = new gpb::dtcpConfig_t;
+    d = new gpb::DtcpConfig;
     DtcpConfig2gpb(cfg.dtcp_cfg, *d);
-    gm.set_allocated_dtcpconfiguration(d);
+    gm.set_allocated_dtcp_cfg(d);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.rcvr_timer_inact, *p);
-    gm.set_allocated_rcvrtimerinactivitypolicy(p);
+    gm.set_allocated_rcvr_timer_inact(p);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.sender_timer_inact, *p);
-    gm.set_allocated_sendertimerinactiviypolicy(p);
+    gm.set_allocated_sender_timer_inact(p);
 
-    p = new gpb::policyDescriptor_t;
+    p = new gpb::PolicyDescr;
     PolicyDescr2gpb(cfg.init_seq_num, *p);
-    gm.set_allocated_initialseqnumpolicy(p);
+    gm.set_allocated_init_seq_num(p);
 
     return 0;
 }
 
 ConnPolicies::ConnPolicies(const char *buf, unsigned int size)
 {
-    gpb::connectionPolicies_t gm;
+    gpb::ConnPolicies gm;
 
     gm.ParseFromArray(buf, size);
 
@@ -932,7 +931,7 @@ ConnPolicies::ConnPolicies(const char *buf, unsigned int size)
 int
 ConnPolicies::serialize(char *buf, unsigned int size) const
 {
-    gpb::connectionPolicies_t gm;
+    gpb::ConnPolicies gm;
 
     ConnPolicies2gpb(*this, gm);
 
@@ -940,26 +939,26 @@ ConnPolicies::serialize(char *buf, unsigned int size) const
 }
 
 static void
-gpb2ConnId(ConnId &id, const gpb::connectionId_t &gm)
+gpb2ConnId(ConnId &id, const gpb::ConnId &gm)
 {
-    id.qos_id  = gm.qosid();
-    id.src_cep = gm.sourcecepid();
-    id.dst_cep = gm.destinationcepid();
+    id.qosid   = gm.qosid();
+    id.src_cep = gm.src_cep();
+    id.dst_cep = gm.dst_cep();
 }
 
 static int
-ConnId2gpb(const ConnId &id, gpb::connectionId_t &gm)
+ConnId2gpb(const ConnId &id, gpb::ConnId &gm)
 {
-    gm.set_qosid(id.qos_id);
-    gm.set_sourcecepid(id.src_cep);
-    gm.set_destinationcepid(id.dst_cep);
+    gm.set_qosid(id.qosid);
+    gm.set_src_cep(id.src_cep);
+    gm.set_dst_cep(id.dst_cep);
 
     return 0;
 }
 
 ConnId::ConnId(const char *buf, unsigned int size)
 {
-    gpb::connectionId_t gm;
+    gpb::ConnId gm;
 
     gm.ParseFromArray(buf, size);
 
@@ -969,7 +968,7 @@ ConnId::ConnId(const char *buf, unsigned int size)
 int
 ConnId::serialize(char *buf, unsigned int size) const
 {
-    gpb::connectionId_t gm;
+    gpb::ConnId gm;
 
     ConnId2gpb(*this, gm);
 
@@ -977,73 +976,73 @@ ConnId::serialize(char *buf, unsigned int size) const
 }
 
 static void
-gpb2FlowRequest(FlowRequest &fr, const gpb::Flow &gm)
+gpb2FlowRequest(FlowRequest &fr, const gpb::FlowRequest &gm)
 {
-    gpb2RinaName(fr.src_app, gm.sourcenaminginfo());
-    gpb2RinaName(fr.dst_app, gm.destinationnaminginfo());
-    fr.src_port = gm.sourceportid();
-    fr.dst_port = gm.destinationportid();
-    fr.src_addr = gm.sourceaddress();
-    fr.dst_addr = gm.destinationaddress();
-    for (int i = 0; i < gm.connectionids_size(); i++) {
+    gpb2RinaName(fr.src_app, gm.src_app());
+    gpb2RinaName(fr.dst_app, gm.dst_app());
+    fr.src_port = gm.src_port();
+    fr.dst_port = gm.dst_port();
+    fr.src_addr = gm.src_addr();
+    fr.dst_addr = gm.dst_addr();
+    for (int i = 0; i < gm.connections_size(); i++) {
         fr.connections.emplace_back();
-        gpb2ConnId(fr.connections.back(), gm.connectionids(i));
+        gpb2ConnId(fr.connections.back(), gm.connections(i));
     }
-    fr.cur_conn_idx = gm.currentconnectionidindex();
+    fr.cur_conn_idx = gm.cur_conn_idx();
     fr.state        = gm.state();
-    gpb2QosSpec(fr.qos, gm.qosparameters());
-    gpb2ConnPolicies(fr.policies, gm.connectionpolicies());
+    gpb2QosSpec(fr.qos, gm.qos());
+    gpb2ConnPolicies(fr.policies, gm.policies());
     fr.access_ctrl             = nullptr;
-    fr.max_create_flow_retries = gm.maxcreateflowretries();
-    fr.create_flow_retries     = gm.createflowretries();
-    fr.hop_cnt                 = gm.hopcount();
+    fr.max_create_flow_retries = gm.max_create_flow_retries();
+    fr.create_flow_retries     = gm.create_flow_retries();
+    fr.hop_cnt                 = gm.hop_cnt();
 }
 
 static int
-FlowRequest2gpb(const FlowRequest &fr, gpb::Flow &gm)
+FlowRequest2gpb(const FlowRequest &fr, gpb::FlowRequest &gm)
 {
-    gpb::applicationProcessNamingInfo_t *name;
-    gpb::qosSpecification_t *q;
-    gpb::connectionPolicies_t *p;
+    gpb::APName *name;
+    gpb::QosSpec *q;
+    gpb::ConnPolicies *p;
 
     name = RinaName2gpb(fr.src_app);
-    gm.set_allocated_sourcenaminginfo(name);
+    gm.set_allocated_src_app(name);
 
     name = RinaName2gpb(fr.dst_app);
-    gm.set_allocated_destinationnaminginfo(name);
+    gm.set_allocated_dst_app(name);
 
-    gm.set_sourceportid(fr.src_port);
-    gm.set_destinationportid(fr.dst_port);
-    gm.set_sourceaddress(fr.src_addr);
-    gm.set_destinationaddress(fr.dst_addr);
+    gm.set_src_port(fr.src_port);
+    gm.set_dst_port(fr.dst_port);
+    gm.set_src_addr(fr.src_addr);
+    gm.set_dst_addr(fr.dst_addr);
     for (const ConnId &conn : fr.connections) {
-        gpb::connectionId_t *c = gm.add_connectionids();
+        gpb::ConnId *c = gm.add_connections();
 
         ConnId2gpb(conn, *c);
     }
-    gm.set_currentconnectionidindex(fr.cur_conn_idx);
+    gm.set_cur_conn_idx(fr.cur_conn_idx);
     gm.set_state(fr.state);
 
-    q = new gpb::qosSpecification_t;
+    q = new gpb::QosSpec;
     QosSpec2gpb(fr.qos, *q);
-    gm.set_allocated_qosparameters(q);
+    gm.set_allocated_qos(q);
 
-    p = new gpb::connectionPolicies_t;
+    p = new gpb::ConnPolicies;
     ConnPolicies2gpb(fr.policies, *p);
-    gm.set_allocated_connectionpolicies(p);
+    gm.set_allocated_policies(p);
 
     /* access_ctrl not considered --> it will be empty */
 
-    gm.set_maxcreateflowretries(fr.max_create_flow_retries);
-    gm.set_createflowretries(fr.create_flow_retries);
-    gm.set_hopcount(fr.hop_cnt);
+    gm.set_max_create_flow_retries(fr.max_create_flow_retries);
+    gm.set_create_flow_retries(fr.create_flow_retries);
+    gm.set_hop_cnt(fr.hop_cnt);
 
     return 0;
 }
 
 FlowRequest::FlowRequest(const char *buf, unsigned int size)
 {
-    gpb::Flow gm;
+    gpb::FlowRequest gm;
 
     gm.ParseFromArray(buf, size);
 
@@ -1055,7 +1054,7 @@ FlowRequest::FlowRequest(const char *buf, unsigned int size)
 int
 FlowRequest::serialize(char *buf, unsigned int size) const
 {
-    gpb::Flow gm;
+    gpb::FlowRequest gm;
 
     FlowRequest2gpb(*this, gm);
 
@@ -1064,29 +1063,29 @@ FlowRequest::serialize(char *buf, unsigned int size) const
 
 AData::AData(const char *buf, unsigned int size)
 {
-    gpb::a_data_t gm;
+    gpb::AData gm;
 
     gm.ParseFromArray(buf, size);
 
-    src_addr = gm.sourceaddress();
-    dst_addr = gm.destaddress();
+    src_addr = gm.src_addr();
+    dst_addr = gm.dst_addr();
     cdap     = std::move(
-        msg_deser_stateless(gm.cdapmessage().data(), gm.cdapmessage().size()));
+        msg_deser_stateless(gm.cdap_msg().data(), gm.cdap_msg().size()));
 }
 
 int
 AData::serialize(char *buf, unsigned int size) const
 {
-    gpb::a_data_t gm;
+    gpb::AData gm;
     char *serbuf = nullptr;
     size_t serlen;
     int ret;
 
-    gm.set_sourceaddress(src_addr);
-    gm.set_destaddress(dst_addr);
+    gm.set_src_addr(src_addr);
+    gm.set_dst_addr(dst_addr);
     if (cdap) {
         msg_ser_stateless(cdap.get(), &serbuf, &serlen);
-        gm.set_cdapmessage(serbuf, serlen);
+        gm.set_cdap_msg(serbuf, serlen);
     }
 
     ret = ser_common(gm, buf, size);

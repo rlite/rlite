@@ -48,7 +48,7 @@ struct rina_pci {
     rl_addr_t dst_addr;
     rl_addr_t src_addr;
     rl_pdulen_t pdu_len;
-    rl_qosid_t qos_id;
+    rl_qosid_t qosid;
     uint8_t pdu_type;
     uint8_t pdu_flags;
 } __attribute__((__packed__));
@@ -112,7 +112,7 @@ rina_pci_dump(struct rina_pci *pci)
 {
     PD("PCI: dst=%lx,src=%lx,qos=%u,dcep=%u,scep=%u,type=%x,flags=%x,"
        "seq=%lu\n",
-       (long unsigned)pci->dst_addr, (long unsigned)pci->src_addr, pci->qos_id,
+       (long unsigned)pci->dst_addr, (long unsigned)pci->src_addr, pci->qosid,
        pci->dst_cep, pci->src_cep, pci->pdu_type, pci->pdu_flags,
        (long unsigned)pci->seqnum);
 }
@@ -408,9 +408,9 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     }
 
     if (flow->cfg.dtcp.rtx_control) {
-        if (!flow->cfg.dtcp.rtx.initial_tr) {
-            PE("Invalid initial_tr parameter (%u)\n",
-               flow->cfg.dtcp.rtx.initial_tr);
+        if (!flow->cfg.dtcp.rtx.initial_rtx_timeout) {
+            PE("Invalid initial_rtx_timeout parameter (%u)\n",
+               flow->cfg.dtcp.rtx.initial_rtx_timeout);
             return -EINVAL;
         }
         if (!flow->cfg.dtcp.rtx.data_rxms_max) {
@@ -426,7 +426,7 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
         dtp->max_rtxq_len = flow->cfg.dtcp.rtx.max_rtxq_len;
     }
 
-    r = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_tr) *
+    r = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_rtx_timeout) *
         flow->cfg.dtcp.rtx.data_rxms_max;
 
     /* MPL + R + A */
@@ -441,8 +441,8 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     dtp->rtx_tmr.function = rtx_tmr_cb;
     dtp->rtx_tmr.data     = (unsigned long)flow;
-    dtp->rtt              = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_tr);
-    dtp->rtt_stddev       = 1;
+    dtp->rtt        = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_rtx_timeout);
+    dtp->rtt_stddev = 1;
 
     dtp->a_tmr.function = a_tmr_cb;
     dtp->a_tmr.data     = (unsigned long)flow;
@@ -689,7 +689,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     pci            = RL_BUF_PCI(rb);
     pci->dst_addr  = flow->remote_addr;
     pci->src_addr  = ipcp->addr;
-    pci->qos_id    = 0;
+    pci->qosid     = 0;
     pci->dst_cep   = flow->remote_cep;
     pci->src_cep   = flow->local_cep;
     pci->pdu_type  = PDU_T_DT;
@@ -809,7 +809,7 @@ rl_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
     pci            = RL_BUF_PCI(rb);
     pci->dst_addr  = dst_addr;
     pci->src_addr  = ipcp->addr;
-    pci->qos_id    = 0; /* Not valid. */
+    pci->qosid     = 0; /* Not valid. */
     pci->dst_cep   = 0; /* Not valid. */
     pci->src_cep   = 0; /* Not valid. */
     pci->pdu_type  = PDU_T_MGMT;
@@ -865,7 +865,7 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
         pcic                         = (struct rina_pci_ctrl *)RL_BUF_DATA(rb);
         pcic->base.dst_addr          = flow->remote_addr;
         pcic->base.src_addr          = ipcp->addr;
-        pcic->base.qos_id            = 0;
+        pcic->base.qosid             = 0;
         pcic->base.dst_cep           = flow->remote_cep;
         pcic->base.src_cep           = flow->local_cep;
         pcic->base.pdu_type          = pdu_type;

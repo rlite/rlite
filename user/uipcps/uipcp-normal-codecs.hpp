@@ -181,9 +181,9 @@ struct Property : public UipcpObject {
 
 struct QosSpec : public UipcpObject {
     std::string name;
-    uint32_t qos_id;
+    uint32_t qosid;
     uint64_t avg_bw;
-    uint64_t avg_sdu_bw;
+    uint64_t avg_sdu_rate;
     uint64_t peak_bw_duration;
     uint64_t peak_sdu_bw_duration;
     double undetected_bit_error_rate;
@@ -222,7 +222,7 @@ struct WindowBasedFlowCtrlConfig : public UipcpObject {
 };
 
 struct RateBasedFlowCtrlConfig : public UipcpObject {
-    uint64_t sending_rate;
+    uint64_t sender_rate;
     uint64_t time_period; /* us */
     PolicyDescr no_rate_slow_down;
     PolicyDescr no_override_default_peak;
@@ -239,7 +239,7 @@ struct FlowCtrlConfig : public UipcpObject {
     RateBasedFlowCtrlConfig rate;
     uint64_t sent_bytes_th;
     uint64_t sent_bytes_perc_th;
-    uint64_t sent_buffer_th;
+    uint64_t sent_buffers_th;
     uint64_t rcv_bytes_th;
     uint64_t rcv_bytes_perc_th;
     uint64_t rcv_buffers_th;
@@ -254,9 +254,9 @@ struct FlowCtrlConfig : public UipcpObject {
 };
 
 struct RtxCtrlConfig : public UipcpObject {
-    uint32_t max_time_to_retry; /* R div initial_tr */
+    uint32_t max_time_to_retry; /* R div initial_rtx_timeout */
     uint16_t data_rxmsn_max;
-    uint32_t initial_tr;
+    uint32_t initial_rtx_timeout;
 
     PolicyDescr rtx_timer_expiry;
     PolicyDescr sender_ack;
@@ -298,7 +298,7 @@ struct ConnPolicies : public UipcpObject {
 };
 
 struct ConnId : public UipcpObject {
-    uint32_t qos_id  = 0;
+    uint32_t qosid   = 0;
     uint32_t src_cep = 0;
     uint32_t dst_cep = 0;
 

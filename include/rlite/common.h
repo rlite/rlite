@@ -178,7 +178,7 @@ struct rl_mgmt_hdr {
 /* Flow specifications and QoS cubes related definitions. */
 
 struct rate_based_config {
-    uint64_t sending_rate;
+    uint64_t sender_rate;
     uint64_t time_period; /* us */
 } __attribute__((packed));
 
@@ -200,10 +200,10 @@ struct fc_config {
 } __attribute__((packed));
 
 struct rtx_config {
-    uint32_t max_time_to_retry; /* R div initial_tr */
+    uint32_t max_time_to_retry; /* R div initial_rtx_timeout */
     uint16_t data_rxms_max;
     uint16_t max_rtxq_len;
-    uint32_t initial_tr;
+    uint32_t initial_rtx_timeout;
 } __attribute__((packed));
 
 struct dtcp_config {

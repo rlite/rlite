@@ -2,252 +2,215 @@ syntax = "proto2";
 package gpb;
 option optimize_for = LITE_RUNTIME;
 
-message objectValue_t {  // value of an object
-  optional int32 intval = 1;
-  optional sint32 sintval = 2;
-  optional int64 int64val = 3;
-  optional sint64 sint64val = 4;
-  optional string strval = 5;
-  optional bytes byteval = 6;  // arbitrary structure or message
-  optional fixed32 floatval = 7;
-  optional fixed64 doubleval = 8;
-}
-
-message nameValuePair_t {  // A name-value pair
-  optional string name = 1;
-  optional objectValue_t value = 2;
-}
-
-message property_t {  // carries the information of a name/value pair
+/* A name/value pair. */
+message Property {
   required string name = 1;
   required string value = 2;
 }
 
-message a_data_t {
-  optional int32 sourceAddress = 1;
-  optional int32 destAddress = 2;
-  optional bytes cdapMessage = 3;
+/* Application process naming information. */
+message APName {
+  required string ap_name = 1;
+  optional string ap_instance = 2;
+  optional string ae_name = 3;
+  optional string ae_instance = 4;
 }
 
-message AddrAllocRequest {
-  required uint64 requestor = 1;
-  required uint64 address = 2;
-}
-
-message AddrAllocEntries {
-  repeated AddrAllocRequest entries = 1;
-}
-
-// carries the naming information of an application process
-message applicationProcessNamingInfo_t {
-  required string applicationProcessName = 1;
-  optional string applicationProcessInstance = 2;
-  optional string applicationEntityName = 3;
-  optional string applicationEntityInstance = 4;
-}
-
-// the window-based flow control configuration of a connection
-message dtcpWindowBasedFlowControlConfig_t {
-  // Integer that the number PDUs that can be put on the ClosedWindowQueue
-  // before something must be done
-  optional uint64 maxclosedwindowqueuelength = 1;
-  // initial sequence number to get right window edge
-  optional uint64 initialcredit = 2;
-  optional policyDescriptor_t rcvrflowcontrolpolicy =
-      3;  // Invoked when a Transfer PDU is received to give the receiving PM an
-          // opportunity to update the flow control allocations
-  optional policyDescriptor_t txcontrolpolicy =
+/* Window-based flow control configuration for an EFCP connection. */
+message WindowBasedFlowCtrlConfig {
+  /* Maximum length of the closed window queue (in PDUs). */
+  optional uint64 max_cwq_len = 1;
+  /* Initial size of the flow control window (RWE-LWE). */
+  optional uint64 initial_credit = 2;
+  /* Invoked when a Transfer PDU is received to give the receiving PM an
+   * opportunity to update the flow control allocations. */
+  optional PolicyDescr rcvr_flow_ctrl = 3;
+  optional PolicyDescr tx_ctrl =
       4;  // This policy is used when there are conditions that warrant sending
           // fewer PDUs than allowed by the sliding window flow control, e.g.
           // the ECN bit is set.
 }
 
-message dtcpRateBasedFlowControlConfig_t {  // the rate-based flow control
-                                            // configuration of a connection
-  optional uint64 sendingrate = 1;  // the number of PDUs that may be sent in a
+message RateBasedFlowCtrlConfig {   // the rate-based flow control
+                                    // configuration of a connection
+  optional uint64 sender_rate = 1;  // the number of PDUs that may be sent in a
                                     // TimePeriod. Used with rate-based flow
                                     // control
-  optional uint64 timeperiod =
+  optional uint64 time_period =
       2;  // length of time in microseconds for pacing rate-based flow control
-  optional policyDescriptor_t norateslowdownpolicy =
+  optional PolicyDescr no_rate_slow_down =
       3;  // used to momentarily lower the send rate below the rate allowed
-  optional policyDescriptor_t nooverridedefaultpeakpolicy =
+  optional PolicyDescr no_override_default_peak =
       4;  // Allows rate-based flow control to exceed its nominal rate
-  optional policyDescriptor_t ratereductionpolicy =
+  optional PolicyDescr rate_reduction =
       5;  // Allows an alternate action when using rate-based flow control and
           // the number of free buffers is getting low
 }
 
-message
-    dtcpFlowControlConfig_t {  // the flow control configuration of a connection
-  optional bool windowBased =
+message FlowCtrlConfig {  // the flow control configuration of a connection
+  optional bool window_based =
       1;  // indicates whether window-based flow control is in use
-  optional dtcpWindowBasedFlowControlConfig_t windowBasedConfig =
+  optional WindowBasedFlowCtrlConfig window_based_config =
       2;  // the window-based flow control configuration
-  optional bool rateBased =
+  optional bool rate_based =
       3;  // indicates whether rate-based flow control is in use
-  optional dtcpRateBasedFlowControlConfig_t rateBasedConfig =
+  optional RateBasedFlowCtrlConfig rate_based_config =
       4;  // the rate-based flow control configuration
-  optional uint64 sentbytesthreshold =
+  optional uint64 send_bytes_th =
       5;  // The number of free bytes below which flow control should slow or
           // block the user from doing any more Writes
-  optional uint64 sentbytespercentthreshold =
+  optional uint64 sent_bytes_perc_th =
       6;  // The percent of free bytes below, which flow control should slow or
           // block the user from doing any more Writes
-  optional uint64 sentbuffersthreshold =
+  optional uint64 sent_buffers_th =
       7;  // The number of free buffers below which flow control should slow or
           // block the user from doing any more Writes
-  optional uint64 rcvbytesthreshold =
+  optional uint64 rcv_bytes_th =
       8;  // The number of free bytes below which flow control does not move or
           // decreases the amount the Right Window Edge is moved
-  optional uint64 rcvbytespercentthreshold =
+  optional uint64 rcv_bytes_perc_th =
       9;  // The number of free buffers at which flow control does not advance
           // or decreases the amount the Right Window Edge is moved.
-  optional uint64 rcvbuffersthreshold =
+  optional uint64 rcv_buffers_th =
       10;  // The percent of free buffers below which flow control should not
            // advance or decreases the amount the Right Window Edge is moved
-  optional policyDescriptor_t closedwindowpolicy =
+  optional PolicyDescr closed_win =
       11;  // Determine the action to be taken when the receiver has not
            // extended more credit to allow the sender to send more PDUs
-  optional policyDescriptor_t flowcontroloverrunpolicy =
+  optional PolicyDescr flow_ctrl_overrun =
       12;  // Determines what action to take if the receiver receives PDUs but
            // the credit or rate has been exceeded
-  optional policyDescriptor_t reconcileflowcontrolpolicy =
+  optional PolicyDescr reconcile_flow_ctrl =
       13;  // Invoked when both Credit and Rate based flow control are in use
            // and they disagree on whether the PM can send or receive data
-  optional policyDescriptor_t receivingflowcontrolpolicy =
+  optional PolicyDescr receiving_flow_ctrl =
       14;  // Allows some discretion in when to send a Flow Control PDU when
            // there is no Retransmission Control
 }
 
-message
-    dtcpRtxControlConfig_t {  // the rtx control configuration of a connection
-  optional uint32 maxtimetoretry =
+message RtxCtrlConfig {  // the rtx control configuration of a connection
+  optional uint32 max_time_to_retry =
       1;  // Maximum time trying to retransmit a PDU (R)
-  optional uint32 datarxmsnmax = 2;  // the number of times the retransmission
-                                     // of a PDU will be attempted before some
-                                     // other action must be taken
-  optional policyDescriptor_t rtxtimerexpirypolicy =
+  optional uint32 data_rxmsn_max = 2;  // the number of times the retransmission
+                                       // of a PDU will be attempted before some
+                                       // other action must be taken
+  optional PolicyDescr rtx_timer_expiry =
       3;  // Executed by the sender when a Retransmission Timer Expires
-  optional policyDescriptor_t senderackpolicy =
+  optional PolicyDescr sender_ack =
       4;  // Executed by the sender and provides the Sender with some discretion
           // on when PDUs may be deleted from the ReTransmissionQ
-  optional policyDescriptor_t recvingacklistpolicy = 5;  //
-  optional policyDescriptor_t rcvrackpolicy =
+  optional PolicyDescr receiving_ack_list = 5;  //
+  optional PolicyDescr rcvr_ack =
       6;  // Executed by the receiver of the PDU and provides some discretion in
           // the action taken
-  optional policyDescriptor_t sendingackpolicy =
+  optional PolicyDescr sending_ack =
       7;  // allows an alternate action when the A-Timer expires when DTCP is
           // present.
-  optional policyDescriptor_t rcvrcontrolackpolicy =
+  optional PolicyDescr rcvr_ctrl_ack =
       8;  // Allows an alternate action when a Control Ack PDU is received
-  optional uint32 initialRtxTime =
+  optional uint32 initial_rtx_timeout =
       9;  // maximum time that a sender will wait before retransmitting the SDU
 }
 
-message dtcpConfig_t {  // configuration of DTCP for a connection
-  optional bool flowControl =
+message DtcpConfig {  // configuration of DTCP for a connection
+  optional bool flow_ctrl =
       1;  // indicates if flow control is enabled in this connection
-  optional dtcpFlowControlConfig_t flowControlConfig =
-      2;  // the flow control configuration
-  optional bool rtxControl =
+  optional FlowCtrlConfig flow_ctrl_cfg = 2;  // the flow control configuration
+  optional bool rtx_ctrl =
       3;  // inidicates if rtx control is enabled in this connection
-  optional dtcpRtxControlConfig_t rtxControlConfig =
-      4;  // the rtx control configuration
-  optional policyDescriptor_t lostcontrolpdupolicy =
+  optional RtxCtrlConfig rtx_ctrl_cfg = 4;  // the rtx control configuration
+  optional PolicyDescr lost_ctrl_pdu =
       5;  // Determines what action to take when the PM detects that a control
           // PDU (Ack or Flow Control) may have been lost
-  optional policyDescriptor_t rttestimatorpolicy =
+  optional PolicyDescr rtt_estimator =
       6;  // Executed by the sender to estimate the duration of the retx timer
 }
 
-message connectionPolicies_t {  // configuration of the policies and parameters
-                                // of an EFCP connection
-  optional bool dtcpPresent = 1;  // indicates if this connection is using DTCP
-  optional dtcpConfig_t dtcpConfiguration =
+message ConnPolicies {  // configuration of the policies and parameters
+                        // of an EFCP connection
+  optional bool dtcp_present = 1;  // indicates if this connection is using DTCP
+  optional DtcpConfig dtcp_cfg =
       2;  // the DTCP Configuration for this connection
-  optional policyDescriptor_t rcvrtimerinactivitypolicy =
+  optional PolicyDescr rcvr_timer_inact =
       3;  // If no PDUs arrive in this time period, the receiver should expect a
           // DRF in the next Transfer PDU
-  optional policyDescriptor_t sendertimerinactiviypolicy =
+  optional PolicyDescr sender_timer_inact =
       4;  // This timer is used to detect long periods of no traffic, indicating
           // that a DRF should be sent
-  optional policyDescriptor_t initialseqnumpolicy =
+  optional PolicyDescr init_seq_num =
       5;  // allows some discretion in selecting the initial sequence number,
           // when DRF is going to be sent
-  optional uint64 seqnumrolloverthreshold =
+  optional uint64 seq_num_rollover_th =
       6;  // the sequence number rollover threshold
-  optional uint32 initialATimer =
+  optional uint32 initial_a_timer =
       7;  // maximum time that a receiver will wait before sending an Ack
 }
 
-message directoryForwardingTableEntry_t {  // information about a
-                                           // directoryforwardingtable entry
-  required applicationProcessNamingInfo_t applicationName = 1;
+message DFTEntry {  // information about a
+                    // directoryforwardingtable entry
+  required APName appl_name = 1;
   required string ipcp_name = 2;  // The name of the hosting IPCP
   optional uint64 timestamp = 3;  // TODO turn into a seqnum
 }
 
-message
-    directoryForwardingTableEntrySet_t {  // carries information about
-                                          // directoryforwardingtable entries
-  repeated directoryForwardingTableEntry_t directoryForwardingTableEntry = 1;
+message DFTSlice {  // carries information about
+                    // directoryforwardingtable entries
+  repeated DFTEntry entries = 1;
 }
 
-message enrollmentInformation_t {  // carries information about a member that
-                                   // requests enrollment to a DIF
+message EnrollmentInfo {  // carries information about a member that
+                          // requests enrollment to a DIF
   optional uint64 address = 1;
-  repeated string supportingDifs = 2;
-  optional bool startEarly = 3;
+  repeated string supp_difs = 2;
+  optional bool start_early = 3;
 }
 
-message connectionId_t {  // information to identify a connection
-  optional uint32 qosId =
+message ConnId {  // information to identify a connection
+  optional uint32 qosid =
       1;  // identifies the QoS cube under which this flow is classified
-  optional uint32 sourceCEPId = 2;  // identifies the source connection endpoint
-                                    // (unique within the source IPC process)
-  optional uint32 destinationCEPId = 3;  // identifies the destination
-                                         // connection endpoint (unique within
-                                         // the destination IPC process)
+  optional uint32 src_cep = 2;  // identifies the source connection endpoint
+                                // (unique within the source IPC process)
+  optional uint32 dst_cep = 3;  // identifies the destination
+                                // connection endpoint (unique within
+                                // the destination IPC process)
 }
 
-message Flow {  // Contains the information to setup a new flow
-  required applicationProcessNamingInfo_t sourceNamingInfo =
+message FlowRequest {  // Contains the information to setup a new flow
+  required APName src_app =
       1;  // The naming information of the source application process
-  required applicationProcessNamingInfo_t destinationNamingInfo =
+  required APName dst_app =
       2;  // The naming information of the destination application process
-  required uint64 sourcePortId =
+  required uint64 src_port =
       3;  // The port id allocated to this flow by the source IPC process
-  optional uint64 destinationPortId =
+  optional uint64 dst_port =
       4;  // The port id allocated to this flow by the destination IPC process
-  required uint64 sourceAddress =
+  required uint64 src_addr =
       5;  // The address of the source IPC process for this flow
-  optional uint64 destinationAddress =
+  optional uint64 dst_addr =
       6;  // The address of the destination IPC process for this flow
-  repeated connectionId_t connectionIds =
+  repeated ConnId connections =
       7;  // The identifiers of all the connections that can be used to support
           // this flow during its lifetime
-  optional uint32 currentConnectionIdIndex =
+  optional uint32 cur_conn_idx =
       8;  // Identifies the index of the current active connection in the flow
   optional uint32 state = 9;  //
-  optional qosSpecification_t qosParameters =
+  optional QosSpec qos =
       10;  // the QoS parameters specified by the application process that
            // requested this flow
-  optional connectionPolicies_t connectionPolicies =
+  optional ConnPolicies policies =
       11;  // the configuration for the policies and parameters of this EFCP
            // connection
-  optional bytes accessControl = 12;  // ?
-  optional uint32 maxCreateFlowRetries =
+  optional bytes access_control = 12;  // ?
+  optional uint32 max_create_flow_retries =
       13;  // Maximum number of retries to create the flow before giving up
-  optional uint32 createFlowRetries = 14;  // The current number of retries
-  optional uint32 hopCount =
-      15;  // While the search rules that generate the
-           // forwarding table should allow for a natural
-           // termination condition, it seems wise to have
-           // the means to enforce termination
+  optional uint32 create_flow_retries = 14;  // The current number of retries
+  optional uint32 hop_cnt = 15;  // While the search rules that generate the
+                                 // forwarding table should allow for a natural
+                                 // termination condition, it seems wise to have
+                                 // the means to enforce termination
 }
 
-message flowStateObject_t {  // Contains the information of a flow state object
+message LowerFlow {          // Contains the information of a flow state object
   optional string name = 1;  // The name of the IPC Process
   optional string neighbor_name = 2;  // The name of the neighbor IPC Process
   optional uint32 cost = 3;           // The cost associated to the N-1 flow
@@ -257,50 +220,50 @@ message flowStateObject_t {  // Contains the information of a flow state object
   optional uint32 age = 6;  // Age of this FSO (in seconds)
 }
 
-message flowStateObjectGroup_t {  // Contains the information of a flow service
-  repeated flowStateObject_t flow_state_objects =
-      1;  // A group of flow state objects
+message LowerFlowList {          // Contains the information of a flow service
+  repeated LowerFlow flows = 1;  // A group of flow state objects
 }
 
-message neighbors_t {  // carries information about all the neighbors
-  repeated neighbor_t neighbor = 1;
+message NeighborCandidateList {  // carries information about all the neighbors
+  repeated NeighborCandidate neighbors = 1;
 }
 
-message neighbor_t {  // carries information about a neighbor
-  optional string applicationProcessName = 1;
-  optional string applicationProcessInstance = 2;
+message NeighborCandidate {  // carries information about a neighbor
+  optional string ap_name = 1;
+  optional string ap_instance = 2;
   optional uint64 address = 3;
-  repeated string supportingDifs = 4;
+  repeated string supp_difs = 4;
 }
 
-message policyDescriptor_t {           // Describes a policy
-  optional string policyName = 1;      // The name of the policy
-  optional string policyImplName = 2;  // The name of the implementation of the
-                                       // policy used in this DIF. Can be a
-                                       // hierarchical name
-  optional string version = 3;  // The version of the policy implementation
-  repeated property_t policyParameters = 4;  // The paramters of the policy
+message PolicyDescr {                // Describes a policy
+  optional string name = 1;          // The name of the policy
+  optional string impl_name = 2;     // The name of the implementation of the
+                                     // policy used in this DIF. Can be a
+                                     // hierarchical name
+  optional string version = 3;       // The version of the policy implementation
+  repeated Property parameters = 4;  // The paramters of the policy
 }
 
-message qosSpecification_t {  // The QoS parameters requested by an application
-                              // for a certain flow
-  optional string name = 1;   // The name of the QoS cube, if known
+message QosSpec {            // The QoS parameters requested by an application
+                             // for a certain flow
+  optional string name = 1;  // The name of the QoS cube, if known
   optional uint32 qosid =
       2;  // The if of the QoS cube, if known (-1 = not known)
-  optional uint64 averageBandwidth =
+  optional uint64 avg_bw =
       3;  // in bytes/s, a value of 0 indicates 'don't care'
-  optional uint64 averageSDUBandwidth =
-      4;  // in bytes/s, a value of 0 indicates 'don't care'
-  optional uint32 peakBandwidthDuration =
+  optional uint64 avg_sdu_rate =
+      4;  // in PDUs/s, a value of 0 indicates 'don't care'
+  optional uint32 peak_bw_duration =
       5;  // in ms, a value of 0 indicates 'don't care'
-  optional uint32 peakSDUBandwidthDuration =
+  optional uint32 peak_sdu_rate_duration =
       6;  // in ms, a value of 0 indicates 'don't care'
-  optional double undetectedBitErrorRate =
+  optional double undetected_bit_error_rate =
       7;  // a value of 0 indicates 'don`t care'
-  optional bool partialDelivery =
+  optional bool partial_delivery =
       8;  // indicates if partial delivery of SDUs is allowed or not
-  optional bool order = 9;  // indicates if SDUs have to be delivered in order
-  optional int32 maxAllowableGapSdu =
+  optional bool in_order_delivery =
+      9;  // indicates if SDUs have to be delivered in order
+  optional int32 max_sdu_gap =
       10;  // indicates the maximum gap allowed in SDUs, a gap of N SDUs is
            // considered the same as all SDUs delivered. A value of -1 indicates
            // 'Any'
@@ -310,7 +273,22 @@ message qosSpecification_t {  // The QoS parameters requested by an application
   optional uint32 jitter = 12;  // in milliseconds, indicates indicates the
                                 // maximum jitter allowed in this flow. A value
                                 // of 0 indicates don't care
-  repeated property_t extraParameters = 13;  // the extra parameters specified
-                                             // by the application process that
-                                             // requested this flow
+  repeated Property extra_parameters = 13;  // the extra parameters specified
+                                            // by the application process that
+                                            // requested this flow
+}
+
+message AData {
+  optional int32 src_addr = 1;
+  optional int32 dst_addr = 2;
+  optional bytes cdap_msg = 3;
+}
+
+message AddrAllocRequest {
+  required uint64 requestor = 1;
+  required uint64 address = 2;
+}
+
+message AddrAllocEntries {
+  repeated AddrAllocRequest entries = 1;
 }

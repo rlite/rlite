@@ -160,8 +160,8 @@ flowcfg2policies(const struct rl_flow_config *cfg, QosSpec &q, ConnPolicies &p)
             cfg->dtcp.fc.cfg.w.initial_credit;
 
     } else if (cfg->dtcp.fc.fc_type == RLITE_FC_T_RATE) {
-        p.dtcp_cfg.flow_ctrl_cfg.rate.sending_rate =
-            cfg->dtcp.fc.cfg.r.sending_rate;
+        p.dtcp_cfg.flow_ctrl_cfg.rate.sender_rate =
+            cfg->dtcp.fc.cfg.r.sender_rate;
         p.dtcp_cfg.flow_ctrl_cfg.rate.time_period =
             cfg->dtcp.fc.cfg.r.time_period;
     }
@@ -169,7 +169,8 @@ flowcfg2policies(const struct rl_flow_config *cfg, QosSpec &q, ConnPolicies &p)
     p.dtcp_cfg.rtx_ctrl_cfg.max_time_to_retry = cfg->dtcp.rtx.max_time_to_retry;
     p.dtcp_cfg.rtx_ctrl_cfg.data_rxmsn_max =
         cfg->dtcp.rtx.data_rxms_max; /* mismatch... */
-    p.dtcp_cfg.rtx_ctrl_cfg.initial_tr = cfg->dtcp.rtx.initial_tr;
+    p.dtcp_cfg.rtx_ctrl_cfg.initial_rtx_timeout =
+        cfg->dtcp.rtx.initial_rtx_timeout;
 }
 
 /* Translate a standard flow policies specification from FlowRequest
@@ -197,15 +198,16 @@ LocalFlowAllocator::policies2flowcfg(struct rl_flow_config *cfg,
             p.dtcp_cfg.flow_ctrl_cfg.win.initial_credit;
 
     } else if (cfg->dtcp.fc.fc_type == RLITE_FC_T_RATE) {
-        cfg->dtcp.fc.cfg.r.sending_rate =
-            p.dtcp_cfg.flow_ctrl_cfg.rate.sending_rate;
+        cfg->dtcp.fc.cfg.r.sender_rate =
+            p.dtcp_cfg.flow_ctrl_cfg.rate.sender_rate;
         cfg->dtcp.fc.cfg.r.time_period =
             p.dtcp_cfg.flow_ctrl_cfg.rate.time_period;
     }
 
     cfg->dtcp.rtx.max_time_to_retry = p.dtcp_cfg.rtx_ctrl_cfg.max_time_to_retry;
     cfg->dtcp.rtx.data_rxms_max     = p.dtcp_cfg.rtx_ctrl_cfg.data_rxmsn_max;
-    cfg->dtcp.rtx.initial_tr        = p.dtcp_cfg.rtx_ctrl_cfg.initial_tr;
+    cfg->dtcp.rtx.initial_rtx_timeout =
+        p.dtcp_cfg.rtx_ctrl_cfg.initial_rtx_timeout;
     cfg->dtcp.rtx.max_rtxq_len =
         rib->get_param_value<int>("flow-allocator", "max-rtxq-len");
 }
@@ -236,7 +238,7 @@ LocalFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
         cfg->dtcp.rtx_control           = 1;
         cfg->dtcp.rtx.max_time_to_retry = 15; /* unused for now */
         cfg->dtcp.rtx.data_rxms_max     = RL_DATA_RXMS_MAX_DFLT;
-        cfg->dtcp.rtx.initial_tr =
+        cfg->dtcp.rtx.initial_rtx_timeout =
             rib->get_param_value<int>("flow-allocator", "initial-tr");
         cfg->dtcp.rtx.max_rtxq_len =
             rib->get_param_value<int>("flow-allocator", "max-rtxq-len");
@@ -283,7 +285,7 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
 
     remote_addr = rib->lookup_node_address(remote_node);
 
-    conn_id.qos_id  = 0;
+    conn_id.qosid   = 0;
     conn_id.src_cep = req->local_cep;
     conn_id.dst_cep = 0;
 
@@ -625,7 +627,7 @@ LocalFlowAllocator::dump(std::stringstream &ss) const
            << ", Connections: [";
         for (const ConnId &conn : freq.connections) {
             ss << "<SrcCep=" << conn.src_cep << ", DstCep=" << conn.dst_cep
-               << ", QosId=" << conn.qos_id << "> ";
+               << ", QosId=" << conn.qosid << "> ";
         }
         ss << "]" << endl;
     }
