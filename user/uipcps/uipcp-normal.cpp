@@ -846,6 +846,20 @@ uipcp_rib::uipcp_obj_serialize(CDAPMessage *m, const UipcpObject *obj)
     return 0;
 }
 
+int
+uipcp_rib::obj_serialize(CDAPMessage *m,
+                         const ::google::protobuf::MessageLite *obj)
+{
+    if (obj) {
+        auto objbuf = std::unique_ptr<char[]>(new char[obj->ByteSize()]);
+
+        obj->SerializeToArray(objbuf.get(), obj->ByteSize());
+        m->set_obj_value(std::move(objbuf), obj->ByteSize());
+    }
+
+    return 0;
+}
+
 /* Takes ownership of 'm'. */
 int
 uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
@@ -861,7 +875,10 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
     size_t serlen;
     int ret;
 
-    assert(!obj); /* it will be used once we get rid of codecs */
+    ret = obj_serialize(m.get(), obj);
+    if (ret) {
+        return ret;
+    }
 
     if (!m->invoke_id_valid()) {
         if (m->is_response()) {

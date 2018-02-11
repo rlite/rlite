@@ -78,9 +78,11 @@ int
 NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
                            const ::google::protobuf::MessageLite *obj)
 {
-    int ret = 0;
+    int ret = rib->obj_serialize(m, obj);
 
-    assert(!obj); /* it will be used once we get rid of codecs */
+    if (ret) {
+        return ret;
+    }
 
     assert(conn);
     if (reliable) {

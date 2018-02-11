@@ -24,8 +24,20 @@
 #include <sstream>
 
 #include "uipcp-normal.hpp"
+#include "BaseRIB.pb.h"
 
 using namespace std;
+
+struct FlowRequest : public gpb::FlowRequest {
+    /* Local storage. */
+    int invoke_id = 0;
+    uint32_t uid  = 0;
+    struct rl_flow_config flowcfg;
+#define RL_FLOWREQ_INITIATOR 0x1 /* Was I the initiator? */
+#define RL_FLOWREQ_SEND_DEL 0x2  /* Should I send a delete message ? */
+    uint8_t flags = 0;
+    /* End of local storage. */
+};
 
 int
 uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
@@ -115,6 +127,7 @@ public:
     void dump(std::stringstream &ss) const override;
     void dump_memtrack(std::stringstream &ss) const override;
 
+    // TODO turn those into unique_ptr
     std::unordered_map<std::string, FlowRequest> flow_reqs;
     std::unordered_map<unsigned int, FlowRequest> flow_reqs_tmp;
 
@@ -131,83 +144,103 @@ public:
 private:
     void flowspec2flowcfg(const struct rina_flow_spec *spec,
                           struct rl_flow_config *cfg) const;
-    void policies2flowcfg(struct rl_flow_config *cfg, const QosSpec &q,
-                          const ConnPolicies &p);
+    void policies2flowcfg(struct rl_flow_config *cfg, const FlowRequest *freq);
 };
 
 /* Translate a local flow configuration into the standard
  * representation to be used in the FlowRequest CDAP
  * message. */
 static void
-flowcfg2policies(const struct rl_flow_config *cfg, QosSpec &q, ConnPolicies &p)
+flowcfg2policies(const struct rl_flow_config *cfg, FlowRequest *freq)
 {
-    q.partial_delivery  = !cfg->msg_boundaries;
-    q.in_order_delivery = cfg->in_order_delivery;
-    q.max_sdu_gap       = cfg->max_sdu_gap;
-    q.avg_bw            = cfg->dtcp.bandwidth;
+    auto qos           = new gpb::QosSpec();
+    auto policies      = new gpb::ConnPolicies();
+    auto dtcp_cfg      = new gpb::DtcpConfig();
+    auto flow_ctrl_cfg = new gpb::FlowCtrlConfig();
+    auto rtx_ctrl_cfg  = new gpb::RtxCtrlConfig();
 
-    p.dtcp_present    = cfg->dtcp_present;
-    p.initial_a_timer = cfg->dtcp.initial_a; /* name mismatch... */
+    freq->set_allocated_qos(qos);
+    freq->set_allocated_policies(policies);
 
-    p.dtcp_cfg.flow_ctrl = cfg->dtcp.flow_control;
-    p.dtcp_cfg.rtx_ctrl  = cfg->dtcp.rtx_control;
+    qos->set_partial_delivery(!cfg->msg_boundaries);
+    qos->set_in_order_delivery(cfg->in_order_delivery);
+    qos->set_max_sdu_gap(cfg->max_sdu_gap);
+    qos->set_avg_bw(cfg->dtcp.bandwidth);
 
-    p.dtcp_cfg.flow_ctrl_cfg.fc_type = cfg->dtcp.fc.fc_type;
+    policies->set_dtcp_present(cfg->dtcp_present);
+    policies->set_initial_a_timer(cfg->dtcp.initial_a); /* name mismatch... */
+    /* missing seq_num_rollover_th */
+
+    policies->set_allocated_dtcp_cfg(dtcp_cfg);
+    dtcp_cfg->set_flow_ctrl(cfg->dtcp.flow_control);
+    dtcp_cfg->set_rtx_ctrl(cfg->dtcp.rtx_control);
+
+    dtcp_cfg->set_allocated_flow_ctrl_cfg(flow_ctrl_cfg);
+    flow_ctrl_cfg->set_window_based(cfg->dtcp.fc.fc_type == RLITE_FC_T_WIN);
+    flow_ctrl_cfg->set_rate_based(cfg->dtcp.fc.fc_type == RLITE_FC_T_RATE);
     if (cfg->dtcp.fc.fc_type == RLITE_FC_T_WIN) {
-        p.dtcp_cfg.flow_ctrl_cfg.win.max_cwq_len =
-            cfg->dtcp.fc.cfg.w.max_cwq_len;
-        p.dtcp_cfg.flow_ctrl_cfg.win.initial_credit =
-            cfg->dtcp.fc.cfg.w.initial_credit;
+        auto win = new gpb::WindowBasedFlowCtrlConfig();
+
+        flow_ctrl_cfg->set_allocated_window_based_config(win);
+        win->set_max_cwq_len(cfg->dtcp.fc.cfg.w.max_cwq_len);
+        win->set_initial_credit(cfg->dtcp.fc.cfg.w.initial_credit);
 
     } else if (cfg->dtcp.fc.fc_type == RLITE_FC_T_RATE) {
-        p.dtcp_cfg.flow_ctrl_cfg.rate.sender_rate =
-            cfg->dtcp.fc.cfg.r.sender_rate;
-        p.dtcp_cfg.flow_ctrl_cfg.rate.time_period =
-            cfg->dtcp.fc.cfg.r.time_period;
+        auto rtx = new gpb::RateBasedFlowCtrlConfig();
+
+        flow_ctrl_cfg->set_allocated_rate_based_config(rtx);
+        rtx->set_sender_rate(cfg->dtcp.fc.cfg.r.sender_rate);
+        rtx->set_time_period(cfg->dtcp.fc.cfg.r.time_period);
     }
 
-    p.dtcp_cfg.rtx_ctrl_cfg.max_time_to_retry = cfg->dtcp.rtx.max_time_to_retry;
-    p.dtcp_cfg.rtx_ctrl_cfg.data_rxmsn_max =
-        cfg->dtcp.rtx.data_rxms_max; /* mismatch... */
-    p.dtcp_cfg.rtx_ctrl_cfg.initial_rtx_timeout =
-        cfg->dtcp.rtx.initial_rtx_timeout;
+    dtcp_cfg->set_allocated_rtx_ctrl_cfg(rtx_ctrl_cfg);
+    rtx_ctrl_cfg->set_max_time_to_retry(cfg->dtcp.rtx.max_time_to_retry);
+    rtx_ctrl_cfg->set_data_rxmsn_max(
+        cfg->dtcp.rtx.data_rxms_max); /* name mismatch... */
+    rtx_ctrl_cfg->set_initial_rtx_timeout(cfg->dtcp.rtx.initial_rtx_timeout);
 }
 
 /* Translate a standard flow policies specification from FlowRequest
  * CDAP message into a local flow configuration. */
 void
 LocalFlowAllocator::policies2flowcfg(struct rl_flow_config *cfg,
-                                     const QosSpec &q, const ConnPolicies &p)
+                                     const FlowRequest *freq)
 {
-    cfg->msg_boundaries    = !q.partial_delivery;
-    cfg->in_order_delivery = q.in_order_delivery;
-    cfg->max_sdu_gap       = q.max_sdu_gap;
-    cfg->dtcp.bandwidth    = q.avg_bw;
+    const gpb::QosSpec &qos    = freq->qos();
+    const gpb::ConnPolicies &p = freq->policies();
 
-    cfg->dtcp_present   = p.dtcp_present;
-    cfg->dtcp.initial_a = p.initial_a_timer;
+    cfg->msg_boundaries    = !qos.partial_delivery();
+    cfg->in_order_delivery = qos.in_order_delivery();
+    cfg->max_sdu_gap       = qos.max_sdu_gap();
+    cfg->dtcp.bandwidth    = qos.avg_bw();
 
-    cfg->dtcp.flow_control = p.dtcp_cfg.flow_ctrl;
-    cfg->dtcp.rtx_control  = p.dtcp_cfg.rtx_ctrl;
+    cfg->dtcp_present   = p.dtcp_present();
+    cfg->dtcp.initial_a = p.initial_a_timer();
 
-    cfg->dtcp.fc.fc_type = p.dtcp_cfg.flow_ctrl_cfg.fc_type;
-    if (cfg->dtcp.fc.fc_type == RLITE_FC_T_WIN) {
+    cfg->dtcp.flow_control = p.dtcp_cfg().flow_ctrl();
+    cfg->dtcp.rtx_control  = p.dtcp_cfg().rtx_ctrl();
+
+    cfg->dtcp.fc.fc_type = RLITE_FC_T_NONE;
+    if (p.dtcp_cfg().flow_ctrl_cfg().window_based()) {
+        cfg->dtcp.fc.fc_type = RLITE_FC_T_WIN;
         cfg->dtcp.fc.cfg.w.max_cwq_len =
-            p.dtcp_cfg.flow_ctrl_cfg.win.max_cwq_len;
+            p.dtcp_cfg().flow_ctrl_cfg().window_based_config().max_cwq_len();
         cfg->dtcp.fc.cfg.w.initial_credit =
-            p.dtcp_cfg.flow_ctrl_cfg.win.initial_credit;
+            p.dtcp_cfg().flow_ctrl_cfg().window_based_config().initial_credit();
 
-    } else if (cfg->dtcp.fc.fc_type == RLITE_FC_T_RATE) {
+    } else if (p.dtcp_cfg().flow_ctrl_cfg().rate_based()) {
+        cfg->dtcp.fc.fc_type = RLITE_FC_T_RATE;
         cfg->dtcp.fc.cfg.r.sender_rate =
-            p.dtcp_cfg.flow_ctrl_cfg.rate.sender_rate;
+            p.dtcp_cfg().flow_ctrl_cfg().rate_based_config().sender_rate();
         cfg->dtcp.fc.cfg.r.time_period =
-            p.dtcp_cfg.flow_ctrl_cfg.rate.time_period;
+            p.dtcp_cfg().flow_ctrl_cfg().rate_based_config().time_period();
     }
 
-    cfg->dtcp.rtx.max_time_to_retry = p.dtcp_cfg.rtx_ctrl_cfg.max_time_to_retry;
-    cfg->dtcp.rtx.data_rxms_max     = p.dtcp_cfg.rtx_ctrl_cfg.data_rxmsn_max;
+    cfg->dtcp.rtx.max_time_to_retry =
+        p.dtcp_cfg().rtx_ctrl_cfg().max_time_to_retry();
+    cfg->dtcp.rtx.data_rxms_max = p.dtcp_cfg().rtx_ctrl_cfg().data_rxmsn_max();
     cfg->dtcp.rtx.initial_rtx_timeout =
-        p.dtcp_cfg.rtx_ctrl_cfg.initial_rtx_timeout;
+        p.dtcp_cfg().rtx_ctrl_cfg().initial_rtx_timeout();
     cfg->dtcp.rtx.max_rtxq_len =
         rib->get_param_value<int>("flow-allocator", "max-rtxq-len");
 }
@@ -269,6 +302,26 @@ LocalFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
 }
 #endif /* !RL_USE_QOS_CUBES */
 
+static gpb::APName *
+RinaName2gpb(const RinaName &name)
+{
+    gpb::APName *gan = new gpb::APName();
+
+    gan->set_ap_name(name.apn);
+    gan->set_ap_instance(name.api);
+    gan->set_ae_name(name.aen);
+    gan->set_ae_instance(name.aei);
+
+    return gan;
+}
+
+static std::string
+gpb2string(const gpb::APName &gname)
+{
+    return rina_string_from_components(gname.ap_name(), gname.ap_instance(),
+                                       gname.ae_name(), gname.ae_instance());
+}
+
 /* (1) Initiator FA <-- Initiator application : FA_REQ */
 int
 LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
@@ -277,7 +330,7 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
     std::unique_ptr<CDAPMessage> m;
     rlm_addr_t remote_addr;
     FlowRequest freq;
-    ConnId conn_id;
+    gpb::ConnId *conn_id;
     stringstream obj_name;
     string cubename;
     struct rl_flow_config flowcfg;
@@ -285,22 +338,21 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
 
     remote_addr = rib->lookup_node_address(remote_node);
 
-    conn_id.qosid   = 0;
-    conn_id.src_cep = req->local_cep;
-    conn_id.dst_cep = 0;
-
-    freq.src_app =
-        RinaName(req->local_appl); /* req->local_appl may be nullptr */
-    freq.dst_app  = RinaName(dest_appl);
-    freq.src_port = req->local_port;
-    freq.dst_port = 0;
-    freq.src_addr = rib->myaddr;
-    freq.dst_addr = remote_addr;
-    freq.connections.push_back(conn_id);
-    freq.cur_conn_idx = 0;
-    freq.state        = true;
-    freq.uid          = req->uid; /* on initiator side, uid is generated by
-                                   * the kernel, we just store it */
+    freq.set_allocated_src_app(RinaName2gpb(
+        RinaName(req->local_appl))); /* req->local_appl may be nullptr */
+    freq.set_allocated_dst_app(RinaName2gpb(RinaName(dest_appl)));
+    freq.set_src_port(req->local_port);
+    freq.set_dst_port(0);
+    freq.set_src_addr(rib->myaddr);
+    freq.set_dst_addr(remote_addr);
+    conn_id = freq.add_connections();
+    conn_id->set_qosid(0);
+    conn_id->set_src_cep(req->local_cep);
+    conn_id->set_dst_cep(0);
+    freq.set_cur_conn_idx(0);
+    freq.set_state(true);
+    freq.uid = req->uid; /* on initiator side, uid is generated by
+                          * the kernel, we just store it */
 
 #ifndef RL_USE_QOS_CUBES
     /* Translate the flow specification into a local flow configuration. */
@@ -324,14 +376,14 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
     }
 #endif /* RL_USE_QOS_CUBES */
 
-    flowcfg2policies(&flowcfg, freq.qos, freq.policies);
+    flowcfg2policies(&flowcfg, &freq);
 
-    freq.flowcfg                 = flowcfg;
-    freq.max_create_flow_retries = 3;
-    freq.create_flow_retries     = 0;
-    freq.hop_cnt                 = 0;
+    freq.flowcfg = flowcfg;
+    freq.set_max_create_flow_retries(3);
+    freq.set_create_flow_retries(0);
+    freq.set_hop_cnt(0);
 
-    obj_name << obj_name::flows << "/" << freq.src_addr << "-"
+    obj_name << obj_name::flows << "/" << freq.src_addr() << "-"
              << req->local_port;
 
     m = make_unique<CDAPMessage>();
@@ -341,19 +393,16 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
     freq.flags     = RL_FLOWREQ_INITIATOR | RL_FLOWREQ_SEND_DEL;
     flow_reqs[obj_name.str() + string("L")] = freq;
 
-    if (rib->uipcp_obj_serialize(m.get(), &freq)) {
-        return -1;
-    }
-    return rib->send_to_dst_addr(std::move(m), freq.dst_addr, nullptr);
+    return rib->send_to_dst_addr(std::move(m), freq.dst_addr(), &freq);
 }
 
 /* (3) Slave FA <-- Slave application : FA_RESP */
 int
 LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
 {
+    std::unique_ptr<CDAPMessage> m;
     stringstream obj_name;
     string reason;
-    std::unique_ptr<CDAPMessage> m;
     int ret;
 
     /* Lookup the corresponding FlowRequest. */
@@ -371,10 +420,11 @@ LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
 
     /* Update the freq object with the port-id and cep-id allocated by
      * the kernel. */
-    freq.dst_port                    = resp->port_id;
-    freq.connections.front().dst_cep = resp->cep_id;
+    freq.set_dst_port(resp->port_id);
+    freq.mutable_connections(0)->set_dst_cep(resp->cep_id);
 
-    obj_name << obj_name::flows << "/" << freq.src_addr << "-" << freq.src_port;
+    obj_name << obj_name::flows << "/" << freq.src_addr() << "-"
+             << freq.src_port();
 
     if (resp->response) {
         reason = "Application refused the accept the flow request";
@@ -388,11 +438,7 @@ LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
                   reason);
     m->invoke_id = freq.invoke_id;
 
-    ret = rib->uipcp_obj_serialize(m.get(), &freq);
-    if (ret == 0) {
-        ret = rib->send_to_dst_addr(std::move(m), freq.src_addr, nullptr);
-    }
-
+    ret = rib->send_to_dst_addr(std::move(m), freq.src_addr(), &freq);
     flow_reqs_tmp.erase(f);
 
     return ret;
@@ -411,30 +457,29 @@ LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm)
         return 0;
     }
 
-    FlowRequest freq(objbuf, objlen);
+    FlowRequest freq;
     std::string local_appl, remote_appl;
     struct rl_flow_config flowcfg;
 
-    if (freq.connections.size() < 1) {
+    freq.ParseFromArray(objbuf, objlen);
+    freq.flags = 0;
+    if (freq.connections_size() < 1) {
         std::unique_ptr<CDAPMessage> m;
 
         UPE(rib->uipcp, "No connections specified on this flow\n");
         m = make_unique<CDAPMessage>();
         m->m_create_r(rm->obj_class, rm->obj_name, 0, -1,
-                      "Cannot find DFT entry");
+                      "No connections specified");
         m->invoke_id = rm->invoke_id;
 
-        if (rib->uipcp_obj_serialize(m.get(), &freq)) {
-            return -1;
-        }
-        return rib->send_to_dst_addr(std::move(m), freq.src_addr, nullptr);
+        return rib->send_to_dst_addr(std::move(m), freq.src_addr(), nullptr);
     }
 
-    /* freq.dst_app is registered with us, let's go ahead. */
+    /* freq.dst_app() is registered with us, let's go ahead. */
 
-    local_appl  = freq.dst_app;
-    remote_appl = freq.src_app;
-    policies2flowcfg(&flowcfg, freq.qos, freq.policies);
+    local_appl  = gpb2string(freq.dst_app());
+    remote_appl = gpb2string(freq.src_app());
+    policies2flowcfg(&flowcfg, &freq);
 
     freq.invoke_id = rm->invoke_id;
     freq.flags     = RL_FLOWREQ_SEND_DEL;
@@ -444,8 +489,8 @@ LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm)
     flow_reqs_tmp[freq.uid] = freq;
 
     uipcp_issue_fa_req_arrived(
-        rib->uipcp, freq.uid, freq.src_port, freq.connections.front().src_cep,
-        freq.src_addr, local_appl.c_str(), remote_appl.c_str(), &flowcfg);
+        rib->uipcp, freq.uid, freq.src_port(), freq.connections(0).src_cep(),
+        freq.src_addr(), local_appl.c_str(), remote_appl.c_str(), &flowcfg);
 
     return 0;
 }
@@ -463,7 +508,6 @@ LocalFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
         return 0;
     }
 
-    FlowRequest remote_freq(objbuf, objlen);
     auto f = flow_reqs.find(rm->obj_name + string("L"));
 
     if (f == flow_reqs.end()) {
@@ -474,15 +518,18 @@ LocalFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
     }
 
     FlowRequest &freq = f->second;
+    FlowRequest remote_freq;
 
+    remote_freq.ParseFromArray(objbuf, objlen);
     /* Update the local freq object with the remote one. */
-    freq.dst_port                    = remote_freq.dst_port;
-    freq.connections.front().dst_cep = remote_freq.connections.front().dst_cep;
+    freq.set_dst_port(remote_freq.dst_port());
+    freq.mutable_connections(0)->set_dst_cep(
+        remote_freq.connections(0).dst_cep());
 
-    return uipcp_issue_fa_resp_arrived(rib->uipcp, freq.src_port, freq.dst_port,
-                                       freq.connections.front().dst_cep,
-                                       freq.dst_addr, rm->result ? 1 : 0,
-                                       &freq.flowcfg);
+    return uipcp_issue_fa_resp_arrived(
+        rib->uipcp, freq.src_port(), freq.dst_port(),
+        freq.connections(0).dst_cep(), freq.dst_addr(), rm->result ? 1 : 0,
+        &freq.flowcfg);
 }
 
 int
@@ -518,7 +565,7 @@ LocalFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 
     /* We were the initiator. */
     assert(!!(f->second.flags & RL_FLOWREQ_INITIATOR) == !!req->initiator);
-    remote_addr = req->initiator ? f->second.dst_addr : f->second.src_addr;
+    remote_addr = req->initiator ? f->second.dst_addr() : f->second.src_addr();
     send_del    = (f->second.flags & RL_FLOWREQ_SEND_DEL);
     flow_reqs.erase(f);
 
@@ -571,8 +618,9 @@ LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm)
         assert(!(f->second.flags & RL_FLOWREQ_INITIATOR));
     }
 
-    local_port = (f->second.flags & RL_FLOWREQ_INITIATOR) ? f->second.src_port
-                                                          : f->second.dst_port;
+    local_port = (f->second.flags & RL_FLOWREQ_INITIATOR)
+                     ? f->second.src_port()
+                     : f->second.dst_port();
 
     /* We received a delete request from the peer, so we won't need to send
      * him a delete request. */
@@ -620,14 +668,15 @@ LocalFlowAllocator::dump(std::stringstream &ss) const
 
         ss << "    [" << ((freq.flags & RL_FLOWREQ_INITIATOR) ? "L" : "R")
            << "]"
-           << ", Src=" << static_cast<string>(freq.src_app)
-           << ", Dst=" << static_cast<string>(freq.dst_app)
-           << ", SrcAddr:Port=" << freq.src_addr << ":" << freq.src_port
-           << ", DstAddr:Port=" << freq.dst_addr << ":" << freq.dst_port
+           << ", Src=" << gpb2string(freq.src_app())
+           << ", Dst=" << gpb2string(freq.dst_app())
+           << ", SrcAddr:Port=" << freq.src_addr() << ":" << freq.src_port()
+           << ", DstAddr:Port=" << freq.dst_addr() << ":" << freq.dst_port()
            << ", Connections: [";
-        for (const ConnId &conn : freq.connections) {
-            ss << "<SrcCep=" << conn.src_cep << ", DstCep=" << conn.dst_cep
-               << ", QosId=" << conn.qosid << "> ";
+        for (int i = 0; i < freq.connections_size(); i++) {
+            ss << "<SrcCep=" << freq.connections(i).src_cep()
+               << ", DstCep=" << freq.connections(i).dst_cep()
+               << ", QosId=" << freq.connections(i).qosid() << "> ";
         }
         ss << "]" << endl;
     }
