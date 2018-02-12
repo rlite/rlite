@@ -167,13 +167,13 @@ flowcfg2policies(const struct rl_flow_config *cfg, FlowRequest *freq)
     qos->set_max_sdu_gap(cfg->max_sdu_gap);
     qos->set_avg_bw(cfg->dtcp.bandwidth);
 
-    policies->set_dtcp_present(cfg->dtcp_present);
+    policies->set_dtcp_present(DTCP_PRESENT(cfg->dtcp));
     policies->set_initial_a_timer(cfg->dtcp.initial_a); /* name mismatch... */
     /* missing seq_num_rollover_th */
 
     policies->set_allocated_dtcp_cfg(dtcp_cfg);
-    dtcp_cfg->set_flow_ctrl(cfg->dtcp.flow_control);
-    dtcp_cfg->set_rtx_ctrl(cfg->dtcp.rtx_control);
+    dtcp_cfg->set_flow_ctrl(cfg->dtcp.flags & DTCP_CFG_FLOW_CTRL);
+    dtcp_cfg->set_rtx_ctrl(cfg->dtcp.flags & DTCP_CFG_RTX_CTRL);
 
     dtcp_cfg->set_allocated_flow_ctrl_cfg(flow_ctrl_cfg);
     flow_ctrl_cfg->set_window_based(cfg->dtcp.fc.fc_type == RLITE_FC_T_WIN);
@@ -213,12 +213,15 @@ LocalFlowAllocator::policies2flowcfg(struct rl_flow_config *cfg,
     cfg->in_order_delivery = qos.in_order_delivery();
     cfg->max_sdu_gap       = qos.max_sdu_gap();
     cfg->dtcp.bandwidth    = qos.avg_bw();
+    cfg->dtcp.initial_a    = p.initial_a_timer();
 
-    cfg->dtcp_present   = p.dtcp_present();
-    cfg->dtcp.initial_a = p.initial_a_timer();
-
-    cfg->dtcp.flow_control = p.dtcp_cfg().flow_ctrl();
-    cfg->dtcp.rtx_control  = p.dtcp_cfg().rtx_ctrl();
+    cfg->dtcp.flags = 0;
+    if (p.dtcp_cfg().flow_ctrl()) {
+        cfg->dtcp.flags |= DTCP_CFG_FLOW_CTRL;
+    }
+    if (p.dtcp_cfg().rtx_ctrl()) {
+        cfg->dtcp.flags |= DTCP_CFG_RTX_CTRL;
+    }
 
     cfg->dtcp.fc.fc_type = RLITE_FC_T_NONE;
     if (p.dtcp_cfg().flow_ctrl_cfg().window_based()) {
@@ -268,9 +271,8 @@ LocalFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
 
     if (spec->max_sdu_gap == 0) {
         /* We need retransmission control. */
-        cfg->dtcp_present               = 1;
+        cfg->dtcp.flags |= DTCP_CFG_RTX_CTRL;
         cfg->in_order_delivery          = 1;
-        cfg->dtcp.rtx_control           = 1;
         cfg->dtcp.rtx.max_time_to_retry = 15; /* unused for now */
         cfg->dtcp.rtx.data_rxms_max     = RL_DATA_RXMS_MAX_DFLT;
         cfg->dtcp.rtx.initial_rtx_timeout =
@@ -288,8 +290,7 @@ LocalFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
     if (force_flow_control || spec->max_sdu_gap == 0) {
         /* We enable flow control if forced by policy or if also
          * retransmission control is needed. */
-        cfg->dtcp_present      = 1;
-        cfg->dtcp.flow_control = 1;
+        cfg->dtcp.flags |= DTCP_CFG_FLOW_CTRL;
         cfg->dtcp.fc.cfg.w.max_cwq_len =
             rib->get_param_value<int>("flow-allocator", "max-cwq-len");
         cfg->dtcp.fc.cfg.w.initial_credit =
@@ -299,7 +300,7 @@ LocalFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
     }
 
     if (spec->avg_bandwidth) {
-        cfg->dtcp_present = 1;
+        cfg->dtcp.flags |= DTCP_CFG_SHAPER;
     }
 }
 #endif /* !RL_USE_QOS_CUBES */

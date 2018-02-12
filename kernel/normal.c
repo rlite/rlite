@@ -407,7 +407,7 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
         mpl = msecs_to_jiffies(RL_MPL_MSECS_DFLT);
     }
 
-    if (flow->cfg.dtcp.rtx_control) {
+    if (flow->cfg.dtcp.flags & DTCP_CFG_RTX_CTRL) {
         if (!flow->cfg.dtcp.rtx.initial_rtx_timeout) {
             PE("Invalid initial_rtx_timeout parameter (%u)\n",
                flow->cfg.dtcp.rtx.initial_rtx_timeout);
@@ -451,7 +451,7 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
         dtp->max_cwq_len = dc->fc.cfg.w.max_cwq_len;
     }
 
-    if (flow->cfg.dtcp.rtx_control || flow->cfg.dtcp.flow_control) {
+    if (flow->cfg.dtcp.flags & (DTCP_CFG_FLOW_CTRL | DTCP_CFG_RTX_CTRL)) {
         flow->sdu_rx_consumed = rl_normal_sdu_rx_consumed;
     }
 
@@ -612,7 +612,8 @@ flow_blocked(struct rl_flow_config *cfg, struct dtp *dtp)
     return (cfg->dtcp.fc.fc_type == RLITE_FC_T_WIN &&
             dtp->next_seq_num_to_send > dtp->snd_rwe &&
             dtp->cwq_len >= dtp->max_cwq_len) ||
-           (cfg->dtcp.rtx_control && dtp->rtxq_len >= dtp->max_rtxq_len);
+           ((cfg->dtcp.flags & DTCP_CFG_RTX_CTRL) &&
+            dtp->rtxq_len >= dtp->max_rtxq_len);
 }
 
 static bool
@@ -628,7 +629,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct rina_pci *pci;
     struct dtp *dtp        = &flow->dtp;
     struct dtcp_config *dc = &flow->cfg.dtcp;
-    bool dtcp_present      = flow->cfg.dtcp_present;
+    bool dtcp_present      = DTCP_PRESENT(flow->cfg.dtcp);
 
     spin_lock_bh(&dtp->lock);
 
@@ -731,7 +732,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
             }
         }
 
-        if (rb && flow->cfg.dtcp.rtx_control) {
+        if (rb && (flow->cfg.dtcp.flags & DTCP_CFG_RTX_CTRL)) {
             int ret = rl_rtxq_push(flow, rb);
 
             if (unlikely(ret)) {
@@ -895,7 +896,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
     rl_seq_t ack_nack_seq_num    = 0;
     uint8_t pdu_type             = 0;
 
-    if (dc->flow_control) {
+    if (dc->flags & DTCP_CFG_FLOW_CTRL) {
         /* POL: RcvrFlowControl */
         if (dc->fc.fc_type == RLITE_FC_T_WIN) {
             rl_seq_t win_size = dc->fc.cfg.w.initial_credit;
@@ -922,15 +923,15 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     /* I know, the following code can be easily simplified, but this
      * way policies are more visible. */
-    if (dc->rtx_control) {
+    if (dc->flags & DTCP_CFG_RTX_CTRL) {
         /* POL: RcvrAck */
         ack_nack_seq_num = flow->dtp.rcv_lwe_priv;
         pdu_type         = PDU_T_CTRL | PDU_T_ACK_BIT | PDU_T_ACK;
-        if (dc->flow_control) {
+        if (dc->flags & DTCP_CFG_FLOW_CTRL) {
             pdu_type |= PDU_T_CTRL | PDU_T_FC_BIT;
         }
 
-    } else if (dc->flow_control) {
+    } else if (dc->flags & DTCP_CFG_FLOW_CTRL) {
         /* POL: ReceivingFlowControl */
         /* Send a flow control only control PDU. */
         pdu_type = PDU_T_CTRL | PDU_T_FC_BIT;
@@ -1079,7 +1080,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow, struct rl_buf *rb)
                 rb_list_enq(qrb, &qrbs);
                 dtp->last_seq_num_sent = dtp->snd_lwe++;
 
-                if (flow->cfg.dtcp.rtx_control) {
+                if (flow->cfg.dtcp.flags & DTCP_CFG_RTX_CTRL) {
                     rl_rtxq_push(flow, qrb);
                 }
             }
@@ -1284,11 +1285,11 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
     /* Ask rl_sdu_rx_flow() to limit the userspace queue only
      * if this flow does not use flow control. If flow control
      * is used, it will limit the userspace queue automatically. */
-    qlimit = (flow->cfg.dtcp.flow_control == 0);
+    qlimit = !(flow->cfg.dtcp.flags & DTCP_CFG_FLOW_CTRL);
 
     spin_lock_bh(&dtp->lock);
 
-    if (flow->cfg.dtcp_present) {
+    if (DTCP_PRESENT(flow->cfg.dtcp)) {
         mod_timer(&dtp->rcv_inact_tmr, jiffies + 2 * dtp->mpl_r_a);
     }
 
@@ -1350,7 +1351,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         rl_buf_free(rb);
         flow->stats.rx_err++;
 
-        if (flow->cfg.dtcp.rtx_control &&
+        if ((flow->cfg.dtcp.flags & DTCP_CFG_RTX_CTRL) &&
             dtp->rcv_lwe_priv >= dtp->last_snd_data_ack) {
             /* Send ACK control PDU. */
             crb = ctrl_pdu_alloc(
@@ -1408,8 +1409,9 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
      *   filled by PDUs arriving out of order or retransmitted
      *   __before__ the A timer expires.
      */
-    drop = ((flow->cfg.in_order_delivery || flow->cfg.dtcp_present) && !a &&
-            !flow->cfg.dtcp.rtx_control && gap > flow->cfg.max_sdu_gap);
+    drop = ((flow->cfg.in_order_delivery || DTCP_PRESENT(flow->cfg.dtcp)) &&
+            !a && !(flow->cfg.dtcp.flags & DTCP_CFG_RTX_CTRL) &&
+            gap > flow->cfg.max_sdu_gap);
 
     deliver = !drop && (gap <= flow->cfg.max_sdu_gap);
 
