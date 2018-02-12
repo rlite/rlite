@@ -241,8 +241,10 @@ LocalFlowAllocator::policies2flowcfg(struct rl_flow_config *cfg,
     cfg->dtcp.rtx.data_rxms_max = p.dtcp_cfg().rtx_ctrl_cfg().data_rxmsn_max();
     cfg->dtcp.rtx.initial_rtx_timeout =
         p.dtcp_cfg().rtx_ctrl_cfg().initial_rtx_timeout();
-    cfg->dtcp.rtx.max_rtxq_len =
-        rib->get_param_value<int>("flow-allocator", "max-rtxq-len");
+    if (p.dtcp_cfg().rtx_ctrl()) {
+        cfg->dtcp.rtx.max_rtxq_len =
+            rib->get_param_value<int>("flow-allocator", "max-rtxq-len");
+    }
 }
 
 #ifndef RL_USE_QOS_CUBES
@@ -272,7 +274,7 @@ LocalFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
         cfg->dtcp.rtx.max_time_to_retry = 15; /* unused for now */
         cfg->dtcp.rtx.data_rxms_max     = RL_DATA_RXMS_MAX_DFLT;
         cfg->dtcp.rtx.initial_rtx_timeout =
-            rib->get_param_value<int>("flow-allocator", "initial-tr");
+            rib->get_param_value<int>("flow-allocator", "initial-rtx-timeout");
         cfg->dtcp.rtx.max_rtxq_len =
             rib->get_param_value<int>("flow-allocator", "max-rtxq-len");
         cfg->dtcp.initial_a = initial_a;
