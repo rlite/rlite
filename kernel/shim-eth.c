@@ -89,83 +89,6 @@ struct rl_shim_eth {
 static LIST_HEAD(shims);
 static DEFINE_MUTEX(shims_lock);
 
-static void arp_resolver_cb(unsigned long arg);
-
-static void *
-rl_shim_eth_create(struct ipcp_entry *ipcp)
-{
-    struct rl_shim_eth *priv;
-
-    priv = rl_alloc(sizeof(*priv), GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
-    if (!priv) {
-        return NULL;
-    }
-
-    priv->ipcp   = ipcp;
-    priv->netdev = NULL;
-    priv->ntu = priv->ntp = 0;
-    INIT_LIST_HEAD(&priv->arp_table);
-    spin_lock_init(&priv->arpt_lock);
-    spin_lock_init(&priv->tx_lock);
-    init_timer(&priv->arp_resolver_tmr);
-    priv->arp_resolver_tmr.function = arp_resolver_cb;
-    priv->arp_resolver_tmr.data     = (unsigned long)priv;
-    priv->arp_tmr_shutdown          = false;
-    ipcp->txhdroom                  = 0;
-    ipcp->tailroom                  = 0;
-
-    mutex_lock(&shims_lock);
-    list_add_tail(&priv->node, &shims);
-    mutex_unlock(&shims_lock);
-
-    PD("New IPC created [%p]\n", priv);
-
-    return priv;
-}
-
-static void
-rl_shim_eth_destroy(struct ipcp_entry *ipcp)
-{
-    struct rl_shim_eth *priv = ipcp->priv;
-    struct arpt_entry *entry, *tmp;
-    unsigned i;
-
-    mutex_lock(&shims_lock);
-    list_del(&priv->node);
-    mutex_unlock(&shims_lock);
-
-    spin_lock_bh(&priv->arpt_lock);
-    list_for_each_entry_safe (entry, tmp, &priv->arp_table, node) {
-        list_del_init(&entry->node);
-        if (entry->spa) {
-            rl_free(entry->spa, RL_MT_SHIMDATA);
-        }
-        rl_free(entry->tpa, RL_MT_SHIMDATA);
-        rl_free(entry, RL_MT_SHIMDATA);
-    }
-    priv->arp_tmr_shutdown = true;
-    spin_unlock_bh(&priv->arpt_lock);
-
-    del_timer_sync(&priv->arp_resolver_tmr);
-
-    if (priv->netdev) {
-        rtnl_lock();
-        netdev_rx_handler_unregister(priv->netdev);
-        rtnl_unlock();
-        dev_put(priv->netdev);
-    }
-
-    for (i = 0; i < ETH_UPPER_NAMES; i++) {
-        if (priv->upper_names[i]) {
-            rl_free(priv->upper_names[i], RL_MT_SHIMDATA);
-        }
-    }
-
-    rl_free(priv, RL_MT_SHIM);
-
-    PD("IPC [%p] destroyed\n", priv);
-}
-
 static int
 rl_shim_eth_register(struct ipcp_entry *ipcp, char *appl, int reg)
 {
@@ -301,9 +224,19 @@ arp_create(struct rl_shim_eth *priv, uint16_t op, const char *spa, int spa_len,
 #define ARP_TMR_INT_MS 2000
 
 static void
-arp_resolver_cb(unsigned long arg)
+arp_resolver_cb(
+#ifdef RL_HAVE_TIMER_SETUP
+    struct timer_list *tmr
+#else  /* !RL_HAVE_TIMER_SETUP */
+    unsigned long arg
+#endif /* !RL_HAVE_TIMER_SETUP */
+)
 {
+#ifdef RL_HAVE_TIMER_SETUP
+    struct rl_shim_eth *priv = from_timer(priv, tmr, arp_resolver_tmr);
+#else  /* !RL_HAVE_TIMER_SETUP */
     struct rl_shim_eth *priv = (struct rl_shim_eth *)arg;
+#endif /* !RL_HAVE_TIMER_SETUP */
     struct arpt_entry *entry;
     bool some_incomplete = false;
     struct sk_buff_head skbq;
@@ -667,7 +600,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     skb_copy_bits(skb, 0, RL_BUF_DATA(rb), skb->len);
     rl_buf_append(rb, skb->len);
 #else /* RL_SKB */
-    rb = skb;
+    rb                       = skb;
 #endif
 
     /* Try to shortcut the packet to the upper IPCP. */
@@ -1151,6 +1084,83 @@ shim_eth_netdev_notify(struct notifier_block *nb, unsigned long event,
     mutex_unlock(&shims_lock);
 
     return 0;
+}
+
+static void *
+rl_shim_eth_create(struct ipcp_entry *ipcp)
+{
+    struct rl_shim_eth *priv;
+
+    priv = rl_alloc(sizeof(*priv), GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
+    if (!priv) {
+        return NULL;
+    }
+
+    priv->ipcp   = ipcp;
+    priv->netdev = NULL;
+    priv->ntu = priv->ntp = 0;
+    INIT_LIST_HEAD(&priv->arp_table);
+    spin_lock_init(&priv->arpt_lock);
+    spin_lock_init(&priv->tx_lock);
+#ifdef RL_HAVE_TIMER_SETUP
+    timer_setup(&priv->arp_resolver_tmr, arp_resolver_cb, 0);
+#else  /* !RL_HAVE_TIMER_SETUP */
+    setup_timer(&priv->arp_resolver_tmr, arp_resolver_cb, (unsigned long)priv);
+#endif /* !RL_HAVE_TIMER_SETUP */
+    priv->arp_tmr_shutdown = false;
+    ipcp->txhdroom         = 0;
+    ipcp->tailroom         = 0;
+
+    mutex_lock(&shims_lock);
+    list_add_tail(&priv->node, &shims);
+    mutex_unlock(&shims_lock);
+
+    PD("New IPC created [%p]\n", priv);
+
+    return priv;
+}
+
+static void
+rl_shim_eth_destroy(struct ipcp_entry *ipcp)
+{
+    struct rl_shim_eth *priv = ipcp->priv;
+    struct arpt_entry *entry, *tmp;
+    unsigned i;
+
+    mutex_lock(&shims_lock);
+    list_del(&priv->node);
+    mutex_unlock(&shims_lock);
+
+    spin_lock_bh(&priv->arpt_lock);
+    list_for_each_entry_safe (entry, tmp, &priv->arp_table, node) {
+        list_del_init(&entry->node);
+        if (entry->spa) {
+            rl_free(entry->spa, RL_MT_SHIMDATA);
+        }
+        rl_free(entry->tpa, RL_MT_SHIMDATA);
+        rl_free(entry, RL_MT_SHIMDATA);
+    }
+    priv->arp_tmr_shutdown = true;
+    spin_unlock_bh(&priv->arpt_lock);
+
+    del_timer_sync(&priv->arp_resolver_tmr);
+
+    if (priv->netdev) {
+        rtnl_lock();
+        netdev_rx_handler_unregister(priv->netdev);
+        rtnl_unlock();
+        dev_put(priv->netdev);
+    }
+
+    for (i = 0; i < ETH_UPPER_NAMES; i++) {
+        if (priv->upper_names[i]) {
+            rl_free(priv->upper_names[i], RL_MT_SHIMDATA);
+        }
+    }
+
+    rl_free(priv, RL_MT_SHIM);
+
+    PD("IPC [%p] destroyed\n", priv);
 }
 
 #define SHIM_DIF_TYPE "shim-eth"

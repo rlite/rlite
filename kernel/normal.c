@@ -209,10 +209,20 @@ dtp_rcv_reset(struct flow_entry *flow)
 }
 
 static void
-snd_inact_tmr_cb(long unsigned arg)
+snd_inact_tmr_cb(
+#ifdef RL_HAVE_TIMER_SETUP
+    struct timer_list *tmr
+#else  /* !RL_HAVE_TIMER_SETUP */
+    long unsigned arg
+#endif /* !RL_HAVE_TIMER_SETUP */
+)
 {
+#ifdef RL_HAVE_TIMER_SETUP
+    struct flow_entry *flow = from_timer(flow, tmr, dtp.snd_inact_tmr);
+#else  /* !RL_HAVE_TIMER_SETUP */
     struct flow_entry *flow = (struct flow_entry *)arg;
-    struct dtp *dtp         = &flow->dtp;
+#endif /* !RL_HAVE_TIMER_SETUP */
+    struct dtp *dtp = &flow->dtp;
     struct rl_buf *rb, *tmp;
 
     spin_lock_bh(&dtp->lock);
@@ -254,10 +264,20 @@ snd_inact_tmr_cb(long unsigned arg)
 }
 
 static void
-rcv_inact_tmr_cb(long unsigned arg)
+rcv_inact_tmr_cb(
+#ifdef RL_HAVE_TIMER_SETUP
+    struct timer_list *tmr
+#else  /* !RL_HAVE_TIMER_SETUP */
+    long unsigned arg
+#endif /* !RL_HAVE_TIMER_SETUP */
+)
 {
+#ifdef RL_HAVE_TIMER_SETUP
+    struct flow_entry *flow = from_timer(flow, tmr, dtp.rcv_inact_tmr);
+#else  /* !RL_HAVE_TIMER_SETUP */
     struct flow_entry *flow = (struct flow_entry *)arg;
-    struct dtp *dtp         = &flow->dtp;
+#endif /* !RL_HAVE_TIMER_SETUP */
+    struct dtp *dtp = &flow->dtp;
     struct rl_buf *rb, *tmp;
 
     spin_lock_bh(&dtp->lock);
@@ -284,9 +304,19 @@ static struct rl_buf *sdu_rx_sv_update(struct ipcp_entry *ipcp,
                                        bool ack_immediate);
 
 static void
-a_tmr_cb(long unsigned arg)
+a_tmr_cb(
+#ifdef RL_HAVE_TIMER_SETUP
+    struct timer_list *tmr
+#else  /* !RL_HAVE_TIMER_SETUP */
+    long unsigned arg
+#endif /* !RL_HAVE_TIMER_SETUP */
+)
 {
+#ifdef RL_HAVE_TIMER_SETUP
+    struct flow_entry *flow = from_timer(flow, tmr, dtp.a_tmr);
+#else  /* !RL_HAVE_TIMER_SETUP */
     struct flow_entry *flow = (struct flow_entry *)arg;
+#endif /* !RL_HAVE_TIMER_SETUP */
     struct ipcp_entry *ipcp = flow->txrx.ipcp;
     struct dtp *dtp         = &flow->dtp;
     struct rl_buf *crb;
@@ -319,10 +349,20 @@ rtt_to_rtx(struct flow_entry *flow)
 }
 
 static void
-rtx_tmr_cb(long unsigned arg)
+rtx_tmr_cb(
+#ifdef RL_HAVE_TIMER_SETUP
+    struct timer_list *tmr
+#else  /* !RL_HAVE_TIMER_SETUP */
+    long unsigned arg
+#endif /* !RL_HAVE_TIMER_SETUP */
+)
 {
+#ifdef RL_HAVE_TIMER_SETUP
+    struct flow_entry *flow = from_timer(flow, tmr, dtp.rtx_tmr);
+#else  /* !RL_HAVE_TIMER_SETUP */
     struct flow_entry *flow = (struct flow_entry *)arg;
-    struct dtp *dtp         = &flow->dtp;
+#endif /* !RL_HAVE_TIMER_SETUP */
+    struct dtp *dtp = &flow->dtp;
     struct rl_buf *rb, *crb, *tmp;
     long unsigned next_exp = ~0U;
     bool next_exp_set      = false;
@@ -433,19 +473,20 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->mpl_r_a = mpl + r + msecs_to_jiffies(flow->cfg.dtcp.initial_a);
     PV("MPL+R+A = %u ms\n", jiffies_to_msecs(dtp->mpl_r_a));
 
-    dtp->snd_inact_tmr.function = snd_inact_tmr_cb;
-    dtp->snd_inact_tmr.data     = (unsigned long)flow;
+#ifdef RL_HAVE_TIMER_SETUP
+    timer_setup(&dtp->snd_inact_tmr, snd_inact_tmr_cb, 0);
+    timer_setup(&dtp->rcv_inact_tmr, rcv_inact_tmr_cb, 0);
+    timer_setup(&dtp->rtx_tmr, rtx_tmr_cb, 0);
+    timer_setup(&dtp->a_tmr, a_tmr_cb, 0);
+#else  /* !RL_HAVE_TIMER_SETUP */
+    setup_timer(&dtp->snd_inact_tmr, snd_inact_tmr_cb, (unsigned long)flow);
+    setup_timer(&dtp->rcv_inact_tmr, rcv_inact_tmr_cb, (unsigned long)flow);
+    setup_timer(&dtp->rtx_tmr, rtx_tmr_cb, (unsigned long)flow);
+    setup_timer(&dtp->a_tmr, a_tmr_cb, (unsigned long)flow);
+#endif /* !RL_HAVE_TIMER_SETUP */
 
-    dtp->rcv_inact_tmr.function = rcv_inact_tmr_cb;
-    dtp->rcv_inact_tmr.data     = (unsigned long)flow;
-
-    dtp->rtx_tmr.function = rtx_tmr_cb;
-    dtp->rtx_tmr.data     = (unsigned long)flow;
     dtp->rtt        = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_rtx_timeout);
     dtp->rtt_stddev = 1;
-
-    dtp->a_tmr.function = a_tmr_cb;
-    dtp->a_tmr.data     = (unsigned long)flow;
 
     if (dc->fc.fc_type == RLITE_FC_T_WIN) {
         dtp->max_cwq_len = dc->fc.cfg.w.max_cwq_len;
