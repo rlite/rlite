@@ -175,9 +175,15 @@ struct rl_mgmt_hdr {
     uint8_t type;
 } __attribute__((packed));
 
+#define DTCP_PRESENT(_dc) ((_dc).flags != 0)
+
 struct dtcp_config {
+    uint32_t flags;
+#define DTCP_CFG_FLOW_CTRL (1 << 0)
+#define DTCP_CFG_RTX_CTRL (1 << 1)
+#define DTCP_CFG_SHAPER (1 << 2)
+
     /* Flow control. */
-    uint8_t flow_control;
     struct {
         uint8_t fc_type;
 #define RLITE_FC_T_NONE 0
@@ -196,7 +202,6 @@ struct dtcp_config {
     } fc;
 
     /* Retransmission control. */
-    uint8_t rtx_control;
     struct {
         uint32_t max_time_to_retry; /* R div initial_rtx_timeout */
         uint16_t data_rxms_max;
@@ -213,7 +218,6 @@ struct rl_flow_config {
     uint8_t msg_boundaries;
     uint8_t in_order_delivery;
     rlm_seq_t max_sdu_gap;
-    uint8_t dtcp_present;
     struct dtcp_config dtcp;
 
     /* Currently used by shim-tcp4 and shim-udp4. */

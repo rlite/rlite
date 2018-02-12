@@ -710,15 +710,16 @@ flow_config_dump(const struct rl_flow_config *c)
                  "   msg_boundaries=%u\n"
                  "   in_order_delivery=%u\n"
                  "   max_sdu_gap=%llu\n"
-                 "   dtcp_present=%u\n"
+                 "   dtcp_flags=%x\n"
                  "   dtcp.initial_a=%u\n"
                  "   dtcp.bandwidth=%u\n"
-                 "   dtcp.flow_control=%u\n"
-                 "   dtcp.rtx_control=%u\n",
+                 "   dtcp.flow_control=%x\n"
+                 "   dtcp.rtx_control=%x\n",
                  c->msg_boundaries, c->in_order_delivery,
-                 (long long unsigned)c->max_sdu_gap, c->dtcp_present,
-                 c->dtcp.initial_a, c->dtcp.bandwidth, c->dtcp.flow_control,
-                 c->dtcp.rtx_control);
+                 (long long unsigned)c->max_sdu_gap, c->dtcp.flags,
+                 c->dtcp.initial_a, c->dtcp.bandwidth,
+                 !!(c->dtcp.flags & DTCP_CFG_FLOW_CTRL),
+                 !!(c->dtcp.flags & DTCP_CFG_RTX_CTRL));
 
     if (c->dtcp.fc.fc_type == RLITE_FC_T_WIN) {
         COMMON_PRINT("   dtcp.fc.max_cwq_len=%lu\n"

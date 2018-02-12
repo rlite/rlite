@@ -1135,7 +1135,7 @@ flow_del(struct flow_entry *entry)
                upper_ipcp->id, (unsigned long long)dst_addr, entry->local_port);
         }
     }
-
+    flow_config_dump(&entry->cfg);
     if (entry->local_appl)
         rl_free(entry->local_appl, RL_MT_FLOW);
     if (entry->remote_appl)
@@ -1782,15 +1782,16 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
             memset(fqe, 0, sizeof(*fqe));
             list_add_tail(&fqe->node, &rc->flows_fetch_q);
 
-            fqe->resp.msg_type     = RLITE_KER_FLOW_FETCH_RESP;
-            fqe->resp.end          = 0;
-            fqe->resp.ipcp_id      = entry->txrx.ipcp->id;
-            fqe->resp.local_port   = entry->local_port;
-            fqe->resp.remote_port  = entry->remote_port;
-            fqe->resp.local_addr   = entry->txrx.ipcp->addr;
-            fqe->resp.remote_addr  = entry->remote_addr;
-            fqe->resp.spec         = entry->spec;
-            fqe->resp.flow_control = entry->cfg.dtcp.flow_control;
+            fqe->resp.msg_type    = RLITE_KER_FLOW_FETCH_RESP;
+            fqe->resp.end         = 0;
+            fqe->resp.ipcp_id     = entry->txrx.ipcp->id;
+            fqe->resp.local_port  = entry->local_port;
+            fqe->resp.remote_port = entry->remote_port;
+            fqe->resp.local_addr  = entry->txrx.ipcp->addr;
+            fqe->resp.remote_addr = entry->remote_addr;
+            fqe->resp.spec        = entry->spec;
+            fqe->resp.flow_control =
+                !!(entry->cfg.dtcp.flags & DTCP_CFG_FLOW_CTRL);
         }
 
         fqe = rl_alloc(sizeof(*fqe), GFP_ATOMIC, RL_MT_FFETCH);
