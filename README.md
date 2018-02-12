@@ -981,7 +981,7 @@ of a normal IPCP process:
 | enrollment          | *                 | auto-reconnect     | Automatically re-enroll to neighbors pruned because unresponsive. |
 | flow-allocator      | local             | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
 | flow-allocator      | local             | max-rtxq-len       | Maximum size of the retransmission queue (in PDUs). |
-| flow-allocator      | local             | initial-tr         | Initial value for the DTCP retransmission timer (in milliseconds). |
+| flow-allocator      | local             | initial-rtx-timeout| Initial value for the DTCP retransmission timer (in milliseconds). |
 | flow-allocator      | local             | initial-a          | Initial value for the DTCP A timer (in milliseconds). |
 | flow-allocator      | local             | initial-credit     | Initial size of the DTCP flow control window (in PDUs). |
 | flow-allocator      | local             | max-cwq-len        | Maximum size of the DTCP closed window queue (in PDUs). |
