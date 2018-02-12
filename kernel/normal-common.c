@@ -32,16 +32,12 @@ void
 dtp_init(struct dtp *dtp)
 {
     spin_lock_init(&dtp->lock);
-    init_timer(&dtp->snd_inact_tmr);
-    init_timer(&dtp->rcv_inact_tmr);
     rb_list_init(&dtp->cwq);
     dtp->cwq_len = dtp->max_cwq_len = 0;
     rb_list_init(&dtp->seqq);
     dtp->seqq_len = 0;
     rb_list_init(&dtp->rtxq);
     dtp->rtxq_len = dtp->max_rtxq_len = 0;
-    init_timer(&dtp->rtx_tmr);
-    init_timer(&dtp->a_tmr);
 }
 EXPORT_SYMBOL(dtp_init);
 

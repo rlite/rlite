@@ -981,7 +981,13 @@ flows_putq_del(struct flow_entry *flow)
 }
 
 static void
-flows_putq_drain(unsigned long unused)
+flows_putq_drain(
+#ifdef RL_HAVE_TIMER_SETUP
+    struct timer_list *tmr
+#else
+    unsigned long unused
+#endif
+)
 {
     struct flow_entry *flow, *tmp;
 
@@ -3254,7 +3260,11 @@ rlite_init(void)
     INIT_LIST_HEAD(&rl_dm.flows_putq);
     INIT_WORK(&rl_dm.appl_removew, appl_removew_func);
     INIT_WORK(&rl_dm.flows_removew, flows_removew_func);
+#ifdef RL_HAVE_TIMER_SETUP
+    timer_setup(&rl_dm.flows_putq_tmr, flows_putq_drain, 0);
+#else  /* !RL_HAVE_TIMER_SETUP */
     setup_timer(&rl_dm.flows_putq_tmr, flows_putq_drain, /* no arg */ 0);
+#endif /* !RL_HAVE_TIMER_SETUP */
 
     ret = misc_register(&rl_ctrl_misc);
     if (ret) {
