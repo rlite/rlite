@@ -1102,6 +1102,9 @@ flow_del(struct flow_entry *entry)
     struct rl_buf *rb;
     struct dtp *dtp;
 
+#if 0
+    flow_config_dump(&entry->cfg);
+#endif
     dtp        = &entry->dtp;
     ipcp       = entry->txrx.ipcp;
     upper_ipcp = entry->upper.ipcp;
@@ -1135,7 +1138,6 @@ flow_del(struct flow_entry *entry)
                upper_ipcp->id, (unsigned long long)dst_addr, entry->local_port);
         }
     }
-    flow_config_dump(&entry->cfg);
     if (entry->local_appl)
         rl_free(entry->local_appl, RL_MT_FLOW);
     if (entry->remote_appl)
