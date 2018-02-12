@@ -175,42 +175,35 @@ struct rl_mgmt_hdr {
     uint8_t type;
 } __attribute__((packed));
 
-/* Flow specifications and QoS cubes related definitions. */
-
-struct rate_based_config {
-    uint64_t sender_rate;
-    uint64_t time_period; /* us */
-} __attribute__((packed));
-
-struct window_based_config {
-    rlm_seq_t max_cwq_len; /* closed window queue */
-    rlm_seq_t initial_credit;
-} __attribute__((packed));
-
+struct dtcp_config {
+    /* Flow control. */
+    uint8_t flow_control;
+    struct {
+        uint8_t fc_type;
 #define RLITE_FC_T_NONE 0
 #define RLITE_FC_T_WIN 1
 #define RLITE_FC_T_RATE 2
+        union {
+            struct {
+                uint64_t sender_rate;
+                uint64_t time_period; /* us */
+            } r;
+            struct {
+                rlm_seq_t max_cwq_len; /* closed window queue */
+                rlm_seq_t initial_credit;
+            } w;
+        } cfg;
+    } fc;
 
-struct fc_config {
-    uint8_t fc_type;
-    union {
-        struct rate_based_config r;
-        struct window_based_config w;
-    } cfg;
-} __attribute__((packed));
-
-struct rtx_config {
-    uint32_t max_time_to_retry; /* R div initial_rtx_timeout */
-    uint16_t data_rxms_max;
-    uint16_t max_rtxq_len;
-    uint32_t initial_rtx_timeout;
-} __attribute__((packed));
-
-struct dtcp_config {
-    uint8_t flow_control;
-    struct fc_config fc;
+    /* Retransmission control. */
     uint8_t rtx_control;
-    struct rtx_config rtx;
+    struct {
+        uint32_t max_time_to_retry; /* R div initial_rtx_timeout */
+        uint16_t data_rxms_max;
+        uint16_t max_rtxq_len;
+        uint32_t initial_rtx_timeout;
+    } rtx;
+
     uint32_t initial_a; /* A */
     uint32_t bandwidth; /* in bps */
 } __attribute__((packed));

@@ -173,8 +173,8 @@ rl_normal_destroy(struct ipcp_entry *ipcp)
 static void
 dtp_snd_reset(struct flow_entry *flow)
 {
-    struct fc_config *fc = &flow->cfg.dtcp.fc;
-    struct dtp *dtp      = &flow->dtp;
+    struct dtcp_config *dc = &flow->cfg.dtcp;
+    struct dtp *dtp        = &flow->dtp;
 
     dtp->flags |= DTP_F_DRF_SET;
     /* InitialSeqNumPolicy */
@@ -182,8 +182,8 @@ dtp_snd_reset(struct flow_entry *flow)
     dtp->snd_lwe = dtp->snd_rwe = dtp->next_seq_num_to_send;
     dtp->last_seq_num_sent      = -1;
     dtp->last_ctrl_seq_num_rcvd = 0;
-    if (fc->fc_type == RLITE_FC_T_WIN) {
-        dtp->snd_rwe += fc->cfg.w.initial_credit;
+    if (dc->fc.fc_type == RLITE_FC_T_WIN) {
+        dtp->snd_rwe += dc->fc.cfg.w.initial_credit;
     }
 }
 
@@ -191,8 +191,8 @@ dtp_snd_reset(struct flow_entry *flow)
 static void
 dtp_rcv_reset(struct flow_entry *flow)
 {
-    struct fc_config *fc = &flow->cfg.dtcp.fc;
-    struct dtp *dtp      = &flow->dtp;
+    struct dtcp_config *dc = &flow->cfg.dtcp;
+    struct dtp *dtp        = &flow->dtp;
 
     dtp->flags |= DTP_F_DRF_EXPECTED;
     dtp->rcv_lwe = dtp->rcv_lwe_priv = dtp->rcv_rwe = 0;
@@ -202,8 +202,8 @@ dtp_rcv_reset(struct flow_entry *flow)
     /* This is reset in the receive datapath (see rl_normal_sdu_rx) */
     dtp->next_snd_ctl_seq = 0;
 #endif
-    if (fc->fc_type == RLITE_FC_T_WIN) {
-        dtp->rcv_rwe += fc->cfg.w.initial_credit;
+    if (dc->fc.fc_type == RLITE_FC_T_WIN) {
+        dtp->rcv_rwe += dc->fc.cfg.w.initial_credit;
     }
     dtp->last_lwe_sent = 0;
 }
@@ -390,9 +390,9 @@ static int rl_normal_sdu_rx_consumed(struct flow_entry *flow, rlm_seq_t seqnum);
 static int
 rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
-    struct dtp *dtp      = &flow->dtp;
-    struct fc_config *fc = &flow->cfg.dtcp.fc;
-    unsigned long mpl    = 0;
+    struct dtp *dtp        = &flow->dtp;
+    struct dtcp_config *dc = &flow->cfg.dtcp;
+    unsigned long mpl      = 0;
     unsigned long r;
 
     dtp_snd_reset(flow);
@@ -447,8 +447,8 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->a_tmr.function = a_tmr_cb;
     dtp->a_tmr.data     = (unsigned long)flow;
 
-    if (fc->fc_type == RLITE_FC_T_WIN) {
-        dtp->max_cwq_len = fc->cfg.w.max_cwq_len;
+    if (dc->fc.fc_type == RLITE_FC_T_WIN) {
+        dtp->max_cwq_len = dc->fc.cfg.w.max_cwq_len;
     }
 
     if (flow->cfg.dtcp.rtx_control || flow->cfg.dtcp.flow_control) {
@@ -626,9 +626,9 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
                     struct rl_buf *rb, bool maysleep)
 {
     struct rina_pci *pci;
-    struct dtp *dtp      = &flow->dtp;
-    struct fc_config *fc = &flow->cfg.dtcp.fc;
-    bool dtcp_present    = flow->cfg.dtcp_present;
+    struct dtp *dtp        = &flow->dtp;
+    struct dtcp_config *dc = &flow->cfg.dtcp;
+    bool dtcp_present      = flow->cfg.dtcp_present;
 
     spin_lock_bh(&dtp->lock);
 
@@ -711,7 +711,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         dtp->last_seq_num_sent = pci->seqnum;
 
     } else {
-        if (fc->fc_type == RLITE_FC_T_WIN) {
+        if (dc->fc.fc_type == RLITE_FC_T_WIN) {
             if (pci->seqnum > dtp->snd_rwe) {
                 /* PDU not in the sender window, let's
                  * insert it into the Closed Window Queue.
@@ -890,15 +890,15 @@ static struct rl_buf *
 sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
                  bool ack_immediate)
 {
-    const struct dtcp_config *cfg = &flow->cfg.dtcp;
-    unsigned int a                = flow->cfg.dtcp.initial_a;
-    rl_seq_t ack_nack_seq_num     = 0;
-    uint8_t pdu_type              = 0;
+    const struct dtcp_config *dc = &flow->cfg.dtcp;
+    unsigned int a               = flow->cfg.dtcp.initial_a;
+    rl_seq_t ack_nack_seq_num    = 0;
+    uint8_t pdu_type             = 0;
 
-    if (cfg->flow_control) {
+    if (dc->flow_control) {
         /* POL: RcvrFlowControl */
-        if (cfg->fc.fc_type == RLITE_FC_T_WIN) {
-            rl_seq_t win_size = cfg->fc.cfg.w.initial_credit;
+        if (dc->fc.fc_type == RLITE_FC_T_WIN) {
+            rl_seq_t win_size = dc->fc.cfg.w.initial_credit;
 
             NPD("rcv_rwe [%lu] --> [%lu]\n", (long unsigned)flow->dtp.rcv_rwe,
                 (long unsigned)(flow->dtp.rcv_lwe + win_size));
@@ -922,15 +922,15 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     /* I know, the following code can be easily simplified, but this
      * way policies are more visible. */
-    if (cfg->rtx_control) {
+    if (dc->rtx_control) {
         /* POL: RcvrAck */
         ack_nack_seq_num = flow->dtp.rcv_lwe_priv;
         pdu_type         = PDU_T_CTRL | PDU_T_ACK_BIT | PDU_T_ACK;
-        if (cfg->flow_control) {
+        if (dc->flow_control) {
             pdu_type |= PDU_T_CTRL | PDU_T_FC_BIT;
         }
 
-    } else if (cfg->flow_control) {
+    } else if (dc->flow_control) {
         /* POL: ReceivingFlowControl */
         /* Send a flow control only control PDU. */
         pdu_type = PDU_T_CTRL | PDU_T_FC_BIT;
