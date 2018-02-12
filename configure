@@ -148,6 +148,18 @@ EOF
         }
 EOF
 
+    add_test 'HAVE_TIMER_SETUP' <<EOF
+        #include <linux/timer.h>
+
+        static void timer_fun(struct timer_list *t) {
+        }
+
+        void dummy(void) {
+            struct timer_list tmr;
+            timer_setup(&tmr, timer_fun, 0);
+        }
+EOF
+
     # Generate a Makefile for the tests.
     cat >> $KTESTDIR/Makefile <<EOF
 ifneq (\$(KERNELRELEASE),)
