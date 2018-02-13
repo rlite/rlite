@@ -139,37 +139,6 @@ struct NeighborCandidateList : public UipcpObject {
     int serialize(char *buf, unsigned int size) const override;
 };
 
-struct LowerFlow : public UipcpObject {
-    NodeId local_node;
-    NodeId remote_node;
-    unsigned int cost   = 0;
-    unsigned int seqnum = 0;
-    bool state          = false;
-    unsigned int age    = 0;
-
-    LowerFlow() = default;
-    RL_COPIABLE_MOVABLE(LowerFlow);
-    LowerFlow(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const override;
-    bool operator==(const LowerFlow &o)
-    {
-        /* Don't use seqnum and age for the comparison. */
-        return local_node == o.local_node && remote_node == o.remote_node &&
-               cost == o.cost;
-    }
-    bool operator!=(const LowerFlow &o) { return !(*this == o); }
-
-    operator std::string() const;
-};
-
-struct LowerFlowList : public UipcpObject {
-    std::list<LowerFlow> flows;
-
-    LowerFlowList() = default;
-    LowerFlowList(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const override;
-};
-
 struct Property : public UipcpObject {
     std::string name;
     std::string value;

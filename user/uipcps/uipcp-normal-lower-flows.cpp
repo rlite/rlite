@@ -28,8 +28,31 @@
 #include <functional>
 
 #include "uipcp-normal.hpp"
+#include "BaseRIB.pb.h"
 
 using namespace std;
+
+static std::string
+to_string(const gpb::LowerFlow &lf)
+{
+    std::stringstream ss;
+    ss << "(" << lf.local_node() << "," << lf.remote_node() << ")";
+    return ss.str();
+}
+
+static bool
+operator==(const gpb::LowerFlow &a, const gpb::LowerFlow &o)
+{
+    /* Don't use seqnum and age for the comparison. */
+    return a.local_node() == o.local_node() &&
+           a.remote_node() == o.remote_node() && a.cost() == o.cost();
+}
+
+static bool
+operator!=(const gpb::LowerFlow &a, const gpb::LowerFlow &o)
+{
+    return !(a == o);
+}
 
 class RoutingEngine {
 public:
@@ -89,7 +112,7 @@ private:
 
 class FullyReplicatedLFDB : public LFDB {
     /* Lower Flow Database. */
-    std::unordered_map<NodeId, std::unordered_map<NodeId, LowerFlow>> db;
+    std::unordered_map<NodeId, std::unordered_map<NodeId, gpb::LowerFlow>> db;
     friend class RoutingEngine;
 
 public:
@@ -103,22 +126,20 @@ public:
     void dump(std::stringstream &ss) const override;
     void dump_routing(std::stringstream &ss) const override;
 
-    const LowerFlow *find(const NodeId &local_node,
-                          const NodeId &remote_node) const override
+    const gpb::LowerFlow *find(const NodeId &local_node,
+                               const NodeId &remote_node) const
     {
         return _find(local_node, remote_node);
     };
-    LowerFlow *find(const NodeId &local_node,
-                    const NodeId &remote_node) override;
-    bool add(const LowerFlow &lf) override;
-    bool del(const NodeId &local_node, const NodeId &remote_node) override;
+    gpb::LowerFlow *find(const NodeId &local_node, const NodeId &remote_node);
+    const gpb::LowerFlow *_find(const NodeId &local_node,
+                                const NodeId &remote_node) const;
+    bool add(const gpb::LowerFlow &lf);
+    bool del(const NodeId &local_node, const NodeId &remote_node);
     void update_local(const std::string &neigh_name) override;
     void update_routing() override;
     int flow_state_update(struct rl_kmsg_flow_state *upd) override;
     void neigh_disconnected(const std::string &neigh_name) override;
-
-    const LowerFlow *_find(const NodeId &local_node,
-                           const NodeId &remote_node) const;
 
     int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
                     std::shared_ptr<Neighbor> const &neigh,
@@ -130,19 +151,19 @@ public:
     void age_incr() override;
 };
 
-LowerFlow *
+gpb::LowerFlow *
 FullyReplicatedLFDB::find(const NodeId &local_node, const NodeId &remote_node)
 {
-    const LowerFlow *lf = _find(local_node, remote_node);
-    return const_cast<LowerFlow *>(lf);
+    const gpb::LowerFlow *lf = _find(local_node, remote_node);
+    return const_cast<gpb::LowerFlow *>(lf);
 }
 
-const LowerFlow *
+const gpb::LowerFlow *
 FullyReplicatedLFDB::_find(const NodeId &local_node,
                            const NodeId &remote_node) const
 {
     const auto it = db.find(local_node);
-    unordered_map<NodeId, LowerFlow>::const_iterator jt;
+    unordered_map<NodeId, gpb::LowerFlow>::const_iterator jt;
 
     if (it == db.end()) {
         return nullptr;
@@ -156,26 +177,26 @@ FullyReplicatedLFDB::_find(const NodeId &local_node,
 /* The add method has overwrite semantic, and possibly resets the age.
  * Returns true if something changed. */
 bool
-FullyReplicatedLFDB::add(const LowerFlow &lf)
+FullyReplicatedLFDB::add(const gpb::LowerFlow &lf)
 {
-    auto it       = db.find(lf.local_node);
-    string repr   = static_cast<string>(lf);
-    LowerFlow lfz = lf;
+    auto it            = db.find(lf.local_node());
+    string repr        = to_string(lf);
+    gpb::LowerFlow lfz = lf;
     bool local_entry;
 
-    lfz.age = 0;
+    lfz.set_age(0);
 
-    if (it == db.end() || it->second.count(lf.remote_node) == 0) {
+    if (it == db.end() || it->second.count(lf.remote_node()) == 0) {
         /* Not there, we should add the entry. */
-        if (lf.local_node == rib->myname &&
-            rib->get_neighbor(lf.remote_node, /*create=*/false) == nullptr) {
+        if (lf.local_node() == rib->myname &&
+            rib->get_neighbor(lf.remote_node(), /*create=*/false) == nullptr) {
             /* Someone is telling us to add an entry where we are the local
              * node, but there is no neighbor. Discard the update. */
             UPD(rib->uipcp, "Lower flow %s not added (no such neighbor)\n",
                 repr.c_str());
             return false;
         }
-        db[lf.local_node][lf.remote_node] = lfz;
+        db[lf.local_node()][lf.remote_node()] = lfz;
         UPD(rib->uipcp, "Lower flow %s added\n", repr.c_str());
         return true;
     }
@@ -183,10 +204,11 @@ FullyReplicatedLFDB::add(const LowerFlow &lf)
     /* Entry is already there. Update if needed (this expression
      * was obtained by means of a Karnaugh map on three variables:
      * local, newer, equal). */
-    local_entry = (lfz.local_node == rib->myname);
-    if ((!local_entry && lfz.seqnum > it->second[lfz.remote_node].seqnum) ||
-        (local_entry && lfz != it->second[lfz.remote_node])) {
-        it->second[lfz.remote_node] = std::move(lfz); /* Update the entry */
+    local_entry = (lfz.local_node() == rib->myname);
+    if ((!local_entry &&
+         lfz.seqnum() > it->second[lfz.remote_node()].seqnum()) ||
+        (local_entry && lfz != it->second[lfz.remote_node()])) {
+        it->second[lfz.remote_node()] = std::move(lfz); /* Update the entry */
         UPV(rib->uipcp, "Lower flow %s updated\n", repr.c_str());
         return true;
     }
@@ -199,7 +221,7 @@ bool
 FullyReplicatedLFDB::del(const NodeId &local_node, const NodeId &remote_node)
 {
     auto it = db.find(local_node);
-    unordered_map<NodeId, LowerFlow>::iterator jt;
+    unordered_map<NodeId, gpb::LowerFlow>::iterator jt;
     string repr;
 
     if (it == db.end()) {
@@ -211,7 +233,7 @@ FullyReplicatedLFDB::del(const NodeId &local_node, const NodeId &remote_node)
     if (jt == it->second.end()) {
         return false;
     }
-    repr = static_cast<string>(jt->second);
+    repr = to_string(jt->second);
 
     it->second.erase(jt);
 
@@ -223,26 +245,25 @@ FullyReplicatedLFDB::del(const NodeId &local_node, const NodeId &remote_node)
 void
 FullyReplicatedLFDB::update_local(const string &node_name)
 {
-    LowerFlowList lfl;
-    LowerFlow lf;
+    gpb::LowerFlowList lfl;
+    gpb::LowerFlow *lf;
     std::unique_ptr<CDAPMessage> sm;
 
     if (rib->get_neighbor(node_name, false) == nullptr) {
         return; /* Not our neighbor. */
     }
 
-    lf.local_node  = rib->myname;
-    lf.remote_node = node_name;
-    lf.cost        = 1;
-    lf.seqnum      = 1; /* not meaningful */
-    lf.state       = true;
-    lf.age         = 0;
-    lfl.flows.push_back(std::move(lf));
+    lf = lfl.add_flows();
+    lf->set_local_node(rib->myname);
+    lf->set_remote_node(node_name);
+    lf->set_cost(1);
+    lf->set_seqnum(1); /* not meaningful */
+    lf->set_state(true);
+    lf->set_age(0);
 
     sm = make_unique<CDAPMessage>();
     sm->m_create(obj_class::lfdb, obj_name::lfdb);
-    rib->uipcp_obj_serialize(sm.get(), &lfl);
-    rib->send_to_myself(std::move(sm), nullptr);
+    rib->send_to_myself(std::move(sm), &lfl);
 }
 
 int
@@ -271,21 +292,23 @@ FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm,
         return 0;
     }
 
-    LowerFlowList lfl(objbuf, objlen);
-    LowerFlowList prop_lfl;
+    gpb::LowerFlowList lfl;
+    gpb::LowerFlowList prop_lfl;
     bool modified = false;
 
-    for (const LowerFlow &f : lfl.flows) {
+    lfl.ParseFromArray(objbuf, objlen);
+
+    for (const gpb::LowerFlow &f : lfl.flows()) {
         if (add_f) {
             if (add(f)) {
-                modified = true;
-                prop_lfl.flows.push_back(f);
+                modified              = true;
+                *prop_lfl.add_flows() = f;
             }
 
         } else {
-            if (del(f.local_node, f.remote_node)) {
-                modified = true;
-                prop_lfl.flows.push_back(f);
+            if (del(f.local_node(), f.remote_node())) {
+                modified              = true;
+                *prop_lfl.add_flows() = f;
             }
         }
     }
@@ -293,7 +316,7 @@ FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm,
     if (modified) {
         /* Send the received lower flows to the other neighbors. */
         rib->neighs_sync_obj_excluding(neigh, add_f, obj_class::lfdb,
-                                       obj_name::lfdb, &prop_lfl);
+                                       obj_name::lfdb, nullptr, &prop_lfl);
 
         /* Update the routing table. */
         re.update_kernel_routing(rib->myname);
@@ -326,12 +349,13 @@ FullyReplicatedLFDB::dump(std::stringstream &ss) const
     ss << "Lower Flow Database:" << endl;
     for (const auto &kvi : db) {
         for (const auto &kvj : kvi.second) {
-            const LowerFlow &flow = kvj.second;
+            const gpb::LowerFlow &flow = kvj.second;
 
-            ss << "    Local: " << flow.local_node
-               << ", Remote: " << flow.remote_node << ", Cost: " << flow.cost
-               << ", Seqnum: " << flow.seqnum << ", State: " << flow.state
-               << ", Age: " << flow.age << endl;
+            ss << "    Local: " << flow.local_node()
+               << ", Remote: " << flow.remote_node()
+               << ", Cost: " << flow.cost() << ", Seqnum: " << flow.seqnum()
+               << ", State: " << flow.state() << ", Age: " << flow.age()
+               << endl;
         }
     }
 
@@ -348,24 +372,24 @@ int
 FullyReplicatedLFDB::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
                                 unsigned int limit) const
 {
-    LowerFlowList lfl;
+    gpb::LowerFlowList lfl;
     auto func = std::bind(&NeighFlow::sync_obj, nf, true, obj_class::lfdb,
-                          obj_name::lfdb, &lfl);
+                          obj_name::lfdb, nullptr, &lfl);
     int ret   = 0;
 
     for (const auto &kvi : db) {
         for (const auto &kvj : kvi.second) {
-            const LowerFlow &flow = kvj.second;
+            const gpb::LowerFlow &flow = kvj.second;
 
-            lfl.flows.push_back(flow);
-            if (lfl.flows.size() >= limit) {
+            *lfl.add_flows() = flow;
+            if (lfl.flows_size() >= static_cast<int>(limit)) {
                 ret |= func();
-                lfl.flows.clear();
+                lfl = gpb::LowerFlowList();
             }
         }
     }
 
-    if (!lfl.flows.empty()) {
+    if (lfl.flows_size() > 0) {
         ret |= func();
     }
 
@@ -375,7 +399,7 @@ FullyReplicatedLFDB::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
 int
 FullyReplicatedLFDB::neighs_refresh(size_t limit)
 {
-    unordered_map<NodeId, LowerFlow>::iterator jt;
+    unordered_map<NodeId, gpb::LowerFlow>::iterator jt;
     int ret = 0;
 
     if (db.size() == 0) {
@@ -389,15 +413,16 @@ FullyReplicatedLFDB::neighs_refresh(size_t limit)
     assert(it != db.end());
 
     for (auto jt = it->second.begin(); jt != it->second.end();) {
-        LowerFlowList lfl;
+        gpb::LowerFlowList lfl;
 
-        while (lfl.flows.size() < limit && jt != it->second.end()) {
-            jt->second.seqnum++;
-            lfl.flows.push_back(jt->second);
+        while (lfl.flows_size() < static_cast<int>(limit) &&
+               jt != it->second.end()) {
+            jt->second.set_seqnum(jt->second.seqnum() + 1);
+            *lfl.add_flows() = jt->second;
             jt++;
         }
         ret |= rib->neighs_sync_obj_all(true, obj_class::lfdb, obj_name::lfdb,
-                                        &lfl);
+                                        nullptr, &lfl);
     }
 
     return ret;
@@ -424,10 +449,10 @@ FullyReplicatedLFDB::age_incr()
     unsigned int age_inc_intval =
         rib->get_param_value<int>("routing", "age-incr-intval");
     unsigned int age_max = rib->get_param_value<int>("routing", "age-max");
-    LowerFlowList prop_lfl;
+    gpb::LowerFlowList prop_lfl;
 
     for (auto &kvi : db) {
-        list<unordered_map<NodeId, LowerFlow>::iterator> discard_list;
+        list<unordered_map<NodeId, gpb::LowerFlow>::iterator> discard_list;
 
         if (kvi.first == rib->myname) {
             /* Don't age local entries, we pretend they
@@ -436,9 +461,9 @@ FullyReplicatedLFDB::age_incr()
         }
 
         for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
-            jt->second.age += age_inc_intval;
+            jt->second.set_age(jt->second.age() + age_inc_intval);
 
-            if (jt->second.age > age_max) {
+            if (jt->second.age() > age_max) {
                 /* Insert this into the list of entries to be discarded. */
                 discard_list.push_back(jt);
             }
@@ -446,15 +471,15 @@ FullyReplicatedLFDB::age_incr()
 
         for (const auto &dit : discard_list) {
             UPI(rib->uipcp, "Discarded lower-flow %s (age)\n",
-                static_cast<string>(dit->second).c_str());
-            prop_lfl.flows.push_back(dit->second);
+                to_string(dit->second).c_str());
+            *prop_lfl.add_flows() = dit->second;
             kvi.second.erase(dit);
         }
     }
 
-    if (!prop_lfl.flows.empty()) {
+    if (prop_lfl.flows_size() > 0) {
         rib->neighs_sync_obj_all(/*create=*/false, obj_class::lfdb,
-                                 obj_name::lfdb, &prop_lfl);
+                                 obj_name::lfdb, nullptr, &prop_lfl);
         /* Update the routing table. */
         re.update_kernel_routing(rib->myname);
     }
@@ -466,10 +491,10 @@ FullyReplicatedLFDB::age_incr()
 void
 FullyReplicatedLFDB::neigh_disconnected(const std::string &neigh_name)
 {
-    LowerFlowList prop_lfl;
+    gpb::LowerFlowList prop_lfl;
 
     for (auto &kvi : db) {
-        list<unordered_map<NodeId, LowerFlow>::iterator> discard_list;
+        list<unordered_map<NodeId, gpb::LowerFlow>::iterator> discard_list;
 
         for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
             if ((kvi.first == rib->myname && jt->first == neigh_name) ||
@@ -481,15 +506,15 @@ FullyReplicatedLFDB::neigh_disconnected(const std::string &neigh_name)
 
         for (const auto &dit : discard_list) {
             UPI(rib->uipcp, "Discarded lower-flow %s (neighbor disconnected)\n",
-                static_cast<string>(dit->second).c_str());
-            prop_lfl.flows.push_back(dit->second);
+                to_string(dit->second).c_str());
+            *prop_lfl.add_flows() = dit->second;
             kvi.second.erase(dit);
         }
     }
 
-    if (!prop_lfl.flows.empty()) {
+    if (prop_lfl.flows_size() > 0) {
         rib->neighs_sync_obj_all(/*create=*/false, obj_class::lfdb,
-                                 obj_name::lfdb, &prop_lfl);
+                                 obj_name::lfdb, nullptr, &prop_lfl);
         /* Update the routing table. */
         re.update_kernel_routing(rib->myname);
     }
@@ -576,22 +601,22 @@ RoutingEngine::compute_next_hops(const NodeId &local_node)
     graph[local_node] = list<Edge>();
     for (const auto &kvi : lfdb->db) {
         for (const auto &kvj : kvi.second) {
-            const LowerFlow *revlf;
+            const gpb::LowerFlow *revlf;
 
             revlf =
-                rib->lfdb->find(kvj.second.local_node, kvj.second.remote_node);
+                lfdb->find(kvj.second.local_node(), kvj.second.remote_node());
 
-            if (revlf == nullptr || revlf->cost != kvj.second.cost) {
+            if (revlf == nullptr || revlf->cost() != kvj.second.cost()) {
                 /* Something is wrong, this could be malicious or erroneous. */
                 continue;
             }
 
-            graph[kvj.second.local_node].emplace_back(kvj.second.remote_node,
-                                                      kvj.second.cost);
-            if (!graph.count(kvj.second.remote_node)) {
+            graph[kvj.second.local_node()].emplace_back(
+                kvj.second.remote_node(), kvj.second.cost());
+            if (!graph.count(kvj.second.remote_node())) {
                 /* Make sure graph contains all the nodes, even if with
                  * empty lists. */
-                graph[kvj.second.remote_node] = list<Edge>();
+                graph[kvj.second.remote_node()] = list<Edge>();
             }
         }
     }

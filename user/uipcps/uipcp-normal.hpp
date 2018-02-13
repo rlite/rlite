@@ -204,7 +204,8 @@ struct NeighFlow {
     int send_to_port_id(CDAPMessage *m, int invoke_id,
                         const ::google::protobuf::MessageLite *obj);
     int sync_obj(bool create, const std::string &obj_class,
-                 const std::string &obj_name, const UipcpObject *obj_value);
+                 const std::string &obj_name, const UipcpObject *obj_value,
+                 const ::google::protobuf::MessageLite *obj = nullptr);
 };
 
 /* Holds the information about a neighbor IPCP. */
@@ -341,15 +342,9 @@ struct LFDB {
     virtual void dump(std::stringstream &ss) const         = 0;
     virtual void dump_routing(std::stringstream &ss) const = 0;
 
-    virtual const LowerFlow *find(const NodeId &local_node,
-                                  const NodeId &remote_node) const        = 0;
-    virtual LowerFlow *find(const NodeId &local_node,
-                            const NodeId &remote_node)                    = 0;
-    virtual bool add(const LowerFlow &lf)                                 = 0;
-    virtual bool del(const NodeId &local_node, const NodeId &remote_node) = 0;
-    virtual void update_local(const std::string &neigh_name)              = 0;
-    virtual void update_routing()                                         = 0;
-    virtual int flow_state_update(struct rl_kmsg_flow_state *upd)         = 0;
+    virtual void update_local(const std::string &neigh_name)      = 0;
+    virtual void update_routing()                                 = 0;
+    virtual int flow_state_update(struct rl_kmsg_flow_state *upd) = 0;
 
     /* Called to flush all the local entries related to a given neighbor. */
     virtual void neigh_disconnected(const std::string &neigh_name) = 0;
@@ -656,13 +651,15 @@ struct uipcp_rib {
                        const ::google::protobuf::MessageLite *obj);
 
     /* Synchronize with neighbors. */
-    int neighs_sync_obj_excluding(const std::shared_ptr<Neighbor> &exclude,
-                                  bool create, const std::string &obj_class,
-                                  const std::string &obj_name,
-                                  const UipcpObject *obj_value) const;
-    int neighs_sync_obj_all(bool create, const std::string &obj_class,
-                            const std::string &obj_name,
-                            const UipcpObject *obj_value) const;
+    int neighs_sync_obj_excluding(
+        const std::shared_ptr<Neighbor> &exclude, bool create,
+        const std::string &obj_class, const std::string &obj_name,
+        const UipcpObject *obj_value,
+        const ::google::protobuf::MessageLite *obj = nullptr) const;
+    int neighs_sync_obj_all(
+        bool create, const std::string &obj_class, const std::string &obj_name,
+        const UipcpObject *obj_value,
+        const ::google::protobuf::MessageLite *obj = nullptr) const;
     int sync_rib(const std::shared_ptr<NeighFlow> &nf);
 
     /* Receive info from neighbors. */

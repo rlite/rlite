@@ -141,10 +141,11 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
 
 int
 NeighFlow::sync_obj(bool create, const string &obj_class,
-                    const string &obj_name, const UipcpObject *obj_value)
+                    const string &obj_name, const UipcpObject *obj_value,
+                    const ::google::protobuf::MessageLite *obj)
 {
     CDAPMessage m;
-    int ret;
+    int ret = 0;
 
     if (create) {
         m.m_create(obj_class, obj_name);
@@ -153,7 +154,12 @@ NeighFlow::sync_obj(bool create, const string &obj_class,
         m.m_delete(obj_class, obj_name);
     }
 
-    ret = rib->uipcp_obj_serialize(&m, obj_value);
+    if (obj_value) {
+        // TODO this must go away once we get rid of codecs
+        ret = rib->uipcp_obj_serialize(&m, obj_value);
+    } else if (obj) {
+        ret = rib->obj_serialize(&m, obj);
+    }
     if (ret) {
         return ret;
     }

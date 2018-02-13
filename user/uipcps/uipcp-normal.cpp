@@ -1036,10 +1036,11 @@ string2int(const string &s, int &ret)
 }
 
 int
-uipcp_rib::neighs_sync_obj_excluding(const std::shared_ptr<Neighbor> &exclude,
-                                     bool create, const string &obj_class,
-                                     const string &obj_name,
-                                     const UipcpObject *obj_value) const
+uipcp_rib::neighs_sync_obj_excluding(
+    const std::shared_ptr<Neighbor> &exclude, bool create,
+    const string &obj_class, const string &obj_name,
+    const UipcpObject *obj_value,
+    const ::google::protobuf::MessageLite *obj) const
 {
     for (const auto &kvn : neighbors) {
         if (exclude && kvn.second == exclude) {
@@ -1055,7 +1056,7 @@ uipcp_rib::neighs_sync_obj_excluding(const std::shared_ptr<Neighbor> &exclude,
         }
 
         kvn.second->mgmt_conn()->sync_obj(create, obj_class, obj_name,
-                                          obj_value);
+                                          obj_value, obj);
     }
 
     return 0;
@@ -1064,10 +1065,11 @@ uipcp_rib::neighs_sync_obj_excluding(const std::shared_ptr<Neighbor> &exclude,
 int
 uipcp_rib::neighs_sync_obj_all(bool create, const string &obj_class,
                                const string &obj_name,
-                               const UipcpObject *obj_value) const
+                               const UipcpObject *obj_value,
+                               const ::google::protobuf::MessageLite *obj) const
 {
     return neighs_sync_obj_excluding(nullptr, create, obj_class, obj_name,
-                                     obj_value);
+                                     obj_value, obj);
 }
 
 void
