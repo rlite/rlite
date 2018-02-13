@@ -338,10 +338,10 @@ NeighborCandidateList::serialize(char *buf, unsigned int size) const
 static void
 gpb2LowerFlow(LowerFlow &lf, const gpb::LowerFlow &gm)
 {
-    lf.local_node  = gm.name();
-    lf.remote_node = gm.neighbor_name();
+    lf.local_node  = gm.local_node();
+    lf.remote_node = gm.remote_node();
     lf.cost        = gm.cost();
-    lf.seqnum      = gm.sequence_number();
+    lf.seqnum      = gm.seqnum();
     lf.state       = gm.state();
     lf.age         = gm.age();
 }
@@ -349,10 +349,10 @@ gpb2LowerFlow(LowerFlow &lf, const gpb::LowerFlow &gm)
 static int
 LowerFlow2gpb(const LowerFlow &lf, gpb::LowerFlow &gm)
 {
-    gm.set_name(lf.local_node);
-    gm.set_neighbor_name(lf.remote_node);
+    gm.set_local_node(lf.local_node);
+    gm.set_remote_node(lf.remote_node);
     gm.set_cost(lf.cost);
-    gm.set_sequence_number(lf.seqnum);
+    gm.set_seqnum(lf.seqnum);
     gm.set_state(lf.state);
     gm.set_age(lf.age);
 
