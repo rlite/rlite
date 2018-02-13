@@ -29,6 +29,8 @@
 using namespace std;
 
 struct FlowRequest : public gpb::FlowRequest {
+    FlowRequest() = default;
+    RL_NONCOPIABLE(FlowRequest);
     /* Local storage. */
     int invoke_id = 0;
     uint32_t uid  = 0;
