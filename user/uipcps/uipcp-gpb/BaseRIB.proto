@@ -161,7 +161,7 @@ message DFTSlice {  // carries information about
 message EnrollmentInfo {  // carries information about a member that
                           // requests enrollment to a DIF
   optional uint64 address = 1;
-  repeated string supp_difs = 2;
+  repeated string lower_difs = 2;
   optional bool start_early = 3;
 }
 

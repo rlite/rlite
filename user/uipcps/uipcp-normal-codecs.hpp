@@ -65,16 +65,6 @@ struct UipcpObject {
     virtual ~UipcpObject() {}
 };
 
-struct EnrollmentInfo : public UipcpObject {
-    rlm_addr_t address = RL_ADDR_NULL;
-    std::list<std::string> lower_difs;
-    bool start_early = false;
-
-    EnrollmentInfo() = default;
-    EnrollmentInfo(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const override;
-};
-
 struct RinaName {
     std::string apn;
     std::string api;
