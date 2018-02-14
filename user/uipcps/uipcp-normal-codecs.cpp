@@ -153,7 +153,7 @@ DFTEntry2gpb(const DFTEntry &entry, gpb::DFTEntry &gm)
     return 0;
 }
 
-DFTEntry::DFTEntry(const char *buf, unsigned int size) : local(false)
+DFTEntry::DFTEntry(const char *buf, unsigned int size)
 {
     gpb::DFTEntry gm;
 

@@ -128,7 +128,6 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
     dft_entry.ipcp_name = rib->myname;
     dft_entry.appl_name = RinaName(appl_name);
     dft_entry.timestamp = time64();
-    dft_entry.local     = true;
 
     /* Get all the entries for 'appl_name', and see if there
      * is an entry associated to this uipcp. */
@@ -328,7 +327,7 @@ FullyReplicatedDFT::neighs_refresh(size_t limit)
         DFTSlice dft_slice;
 
         while (dft_slice.entries.size() < limit && eit != dft_table.end()) {
-            if (eit->second.local) {
+            if (eit->second.ipcp_name == rib->myname) { /* local */
                 dft_slice.entries.push_back(eit->second);
             }
             eit++;
@@ -912,7 +911,6 @@ CentralizedFaultTolerantDFT::Replica::apply(raft::LogIndex index,
     e.ipcp_name = c->ipcp_name;
     e.appl_name = RinaName(c->appl_name);
     e.timestamp = time64();
-    e.local     = false;
     assert(c->opcode == Command::OpcodeSet || c->opcode == Command::OpcodeDel);
     impl->mod_table(e, c->opcode == Command::OpcodeSet, nullptr, nullptr);
 
