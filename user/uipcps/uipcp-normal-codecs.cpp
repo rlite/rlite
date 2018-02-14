@@ -128,39 +128,6 @@ RinaName2gpb(const RinaName &name)
     return gan;
 }
 
-EnrollmentInfo::EnrollmentInfo(const char *buf, unsigned int size)
-{
-    gpb::EnrollmentInfo gm;
-
-    gm.ParseFromArray(buf, size);
-
-    address = gm.address();
-#if 0
-    start_early = gm.start_early();
-#else
-    start_early = true;
-#endif
-
-    for (int i = 0; i < gm.supp_difs_size(); i++) {
-        lower_difs.push_back(gm.supp_difs(i));
-    }
-}
-
-int
-EnrollmentInfo::serialize(char *buf, unsigned int size) const
-{
-    gpb::EnrollmentInfo gm;
-
-    gm.set_address(address);
-    gm.set_start_early(start_early);
-
-    for (const string &dif : lower_difs) {
-        gm.add_supp_difs(dif);
-    }
-
-    return ser_common(gm, buf, size);
-}
-
 static void
 gpb2DFTEntry(DFTEntry &entry, const gpb::DFTEntry &gm)
 {

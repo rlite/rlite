@@ -28,6 +28,7 @@
 #include <errno.h>
 
 #include "uipcp-normal.hpp"
+#include "BaseRIB.pb.h"
 #include "rlite/conf.h"
 
 using namespace std;
@@ -432,17 +433,19 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
 
     {
         /* (3) I --> S: M_START */
-        EnrollmentInfo enr_info;
+        gpb::EnrollmentInfo enr_info;
         CDAPMessage m;
         int ret;
 
         /* The IPCP is not enrolled yet, so we have to start a complete
          * enrollment. */
-        enr_info.address    = rib->myaddr;
-        enr_info.lower_difs = rib->lower_difs;
+        enr_info.set_address(rib->myaddr);
+        for (const auto &dif : rib->lower_difs) {
+            enr_info.add_lower_difs(dif);
+        }
 
         m.m_start(obj_class::enrollment, obj_name::enrollment);
-        ret = rib->uipcp_obj_serialize(&m, &enr_info);
+        ret = rib->obj_serialize(&m, &enr_info);
         if (ret) {
             return -1;
         }
@@ -490,11 +493,12 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
             return -1;
         }
 
-        EnrollmentInfo enr_info(objbuf, objlen);
+        gpb::EnrollmentInfo enr_info;
 
+        enr_info.ParseFromArray(objbuf, objlen);
         /* The slave may have specified an address for us. */
-        if (enr_info.address) {
-            rib->set_address(enr_info.address);
+        if (enr_info.address()) {
+            rib->set_address(enr_info.address());
         }
     }
 
@@ -538,12 +542,14 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
 
         UPD(rib->uipcp, "I <-- S M_STOP(enrollment)\n");
 
-        EnrollmentInfo enr_info(objbuf, objlen);
+        gpb::EnrollmentInfo enr_info;
+
+        enr_info.ParseFromArray(objbuf, objlen);
 
         /* Update our address according to what received from the
          * neighbor. */
-        if (enr_info.address) {
-            rib->set_address(enr_info.address);
+        if (enr_info.address()) {
+            rib->set_address(enr_info.address());
         }
 
         /* If operational state indicates that we (the initiator) are already
@@ -562,11 +568,10 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
         }
         UPD(rib->uipcp, "I --> S M_STOP_R(enrollment)\n");
 
-        if (enr_info.start_early) {
+        if (enr_info.start_early()) {
             UPD(rib->uipcp, "Initiator is allowed to start early\n");
         } else {
-            UPE(rib->uipcp, "Not yet implemented\n");
-            assert(false);
+            UPE(rib->uipcp, "Not yet implemented (start_early==false)\n");
         }
 
         break;
@@ -750,16 +755,17 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
             return -1;
         }
 
-        EnrollmentInfo enr_info(objbuf, objlen);
+        gpb::EnrollmentInfo enr_info;
         CDAPMessage m;
 
-        enr_info.address = rib->addr_allocate();
+        enr_info.ParseFromArray(objbuf, objlen);
+        enr_info.set_address(rib->addr_allocate());
 
         m.m_start_r();
         m.obj_class = obj_class::enrollment;
         m.obj_name  = obj_name::enrollment;
 
-        ret = rib->uipcp_obj_serialize(&m, &enr_info);
+        ret = rib->obj_serialize(&m, &enr_info);
         if (ret) {
             return -1;
         }
@@ -773,12 +779,12 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
         /* Send DIF static information. */
 
         /* Stop the enrollment. */
-        enr_info.start_early = true;
+        enr_info.set_start_early(true);
 
         m = CDAPMessage();
         m.m_stop(obj_class::enrollment, obj_name::enrollment);
 
-        ret = rib->uipcp_obj_serialize(&m, &enr_info);
+        ret = rib->obj_serialize(&m, &enr_info);
         if (ret) {
             return -1;
         }
