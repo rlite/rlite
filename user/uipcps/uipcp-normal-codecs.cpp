@@ -107,106 +107,6 @@ RinaName::rina_name_fill(struct rina_name *rn)
 }
 
 static void
-gpb2RinaName(RinaName &name, const gpb::APName &gname)
-{
-    name.apn = gname.ap_name();
-    name.api = gname.ap_instance();
-    name.aen = gname.ae_name();
-    name.aei = gname.ae_instance();
-}
-
-static gpb::APName *
-RinaName2gpb(const RinaName &name)
-{
-    gpb::APName *gan = new gpb::APName();
-
-    gan->set_ap_name(name.apn);
-    gan->set_ap_instance(name.api);
-    gan->set_ae_name(name.aen);
-    gan->set_ae_instance(name.aei);
-
-    return gan;
-}
-
-static void
-gpb2DFTEntry(DFTEntry &entry, const gpb::DFTEntry &gm)
-{
-    gpb2RinaName(entry.appl_name, gm.appl_name());
-    entry.ipcp_name = gm.ipcp_name();
-    entry.timestamp = gm.timestamp();
-}
-
-static int
-DFTEntry2gpb(const DFTEntry &entry, gpb::DFTEntry &gm)
-{
-    gpb::APName *gan = RinaName2gpb(entry.appl_name);
-
-    if (!gan) {
-        PE("Out of memory\n");
-        return -1;
-    }
-
-    gm.set_allocated_appl_name(gan);
-    gm.set_ipcp_name(entry.ipcp_name);
-    gm.set_timestamp(entry.timestamp);
-
-    return 0;
-}
-
-DFTEntry::DFTEntry(const char *buf, unsigned int size)
-{
-    gpb::DFTEntry gm;
-
-    gm.ParseFromArray(buf, size);
-
-    gpb2DFTEntry(*this, gm);
-}
-
-int
-DFTEntry::serialize(char *buf, unsigned int size) const
-{
-    gpb::DFTEntry gm;
-    int ret = DFTEntry2gpb(*this, gm);
-
-    if (ret) {
-        return ret;
-    }
-
-    return ser_common(gm, buf, size);
-}
-
-DFTSlice::DFTSlice(const char *buf, unsigned int size)
-{
-    gpb::DFTSlice gm;
-
-    gm.ParseFromArray(buf, size);
-
-    for (int i = 0; i < gm.entries_size(); i++) {
-        entries.emplace_back();
-        gpb2DFTEntry(entries.back(), gm.entries(i));
-    }
-}
-
-int
-DFTSlice::serialize(char *buf, unsigned int size) const
-{
-    gpb::DFTSlice gm;
-
-    for (const DFTEntry &e : entries) {
-        gpb::DFTEntry *gentry;
-        int ret;
-
-        gentry = gm.add_entries();
-        ret    = DFTEntry2gpb(e, *gentry);
-        if (ret) {
-            return ret;
-        }
-    }
-
-    return ser_common(gm, buf, size);
-}
-
-static void
 gpb2NeighborCandidate(NeighborCandidate &cand, const gpb::NeighborCandidate &gm)
 {
     cand.apn     = gm.ap_name();
@@ -602,4 +502,24 @@ RaftAppendEntriesResp::serialize(char *buf, unsigned int size) const
     gm.set_success(success);
 
     return ser_common(gm, buf, size);
+}
+
+gpb::APName *
+RinaName2gpb(const RinaName &name)
+{
+    gpb::APName *gan = new gpb::APName();
+
+    gan->set_ap_name(name.apn);
+    gan->set_ap_instance(name.api);
+    gan->set_ae_name(name.aen);
+    gan->set_ae_instance(name.aei);
+
+    return gan;
+}
+
+std::string
+gpb2string(const gpb::APName &gname)
+{
+    return rina_string_from_components(gname.ap_name(), gname.ap_instance(),
+                                       gname.ae_name(), gname.ae_instance());
 }

@@ -83,24 +83,6 @@ struct RinaName {
     int rina_name_fill(struct rina_name *name);
 };
 
-struct DFTEntry : public UipcpObject {
-    RinaName appl_name;
-    std::string ipcp_name;
-    uint64_t timestamp = 0;
-
-    DFTEntry() = default;
-    DFTEntry(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const override;
-};
-
-struct DFTSlice : public UipcpObject {
-    std::list<DFTEntry> entries;
-
-    DFTSlice() = default;
-    DFTSlice(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const override;
-};
-
 struct NeighborCandidate : public UipcpObject {
     std::string apn;
     std::string api;
@@ -222,5 +204,9 @@ struct RaftAppendEntriesResp : public UipcpObject {
     RaftAppendEntriesResp(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const override;
 };
+
+#include "BaseRIB.pb.h"
+gpb::APName *RinaName2gpb(const RinaName &name);
+std::string gpb2string(const gpb::APName &gname);
 
 #endif /* __UIPCP_CODECS_H__ */
