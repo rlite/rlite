@@ -307,26 +307,6 @@ LocalFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
 }
 #endif /* !RL_USE_QOS_CUBES */
 
-static gpb::APName *
-RinaName2gpb(const RinaName &name)
-{
-    gpb::APName *gan = new gpb::APName();
-
-    gan->set_ap_name(name.apn);
-    gan->set_ap_instance(name.api);
-    gan->set_ae_name(name.aen);
-    gan->set_ae_instance(name.aei);
-
-    return gan;
-}
-
-static std::string
-gpb2string(const gpb::APName &gname)
-{
-    return rina_string_from_components(gname.ap_name(), gname.ap_instance(),
-                                       gname.ae_name(), gname.ae_instance());
-}
-
 /* (1) Initiator FA <-- Initiator application : FA_REQ */
 int
 LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,

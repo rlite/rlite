@@ -47,7 +47,8 @@ class FullyReplicatedDFT : public DFT {
     /* Directory Forwarding Table, mapping application name (std::string)
      * to a set of nodes that registered that name. All nodes are considered
      * equivalent. */
-    std::multimap<std::string, DFTEntry> dft_table;
+    // TODO replace with std::unique_ptr
+    std::multimap<std::string, gpb::DFTEntry> dft_table;
 
 public:
     RL_NODEFAULT_NONCOPIABLE(FullyReplicatedDFT);
@@ -67,8 +68,8 @@ public:
     int neighs_refresh(size_t limit) override;
 
     /* Helper function shared with CentralizedFaultTolerantDFT::Replica. */
-    void mod_table(const DFTEntry &e, bool add, DFTSlice *added,
-                   DFTSlice *removed);
+    void mod_table(const gpb::DFTEntry &e, bool add, gpb::DFTSlice *added,
+                   gpb::DFTSlice *removed);
 };
 
 int
@@ -94,7 +95,7 @@ FullyReplicatedDFT::lookup_req(const std::string &appl_name,
             /* Only accept the preferred address. */
 
             for (; mit != range.second; mit++) {
-                if (mit->second.ipcp_name == preferred) {
+                if (mit->second.ipcp_name() == preferred) {
                     break;
                 }
             }
@@ -111,7 +112,7 @@ FullyReplicatedDFT::lookup_req(const std::string &appl_name,
         assert(mit != range.second);
     }
 
-    *dst_node = mit->second.ipcp_name;
+    *dst_node = mit->second.ipcp_name();
 
     return 0;
 }
@@ -119,21 +120,21 @@ FullyReplicatedDFT::lookup_req(const std::string &appl_name,
 int
 FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
 {
-    multimap<string, DFTEntry>::iterator mit;
+    multimap<string, gpb::DFTEntry>::iterator mit;
     string appl_name(req->appl_name);
     struct uipcp *uipcp = rib->uipcp;
-    DFTSlice dft_slice;
-    DFTEntry dft_entry;
+    gpb::DFTSlice dft_slice;
+    gpb::DFTEntry dft_entry;
 
-    dft_entry.ipcp_name = rib->myname;
-    dft_entry.appl_name = RinaName(appl_name);
-    dft_entry.timestamp = time64();
+    dft_entry.set_ipcp_name(rib->myname);
+    dft_entry.set_allocated_appl_name(RinaName2gpb(RinaName(appl_name)));
+    dft_entry.set_timestamp(time64());
 
     /* Get all the entries for 'appl_name', and see if there
      * is an entry associated to this uipcp. */
     auto range = dft_table.equal_range(appl_name);
     for (mit = range.first; mit != range.second; mit++) {
-        if (mit->second.ipcp_name == rib->myname) {
+        if (mit->second.ipcp_name() == rib->myname) {
             break;
         }
     }
@@ -170,13 +171,13 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
         dft_table.erase(mit);
     }
 
-    dft_slice.entries.push_back(dft_entry);
+    *dft_slice.add_entries() = dft_entry;
 
     UPD(uipcp, "Application %s %sregistered\n", appl_name.c_str(),
         req->reg ? "" : "un");
 
     rib->neighs_sync_obj_all(req->reg != 0, obj_class::dft, obj_name::dft,
-                             &dft_slice);
+                             nullptr, &dft_slice);
 
     return 0;
 }
@@ -185,16 +186,16 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
  * the entries added and/or removed are appended to 'added' and 'removed'
  * respectively. */
 void
-FullyReplicatedDFT::mod_table(const DFTEntry &e, bool add, DFTSlice *added,
-                              DFTSlice *removed)
+FullyReplicatedDFT::mod_table(const gpb::DFTEntry &e, bool add,
+                              gpb::DFTSlice *added, gpb::DFTSlice *removed)
 {
-    string key = static_cast<string>(e.appl_name);
+    string key = gpb2string(e.appl_name());
     auto range = dft_table.equal_range(key);
-    multimap<string, DFTEntry>::iterator mit;
+    multimap<string, gpb::DFTEntry>::iterator mit;
     struct uipcp *uipcp = rib->uipcp;
 
     for (mit = range.first; mit != range.second; mit++) {
-        if (mit->second.ipcp_name == e.ipcp_name) {
+        if (mit->second.ipcp_name() == e.ipcp_name()) {
             break;
         }
     }
@@ -202,20 +203,20 @@ FullyReplicatedDFT::mod_table(const DFTEntry &e, bool add, DFTSlice *added,
     if (add) {
         bool collision = (mit != range.second);
 
-        if (!collision || e.timestamp > mit->second.timestamp) {
+        if (!collision || e.timestamp() > mit->second.timestamp()) {
             if (collision) {
                 /* Remove the collided entry. */
                 if (removed) {
-                    removed->entries.push_back(mit->second);
+                    *removed->add_entries() = mit->second;
                 }
                 dft_table.erase(mit);
             }
             dft_table.insert(make_pair(key, e));
             if (added) {
-                added->entries.push_back(e);
+                *added->add_entries() = e;
             }
             UPD(uipcp, "DFT entry %s --> %s %s remotely\n", key.c_str(),
-                e.ipcp_name.c_str(), (collision ? "updated" : "added"));
+                e.ipcp_name().c_str(), (collision ? "updated" : "added"));
         }
 
     } else {
@@ -224,10 +225,10 @@ FullyReplicatedDFT::mod_table(const DFTEntry &e, bool add, DFTSlice *added,
         } else {
             dft_table.erase(mit);
             if (removed) {
-                removed->entries.push_back(e);
+                *removed->add_entries() = e;
             }
             UPD(uipcp, "DFT entry %s --> %s removed remotely\n", key.c_str(),
-                e.ipcp_name.c_str());
+                e.ipcp_name().c_str());
         }
     }
 }
@@ -259,23 +260,24 @@ FullyReplicatedDFT::rib_handler(const CDAPMessage *rm,
         return 0;
     }
 
-    DFTSlice dft_slice(objbuf, objlen);
-    DFTSlice prop_dft_add, prop_dft_del;
+    gpb::DFTSlice dft_slice;
+    gpb::DFTSlice prop_dft_add, prop_dft_del;
 
-    for (const DFTEntry &e : dft_slice.entries) {
+    dft_slice.ParseFromArray(objbuf, objlen);
+    for (const gpb::DFTEntry &e : dft_slice.entries()) {
         mod_table(e, add, &prop_dft_add, &prop_dft_del);
     }
 
     /* Propagate the DFT entries update to the other neighbors,
      * except for who told us. */
-    if (prop_dft_add.entries.size()) {
+    if (prop_dft_add.entries_size() > 0) {
         rib->neighs_sync_obj_excluding(neigh, true, obj_class::dft,
-                                       obj_name::dft, &prop_dft_add);
+                                       obj_name::dft, nullptr, &prop_dft_add);
     }
 
-    if (prop_dft_del.entries.size()) {
+    if (prop_dft_del.entries_size() > 0) {
         rib->neighs_sync_obj_excluding(neigh, false, obj_class::dft,
-                                       obj_name::dft, &prop_dft_del);
+                                       obj_name::dft, nullptr, &prop_dft_del);
     }
 
     return 0;
@@ -286,11 +288,11 @@ FullyReplicatedDFT::dump(stringstream &ss) const
 {
     ss << "Directory Forwarding Table:" << endl;
     for (const auto &kve : dft_table) {
-        const DFTEntry &entry = kve.second;
+        const gpb::DFTEntry &entry = kve.second;
 
-        ss << "    Application: " << static_cast<string>(entry.appl_name)
-           << ", Remote node: " << entry.ipcp_name
-           << ", Timestamp: " << entry.timestamp << endl;
+        ss << "    Application: " << gpb2string(entry.appl_name())
+           << ", Remote node: " << entry.ipcp_name()
+           << ", Timestamp: " << entry.timestamp() << endl;
     }
 
     ss << endl;
@@ -303,14 +305,16 @@ FullyReplicatedDFT::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
     int ret = 0;
 
     for (auto eit = dft_table.begin(); eit != dft_table.end();) {
-        DFTSlice dft_slice;
+        gpb::DFTSlice dft_slice;
 
-        while (dft_slice.entries.size() < limit && eit != dft_table.end()) {
-            dft_slice.entries.push_back(eit->second);
+        while (dft_slice.entries_size() < static_cast<int>(limit) &&
+               eit != dft_table.end()) {
+            *dft_slice.add_entries() = eit->second;
             eit++;
         }
 
-        ret |= nf->sync_obj(true, obj_class::dft, obj_name::dft, &dft_slice);
+        ret |= nf->sync_obj(true, obj_class::dft, obj_name::dft, nullptr,
+                            &dft_slice);
     }
 
     return ret;
@@ -324,18 +328,19 @@ FullyReplicatedDFT::neighs_refresh(size_t limit)
     int ret = 0;
 
     for (auto eit = dft_table.begin(); eit != dft_table.end();) {
-        DFTSlice dft_slice;
+        gpb::DFTSlice dft_slice;
 
-        while (dft_slice.entries.size() < limit && eit != dft_table.end()) {
-            if (eit->second.ipcp_name == rib->myname) { /* local */
-                dft_slice.entries.push_back(eit->second);
+        while (dft_slice.entries_size() < static_cast<int>(limit) &&
+               eit != dft_table.end()) {
+            if (eit->second.ipcp_name() == rib->myname) { /* local */
+                *dft_slice.add_entries() = eit->second;
             }
             eit++;
         }
 
-        if (dft_slice.entries.size()) {
+        if (dft_slice.entries().size()) {
             ret |= rib->neighs_sync_obj_all(true, obj_class::dft, obj_name::dft,
-                                            &dft_slice);
+                                            nullptr, &dft_slice);
         }
     }
 
@@ -656,7 +661,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
         if (leader_id.empty() || r == leader_id) {
             auto m = make_unique<CDAPMessage>();
             gpb::opCode_t op_code;
-            DFTEntry dft_entry;
+            gpb::DFTEntry dft_entry;
             int invoke_id;
             int ret;
 
@@ -665,10 +670,11 @@ CentralizedFaultTolerantDFT::Client::appl_register(
             } else {
                 m->m_delete(obj_class::dft, obj_name::dft);
             }
-            op_code             = m->op_code;
-            dft_entry.ipcp_name = parent->rib->myname;
-            dft_entry.appl_name = RinaName(appl_name);
-            dft_entry.timestamp = time64();
+            op_code = m->op_code;
+            dft_entry.set_ipcp_name(parent->rib->myname);
+            dft_entry.set_allocated_appl_name(
+                RinaName2gpb(RinaName(appl_name)));
+            dft_entry.set_timestamp(time64());
 
             /* Set the 'pending' map before sending, in case we are sending to
              * ourselves (and so we wouldn't find the entry in the map).*/
@@ -676,7 +682,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
                 parent->rib->invoke_id_mgr.get_invoke_id();
             pending[invoke_id] =
                 std::move(PendingReq(op_code, appl_name, r, req->event_id));
-            ret = parent->rib->uipcp_obj_serialize(m.get(), &dft_entry);
+            ret = parent->rib->obj_serialize(m.get(), &dft_entry);
             if (ret == 0) {
                 ret = parent->rib->send_to_dst_node(std::move(m), r, nullptr,
                                                     nullptr);
@@ -906,11 +912,11 @@ CentralizedFaultTolerantDFT::Replica::apply(raft::LogIndex index,
                                             const char *const serbuf)
 {
     auto c = reinterpret_cast<const Command *const>(serbuf);
-    DFTEntry e;
+    gpb::DFTEntry e;
 
-    e.ipcp_name = c->ipcp_name;
-    e.appl_name = RinaName(c->appl_name);
-    e.timestamp = time64();
+    e.set_ipcp_name(c->ipcp_name);
+    e.set_allocated_appl_name(RinaName2gpb(RinaName(c->appl_name)));
+    e.set_timestamp(time64());
     assert(c->opcode == Command::OpcodeSet || c->opcode == Command::OpcodeDel);
     impl->mod_table(e, c->opcode == Command::OpcodeSet, nullptr, nullptr);
 
@@ -979,13 +985,15 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
             /* We received an M_WRITE or M_DELETE as sent by
              * Client::appl_register(). We are the leader. Let's submit the
              * request to the Raft state machine. */
-            DFTEntry dft_entry(objbuf, objlen);
-            string appl_name(static_cast<string>(dft_entry.appl_name));
+            gpb::DFTEntry dft_entry;
             raft::LogIndex index;
+            string appl_name;
             Command c;
 
+            dft_entry.ParseFromArray(objbuf, objlen);
+            appl_name = gpb2string(dft_entry.appl_name());
             /* Fill in the command struct (already serialized). */
-            strncpy(c.ipcp_name, dft_entry.ipcp_name.c_str(),
+            strncpy(c.ipcp_name, dft_entry.ipcp_name().c_str(),
                     sizeof(c.ipcp_name));
             strncpy(c.appl_name, appl_name.c_str(), sizeof(c.appl_name));
             c.opcode = rm->op_code == gpb::M_WRITE ? Command::OpcodeSet
