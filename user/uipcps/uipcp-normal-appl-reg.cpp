@@ -48,7 +48,7 @@ class FullyReplicatedDFT : public DFT {
      * to a set of nodes that registered that name. All nodes are considered
      * equivalent. */
     // TODO replace with std::unique_ptr
-    std::multimap<std::string, gpb::DFTEntry> dft_table;
+    std::multimap<std::string, std::unique_ptr<gpb::DFTEntry>> dft_table;
 
 public:
     RL_NODEFAULT_NONCOPIABLE(FullyReplicatedDFT);
@@ -95,7 +95,7 @@ FullyReplicatedDFT::lookup_req(const std::string &appl_name,
             /* Only accept the preferred address. */
 
             for (; mit != range.second; mit++) {
-                if (mit->second.ipcp_name() == preferred) {
+                if (mit->second->ipcp_name() == preferred) {
                     break;
                 }
             }
@@ -112,7 +112,7 @@ FullyReplicatedDFT::lookup_req(const std::string &appl_name,
         assert(mit != range.second);
     }
 
-    *dst_node = mit->second.ipcp_name();
+    *dst_node = mit->second->ipcp_name();
 
     return 0;
 }
@@ -120,24 +120,26 @@ FullyReplicatedDFT::lookup_req(const std::string &appl_name,
 int
 FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
 {
-    multimap<string, gpb::DFTEntry>::iterator mit;
+    auto dft_entry = make_unique<gpb::DFTEntry>();
+    multimap<string, std::unique_ptr<gpb::DFTEntry>>::iterator mit;
     string appl_name(req->appl_name);
     struct uipcp *uipcp = rib->uipcp;
     gpb::DFTSlice dft_slice;
-    gpb::DFTEntry dft_entry;
 
-    dft_entry.set_ipcp_name(rib->myname);
-    dft_entry.set_allocated_appl_name(RinaName2gpb(RinaName(appl_name)));
-    dft_entry.set_timestamp(time64());
+    dft_entry->set_ipcp_name(rib->myname);
+    dft_entry->set_allocated_appl_name(RinaName2gpb(RinaName(appl_name)));
+    dft_entry->set_timestamp(time64());
 
     /* Get all the entries for 'appl_name', and see if there
      * is an entry associated to this uipcp. */
     auto range = dft_table.equal_range(appl_name);
     for (mit = range.first; mit != range.second; mit++) {
-        if (mit->second.ipcp_name() == rib->myname) {
+        if (mit->second->ipcp_name() == rib->myname) {
             break;
         }
     }
+
+    *dft_slice.add_entries() = *dft_entry;
 
     if (req->reg) {
         if (mit != range.second) { /* local collision */
@@ -159,7 +161,8 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
         }
 
         /* Insert the object into the RIB. */
-        dft_table.insert(make_pair(appl_name, dft_entry));
+
+        dft_table.insert(make_pair(appl_name, std::move(dft_entry)));
     } else {
         if (mit == range.second) {
             UPE(uipcp, "Application %s was not registered here\n",
@@ -170,8 +173,6 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
         /* Remove from the RIB. */
         dft_table.erase(mit);
     }
-
-    *dft_slice.add_entries() = dft_entry;
 
     UPD(uipcp, "Application %s %sregistered\n", appl_name.c_str(),
         req->reg ? "" : "un");
@@ -191,11 +192,11 @@ FullyReplicatedDFT::mod_table(const gpb::DFTEntry &e, bool add,
 {
     string key = gpb2string(e.appl_name());
     auto range = dft_table.equal_range(key);
-    multimap<string, gpb::DFTEntry>::iterator mit;
+    multimap<string, std::unique_ptr<gpb::DFTEntry>>::iterator mit;
     struct uipcp *uipcp = rib->uipcp;
 
     for (mit = range.first; mit != range.second; mit++) {
-        if (mit->second.ipcp_name() == e.ipcp_name()) {
+        if (mit->second->ipcp_name() == e.ipcp_name()) {
             break;
         }
     }
@@ -203,15 +204,15 @@ FullyReplicatedDFT::mod_table(const gpb::DFTEntry &e, bool add,
     if (add) {
         bool collision = (mit != range.second);
 
-        if (!collision || e.timestamp() > mit->second.timestamp()) {
+        if (!collision || e.timestamp() > mit->second->timestamp()) {
             if (collision) {
                 /* Remove the collided entry. */
                 if (removed) {
-                    *removed->add_entries() = mit->second;
+                    *removed->add_entries() = *mit->second;
                 }
                 dft_table.erase(mit);
             }
-            dft_table.insert(make_pair(key, e));
+            dft_table.insert(make_pair(key, make_unique<gpb::DFTEntry>(e)));
             if (added) {
                 *added->add_entries() = e;
             }
@@ -288,11 +289,11 @@ FullyReplicatedDFT::dump(stringstream &ss) const
 {
     ss << "Directory Forwarding Table:" << endl;
     for (const auto &kve : dft_table) {
-        const gpb::DFTEntry &entry = kve.second;
+        const auto &entry = kve.second;
 
-        ss << "    Application: " << gpb2string(entry.appl_name())
-           << ", Remote node: " << entry.ipcp_name()
-           << ", Timestamp: " << entry.timestamp() << endl;
+        ss << "    Application: " << gpb2string(entry->appl_name())
+           << ", Remote node: " << entry->ipcp_name()
+           << ", Timestamp: " << entry->timestamp() << endl;
     }
 
     ss << endl;
@@ -309,7 +310,7 @@ FullyReplicatedDFT::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
 
         while (dft_slice.entries_size() < static_cast<int>(limit) &&
                eit != dft_table.end()) {
-            *dft_slice.add_entries() = eit->second;
+            *dft_slice.add_entries() = *eit->second;
             eit++;
         }
 
@@ -332,13 +333,13 @@ FullyReplicatedDFT::neighs_refresh(size_t limit)
 
         while (dft_slice.entries_size() < static_cast<int>(limit) &&
                eit != dft_table.end()) {
-            if (eit->second.ipcp_name() == rib->myname) { /* local */
-                *dft_slice.add_entries() = eit->second;
+            if (eit->second->ipcp_name() == rib->myname) { /* local */
+                *dft_slice.add_entries() = *eit->second;
             }
             eit++;
         }
 
-        if (dft_slice.entries().size()) {
+        if (dft_slice.entries_size()) {
             ret |= rib->neighs_sync_obj_all(true, obj_class::dft, obj_name::dft,
                                             nullptr, &dft_slice);
         }
