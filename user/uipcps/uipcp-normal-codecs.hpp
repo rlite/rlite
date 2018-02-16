@@ -83,28 +83,6 @@ struct RinaName {
     int rina_name_fill(struct rina_name *name);
 };
 
-struct AddrAllocRequest : public UipcpObject {
-    rlm_addr_t requestor = RL_ADDR_NULL;
-    rlm_addr_t address   = RL_ADDR_NULL;
-    bool pending         = true; /* not serialized */
-
-    AddrAllocRequest() = default;
-    AddrAllocRequest(rlm_addr_t a, rlm_addr_t r)
-        : requestor(r), address(a), pending(true)
-    {
-    }
-    AddrAllocRequest(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const override;
-};
-
-struct AddrAllocEntries : public UipcpObject {
-    std::list<AddrAllocRequest> entries;
-
-    AddrAllocEntries() = default;
-    AddrAllocEntries(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const override;
-};
-
 struct RaftRequestVote : public UipcpObject {
     uint32_t term;
     std::string candidate_id;
