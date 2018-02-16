@@ -142,7 +142,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
 
 int
 NeighFlow::sync_obj(bool create, const string &obj_class,
-                    const string &obj_name, const UipcpObject *obj_value,
+                    const string &obj_name,
                     const ::google::protobuf::MessageLite *obj)
 {
     CDAPMessage m;
@@ -1029,7 +1029,7 @@ uipcp_rib::sync_rib(const std::shared_ptr<NeighFlow> &nf)
             }
 
             ret |= nf->sync_obj(true, obj_class::neighbors, obj_name::neighbors,
-                                nullptr, &ncl);
+                                &ncl);
         }
 
         /* Remove myself. */
@@ -1079,7 +1079,7 @@ uipcp_rib::neighs_refresh()
 
         *ncl.add_candidates() = neighbor_cand_get();
         neighs_sync_obj_all(true, obj_class::neighbors, obj_name::neighbors,
-                            nullptr, &ncl);
+                            &ncl);
     }
     neighs_refresh_tmr_restart();
 }
@@ -1297,7 +1297,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm,
         /* Propagate the updated information to the other neighbors,
          * so that they can update their Neighbor objects. */
         neighs_sync_obj_excluding(neigh, add, obj_class::neighbors,
-                                  obj_name::neighbors, nullptr, &prop_ncl);
+                                  obj_name::neighbors, &prop_ncl);
         /* Update the routing, as node addressing information has changed. */
         lfdb->update_routing();
     }

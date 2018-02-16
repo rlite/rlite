@@ -178,7 +178,7 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
         req->reg ? "" : "un");
 
     rib->neighs_sync_obj_all(req->reg != 0, obj_class::dft, obj_name::dft,
-                             nullptr, &dft_slice);
+                             &dft_slice);
 
     return 0;
 }
@@ -273,12 +273,12 @@ FullyReplicatedDFT::rib_handler(const CDAPMessage *rm,
      * except for who told us. */
     if (prop_dft_add.entries_size() > 0) {
         rib->neighs_sync_obj_excluding(neigh, true, obj_class::dft,
-                                       obj_name::dft, nullptr, &prop_dft_add);
+                                       obj_name::dft, &prop_dft_add);
     }
 
     if (prop_dft_del.entries_size() > 0) {
         rib->neighs_sync_obj_excluding(neigh, false, obj_class::dft,
-                                       obj_name::dft, nullptr, &prop_dft_del);
+                                       obj_name::dft, &prop_dft_del);
     }
 
     return 0;
@@ -314,8 +314,7 @@ FullyReplicatedDFT::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
             eit++;
         }
 
-        ret |= nf->sync_obj(true, obj_class::dft, obj_name::dft, nullptr,
-                            &dft_slice);
+        ret |= nf->sync_obj(true, obj_class::dft, obj_name::dft, &dft_slice);
     }
 
     return ret;
@@ -341,7 +340,7 @@ FullyReplicatedDFT::neighs_refresh(size_t limit)
 
         if (dft_slice.entries_size()) {
             ret |= rib->neighs_sync_obj_all(true, obj_class::dft, obj_name::dft,
-                                            nullptr, &dft_slice);
+                                            &dft_slice);
         }
     }
 

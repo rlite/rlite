@@ -60,11 +60,6 @@ node_id_pretty(const NodeId &node)
     return node;
 }
 
-struct UipcpObject {
-    virtual int serialize(char *buf, unsigned int size) const = 0;
-    virtual ~UipcpObject() {}
-};
-
 struct RinaName {
     std::string apn;
     std::string api;

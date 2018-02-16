@@ -204,7 +204,7 @@ struct NeighFlow {
     int send_to_port_id(CDAPMessage *m, int invoke_id,
                         const ::google::protobuf::MessageLite *obj);
     int sync_obj(bool create, const std::string &obj_class,
-                 const std::string &obj_name, const UipcpObject *obj_value,
+                 const std::string &obj_name,
                  const ::google::protobuf::MessageLite *obj = nullptr);
 };
 
@@ -653,11 +653,9 @@ struct uipcp_rib {
     int neighs_sync_obj_excluding(
         const std::shared_ptr<Neighbor> &exclude, bool create,
         const std::string &obj_class, const std::string &obj_name,
-        const UipcpObject *obj_value,
         const ::google::protobuf::MessageLite *obj = nullptr) const;
     int neighs_sync_obj_all(
         bool create, const std::string &obj_class, const std::string &obj_name,
-        const UipcpObject *obj_value,
         const ::google::protobuf::MessageLite *obj = nullptr) const;
     int sync_rib(const std::shared_ptr<NeighFlow> &nf);
 
