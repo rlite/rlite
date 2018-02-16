@@ -38,76 +38,20 @@
 
 using namespace std;
 
-RinaName::RinaName(const std::string &apn_, const std::string &api_,
-                   const std::string &aen_, const std::string &aei_)
-{
-    apn = apn_;
-    api = api_;
-    aen = aen_;
-    aei = aei_;
-}
-
-RinaName::RinaName(const struct rina_name *name)
-{
-    apn = name->apn ? string(name->apn) : string();
-    api = name->api ? string(name->api) : string();
-    aen = name->aen ? string(name->aen) : string();
-    aei = name->aei ? string(name->aei) : string();
-}
-
-RinaName::RinaName(const string &str)
-{
-    rina_components_from_string(str, apn, api, aen, aei);
-}
-
-RinaName::RinaName(const char *str)
-{
-    if (str == nullptr) {
-        str = "";
-    }
-    rina_components_from_string(string(str), apn, api, aen, aei);
-}
-
-RinaName::operator std::string() const
-{
-    return rina_string_from_components(apn, api, aen, aei);
-}
-
-bool
-RinaName::operator==(const RinaName &other) const
-{
-    return api == other.api && apn == other.apn && aen == other.aen &&
-           aei == other.aei;
-}
-
-bool
-RinaName::operator!=(const RinaName &other) const
-{
-    return !(*this == other);
-}
-
-int
-RinaName::rina_name_fill(struct rina_name *rn)
-{
-    return ::rina_name_fill(rn, apn.c_str(), api.c_str(), aen.c_str(),
-                            aei.c_str());
-}
-
 gpb::APName *
-RinaName2gpb(const RinaName &name)
+apname2gpb(const std::string &str)
 {
     gpb::APName *gan = new gpb::APName();
 
-    gan->set_ap_name(name.apn);
-    gan->set_ap_instance(name.api);
-    gan->set_ae_name(name.aen);
-    gan->set_ae_instance(name.aei);
+    rina_components_from_string(
+        str, *gan->mutable_ap_name(), *gan->mutable_ap_instance(),
+        *gan->mutable_ae_name(), *gan->mutable_ae_instance());
 
     return gan;
 }
 
 std::string
-gpb2string(const gpb::APName &gname)
+apname2string(const gpb::APName &gname)
 {
     return rina_string_from_components(gname.ap_name(), gname.ap_instance(),
                                        gname.ae_name(), gname.ae_instance());

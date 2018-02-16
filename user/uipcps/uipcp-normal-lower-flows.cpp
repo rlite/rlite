@@ -32,6 +32,18 @@
 
 using namespace std;
 
+using NodeId = std::string;
+
+/* Helper for pretty printing of default route. */
+static inline std::string
+node_id_pretty(const NodeId &node)
+{
+    if (node == std::string()) {
+        return std::string("any");
+    }
+    return node;
+}
+
 static std::string
 to_string(const gpb::LowerFlow &lf)
 {

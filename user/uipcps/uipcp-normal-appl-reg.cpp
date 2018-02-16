@@ -127,7 +127,7 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
     gpb::DFTSlice dft_slice;
 
     dft_entry->set_ipcp_name(rib->myname);
-    dft_entry->set_allocated_appl_name(RinaName2gpb(RinaName(appl_name)));
+    dft_entry->set_allocated_appl_name(apname2gpb(appl_name));
     dft_entry->set_timestamp(time64());
 
     /* Get all the entries for 'appl_name', and see if there
@@ -190,7 +190,7 @@ void
 FullyReplicatedDFT::mod_table(const gpb::DFTEntry &e, bool add,
                               gpb::DFTSlice *added, gpb::DFTSlice *removed)
 {
-    string key = gpb2string(e.appl_name());
+    string key = apname2string(e.appl_name());
     auto range = dft_table.equal_range(key);
     multimap<string, std::unique_ptr<gpb::DFTEntry>>::iterator mit;
     struct uipcp *uipcp = rib->uipcp;
@@ -291,7 +291,7 @@ FullyReplicatedDFT::dump(stringstream &ss) const
     for (const auto &kve : dft_table) {
         const auto &entry = kve.second;
 
-        ss << "    Application: " << gpb2string(entry->appl_name())
+        ss << "    Application: " << apname2string(entry->appl_name())
            << ", Remote node: " << entry->ipcp_name()
            << ", Timestamp: " << entry->timestamp() << endl;
     }
@@ -672,8 +672,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
             }
             op_code = m->op_code;
             dft_entry.set_ipcp_name(parent->rib->myname);
-            dft_entry.set_allocated_appl_name(
-                RinaName2gpb(RinaName(appl_name)));
+            dft_entry.set_allocated_appl_name(apname2gpb(appl_name));
             dft_entry.set_timestamp(time64());
 
             /* Set the 'pending' map before sending, in case we are sending to
@@ -914,7 +913,7 @@ CentralizedFaultTolerantDFT::Replica::apply(raft::LogIndex index,
     gpb::DFTEntry e;
 
     e.set_ipcp_name(c->ipcp_name);
-    e.set_allocated_appl_name(RinaName2gpb(RinaName(c->appl_name)));
+    e.set_allocated_appl_name(apname2gpb(c->appl_name));
     e.set_timestamp(time64());
     assert(c->opcode == Command::OpcodeSet || c->opcode == Command::OpcodeDel);
     impl->mod_table(e, c->opcode == Command::OpcodeSet, nullptr, nullptr);
@@ -990,7 +989,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
             Command c;
 
             dft_entry.ParseFromArray(objbuf, objlen);
-            appl_name = gpb2string(dft_entry.appl_name());
+            appl_name = apname2string(dft_entry.appl_name());
             /* Fill in the command struct (already serialized). */
             strncpy(c.ipcp_name, dft_entry.ipcp_name().c_str(),
                     sizeof(c.ipcp_name));

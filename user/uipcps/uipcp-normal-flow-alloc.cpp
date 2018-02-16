@@ -324,9 +324,9 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
 
     remote_addr = rib->lookup_node_address(remote_node);
 
-    freq->set_allocated_src_app(RinaName2gpb(
-        RinaName(req->local_appl))); /* req->local_appl may be nullptr */
-    freq->set_allocated_dst_app(RinaName2gpb(RinaName(dest_appl)));
+    freq->set_allocated_src_app(
+        apname2gpb(req->local_appl)); /* req->local_appl may be nullptr */
+    freq->set_allocated_dst_app(apname2gpb(dest_appl));
     freq->set_src_port(req->local_port);
     freq->set_dst_port(0);
     freq->set_src_addr(rib->myaddr);
@@ -469,8 +469,8 @@ LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm)
 
     /* freq->dst_app() is registered with us, let's go ahead. */
 
-    local_appl  = gpb2string(freq->dst_app());
-    remote_appl = gpb2string(freq->src_app());
+    local_appl  = apname2string(freq->dst_app());
+    remote_appl = apname2string(freq->src_app());
     policies2flowcfg(&flowcfg, freq.get());
 
     freq->invoke_id = rm->invoke_id;
@@ -662,8 +662,8 @@ LocalFlowAllocator::dump(std::stringstream &ss) const
 
         ss << "    [" << ((freq->flags & RL_FLOWREQ_INITIATOR) ? "L" : "R")
            << "]"
-           << ", Src=" << gpb2string(freq->src_app())
-           << ", Dst=" << gpb2string(freq->dst_app())
+           << ", Src=" << apname2string(freq->src_app())
+           << ", Dst=" << apname2string(freq->dst_app())
            << ", SrcAddr:Port=" << freq->src_addr() << ":" << freq->src_port()
            << ", DstAddr:Port=" << freq->dst_addr() << ":" << freq->dst_port()
            << ", Connections: [";
