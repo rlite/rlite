@@ -225,14 +225,14 @@ message LowerFlowList {          // Contains the information of a flow service
 }
 
 message NeighborCandidateList {  // carries information about all the neighbors
-  repeated NeighborCandidate neighbors = 1;
+  repeated NeighborCandidate candidates = 1;
 }
 
 message NeighborCandidate {  // carries information about a neighbor
   optional string ap_name = 1;
   optional string ap_instance = 2;
   optional uint64 address = 3;
-  repeated string supp_difs = 4;
+  repeated string lower_difs = 4;
 }
 
 message PolicyDescr {                // Describes a policy

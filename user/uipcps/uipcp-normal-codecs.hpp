@@ -83,30 +83,6 @@ struct RinaName {
     int rina_name_fill(struct rina_name *name);
 };
 
-struct NeighborCandidate : public UipcpObject {
-    std::string apn;
-    std::string api;
-    std::string aen; /* not serialized */
-    std::string aei; /* not serialized */
-    rlm_addr_t address = RL_ADDR_NULL;
-    std::list<std::string> lower_difs;
-
-    NeighborCandidate() = default;
-    NeighborCandidate(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const override;
-
-    bool operator==(const NeighborCandidate &o) const;
-    bool operator!=(const NeighborCandidate &o) const { return !(*this == o); }
-};
-
-struct NeighborCandidateList : public UipcpObject {
-    std::list<NeighborCandidate> candidates;
-
-    NeighborCandidateList() = default;
-    NeighborCandidateList(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const override;
-};
-
 struct Property : public UipcpObject {
     std::string name;
     std::string value;

@@ -1000,6 +1000,27 @@ Neighbor::enrollment_complete()
            mgmt_conn()->enroll_state == EnrollState::NEIGH_ENROLLED;
 }
 
+static bool
+operator==(const gpb::NeighborCandidate &a, const gpb::NeighborCandidate &o)
+{
+    if (a.ap_instance() != o.ap_instance() || a.ap_name() != o.ap_name() ||
+        a.address() != o.address() ||
+        a.lower_difs_size() != o.lower_difs_size()) {
+        return false;
+    }
+
+    set<string> s1, s2;
+
+    for (const string &lower : a.lower_difs()) {
+        s1.insert(lower);
+    }
+    for (const string &lower : o.lower_difs()) {
+        s2.insert(lower);
+    }
+
+    return s1 == s2;
+}
+
 int
 uipcp_rib::sync_rib(const std::shared_ptr<NeighFlow> &nf)
 {
@@ -1011,8 +1032,8 @@ uipcp_rib::sync_rib(const std::shared_ptr<NeighFlow> &nf)
 
     /* Synchronize neighbors first. */
     {
-        NeighborCandidate cand = neighbor_cand_get();
-        string my_name         = myname;
+        gpb::NeighborCandidate cand = neighbor_cand_get();
+        string my_name              = myname;
 
         /* Temporarily insert a neighbor representing myself,
          * to simplify the loop below. */
@@ -1020,16 +1041,16 @@ uipcp_rib::sync_rib(const std::shared_ptr<NeighFlow> &nf)
 
         /* Scan all the neighbors I know about. */
         for (auto cit = neighbors_seen.begin(); cit != neighbors_seen.end();) {
-            NeighborCandidateList ncl;
+            gpb::NeighborCandidateList ncl;
 
-            while (ncl.candidates.size() < limit &&
+            while (ncl.candidates_size() < static_cast<int>(limit) &&
                    cit != neighbors_seen.end()) {
-                ncl.candidates.push_back(cit->second);
+                *ncl.add_candidates() = cit->second;
                 cit++;
             }
 
             ret |= nf->sync_obj(true, obj_class::neighbors, obj_name::neighbors,
-                                &ncl);
+                                nullptr, &ncl);
         }
 
         /* Remove myself. */
@@ -1075,11 +1096,11 @@ uipcp_rib::neighs_refresh()
     lfdb->neighs_refresh(limit);
     dft->neighs_refresh(limit);
     {
-        NeighborCandidateList ncl;
+        gpb::NeighborCandidateList ncl;
 
-        ncl.candidates.push_back(neighbor_cand_get());
+        *ncl.add_candidates() = neighbor_cand_get();
         neighs_sync_obj_all(true, obj_class::neighbors, obj_name::neighbors,
-                            &ncl);
+                            nullptr, &ncl);
     }
     neighs_refresh_tmr_restart();
 }
@@ -1168,7 +1189,7 @@ uipcp_rib::lookup_node_address(const std::string &node_name) const
     auto mit = neighbors_seen.find(node_name);
 
     if (mit != neighbors_seen.end()) {
-        return mit->second.address;
+        return mit->second.address();
     }
 
     if (node_name == myname) {
@@ -1182,8 +1203,9 @@ std::string
 uipcp_rib::lookup_neighbor_by_address(rlm_addr_t address)
 {
     for (const auto &kvn : neighbors_seen) {
-        if (kvn.second.address == address) {
-            return rina_string_from_components(kvn.second.apn, kvn.second.api,
+        if (kvn.second.address() == address) {
+            return rina_string_from_components(kvn.second.ap_name(),
+                                               kvn.second.ap_instance(),
                                                string(), string());
         }
     }
@@ -1192,9 +1214,9 @@ uipcp_rib::lookup_neighbor_by_address(rlm_addr_t address)
 }
 
 static string
-common_lower_dif(const list<string> l1, const list<string> l2)
+common_lower_dif(const gpb::NeighborCandidate &cand, const list<string> l2)
 {
-    for (const string &i : l1) {
+    for (const string &i : cand.lower_difs()) {
         for (const string &j : l2) {
             if (i == j) {
                 return i;
@@ -1231,12 +1253,14 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm,
         return 0;
     }
 
-    NeighborCandidateList ncl(objbuf, objlen);
-    NeighborCandidateList prop_ncl;
+    gpb::NeighborCandidateList prop_ncl;
+    gpb::NeighborCandidateList ncl;
 
-    for (const NeighborCandidate &nc : ncl.candidates) {
-        string neigh_name =
-            rina_string_from_components(nc.apn, nc.api, string(), string());
+    ncl.ParseFromArray(objbuf, objlen);
+
+    for (const gpb::NeighborCandidate &nc : ncl.candidates()) {
+        string neigh_name = rina_string_from_components(
+            nc.ap_name(), nc.ap_instance(), string(), string());
         auto mit = neighbors_seen.find(neigh_name);
 
         if (neigh_name == myname) {
@@ -1252,11 +1276,11 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm,
             }
 
             neighbors_seen[neigh_name] = nc;
-            prop_ncl.candidates.push_back(nc);
-            propagate = true;
+            *prop_ncl.add_candidates() = nc;
+            propagate                  = true;
 
             /* Check if it can be a candidate neighbor. */
-            string common_dif = common_lower_dif(nc.lower_difs, lower_difs);
+            string common_dif = common_lower_dif(nc, lower_difs);
             if (common_dif == string()) {
                 UPD(uipcp,
                     "Neighbor %s discarded because there are no lower DIFs in "
@@ -1280,8 +1304,8 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm,
 
             /* Let's forget about this neighbor. */
             neighbors_seen.erase(mit);
-            prop_ncl.candidates.push_back(nc);
-            propagate = true;
+            *prop_ncl.add_candidates() = nc;
+            propagate                  = true;
             if (neighbors_cand.count(neigh_name)) {
                 neighbors_cand.erase(neigh_name);
             }
@@ -1294,7 +1318,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm,
         /* Propagate the updated information to the other neighbors,
          * so that they can update their Neighbor objects. */
         neighs_sync_obj_excluding(neigh, add, obj_class::neighbors,
-                                  obj_name::neighbors, &prop_ncl);
+                                  obj_name::neighbors, nullptr, &prop_ncl);
         /* Update the routing, as node addressing information has changed. */
         lfdb->update_routing();
     }
@@ -1408,14 +1432,18 @@ uipcp_rib::lookup_neigh_flow_by_flow_fd(int flow_fd,
     return -1;
 }
 
-NeighborCandidate
+gpb::NeighborCandidate
 uipcp_rib::neighbor_cand_get() const
 {
-    NeighborCandidate cand;
+    gpb::NeighborCandidate cand;
+    string u1, u2;
 
-    rina_components_from_string(myname, cand.apn, cand.api, cand.aen, cand.aei);
-    cand.address    = myaddr;
-    cand.lower_difs = lower_difs;
+    rina_components_from_string(myname, *cand.mutable_ap_name(),
+                                *cand.mutable_ap_instance(), u1, u2);
+    cand.set_address(myaddr);
+    for (const auto &dif : lower_difs) {
+        cand.add_lower_difs(dif);
+    }
 
     return cand;
 }
@@ -1759,7 +1787,7 @@ uipcp_rib::trigger_re_enrollments()
             continue;
         }
 
-        common_dif = common_lower_dif(mit->second.lower_difs, lower_difs);
+        common_dif = common_lower_dif(mit->second, lower_difs);
         if (common_dif == string()) {
             /* Weird, but it could happen. */
             continue;
@@ -1879,15 +1907,15 @@ void
 uipcp_rib::check_for_address_conflicts()
 {
     std::lock_guard<std::mutex> guard(mutex);
-    NeighborCandidate cand = neighbor_cand_get();
-    bool need_to_change    = false;
+    gpb::NeighborCandidate cand = neighbor_cand_get();
+    bool need_to_change         = false;
     map<rlm_addr_t, string> m;
 
     /* Temporarily insert a neighbor representing myself. */
     neighbors_seen[myname] = cand;
 
     for (const auto &kvn : neighbors_seen) {
-        rlm_addr_t addr = kvn.second.address;
+        rlm_addr_t addr = kvn.second.address();
 
         if (m.count(addr)) {
             UPW(uipcp, "Nodes %s and %s conflicts on the same address %lu\n",
