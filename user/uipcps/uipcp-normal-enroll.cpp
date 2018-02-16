@@ -1663,10 +1663,12 @@ uipcp_rib::neigh_disconnect(const std::string &neigh_name)
     /* Stop all the lower flows to trigger deallocation on the remote side. */
     for (auto &kv : neigh->flows) {
         const std::shared_ptr<NeighFlow> &nf = kv.second;
-        CDAPMessage m;
+        if (nf->conn->connected()) {
+            CDAPMessage m;
 
-        m.m_stop(obj_class::lowerflow, obj_name::lowerflow);
-        nf->send_to_port_id(&m, 0, nullptr);
+            m.m_stop(obj_class::lowerflow, obj_name::lowerflow);
+            nf->send_to_port_id(&m, 0, nullptr);
+        }
     }
 
     del_neighbor(neigh_name);
