@@ -8,7 +8,7 @@ using namespace std;
 
 class DistributedAddrAllocator : public AddrAllocator {
     /* Table used to carry on distributed address allocation.
-     * It maps (address allocated) --> (requestor address). */
+     * It maps (address allocated) --> (requestor name). */
     std::unordered_map<rlm_addr_t, gpb::AddrAllocRequest> addr_alloc_table;
     std::unordered_set<rlm_addr_t> addr_pending;
 
@@ -33,7 +33,7 @@ DistributedAddrAllocator::dump(std::stringstream &ss) const
     for (const auto &kva : addr_alloc_table) {
         ss << "    Address: " << kva.first
            << ", Requestor: " << kva.second.requestor();
-        if (addr_pending.count(kva.second.requestor())) {
+        if (addr_pending.count(kva.second.address())) {
             ss << " [pending]";
         }
         ss << endl;
@@ -97,7 +97,7 @@ DistributedAddrAllocator::allocate()
         {
             gpb::AddrAllocRequest aar;
             aar.set_address(addr);
-            aar.set_requestor(rib->myaddr);
+            aar.set_requestor(rib->myname);
             addr_alloc_table[addr] = aar;
             addr_pending.insert(addr);
         }
@@ -110,7 +110,7 @@ DistributedAddrAllocator::allocate()
 
                 m.m_create(obj_class::addr_alloc_req,
                            obj_name::addr_alloc_table);
-                aar.set_requestor(rib->myaddr);
+                aar.set_requestor(rib->myname);
                 aar.set_address(addr);
                 ret = kvn.second->mgmt_conn()->send_to_port_id(&m, 0, &aar);
                 if (ret) {
@@ -120,10 +120,9 @@ DistributedAddrAllocator::allocate()
                 } else {
                     UPD(rib->uipcp,
                         "Sent address allocation request to neigh %s, "
-                        "(addr=%lu,requestor=%lu)\n",
+                        "(addr=%lu,requestor=%s)\n",
                         kvn.second->ipcp_name.c_str(),
-                        (long unsigned)aar.address(),
-                        (long unsigned)aar.requestor());
+                        (long unsigned)aar.address(), aar.requestor().c_str());
                 }
             }
         }
@@ -137,7 +136,7 @@ DistributedAddrAllocator::allocate()
          * complete. */
         auto mit = addr_alloc_table.find(addr);
         if (mit != addr_alloc_table.end() &&
-            mit->second.requestor() == rib->myaddr) {
+            mit->second.requestor() == rib->myname) {
             addr_pending.erase(addr);
             UPD(rib->uipcp, "Address %lu allocated\n", (unsigned long)addr);
             break;
@@ -199,9 +198,8 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
                 addr_alloc_table[aar.address()] = aar;
                 UPD(rib->uipcp,
                     "Address allocation request ok, (addr=%lu,"
-                    "requestor=%lu)\n",
-                    (long unsigned)aar.address(),
-                    (long unsigned)aar.requestor());
+                    "requestor=%s)\n",
+                    (long unsigned)aar.address(), aar.requestor().c_str());
                 propagate = true;
 
             } else if (cand_neigh_conflict ||
@@ -212,16 +210,15 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
 
                 UPI(rib->uipcp,
                     "Address allocation request conflicts, (addr=%lu,"
-                    "requestor=%lu)\n",
-                    (long unsigned)aar.address(),
-                    (long unsigned)aar.requestor());
+                    "requestor=%s)\n",
+                    (long unsigned)aar.address(), aar.requestor().c_str());
                 m->m_delete(obj_class::addr_alloc_req,
                             obj_name::addr_alloc_table);
                 ret =
-                    rib->send_to_dst_addr(std::move(m), aar.requestor(), &aar);
+                    rib->send_to_dst_node(std::move(m), aar.requestor(), &aar);
                 if (ret) {
-                    UPE(rib->uipcp, "Failed to send message to %lu [%s]\n",
-                        (unsigned long)aar.requestor(), strerror(errno));
+                    UPE(rib->uipcp, "Failed to send message to %s [%s]\n",
+                        aar.requestor().c_str(), strerror(errno));
                 }
             } else {
                 /* We have already seen this request, don't propagate. */
@@ -237,9 +234,8 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
                     propagate = true;
                     UPI(rib->uipcp,
                         "Address allocation request deleted, "
-                        "(addr=%lu,requestor=%lu)\n",
-                        (long unsigned)aar.address(),
-                        (long unsigned)aar.requestor());
+                        "(addr=%lu,requestor=%s)\n",
+                        (long unsigned)aar.address(), aar.requestor().c_str());
                 } else {
                     /* Late negative feedback. This is a serious problem
                      * that we don't manage for now. */
@@ -247,9 +243,8 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
                         "Conflict on a committed address! "
                         "Part of the network may be "
                         "unreachable "
-                        "(addr=%lu,requestor=%lu)\n",
-                        (long unsigned)aar.address(),
-                        (long unsigned)aar.requestor());
+                        "(addr=%lu,requestor=%s)\n",
+                        (long unsigned)aar.address(), aar.requestor().c_str());
                 }
             }
             break;
@@ -281,9 +276,8 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
                     *prop_aal.add_entries()       = r;
                     UPD(rib->uipcp,
                         "Address allocation entry created (addr=%lu,"
-                        "requestor=%lu)\n",
-                        (long unsigned)r.address(),
-                        (long unsigned)r.requestor());
+                        "requestor=%s)\n",
+                        (long unsigned)r.address(), r.requestor().c_str());
                 }
             } else { /* M_DELETE */
                 if (mit != addr_alloc_table.end() &&
@@ -292,9 +286,8 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
                     *prop_aal.add_entries() = r;
                     UPD(rib->uipcp,
                         "Address allocation entry deleted (addr=%lu,"
-                        "requestor=%lu)\n",
-                        (long unsigned)r.address(),
-                        (long unsigned)r.requestor());
+                        "requestor=%s)\n",
+                        (long unsigned)r.address(), r.requestor().c_str());
                 }
             }
         }

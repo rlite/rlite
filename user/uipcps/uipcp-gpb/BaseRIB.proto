@@ -285,8 +285,8 @@ message AData {
 }
 
 message AddrAllocRequest {
-  required uint64 requestor = 1;
-  required uint64 address = 2;
+  required string requestor = 1; /* Name of the requesting IPCP. */
+  required uint64 address = 2;   /* Address to be allocated. */
 }
 
 message AddrAllocEntries {
