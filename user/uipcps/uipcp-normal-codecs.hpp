@@ -83,51 +83,6 @@ struct RinaName {
     int rina_name_fill(struct rina_name *name);
 };
 
-struct RaftRequestVote : public UipcpObject {
-    uint32_t term;
-    std::string candidate_id;
-    uint32_t last_log_index;
-    uint32_t last_log_term;
-
-    RaftRequestVote() = default;
-    RaftRequestVote(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const override;
-};
-
-struct RaftRequestVoteResp : public UipcpObject {
-    uint32_t term;
-    bool vote_granted;
-
-    RaftRequestVoteResp() = default;
-    RaftRequestVoteResp(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const override;
-};
-
-struct RaftAppendEntries : public UipcpObject {
-    uint32_t term;
-    std::string leader_id;
-    uint32_t leader_commit;
-    uint32_t prev_log_index;
-    uint32_t prev_log_term;
-    size_t EntrySize = 0; /* not serialized */
-    std::list<std::pair<uint32_t, std::unique_ptr<char[]>>> entries;
-
-    RaftAppendEntries() = default;
-    RaftAppendEntries(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const override;
-};
-
-struct RaftAppendEntriesResp : public UipcpObject {
-    uint32_t term;
-    std::string follower_id;
-    uint32_t log_index;
-    bool success;
-
-    RaftAppendEntriesResp() = default;
-    RaftAppendEntriesResp(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const override;
-};
-
 #include "BaseRIB.pb.h"
 gpb::APName *RinaName2gpb(const RinaName &name);
 std::string gpb2string(const gpb::APName &gname);

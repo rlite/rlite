@@ -26,6 +26,7 @@
 #include <cstdlib>
 
 #include "uipcp-normal.hpp"
+#include "Raft.pb.h"
 
 using namespace std;
 
@@ -802,50 +803,52 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
         const auto *aer =
             dynamic_cast<const raft::RaftAppendEntriesResp *>(msg);
         auto m = make_unique<CDAPMessage>();
-        std::unique_ptr<UipcpObject> obj;
+        std::unique_ptr<::google::protobuf::MessageLite> obj;
         std::string obj_class;
 
         if (rv) {
-            auto mm            = make_unique<RaftRequestVote>();
-            mm->term           = rv->term;
-            mm->candidate_id   = rv->candidate_id;
-            mm->last_log_index = rv->last_log_index;
-            mm->last_log_term  = rv->last_log_term;
-            obj                = std::move(mm);
-            obj_class          = obj_class::raft_req_vote;
+            auto mm = make_unique<gpb::RaftRequestVote>();
+            mm->set_term(rv->term);
+            mm->set_candidate_id(rv->candidate_id);
+            mm->set_last_log_index(rv->last_log_index);
+            mm->set_last_log_term(rv->last_log_term);
+            obj       = std::move(mm);
+            obj_class = obj_class::raft_req_vote;
         } else if (rvr) {
-            auto mm          = make_unique<RaftRequestVoteResp>();
-            mm->term         = rvr->term;
-            mm->vote_granted = rvr->vote_granted;
-            obj              = std::move(mm);
-            obj_class        = obj_class::raft_req_vote_resp;
+            auto mm = make_unique<gpb::RaftRequestVoteResp>();
+            mm->set_term(rvr->term);
+            mm->set_vote_granted(rvr->vote_granted);
+            obj       = std::move(mm);
+            obj_class = obj_class::raft_req_vote_resp;
         } else if (ae) {
-            auto mm            = make_unique<RaftAppendEntries>();
-            mm->term           = ae->term;
-            mm->leader_id      = ae->leader_id;
-            mm->leader_commit  = ae->leader_commit;
-            mm->prev_log_index = ae->prev_log_index;
-            mm->prev_log_term  = ae->prev_log_term;
-            mm->entries        = std::move(ae->entries);
-            mm->EntrySize      = sizeof(Command);
-            obj                = std::move(mm);
-            obj_class          = obj_class::raft_append_entries;
+            auto mm = make_unique<gpb::RaftAppendEntries>();
+            mm->set_term(ae->term);
+            mm->set_leader_id(ae->leader_id);
+            mm->set_leader_commit(ae->leader_commit);
+            mm->set_prev_log_index(ae->prev_log_index);
+            mm->set_prev_log_term(ae->prev_log_term);
+            for (const auto &p : ae->entries) {
+                gpb::RaftLogEntry *ge = mm->add_entries();
+                ge->set_term(p.first);
+                ge->set_buffer(p.second.get(), sizeof(Command));
+            }
+            obj       = std::move(mm);
+            obj_class = obj_class::raft_append_entries;
         } else if (aer) {
-            auto mm         = make_unique<RaftAppendEntriesResp>();
-            mm->term        = aer->term;
-            mm->follower_id = aer->follower_id;
-            mm->log_index   = aer->log_index;
-            mm->success     = aer->success;
-            obj             = std::move(mm);
-            obj_class       = obj_class::raft_append_entries_resp;
+            auto mm = make_unique<gpb::RaftAppendEntriesResp>();
+            mm->set_term(aer->term);
+            mm->set_follower_id(aer->follower_id);
+            mm->set_log_index(aer->log_index);
+            mm->set_success(aer->success);
+            obj       = std::move(mm);
+            obj_class = obj_class::raft_append_entries_resp;
         } else {
             assert(false);
         }
 
         m->m_write(obj_class, obj_name::dft);
-        parent->rib->uipcp_obj_serialize(m.get(), obj.get());
-        ret |= parent->rib->send_to_dst_node(std::move(m), pair.first, nullptr,
-                                             nullptr);
+        ret |= parent->rib->send_to_dst_node(std::move(m), pair.first,
+                                             obj.get(), nullptr);
     }
 
     /* Here we make an assumption about the raft library, that is one
@@ -1040,41 +1043,51 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
         if (rm->obj_class == obj_class::raft_req_vote) {
             auto rv = make_unique<raft::RaftRequestVote>();
 
-            RaftRequestVote mm(objbuf, objlen);
-            rv->term           = mm.term;
-            rv->candidate_id   = mm.candidate_id;
-            rv->last_log_index = mm.last_log_index;
-            rv->last_log_term  = mm.last_log_term;
+            gpb::RaftRequestVote mm;
+            mm.ParseFromArray(objbuf, objlen);
+            rv->term           = mm.term();
+            rv->candidate_id   = mm.candidate_id();
+            rv->last_log_index = mm.last_log_index();
+            rv->last_log_term  = mm.last_log_term();
             ret                = request_vote_input(*rv, &out);
 
         } else if (rm->obj_class == obj_class::raft_req_vote_resp) {
             auto rvr = make_unique<raft::RaftRequestVoteResp>();
 
-            RaftRequestVoteResp mm(objbuf, objlen);
-            rvr->term         = mm.term;
-            rvr->vote_granted = mm.vote_granted;
+            gpb::RaftRequestVoteResp mm;
+            mm.ParseFromArray(objbuf, objlen);
+            rvr->term         = mm.term();
+            rvr->vote_granted = mm.vote_granted();
             ret               = request_vote_resp_input(*rvr, &out);
 
         } else if (rm->obj_class == obj_class::raft_append_entries) {
             auto ae = make_unique<raft::RaftAppendEntries>();
 
-            RaftAppendEntries mm(objbuf, objlen);
-            ae->term           = mm.term;
-            ae->leader_id      = mm.leader_id;
-            ae->leader_commit  = mm.leader_commit;
-            ae->prev_log_index = mm.prev_log_index;
-            ae->prev_log_term  = mm.prev_log_term;
-            ae->entries        = std::move(mm.entries);
-            ret                = append_entries_input(*ae, &out);
+            gpb::RaftAppendEntries mm;
+            mm.ParseFromArray(objbuf, objlen);
+            ae->term           = mm.term();
+            ae->leader_id      = mm.leader_id();
+            ae->leader_commit  = mm.leader_commit();
+            ae->prev_log_index = mm.prev_log_index();
+            ae->prev_log_term  = mm.prev_log_term();
+            for (int i = 0; i < mm.entries_size(); i++) {
+                size_t bufsize = mm.entries(i).buffer().size();
+                auto bufcopy   = std::unique_ptr<char[]>(new char[bufsize]);
+                memcpy(bufcopy.get(), mm.entries(i).buffer().data(), bufsize);
+                ae->entries.push_back(
+                    std::make_pair(mm.entries(i).term(), std::move(bufcopy)));
+            }
+            ret = append_entries_input(*ae, &out);
 
         } else if (rm->obj_class == obj_class::raft_append_entries_resp) {
             auto aer = make_unique<raft::RaftAppendEntriesResp>();
 
-            RaftAppendEntriesResp mm(objbuf, objlen);
-            aer->term        = mm.term;
-            aer->follower_id = mm.follower_id;
-            aer->log_index   = mm.log_index;
-            aer->success     = mm.success;
+            gpb::RaftAppendEntriesResp mm;
+            mm.ParseFromArray(objbuf, objlen);
+            aer->term        = mm.term();
+            aer->follower_id = mm.follower_id();
+            aer->log_index   = mm.log_index();
+            aer->success     = mm.success();
             ret              = append_entries_resp_input(*aer, &out);
         } else {
             UPE(uipcp, "Unexpected object class '%s'\n", rm->obj_class.c_str());
