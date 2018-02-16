@@ -638,7 +638,6 @@ struct uipcp_rib {
                  std::shared_ptr<Neighbor> neigh);
     int mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
                               size_t buflen);
-    int uipcp_obj_serialize(CDAPMessage *m, const UipcpObject *obj);
     int obj_serialize(CDAPMessage *m,
                       const ::google::protobuf::MessageLite *obj);
     int send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,

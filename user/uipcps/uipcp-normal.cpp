@@ -834,26 +834,6 @@ uipcp_rib::realize_registrations(bool reg)
 }
 
 int
-uipcp_rib::uipcp_obj_serialize(CDAPMessage *m, const UipcpObject *obj)
-{
-    if (obj) {
-        auto objbuf = std::unique_ptr<char[]>(new char[2000]);
-        int objlen;
-
-        objlen = obj->serialize(objbuf.get(), 2000);
-        if (objlen < 0) {
-            UPE(uipcp, "serialization failed\n");
-
-            return -1;
-        }
-
-        m->set_obj_value(std::move(objbuf), objlen);
-    }
-
-    return 0;
-}
-
-int
 uipcp_rib::obj_serialize(CDAPMessage *m,
                          const ::google::protobuf::MessageLite *obj)
 {
