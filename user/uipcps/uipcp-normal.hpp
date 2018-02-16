@@ -47,8 +47,8 @@
 #include "rlite/raft.hpp"
 #include "rina/cdap.hpp"
 
-#include "uipcp-normal-codecs.hpp"
 #include "uipcp-container.h"
+#include "BaseRIB.pb.h"
 
 namespace obj_class {
 extern std::string adata;
@@ -84,6 +84,22 @@ extern std::string keepalive;
 extern std::string lowerflow;
 extern std::string addr_alloc_table;
 }; // namespace obj_name
+
+#ifdef RL_MEMTRACK
+#define rl_new(_exp, _ty)                                                      \
+    ({                                                                         \
+        rl_mt_adjust(1, _ty);                                                  \
+        new _exp;                                                              \
+    })
+#define rl_delete(_exp, _ty)                                                   \
+    do {                                                                       \
+        rl_mt_adjust(-1, _ty);                                                 \
+        delete _exp;                                                           \
+    } while (0)
+#else /* RL_MEMTRACK */
+#define rl_new(_exp, _ty) new _exp
+#define rl_delete(_exp, _ty) delete _exp
+#endif /* RL_MEMTRACK */
 
 enum class PolicyParamType {
     INT = 0,
@@ -758,6 +774,9 @@ bool uipcp_rib::get_param_value<bool>(const std::string &component,
 template <>
 int uipcp_rib::get_param_value<int>(const std::string &component,
                                     const std::string &param_name);
+
+gpb::APName *apname2gpb(const std::string &name);
+std::string apname2string(const gpb::APName &gname);
 
 static inline void
 reliable_spec(struct rina_flow_spec *spec)

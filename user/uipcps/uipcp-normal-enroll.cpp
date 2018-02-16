@@ -28,7 +28,6 @@
 #include <errno.h>
 
 #include "uipcp-normal.hpp"
-#include "BaseRIB.pb.h"
 #include "rlite/conf.h"
 
 using namespace std;
