@@ -58,7 +58,7 @@ DistributedAddrAllocator::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
         }
 
         ret |= nf->sync_obj(true, obj_class::addr_alloc_table,
-                            obj_name::addr_alloc_table, nullptr, &l);
+                            obj_name::addr_alloc_table, &l);
     }
 
     return ret;
@@ -261,7 +261,7 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
         if (propagate) {
             /* nf can be nullptr for M_DELETE messages */
             rib->neighs_sync_obj_excluding(neigh, create, rm->obj_class,
-                                           rm->obj_name, nullptr, &aar);
+                                           rm->obj_name, &aar);
         }
 
     } else if (rm->obj_class == obj_class::addr_alloc_table) {
@@ -302,7 +302,7 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
         if (prop_aal.entries_size() > 0) {
             assert(nf);
             rib->neighs_sync_obj_excluding(neigh, create, rm->obj_class,
-                                           rm->obj_name, nullptr, &prop_aal);
+                                           rm->obj_name, &prop_aal);
         }
 
     } else {
