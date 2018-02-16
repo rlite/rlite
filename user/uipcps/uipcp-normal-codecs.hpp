@@ -83,37 +83,6 @@ struct RinaName {
     int rina_name_fill(struct rina_name *name);
 };
 
-struct Property : public UipcpObject {
-    std::string name;
-    std::string value;
-
-    Property() = default;
-    Property(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const override;
-};
-
-struct PolicyDescr : public UipcpObject {
-    std::string name;
-    std::string impl_name;
-    std::string version;
-    std::list<Property> parameters;
-
-    PolicyDescr() = default;
-    PolicyDescr(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const override;
-};
-
-struct AData : public UipcpObject {
-    rlm_addr_t src_addr;
-    rlm_addr_t dst_addr;
-    std::unique_ptr<CDAPMessage> cdap;
-
-    AData() = default;
-    AData(const char *buf, unsigned int size);
-    ~AData() = default;
-    int serialize(char *buf, unsigned int size) const override;
-};
-
 struct AddrAllocRequest : public UipcpObject {
     rlm_addr_t requestor = RL_ADDR_NULL;
     rlm_addr_t address   = RL_ADDR_NULL;
