@@ -155,16 +155,7 @@ NeighFlow::sync_obj(bool create, const string &obj_class,
         m.m_delete(obj_class, obj_name);
     }
 
-    if (obj_value) {
-        // TODO this must go away once we get rid of codecs
-        ret = rib->uipcp_obj_serialize(&m, obj_value);
-    } else if (obj) {
-        ret = rib->obj_serialize(&m, obj);
-    }
-    if (ret) {
-        return ret;
-    }
-    ret = send_to_port_id(&m, 0, nullptr);
+    ret = send_to_port_id(&m, 0, obj);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
     }
@@ -445,11 +436,7 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
         }
 
         m.m_start(obj_class::enrollment, obj_name::enrollment);
-        ret = rib->obj_serialize(&m, &enr_info);
-        if (ret) {
-            return -1;
-        }
-        ret = nf->send_to_port_id(&m, 0, nullptr);
+        ret = nf->send_to_port_id(&m, 0, &enr_info);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             return -1;
@@ -765,11 +752,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
         m.obj_class = obj_class::enrollment;
         m.obj_name  = obj_name::enrollment;
 
-        ret = rib->obj_serialize(&m, &enr_info);
-        if (ret) {
-            return -1;
-        }
-        ret = nf->send_to_port_id(&m, rm->invoke_id, nullptr);
+        ret = nf->send_to_port_id(&m, rm->invoke_id, &enr_info);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             return -1;
@@ -784,11 +767,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
         m = CDAPMessage();
         m.m_stop(obj_class::enrollment, obj_name::enrollment);
 
-        ret = rib->obj_serialize(&m, &enr_info);
-        if (ret) {
-            return -1;
-        }
-        ret = nf->send_to_port_id(&m, 0, nullptr);
+        ret = nf->send_to_port_id(&m, 0, &enr_info);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             return -1;
