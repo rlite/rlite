@@ -613,18 +613,18 @@ uipcp_rib::dump() const
        << neighbors.size() << " connected, " << neighbors_cand.size()
        << " candidates" << endl;
     for (const auto &kvn : neighbors_seen) {
-        const NeighborCandidate &cand = kvn.second;
-        string neigh_name =
-            rina_string_from_components(cand.apn, cand.api, string(), string());
+        const gpb::NeighborCandidate &cand = kvn.second;
+        string neigh_name                  = rina_string_from_components(
+            cand.ap_name(), cand.ap_instance(), string(), string());
         ss << "    Name: "
-           << rina_string_from_components(cand.apn, cand.api, cand.aen,
-                                          cand.aei)
-           << ", Address: " << cand.address << ", Lower DIFs: {";
+           << rina_string_from_components(cand.ap_name(), cand.ap_instance(),
+                                          string(), string())
+           << ", Address: " << cand.address() << ", Lower DIFs: {";
 
         {
             bool first = true;
 
-            for (const string &lower : cand.lower_difs) {
+            for (const string &lower : cand.lower_difs()) {
                 if (first) {
                     first = false;
                 } else {

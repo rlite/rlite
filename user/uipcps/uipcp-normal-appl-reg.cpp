@@ -47,7 +47,6 @@ class FullyReplicatedDFT : public DFT {
     /* Directory Forwarding Table, mapping application name (std::string)
      * to a set of nodes that registered that name. All nodes are considered
      * equivalent. */
-    // TODO replace with std::unique_ptr
     std::multimap<std::string, std::unique_ptr<gpb::DFTEntry>> dft_table;
 
 public:

@@ -476,7 +476,7 @@ struct uipcp_rib {
                        std::unordered_map<std::string, PolicyParam>>
         params_map;
 
-    /* Neighbors. We keep track of all the NeighborCandidate objects seen,
+    /* Neighbors. We keep track of all the gpb::NeighborCandidate objects seen,
      * even for candidates that have no lower DIF in common with us. This
      * is used to implement propagation of the CandidateNeighbors information,
      * so that all the IPCPs in the DIF know their potential candidate
@@ -485,7 +485,7 @@ struct uipcp_rib {
      * we can temporarily release the RIB lock while keeping a reference
      * to the object. */
     std::unordered_map<std::string, std::shared_ptr<Neighbor>> neighbors;
-    std::unordered_map<std::string, NeighborCandidate> neighbors_seen;
+    std::unordered_map<std::string, gpb::NeighborCandidate> neighbors_seen;
     std::unordered_set<std::string> neighbors_cand;
     std::unordered_set<std::string> neighbors_deleted;
 
@@ -615,7 +615,7 @@ struct uipcp_rib {
     std::string lookup_neighbor_by_address(rlm_addr_t address);
     void check_for_address_conflicts();
 
-    NeighborCandidate neighbor_cand_get() const;
+    gpb::NeighborCandidate neighbor_cand_get() const;
     int lookup_neigh_flow_by_port_id(rl_port_t port_id,
                                      std::shared_ptr<NeighFlow> *pnf,
                                      std::shared_ptr<Neighbor> *pneigh);
