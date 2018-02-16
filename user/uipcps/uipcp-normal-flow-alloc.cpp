@@ -24,7 +24,6 @@
 #include <sstream>
 
 #include "uipcp-normal.hpp"
-#include "BaseRIB.pb.h"
 
 using namespace std;
 

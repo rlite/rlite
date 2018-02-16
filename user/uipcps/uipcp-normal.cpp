@@ -108,6 +108,25 @@ TimeoutEvent::clear()
     cb    = nullptr;
 }
 
+gpb::APName *
+apname2gpb(const std::string &str)
+{
+    gpb::APName *gan = new gpb::APName();
+
+    rina_components_from_string(
+        str, *gan->mutable_ap_name(), *gan->mutable_ap_instance(),
+        *gan->mutable_ae_name(), *gan->mutable_ae_instance());
+
+    return gan;
+}
+
+std::string
+apname2string(const gpb::APName &gname)
+{
+    return rina_string_from_components(gname.ap_name(), gname.ap_instance(),
+                                       gname.ae_name(), gname.ae_instance());
+}
+
 #define MGMTBUF_SIZE_MAX 8092
 
 int
