@@ -198,16 +198,23 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
                 return 0;
             }
 
-            AData adata(objbuf, objlen);
-
-            if (!adata.cdap) {
+            gpb::AData adata;
+            adata.ParseFromArray(objbuf, objlen);
+            if (!adata.has_cdap_msg()) {
                 UPE(uipcp, "A_DATA does not contain a valid "
                            "encapsulated CDAP message\n");
 
                 return 0;
             }
 
-            cdap_dispatch(adata.cdap.get(), nullptr, nullptr, adata.src_addr);
+            /* Get the encapsulated CDAP message and dispatch it. */
+            auto cdap = msg_deser_stateless(adata.cdap_msg().data(),
+                                            adata.cdap_msg().size());
+            if (!cdap) {
+                UPE(uipcp, "Failed to deserialize encapsulated CDAP message\n");
+                return 0;
+            }
+            cdap_dispatch(cdap.get(), nullptr, nullptr, adata.src_addr());
 
             return 0;
         }
@@ -867,11 +874,9 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
                             int *invoke_id)
 {
     struct rl_mgmt_hdr mhdr;
-    AData adata;
+    gpb::AData adata;
     CDAPMessage am;
-    char aobjbuf[4096];
     char *serbuf = nullptr;
-    int aobjlen;
     size_t serlen;
     int ret;
 
@@ -898,20 +903,26 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
         return ret;
     }
 
-    adata.src_addr = myaddr;
-    adata.dst_addr = dst_addr;
-    adata.cdap     = std::move(m); /* Ownership passing */
+    adata.set_src_addr(myaddr);
+    adata.set_dst_addr(dst_addr);
+    {
+        char *serbuf = nullptr;
+        size_t serlen;
+
+        ret = msg_ser_stateless(m.get(), &serbuf, &serlen);
+        if (ret) {
+            return ret;
+        }
+        adata.set_cdap_msg(serbuf, serlen);
+        delete[] serbuf;
+    }
 
     am.m_write(obj_class::adata, obj_name::adata);
 
-    aobjlen = adata.serialize(aobjbuf, sizeof(aobjbuf));
-    if (aobjlen < 0) {
-        invoke_id_mgr.put_invoke_id(m->invoke_id);
+    if (obj_serialize(&am, &adata)) {
         UPE(uipcp, "serialization failed\n");
         return -1;
     }
-
-    am.set_obj_value(aobjbuf, aobjlen); /* no ownership passing */
 
     try {
         ret = msg_ser_stateless(&am, &serbuf, &serlen);
