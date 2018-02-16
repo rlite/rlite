@@ -48,18 +48,6 @@
 #define rl_delete(_exp, _ty) delete _exp
 #endif /* RL_MEMTRACK */
 
-using NodeId = std::string;
-
-/* Helper for pretty printing of default route. */
-static inline std::string
-node_id_pretty(const NodeId &node)
-{
-    if (node == std::string()) {
-        return std::string("any");
-    }
-    return node;
-}
-
 struct RinaName {
     std::string apn;
     std::string api;
@@ -79,7 +67,7 @@ struct RinaName {
 };
 
 #include "BaseRIB.pb.h"
-gpb::APName *RinaName2gpb(const RinaName &name);
-std::string gpb2string(const gpb::APName &gname);
+gpb::APName *apname2gpb(const std::string &name);
+std::string apname2string(const gpb::APName &gname);
 
 #endif /* __UIPCP_CODECS_H__ */
