@@ -172,21 +172,6 @@ EnrollmentResources::enrollment_abort()
     }
     nf->enroll_state_set(EnrollState::NEIGH_NONE);
 
-    if (nf->conn->connected()) {
-        CDAPMessage m;
-        int ret;
-
-        m.m_release();
-        ret = nf->send_to_port_id(&m, 0, nullptr);
-        if (ret) {
-            UPE(neigh->rib->uipcp, "send_to_port_id() failed [%s]\n",
-                strerror(errno));
-        }
-    }
-
-    if (nf->conn) {
-        nf->conn->reset();
-    }
     neigh->rib->neigh_flow_prune(nf);
     stopped.notify_all();
 
@@ -1341,26 +1326,6 @@ uipcp_rib::keepalive_handler(const CDAPMessage *rm,
 }
 
 int
-uipcp_rib::lowerflow_handler(const CDAPMessage *rm,
-                             std::shared_ptr<NeighFlow> const &nf,
-                             std::shared_ptr<Neighbor> const &neigh,
-                             rlm_addr_t src_addr)
-{
-    std::string neigh_name = neigh->ipcp_name;
-
-    if (rm->obj_class != obj_class::lowerflow || rm->op_code != gpb::M_STOP) {
-        UPE(uipcp, "Cannot handle obj_class %s and op_code %s\n",
-            rm->obj_class.c_str(),
-            CDAPMessage::opcode_repr(rm->op_code).c_str());
-        return -1;
-    }
-    UPD(uipcp, "Peer %s wants to disconnect\n", neigh_name.c_str());
-    del_neighbor(neigh_name);
-
-    return 0;
-}
-
-int
 uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id,
                                         std::shared_ptr<NeighFlow> *pnf,
                                         std::shared_ptr<Neighbor> *pneigh)
@@ -1665,8 +1630,7 @@ uipcp_rib::neigh_disconnect(const std::string &neigh_name)
         const std::shared_ptr<NeighFlow> &nf = kv.second;
         if (nf->conn->connected()) {
             CDAPMessage m;
-
-            m.m_stop(obj_class::lowerflow, obj_name::lowerflow);
+            m.m_release();
             nf->send_to_port_id(&m, 0, nullptr);
         }
     }

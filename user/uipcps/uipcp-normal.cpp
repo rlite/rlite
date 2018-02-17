@@ -306,6 +306,11 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
              * enrolling thread (also ownership is passed) and notify it. */
             er->msgs.push_back(std::move(m));
             er->msgs_avail.notify_all();
+        } else if (m->op_code == gpb::M_RELEASE) {
+            /* The peer wants to disconnect, let's remove the neighbor. */
+            std::string neigh_name = neigh->ipcp_name;
+            UPD(uipcp, "Peer %s wants to disconnect\n", neigh_name.c_str());
+            del_neighbor(neigh_name);
         } else {
             /* We are already enrolled, we can dispatch this message to
              * the RIB. */
@@ -468,8 +473,6 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     handlers.insert(make_pair(obj_name::status, &uipcp_rib::status_handler));
     handlers.insert(make_pair(obj_name::addr_alloc_table,
                               &uipcp_rib::addr_alloc_table_handler));
-    handlers.insert(
-        make_pair(obj_name::lowerflow, &uipcp_rib::lowerflow_handler));
 
     /* Start timers for periodic tasks. */
     age_incr_tmr_restart();
@@ -1083,7 +1086,6 @@ uipcp_rib::neigh_flow_prune(const std::shared_ptr<NeighFlow> &nf)
 {
     std::shared_ptr<Neighbor> neigh =
         get_neighbor(nf->neigh_name, /*create=*/false);
-    CDAPMessage m;
 
     if (!neigh) {
         UPW(uipcp, "Neighbor %s disappeared; cannot prune flow with fd %d\n",
@@ -1092,8 +1094,20 @@ uipcp_rib::neigh_flow_prune(const std::shared_ptr<NeighFlow> &nf)
     }
 
     /* Stop this lower flow to trigger deallocation on the remote side. */
-    m.m_stop(obj_class::lowerflow, obj_name::lowerflow);
-    nf->send_to_port_id(&m, 0, nullptr);
+    if (nf->conn) {
+        if (nf->conn->connected()) {
+            CDAPMessage m;
+            int ret;
+
+            m.m_release();
+            ret = nf->send_to_port_id(&m, 0, nullptr);
+            if (ret) {
+                UPE(neigh->rib->uipcp, "send_to_port_id() failed [%s]\n",
+                    strerror(errno));
+            }
+        }
+        nf->conn->reset();
+    }
 
     if (nf == neigh->mgmt_only) {
         neigh->mgmt_only_set(nullptr);
