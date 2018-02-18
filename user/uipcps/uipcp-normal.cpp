@@ -1100,7 +1100,7 @@ uipcp_rib::neigh_flow_prune(const std::shared_ptr<NeighFlow> &nf)
             int ret;
 
             m.m_release();
-            ret = nf->send_to_port_id(&m, 0, nullptr);
+            ret = nf->send_to_port_id(&m);
             if (ret) {
                 UPE(neigh->rib->uipcp, "send_to_port_id() failed [%s]\n",
                     strerror(errno));
