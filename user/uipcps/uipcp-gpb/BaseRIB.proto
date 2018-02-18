@@ -16,6 +16,15 @@ message APName {
   optional string ae_instance = 4;
 }
 
+message PolicyDescr {                // Describes a policy
+  optional string name = 1;          // The name of the policy
+  optional string impl_name = 2;     // The name of the implementation of the
+                                     // policy used in this DIF. Can be a
+                                     // hierarchical name
+  optional string version = 3;       // The version of the policy implementation
+  repeated Property parameters = 4;  // The parameters of the policy
+}
+
 /* Window-based flow control configuration for an EFCP connection. */
 message WindowBasedFlowCtrlConfig {
   /* Maximum length of the closed window queue (in PDUs). */
@@ -233,15 +242,6 @@ message NeighborCandidate {  // carries information about a neighbor
   optional string ap_instance = 2;
   optional uint64 address = 3;
   repeated string lower_difs = 4;
-}
-
-message PolicyDescr {                // Describes a policy
-  optional string name = 1;          // The name of the policy
-  optional string impl_name = 2;     // The name of the implementation of the
-                                     // policy used in this DIF. Can be a
-                                     // hierarchical name
-  optional string version = 3;       // The version of the policy implementation
-  repeated Property parameters = 4;  // The paramters of the policy
 }
 
 message QosSpec {            // The QoS parameters requested by an application
