@@ -928,8 +928,7 @@ CentralizedFaultTolerantDFT::Replica::apply(raft::LogIndex index,
         m->obj_name  = mit->second.obj_name;
         m->obj_class = mit->second.obj_class;
         m->invoke_id = mit->second.invoke_id;
-        parent->rib->send_to_dst_addr(std::move(m), mit->second.requestor_addr,
-                                      nullptr, nullptr);
+        parent->rib->send_to_dst_addr(std::move(m), mit->second.requestor_addr);
         UPD(parent->rib->uipcp,
             "Pending response for index %u sent to client %lu (invoke_id=%d)\n",
             index, mit->second.requestor_addr, mit->second.invoke_id);
@@ -1025,9 +1024,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
                         /*result_reason=*/ret ? "No match found" : string());
             m->invoke_id = rm->invoke_id;
             m->set_obj_value(remote_node);
-            parent->rib->send_to_dst_addr(std::move(m), src_addr,
-                                          /*obj=*/nullptr,
-                                          /*invoke_id=*/nullptr);
+            parent->rib->send_to_dst_addr(std::move(m), src_addr);
         } else {
             UPE(uipcp, "M_WRITE(dft) or M_DELETE(dft) expected\n");
             return 0;

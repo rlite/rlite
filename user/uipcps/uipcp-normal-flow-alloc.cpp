@@ -463,7 +463,7 @@ LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm)
                       "No connections specified");
         m->invoke_id = rm->invoke_id;
 
-        return rib->send_to_dst_addr(std::move(m), freq->src_addr(), nullptr);
+        return rib->send_to_dst_addr(std::move(m), freq->src_addr());
     }
 
     /* freq->dst_app() is registered with us, let's go ahead. */
@@ -572,7 +572,7 @@ LocalFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     m = make_unique<CDAPMessage>();
     m->m_delete(obj_class::flow, obj_name);
 
-    return rib->send_to_dst_addr(std::move(m), remote_addr, nullptr);
+    return rib->send_to_dst_addr(std::move(m), remote_addr);
 }
 
 int
