@@ -657,13 +657,13 @@ struct uipcp_rib {
     int obj_serialize(CDAPMessage *m,
                       const ::google::protobuf::MessageLite *obj);
     int send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
-                         const ::google::protobuf::MessageLite *obj,
-                         int *invoke_id = nullptr);
+                         const ::google::protobuf::MessageLite *obj = nullptr,
+                         int *invoke_id                             = nullptr);
     int send_to_dst_node(std::unique_ptr<CDAPMessage> m, std::string node_name,
-                         const ::google::protobuf::MessageLite *obj,
-                         int *invoke_id = nullptr);
+                         const ::google::protobuf::MessageLite *obj = nullptr,
+                         int *invoke_id                             = nullptr);
     int send_to_myself(std::unique_ptr<CDAPMessage> m,
-                       const ::google::protobuf::MessageLite *obj);
+                       const ::google::protobuf::MessageLite *obj = nullptr);
 
     /* Synchronize with neighbors. */
     int neighs_sync_obj_excluding(
