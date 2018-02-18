@@ -84,8 +84,7 @@ extern struct rl_msg_layout rl_ker_numtables[RLITE_KER_MSG_MAX + 1];
 
 /* application --> kernel message to create a new IPC process. */
 struct rl_kmsg_ipcp_create {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     char *name;
     char *dif_type;
@@ -95,8 +94,7 @@ struct rl_kmsg_ipcp_create {
 /* application <-- kernel message to inform the application about the
  * ID of a new IPC process. */
 struct rl_kmsg_ipcp_create_resp {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
 } __attribute__((packed));
@@ -106,8 +104,7 @@ struct rl_kmsg_ipcp_create_resp {
 
 /* application --> kernel message to ask for a list of flows. */
 struct rl_kmsg_flow_fetch {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     /* If ipcp_id != ~0 filter flows by ipcp_id, otherwise
      * fetch all of them. */
@@ -116,8 +113,7 @@ struct rl_kmsg_flow_fetch {
 
 /* application <-- kernel message to fetch flow information. */
 struct rl_kmsg_flow_fetch_resp {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     uint8_t end;
     rl_ipcp_id_t ipcp_id;
@@ -132,8 +128,7 @@ struct rl_kmsg_flow_fetch_resp {
 #define rl_kmsg_reg_fetch rl_kmsg_flow_fetch
 
 struct rl_kmsg_reg_fetch_resp {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     uint8_t end;
     uint8_t pending; /* Is registration pending ? */
@@ -148,8 +143,7 @@ struct rl_kmsg_reg_fetch_resp {
 
 /* application <-- kernel message to report updated IPCP information. */
 struct rl_kmsg_ipcp_update {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     uint8_t update_type;
     rl_ipcp_id_t ipcp_id;
@@ -169,8 +163,7 @@ struct rl_kmsg_ipcp_update {
 
 /* application <-- kernel message to report flow up/down state. */
 struct rl_kmsg_flow_state {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
     rl_port_t local_port;
@@ -179,8 +172,7 @@ struct rl_kmsg_flow_state {
 
 /* application --> kernel to register a name. */
 struct rl_kmsg_appl_register {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     uint8_t reg;
     char *appl_name;
@@ -189,8 +181,7 @@ struct rl_kmsg_appl_register {
 
 /* application <-- kernel report the result of (un)registration. */
 struct rl_kmsg_appl_register_resp {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
     uint8_t reg;
@@ -199,8 +190,7 @@ struct rl_kmsg_appl_register_resp {
 } __attribute__((packed));
 
 struct rl_kmsg_appl_move {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
     int fd; /* where to move */
@@ -208,8 +198,7 @@ struct rl_kmsg_appl_move {
 
 /* application --> kernel to initiate a flow allocation. */
 struct rl_kmsg_fa_req {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t upper_ipcp_id;
     struct rina_flow_spec flowspec;
@@ -231,8 +220,7 @@ struct rl_kmsg_fa_req {
 
 /* application <-- kernel to notify about an incoming flow response. */
 struct rl_kmsg_fa_resp_arrived {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     uint8_t response;
     rl_port_t port_id;
@@ -240,8 +228,7 @@ struct rl_kmsg_fa_resp_arrived {
 
 /* application <-- kernel to notify an incoming flow request. */
 struct rl_kmsg_fa_req_arrived {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     uint32_t kevent_id;
     rl_port_t port_id;
@@ -254,8 +241,7 @@ struct rl_kmsg_fa_req_arrived {
 
 /* application --> kernel to respond to an incoming flow request. */
 struct rl_kmsg_fa_resp {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     uint32_t kevent_id;
     /* The ipcp_id field is currently unused, since port-id are currently
@@ -272,8 +258,7 @@ struct rl_kmsg_fa_resp {
 
 /* application --> kernel to configure an IPC process. */
 struct rl_kmsg_ipcp_config {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
     char *name;
@@ -283,8 +268,7 @@ struct rl_kmsg_ipcp_config {
 /* application --> kernel to modifty an IPCP PDUFT
  * (PDU Forwarding Table) entry. */
 struct rl_kmsg_ipcp_pduft_mod {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     /* The IPCP whose PDUFT is to be modified. */
     rl_ipcp_id_t ipcp_id;
@@ -301,8 +285,7 @@ struct rl_kmsg_ipcp_pduft_mod {
 /* uipcp (application) --> kernel to tell the kernel that this event
  * loop corresponds to an uipcp. */
 struct rl_kmsg_ipcp_uipcp_set {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
 } __attribute__((packed));
@@ -312,8 +295,7 @@ struct rl_kmsg_ipcp_uipcp_set {
 /* uipcp (application) --> kernel to tell the kernel that a flow
  * allocation request has arrived. */
 struct rl_kmsg_uipcp_fa_req_arrived {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     uint32_t kevent_id;
     rl_ipcp_id_t ipcp_id;
@@ -331,8 +313,7 @@ struct rl_kmsg_uipcp_fa_req_arrived {
 /* uipcp (application) --> kernel to tell the kernel that a flow
  * allocation response has arrived. */
 struct rl_kmsg_uipcp_fa_resp_arrived {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
     rl_port_t local_port;
@@ -346,8 +327,7 @@ struct rl_kmsg_uipcp_fa_resp_arrived {
 /* uipcp (application) --> kernel to update the configuration
  * of a flow */
 struct rl_kmsg_flow_cfg_update {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
     rl_port_t port_id;
@@ -357,8 +337,7 @@ struct rl_kmsg_flow_cfg_update {
 /* uipcp (application) <-- kernel to inform an uipcp that
  * a flow has been deallocated locally. */
 struct rl_kmsg_flow_deallocated {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
     rl_port_t local_port_id;
@@ -370,8 +349,7 @@ struct rl_kmsg_flow_deallocated {
 /* uipcp (application) --> kernel message to ask
  * for a flow to be deallocated. */
 struct rl_kmsg_flow_dealloc {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
     rl_port_t port_id;
@@ -383,8 +361,7 @@ struct rl_kmsg_flow_dealloc {
 /* application --> kernel message to ask for
  * statistics of a given flow. */
 struct rl_kmsg_flow_stats_req {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     rl_port_t port_id;
 } __attribute__((packed));
@@ -392,8 +369,7 @@ struct rl_kmsg_flow_stats_req {
 /* application <-- kernel message to report statistics
  * about a give flow. */
 struct rl_kmsg_flow_stats_resp {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     struct rl_flow_stats stats;
     struct rl_flow_dtp dtp;
@@ -402,8 +378,7 @@ struct rl_kmsg_flow_stats_resp {
 /* application --> kernel message to ask an IPCP if a given
  * QoS can be supported. */
 struct rl_kmsg_ipcp_qos_supported {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
     struct rina_flow_spec flowspec;

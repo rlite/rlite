@@ -78,8 +78,8 @@ static int
 rl_u_response(int sfd, const struct rl_msg_base *req,
               struct rl_msg_base_resp *resp)
 {
-    resp->msg_type = RLITE_U_BASE_RESP;
-    resp->event_id = req->event_id;
+    resp->hdr.msg_type = RLITE_U_BASE_RESP;
+    resp->hdr.event_id = req->hdr.event_id;
 
     return rl_msg_write_fd(sfd, RLITE_MB(resp));
 }
@@ -189,7 +189,7 @@ rl_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
         goto out;
     }
 
-    switch (req->msg_type) {
+    switch (req->hdr.msg_type) {
     case RLITE_U_IPCP_RIB_SHOW_REQ:
         show = uipcp->ops.rib_show;
         break;
@@ -211,8 +211,8 @@ rl_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
     uipcp_put(uipcp);
 
 out:
-    resp.msg_type = req->msg_type + 1;
-    resp.event_id = req->event_id;
+    resp.hdr.msg_type = req->hdr.msg_type + 1;
+    resp.hdr.event_id = req->hdr.event_id;
 
     ret = rl_msg_write_fd(sfd, RLITE_MB(&resp));
 
@@ -273,7 +273,7 @@ rl_u_ipcp_policy_list(struct uipcps *uipcps, int sfd,
         goto out;
     }
 
-    switch (req->msg_type) {
+    switch (req->hdr.msg_type) {
     case RLITE_U_IPCP_POLICY_LIST_REQ:
         ret = uipcp->ops.policy_list(uipcp, req, &msg);
         break;
@@ -292,8 +292,8 @@ rl_u_ipcp_policy_list(struct uipcps *uipcps, int sfd,
     uipcp_put(uipcp);
 
 out:
-    resp.msg_type = req->msg_type + 1;
-    resp.event_id = req->event_id;
+    resp.hdr.msg_type = req->hdr.msg_type + 1;
+    resp.hdr.event_id = req->hdr.event_id;
 
     ret = rl_msg_write_fd(sfd, RLITE_MB(&resp));
 
@@ -407,7 +407,7 @@ uipcps_reset(int sync)
             }
             break;
         }
-        assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
+        assert(upd->hdr.msg_type == RLITE_KER_IPCP_UPDATE);
 
         if (upd->update_type == RL_IPCP_UPDATE_ADD) {
             /* Destroy the IPCP. */
@@ -531,24 +531,24 @@ worker_fn(void *opaque)
 
     /* Lookup the message type. */
     req = RLITE_MB(msgbuf);
-    if (rl_config_handlers[req->msg_type] == NULL) {
-        PE("No handler for message of type [%d]\n", req->msg_type);
+    if (rl_config_handlers[req->hdr.msg_type] == NULL) {
+        PE("No handler for message of type [%d]\n", req->hdr.msg_type);
         ret = -1;
         goto out;
     }
 
     /* Valid message type: handle the request. */
-    ret = rl_config_handlers[req->msg_type](wi->uipcps, wi->cfd, req);
+    ret = rl_config_handlers[req->hdr.msg_type](wi->uipcps, wi->cfd, req);
     if (ret) {
-        PE("Error while handling message type [%d]\n", req->msg_type);
+        PE("Error while handling message type [%d]\n", req->hdr.msg_type);
     }
 out:
     if (ret) {
         struct rl_msg_base_resp resp;
 
-        resp.msg_type = RLITE_U_BASE_RESP;
-        resp.event_id = req ? req->event_id : 0;
-        resp.result   = RLITE_ERR;
+        resp.hdr.msg_type = RLITE_U_BASE_RESP;
+        resp.hdr.event_id = req ? req->hdr.event_id : 0;
+        resp.result       = RLITE_ERR;
         rl_msg_write_fd(wi->cfd, RLITE_MB(&resp));
     }
 
@@ -813,7 +813,7 @@ uipcps_loop(void *opaque)
             break;
         }
 
-        assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
+        assert(upd->hdr.msg_type == RLITE_KER_IPCP_UPDATE);
 
         switch (upd->update_type) {
         case RL_IPCP_UPDATE_ADD:

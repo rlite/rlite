@@ -145,7 +145,7 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
         if (mit != range.second) { /* local collision */
             UPE(uipcp, "Application %s already registered on this uipcp\n",
                 appl_name.c_str());
-            return uipcp_appl_register_resp(uipcp, RLITE_ERR, req->event_id,
+            return uipcp_appl_register_resp(uipcp, RLITE_ERR, req->hdr.event_id,
                                             req->appl_name);
         }
 
@@ -153,8 +153,8 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
             /* Registration requires a response, while unregistrations doesn't.
              * Respond to the client before committing to the RIB, because the
              * response may fail. */
-            int ret = uipcp_appl_register_resp(uipcp, RLITE_SUCC, req->event_id,
-                                               req->appl_name);
+            int ret = uipcp_appl_register_resp(
+                uipcp, RLITE_SUCC, req->hdr.event_id, req->appl_name);
             if (ret) {
                 return ret;
             }
@@ -680,7 +680,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
             m->invoke_id = invoke_id =
                 parent->rib->invoke_id_mgr.get_invoke_id();
             pending[invoke_id] =
-                std::move(PendingReq(op_code, appl_name, r, req->event_id));
+                std::move(PendingReq(op_code, appl_name, r, req->hdr.event_id));
             ret = parent->rib->send_to_dst_node(std::move(m), r, &dft_entry,
                                                 nullptr);
             if (ret) {

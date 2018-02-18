@@ -107,17 +107,25 @@ struct pci_sizes {
 #define RLITE_SUCC 0
 #define RLITE_ERR 1
 
+/* Expected control API version. */
+#define RL_API_VERSION 1
+
 /* All the possible messages begin like this. */
-struct rl_msg_base {
+struct rl_msg_hdr {
+    uint16_t version;
     rl_msg_t msg_type;
     uint32_t event_id;
+} __attribute__((packed));
+
+/* Base message, when no arguments are needed. */
+struct rl_msg_base {
+    struct rl_msg_hdr hdr;
 } __attribute__((packed));
 
 /* A simple response message layout that can be shared by many
  * different types. */
 struct rl_msg_base_resp {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     uint8_t result;
 } __attribute__((packed));

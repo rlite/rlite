@@ -298,8 +298,8 @@ handover_signal_strength(struct uipcp *const uipcp)
     {
         struct rl_cmsg_ipcp_enroll cmsg;
         memset(&cmsg, 0, sizeof(cmsg));
-        cmsg.msg_type      = RLITE_U_IPCP_ENROLL;
-        cmsg.event_id      = 0;
+        cmsg.hdr.msg_type  = RLITE_U_IPCP_ENROLL;
+        cmsg.hdr.event_id  = 0;
         cmsg.ipcp_name     = uipcp->name;
         cmsg.dif_name      = best_net->ssid;
         cmsg.supp_dif_name = "null";
@@ -322,8 +322,8 @@ handover_signal_strength(struct uipcp *const uipcp)
                upper->name, uipcp->dif_name);
 
             memset(&cmsg, 0, sizeof(cmsg));
-            cmsg.msg_type      = RLITE_U_IPCP_ENROLL;
-            cmsg.event_id      = 0;
+            cmsg.hdr.msg_type  = RLITE_U_IPCP_ENROLL;
+            cmsg.hdr.event_id  = 0;
             cmsg.ipcp_name     = upper->name;
             cmsg.dif_name      = upper->dif_name;
             cmsg.supp_dif_name = uipcp->dif_name;

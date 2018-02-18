@@ -79,12 +79,12 @@ uipcp_appl_register_resp(struct uipcp *uipcp, uint8_t response,
 
     /* Create a request message. */
     memset(&resp, 0, sizeof(resp));
-    resp.msg_type  = RLITE_KER_APPL_REGISTER_RESP;
-    resp.event_id  = kevent_id; /* This is just zero for now. */
-    resp.ipcp_id   = uipcp->id;
-    resp.reg       = 1;
-    resp.response  = response;
-    resp.appl_name = rl_strdup(appl_name, RL_MT_UTILS);
+    resp.hdr.msg_type = RLITE_KER_APPL_REGISTER_RESP;
+    resp.hdr.event_id = kevent_id; /* This is just zero for now. */
+    resp.ipcp_id      = uipcp->id;
+    resp.reg          = 1;
+    resp.response     = response;
+    resp.appl_name    = rl_strdup(appl_name, RL_MT_UTILS);
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&resp), 1);
     if (ret) {
@@ -105,11 +105,11 @@ uipcp_pduft_mod(struct uipcp *uipcp, rlm_addr_t dst_addr, rl_port_t local_port,
 
     /* Create a request message. */
     memset(&req, 0, sizeof(req));
-    req.msg_type   = msg_type;
-    req.event_id   = 1;
-    req.ipcp_id    = uipcp->id;
-    req.dst_addr   = dst_addr;
-    req.local_port = local_port;
+    req.hdr.msg_type = msg_type;
+    req.hdr.event_id = 1;
+    req.ipcp_id      = uipcp->id;
+    req.dst_addr     = dst_addr;
+    req.local_port   = local_port;
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
@@ -142,9 +142,9 @@ uipcp_pduft_flush(struct uipcp *uipcp)
 
     /* Create a request message. */
     memset(&req, 0, sizeof(req));
-    req.msg_type = RLITE_KER_IPCP_PDUFT_FLUSH;
-    req.event_id = 1;
-    req.ipcp_id  = uipcp->id;
+    req.hdr.msg_type = RLITE_KER_IPCP_PDUFT_FLUSH;
+    req.hdr.event_id = 1;
+    req.ipcp_id      = uipcp->id;
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
@@ -180,13 +180,13 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
 
     /* Create a request message. */
     memset(&req, 0, sizeof(req));
-    req.msg_type    = RLITE_KER_UIPCP_FA_REQ_ARRIVED;
-    req.event_id    = 1;
-    req.kevent_id   = kevent_id;
-    req.ipcp_id     = uipcp->id;
-    req.remote_port = remote_port;
-    req.remote_cep  = remote_cep;
-    req.remote_addr = remote_addr;
+    req.hdr.msg_type = RLITE_KER_UIPCP_FA_REQ_ARRIVED;
+    req.hdr.event_id = 1;
+    req.kevent_id    = kevent_id;
+    req.ipcp_id      = uipcp->id;
+    req.remote_port  = remote_port;
+    req.remote_cep   = remote_cep;
+    req.remote_addr  = remote_addr;
     if (flowcfg) {
         memcpy(&req.flowcfg, flowcfg, sizeof(*flowcfg));
     } else {
@@ -217,14 +217,14 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
 
     /* Create a request message. */
     memset(&req, 0, sizeof(req));
-    req.msg_type    = RLITE_KER_UIPCP_FA_RESP_ARRIVED;
-    req.event_id    = 1;
-    req.ipcp_id     = uipcp->id;
-    req.local_port  = local_port;
-    req.remote_port = remote_port;
-    req.remote_cep  = remote_cep;
-    req.remote_addr = remote_addr;
-    req.response    = response;
+    req.hdr.msg_type = RLITE_KER_UIPCP_FA_RESP_ARRIVED;
+    req.hdr.event_id = 1;
+    req.ipcp_id      = uipcp->id;
+    req.local_port   = local_port;
+    req.remote_port  = remote_port;
+    req.remote_cep   = remote_cep;
+    req.remote_addr  = remote_addr;
+    req.response     = response;
     if (flowcfg) {
         memcpy(&req.flowcfg, flowcfg, sizeof(*flowcfg));
     } else {
@@ -249,11 +249,11 @@ uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port,
 
     /* Create a request message. */
     memset(&req, 0, sizeof(req));
-    req.msg_type = RLITE_KER_FLOW_DEALLOC;
-    req.event_id = 1;
-    req.ipcp_id  = uipcp->id;
-    req.port_id  = local_port;
-    req.uid      = uid;
+    req.hdr.msg_type = RLITE_KER_FLOW_DEALLOC;
+    req.hdr.event_id = 1;
+    req.ipcp_id      = uipcp->id;
+    req.port_id      = local_port;
+    req.uid          = uid;
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
@@ -277,10 +277,10 @@ uipcp_issue_flow_cfg_update(struct uipcp *uipcp, rl_port_t port_id,
 
     /* Create a request message. */
     memset(&req, 0, sizeof(req));
-    req.msg_type = RLITE_KER_FLOW_CFG_UPDATE;
-    req.event_id = 1;
-    req.ipcp_id  = uipcp->id;
-    req.port_id  = port_id;
+    req.hdr.msg_type = RLITE_KER_FLOW_CFG_UPDATE;
+    req.hdr.event_id = 1;
+    req.ipcp_id      = uipcp->id;
+    req.port_id      = port_id;
     memcpy(&req.flowcfg, flowcfg, sizeof(*flowcfg));
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
@@ -300,9 +300,9 @@ uipcp_loop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
 
     /* Create a request message. */
     memset(&req, 0, sizeof(req));
-    req.msg_type = RLITE_KER_IPCP_UIPCP_SET;
-    req.event_id = 1;
-    req.ipcp_id  = ipcp_id;
+    req.hdr.msg_type = RLITE_KER_IPCP_UIPCP_SET;
+    req.hdr.event_id = 1;
+    req.ipcp_id      = ipcp_id;
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
@@ -514,9 +514,9 @@ uipcp_loop(void *opaque)
             continue;
         }
 
-        assert(msg->msg_type < RLITE_KER_MSG_MAX);
+        assert(msg->hdr.msg_type < RLITE_KER_MSG_MAX);
 
-        switch (msg->msg_type) {
+        switch (msg->hdr.msg_type) {
         case RLITE_KER_FA_REQ:
             handler = uipcp->ops.fa_req;
             break;
@@ -542,7 +542,7 @@ uipcp_loop(void *opaque)
             break;
 
         default:
-            UPE(uipcp, "Message type %u not handled\n", msg->msg_type);
+            UPE(uipcp, "Message type %u not handled\n", msg->hdr.msg_type);
             break;
         }
 
