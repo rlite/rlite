@@ -217,8 +217,8 @@ struct NeighFlow {
 
     void enroll_state_set(EnrollState st);
 
-    int send_to_port_id(CDAPMessage *m, int invoke_id,
-                        const ::google::protobuf::MessageLite *obj);
+    int send_to_port_id(CDAPMessage *m, int invoke_id = 0,
+                        const ::google::protobuf::MessageLite *obj = nullptr);
     int sync_obj(bool create, const std::string &obj_class,
                  const std::string &obj_name,
                  const ::google::protobuf::MessageLite *obj = nullptr);

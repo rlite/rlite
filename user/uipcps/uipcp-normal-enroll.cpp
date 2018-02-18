@@ -532,7 +532,7 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
         m.obj_class = obj_class::enrollment;
         m.obj_name  = obj_name::enrollment;
 
-        ret = nf->send_to_port_id(&m, rm->invoke_id, nullptr);
+        ret = nf->send_to_port_id(&m, rm->invoke_id);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             return -1;
@@ -570,7 +570,7 @@ EnrollmentResources::enrollee_thread()
 
         m.m_connect(gpb::AUTH_NONE, &av, rib->myname, neigh->ipcp_name);
 
-        ret = nf->send_to_port_id(&m, 0, nullptr);
+        ret = nf->send_to_port_id(&m);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             goto err;
@@ -616,7 +616,7 @@ EnrollmentResources::enrollee_thread()
              * This is not a complete enrollment, but only the allocation
              * of a lower flow. */
             m.m_start(obj_class::lowerflow, obj_name::lowerflow);
-            ret = nf->send_to_port_id(&m, 0, nullptr);
+            ret = nf->send_to_port_id(&m);
             if (ret) {
                 UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
                     strerror(errno));
@@ -787,7 +787,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
          * early. */
         m.m_start(obj_class::status, obj_name::status);
 
-        ret = nf->send_to_port_id(&m, 0, nullptr);
+        ret = nf->send_to_port_id(&m);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id failed\n");
             return -1;
@@ -834,7 +834,7 @@ EnrollmentResources::enroller_thread()
             m.src_appl = rib->myname;
         }
 
-        ret = nf->send_to_port_id(&m, rm->invoke_id, nullptr);
+        ret = nf->send_to_port_id(&m, rm->invoke_id);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             goto err;
@@ -867,7 +867,7 @@ EnrollmentResources::enroller_thread()
         m.obj_class = obj_class::lowerflow;
         m.obj_name  = obj_name::lowerflow;
 
-        ret = nf->send_to_port_id(&m, rm->invoke_id, nullptr);
+        ret = nf->send_to_port_id(&m, rm->invoke_id);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             goto err;
@@ -1080,7 +1080,7 @@ uipcp_rib::keepalive_timeout(const std::shared_ptr<NeighFlow> &nf)
 
     m.m_read(obj_class::keepalive, obj_name::keepalive);
 
-    ret = nf->send_to_port_id(&m, 0, nullptr);
+    ret = nf->send_to_port_id(&m);
     if (ret) {
         UPE(uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
     }
@@ -1317,7 +1317,7 @@ uipcp_rib::keepalive_handler(const CDAPMessage *rm,
 
     m.m_read_r(obj_class::keepalive, obj_name::keepalive);
 
-    ret = nf->send_to_port_id(&m, rm->invoke_id, nullptr);
+    ret = nf->send_to_port_id(&m, rm->invoke_id);
     if (ret) {
         UPE(uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
     }
@@ -1631,7 +1631,7 @@ uipcp_rib::neigh_disconnect(const std::string &neigh_name)
         if (nf->conn->connected()) {
             CDAPMessage m;
             m.m_release();
-            nf->send_to_port_id(&m, 0, nullptr);
+            nf->send_to_port_id(&m);
         }
     }
 
