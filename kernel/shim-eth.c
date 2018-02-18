@@ -1045,10 +1045,10 @@ shim_eth_netdev_notify(struct notifier_block *nb, unsigned long event,
                 bool filter = false;
 
                 memset(&ntfy, 0, sizeof(ntfy));
-                ntfy.msg_type   = RLITE_KER_FLOW_STATE;
-                ntfy.event_id   = 0;
-                ntfy.ipcp_id    = flow->upper.ipcp->id;
-                ntfy.local_port = flow->local_port;
+                ntfy.hdr.msg_type = RLITE_KER_FLOW_STATE;
+                ntfy.hdr.event_id = 0;
+                ntfy.ipcp_id      = flow->upper.ipcp->id;
+                ntfy.local_port   = flow->local_port;
                 switch (event) {
                 case NETDEV_UP:
                     ntfy.flow_state = RL_FLOW_STATE_UP;

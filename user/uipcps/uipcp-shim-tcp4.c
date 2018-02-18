@@ -300,7 +300,7 @@ shim_tcp4_appl_register(struct uipcp *uipcp, const struct rl_msg_base *msg)
     list_add_tail(&bp->node, &shim->bindpoints);
 
     /* Registration requires a response, while unregistrations doesn't. */
-    return uipcp_appl_register_resp(uipcp, RLITE_SUCC, req->event_id,
+    return uipcp_appl_register_resp(uipcp, RLITE_SUCC, req->hdr.event_id,
                                     req->appl_name);
 
 err3:
@@ -310,7 +310,7 @@ err2:
 err1:
     rl_free(bp, RL_MT_SHIMDATA);
 err0:
-    return uipcp_appl_register_resp(uipcp, RLITE_ERR, req->event_id,
+    return uipcp_appl_register_resp(uipcp, RLITE_ERR, req->hdr.event_id,
                                     req->appl_name);
 }
 

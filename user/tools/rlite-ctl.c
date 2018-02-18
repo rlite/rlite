@@ -370,7 +370,7 @@ reset(int argc, char **argv, struct cmd_descriptor *cd)
             }
             break;
         }
-        assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
+        assert(upd->hdr.msg_type == RLITE_KER_IPCP_UPDATE);
 
         list_for_each_entry (attrs, &ipcps, node) {
             if (upd->update_type == RL_IPCP_UPDATE_DEL &&
@@ -409,11 +409,11 @@ ipcp_config(int argc, char **argv, struct cmd_descriptor *cd)
         return -1;
     }
 
-    req.msg_type = RLITE_U_IPCP_CONFIG;
-    req.event_id = 0;
-    req.ipcp_id  = attrs->id;
-    req.name     = strdup(param_name);
-    req.value    = strdup(param_value);
+    req.hdr.msg_type = RLITE_U_IPCP_CONFIG;
+    req.hdr.event_id = 0;
+    req.ipcp_id      = attrs->id;
+    req.name         = strdup(param_name);
+    req.value        = strdup(param_value);
 
     return request_response(RLITE_MB(&req), NULL);
 }
@@ -443,10 +443,10 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
         return -1;
     }
 
-    req.msg_type = RLITE_U_IPCP_REGISTER;
-    req.event_id = 0;
-    req.dif_name = strdup(dif_name);
-    req.reg      = reg;
+    req.hdr.msg_type = RLITE_U_IPCP_REGISTER;
+    req.hdr.event_id = 0;
+    req.dif_name     = strdup(dif_name);
+    req.reg          = reg;
 
     return request_response(RLITE_MB(&req), NULL);
 }
@@ -492,8 +492,8 @@ ipcp_enroll_common(int argc, char **argv, rl_msg_t msg_type)
         return -1;
     }
 
-    req.msg_type      = msg_type;
-    req.event_id      = 0;
+    req.hdr.msg_type  = msg_type;
+    req.hdr.event_id  = 0;
     req.dif_name      = strdup(dif_name);
     req.neigh_name    = neigh_ipcp_name ? strdup(neigh_ipcp_name) : NULL;
     req.supp_dif_name = strdup(supp_dif_name);
@@ -697,10 +697,10 @@ ipcp_policy_mod(int argc, char **argv, struct cmd_descriptor *cd)
         }
     }
 
-    req.msg_type    = RLITE_U_IPCP_POLICY_MOD;
-    req.event_id    = 0;
-    req.comp_name   = strdup(comp_name);
-    req.policy_name = strdup(policy_name);
+    req.hdr.msg_type = RLITE_U_IPCP_POLICY_MOD;
+    req.hdr.event_id = 0;
+    req.comp_name    = strdup(comp_name);
+    req.policy_name  = strdup(policy_name);
 
     return request_response(RLITE_MB(&req), NULL);
 }
@@ -737,11 +737,11 @@ ipcp_policy_param_mod(int argc, char **argv, struct cmd_descriptor *cd)
         }
     }
 
-    req.msg_type    = RLITE_U_IPCP_POLICY_PARAM_MOD;
-    req.event_id    = 0;
-    req.comp_name   = strdup(comp_name);
-    req.param_name  = strdup(param_name);
-    req.param_value = strdup(param_value);
+    req.hdr.msg_type = RLITE_U_IPCP_POLICY_PARAM_MOD;
+    req.hdr.event_id = 0;
+    req.comp_name    = strdup(comp_name);
+    req.param_name   = strdup(param_name);
+    req.param_value  = strdup(param_value);
 
     return request_response(RLITE_MB(&req), NULL);
 }
@@ -763,9 +763,9 @@ ipcp_enroller_mod(int argc, char **argv, struct cmd_descriptor *cd, int enable)
         return -1;
     }
 
-    req.msg_type = RLITE_U_IPCP_ENROLLER_ENABLE;
-    req.event_id = 0;
-    req.enable   = enable ? 1 : 0;
+    req.hdr.msg_type = RLITE_U_IPCP_ENROLLER_ENABLE;
+    req.hdr.event_id = 0;
+    req.enable       = enable ? 1 : 0;
 
     return request_response(RLITE_MB(&req), NULL);
 }
@@ -787,8 +787,8 @@ probe(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct rl_msg_base req;
 
-    req.msg_type = RLITE_U_PROBE;
-    req.event_id = 0;
+    req.hdr.msg_type = RLITE_U_PROBE;
+    req.hdr.event_id = 0;
 
     return request_response(RLITE_MB(&req), NULL);
 }
@@ -798,8 +798,8 @@ terminate(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct rl_msg_base req;
 
-    req.msg_type = RLITE_U_TERMINATE;
-    req.event_id = 0;
+    req.hdr.msg_type = RLITE_U_TERMINATE;
+    req.hdr.event_id = 0;
 
     return request_response(RLITE_MB(&req), NULL);
 }
@@ -824,8 +824,8 @@ ipcp_neigh_disconnect(int argc, char **argv, struct cmd_descriptor *cd)
         return -1;
     }
 
-    req.msg_type = RLITE_U_IPCP_NEIGH_DISCONNECT;
-    req.event_id = 0;
+    req.hdr.msg_type = RLITE_U_IPCP_NEIGH_DISCONNECT;
+    req.hdr.event_id = 0;
 
     return request_response(RLITE_MB(&req), NULL);
 }
@@ -840,8 +840,8 @@ memtrack_dump(int argc, char **argv, struct cmd_descriptor *cd)
     rl_conf_memtrack_dump();
 
     /* trigger user-space dump */
-    req.msg_type = RLITE_U_MEMTRACK_DUMP;
-    req.event_id = 0;
+    req.hdr.msg_type = RLITE_U_MEMTRACK_DUMP;
+    req.hdr.event_id = 0;
 
     return request_response(RLITE_MB(&req), NULL);
 }
@@ -896,14 +896,14 @@ ipcp_rib_show(int argc, char **argv, struct cmd_descriptor *cd)
 
     if (strcmp(cd->name, "dif-rib-show") == 0 ||
         strcmp(cd->name, "ipcp-rib-show") == 0) {
-        req.msg_type = RLITE_U_IPCP_RIB_SHOW_REQ;
+        req.hdr.msg_type = RLITE_U_IPCP_RIB_SHOW_REQ;
     } else if (strcmp(cd->name, "dif-routing-show") == 0 ||
                strcmp(cd->name, "ipcp-routing-show") == 0) {
-        req.msg_type = RLITE_U_IPCP_ROUTING_SHOW_REQ;
+        req.hdr.msg_type = RLITE_U_IPCP_ROUTING_SHOW_REQ;
     } else {
         return -1;
     }
-    req.event_id = 0;
+    req.hdr.event_id = 0;
 
     return request_response(RLITE_MB(&req), ipcp_rib_show_handler);
 }
@@ -946,9 +946,9 @@ ipcp_policy_list(int argc, char **argv, struct cmd_descriptor *cd)
         }
     }
 
-    req.msg_type  = RLITE_U_IPCP_POLICY_LIST_REQ;
-    req.event_id  = 0;
-    req.comp_name = comp_name ? strdup(comp_name) : NULL;
+    req.hdr.msg_type = RLITE_U_IPCP_POLICY_LIST_REQ;
+    req.hdr.event_id = 0;
+    req.comp_name    = comp_name ? strdup(comp_name) : NULL;
 
     return request_response(RLITE_MB(&req), ipcp_rib_show_handler);
 }
@@ -995,10 +995,10 @@ ipcp_policy_param_list(int argc, char **argv, struct cmd_descriptor *cd)
         }
     }
 
-    req.msg_type   = RLITE_U_IPCP_POLICY_PARAM_LIST_REQ;
-    req.event_id   = 0;
-    req.comp_name  = comp_name ? strdup(comp_name) : NULL;
-    req.param_name = param_name ? strdup(param_name) : NULL;
+    req.hdr.msg_type = RLITE_U_IPCP_POLICY_PARAM_LIST_REQ;
+    req.hdr.event_id = 0;
+    req.comp_name    = comp_name ? strdup(comp_name) : NULL;
+    req.param_name   = param_name ? strdup(param_name) : NULL;
 
     return request_response(RLITE_MB(&req), ipcp_rib_show_handler);
 }
@@ -1041,7 +1041,7 @@ ipcps_load()
             }
             break;
         }
-        assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
+        assert(upd->hdr.msg_type == RLITE_KER_IPCP_UPDATE);
 
         if (upd->update_type == RL_IPCP_UPDATE_ADD) {
             attrs = malloc(sizeof(*attrs));

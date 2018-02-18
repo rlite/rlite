@@ -471,7 +471,7 @@ shim_udp4_appl_register(struct uipcp *uipcp, const struct rl_msg_base *msg)
     if (req->reg) {
         bp = udp4_bindpoint_open(shim, req->appl_name);
         return uipcp_appl_register_resp(uipcp, bp ? RLITE_SUCC : RLITE_ERR,
-                                        req->event_id, req->appl_name);
+                                        req->hdr.event_id, req->appl_name);
     }
 
     list_for_each_entry (bp, &shim->bindpoints, node) {

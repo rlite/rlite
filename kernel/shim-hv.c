@@ -199,11 +199,11 @@ rl_shim_hv_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     rl_flow_share_tx_wqh(flow);
 
-    req.msg_type = RLITE_SHIM_HV_FA_REQ;
-    req.event_id = 0;
-    req.src_appl = rl_strdup(flow->local_appl, GFP_KERNEL, RL_MIT_UTILS);
-    req.dst_appl = rl_strdup(flow->remote_appl, GFP_KERNEL, RL_MIT_UTILS);
-    req.src_port = flow->local_port;
+    req.hdr.msg_type = RLITE_SHIM_HV_FA_REQ;
+    req.hdr.event_id = 0;
+    req.src_appl     = rl_strdup(flow->local_appl, GFP_KERNEL, RL_MIT_UTILS);
+    req.dst_appl     = rl_strdup(flow->remote_appl, GFP_KERNEL, RL_MIT_UTILS);
+    req.src_port     = flow->local_port;
 
     return shim_hv_send_ctrl_msg(ipcp, RLITE_MB(&req));
 }
@@ -216,11 +216,11 @@ rl_shim_hv_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     rl_flow_share_tx_wqh(flow);
 
-    resp.msg_type = RLITE_SHIM_HV_FA_RESP;
-    resp.event_id = 0;
-    resp.dst_port = flow->local_port;
-    resp.src_port = flow->remote_port;
-    resp.response = response;
+    resp.hdr.msg_type = RLITE_SHIM_HV_FA_RESP;
+    resp.hdr.event_id = 0;
+    resp.dst_port     = flow->local_port;
+    resp.src_port     = flow->remote_port;
+    resp.response     = response;
 
     return shim_hv_send_ctrl_msg(ipcp, RLITE_MB(&resp));
 }

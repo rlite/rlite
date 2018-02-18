@@ -66,8 +66,7 @@ extern struct rl_msg_layout rl_uipcps_numtables[RLITE_U_MSG_MAX + 1];
 /* rlite-ctl --> uipcps message to register an IPC process
  * to another IPC process */
 struct rl_cmsg_ipcp_register {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     uint8_t reg;
     char *ipcp_name;
@@ -78,8 +77,7 @@ struct rl_cmsg_ipcp_register {
  * to another IPC process, or to only alloc a flow.
  * If neigh_name is NULL, this is a broadcast enrollment. */
 struct rl_cmsg_ipcp_enroll {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     char *ipcp_name;
     char *neigh_name;
@@ -89,16 +87,14 @@ struct rl_cmsg_ipcp_enroll {
 
 /* rlite-ctl --> uipcps message to query the whole RIB */
 struct rl_cmsg_ipcp_rib_show_req {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     char *ipcp_name;
 } __attribute__((packed));
 
 /* rlite-ctl <-- uipcps message to report a RIB dump */
 struct rl_cmsg_ipcp_rib_show_resp {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     uint8_t result;
     struct rl_buf_field dump;
@@ -106,8 +102,7 @@ struct rl_cmsg_ipcp_rib_show_resp {
 
 /* rlite-ctl --> uipcps message to change a DIF policy */
 struct rl_cmsg_ipcp_policy_mod {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     char *ipcp_name;
     char *comp_name;
@@ -116,8 +111,7 @@ struct rl_cmsg_ipcp_policy_mod {
 
 /* rlite-ctl --> uipcps message to list DIF policies */
 struct rl_cmsg_ipcp_policy_list_req {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     char *ipcp_name;
     char *comp_name;
@@ -128,8 +122,7 @@ struct rl_cmsg_ipcp_policy_list_req {
 
 /* rlite-ctl --> uipcps message to change a DIF policy parameter */
 struct rl_cmsg_ipcp_policy_param_mod {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     char *ipcp_name;
     char *comp_name;
@@ -139,8 +132,7 @@ struct rl_cmsg_ipcp_policy_param_mod {
 
 /* rlite-ctl --> uipcps message to list DIF policies */
 struct rl_cmsg_ipcp_policy_param_list_req {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     char *ipcp_name;
     char *comp_name;
@@ -154,8 +146,7 @@ struct rl_cmsg_ipcp_policy_param_list_req {
  * enrollment requests even if it is not enrolled in
  * any DIF (used for the first IPCP in the DIF). */
 struct rl_cmsg_ipcp_enroller_enable {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     uint8_t enable;
     char *ipcp_name;
@@ -169,8 +160,7 @@ struct rl_cmsg_ipcp_enroller_enable {
 
 /* rlite-ctl --> uipcps message to configure an IPC process. */
 struct rl_cmsg_ipcp_config {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
     char *name;
@@ -180,8 +170,7 @@ struct rl_cmsg_ipcp_config {
 /* rlite-ctl --> uipcps message to enroll an IPC process
  * to another IPC process, or to only alloc a flow. */
 struct rl_cmsg_ipcp_neigh_disconnect {
-    rl_msg_t msg_type;
-    uint32_t event_id;
+    struct rl_msg_hdr hdr;
 
     char *ipcp_name;  /* local IPCP */
     char *neigh_name; /* neigh IPCP to disconnect from */

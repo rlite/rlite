@@ -107,7 +107,7 @@ rl_write_msg(int rfd, struct rl_msg_base *msg, int quiet)
         /* An uIPCP may try to deallocate an already deallocated
          * flow. Be quiet just in case. */
         if (!quiet &&
-            !(errno == ENXIO && msg->msg_type == RLITE_KER_FLOW_DEALLOC)) {
+            !(errno == ENXIO && msg->hdr.msg_type == RLITE_KER_FLOW_DEALLOC)) {
             perror("write(ctrlmsg)");
         }
 
@@ -192,11 +192,11 @@ rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type  = RLITE_KER_APPL_REGISTER;
-    req->event_id  = event_id;
-    req->dif_name  = dif_name ? rl_strdup(dif_name, RL_MT_UTILS) : NULL;
-    req->reg       = reg;
-    req->appl_name = appl_name ? rl_strdup(appl_name, RL_MT_UTILS) : NULL;
+    req->hdr.msg_type = RLITE_KER_APPL_REGISTER;
+    req->hdr.event_id = event_id;
+    req->dif_name     = dif_name ? rl_strdup(dif_name, RL_MT_UTILS) : NULL;
+    req->reg          = reg;
+    req->appl_name    = appl_name ? rl_strdup(appl_name, RL_MT_UTILS) : NULL;
 
     if (dif_name && !req->dif_name) {
         return -1; /* Out of memory. */
@@ -216,9 +216,9 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req, uint32_t event_id,
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RLITE_KER_FA_REQ;
-    req->event_id = event_id;
-    req->dif_name = dif_name ? rl_strdup(dif_name, RL_MT_UTILS) : NULL;
+    req->hdr.msg_type = RLITE_KER_FA_REQ;
+    req->hdr.event_id = event_id;
+    req->dif_name     = dif_name ? rl_strdup(dif_name, RL_MT_UTILS) : NULL;
     if (dif_name && !req->dif_name) {
         return -1; /* Out of memory. */
     }
@@ -242,8 +242,8 @@ rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
 {
     memset(resp, 0, sizeof(*resp));
 
-    resp->msg_type      = RLITE_KER_FA_RESP;
-    resp->event_id      = 1;
+    resp->hdr.msg_type  = RLITE_KER_FA_RESP;
+    resp->hdr.event_id  = 1;
     resp->kevent_id     = kevent_id;
     resp->ipcp_id       = ipcp_id; /* Currently unused by the kernel. */
     resp->upper_ipcp_id = upper_ipcp_id;
@@ -279,8 +279,8 @@ rina_register_wait(int fd, int wfd)
         goto out;
     }
 
-    assert(resp->msg_type == RLITE_KER_APPL_REGISTER_RESP);
-    assert(resp->event_id == RINA_REG_EVENT_ID);
+    assert(resp->hdr.msg_type == RLITE_KER_APPL_REGISTER_RESP);
+    assert(resp->hdr.event_id == RINA_REG_EVENT_ID);
     ipcp_id  = resp->ipcp_id;
     response = resp->response;
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
@@ -294,10 +294,10 @@ rina_register_wait(int fd, int wfd)
     /* Registration was successful: associate the registered application
      * with the file descriptor specified by the caller. */
     memset(&move, 0, sizeof(move));
-    move.msg_type = RLITE_KER_APPL_MOVE;
-    move.event_id = 1;
-    move.ipcp_id  = ipcp_id;
-    move.fd       = fd;
+    move.hdr.msg_type = RLITE_KER_APPL_MOVE;
+    move.hdr.event_id = 1;
+    move.ipcp_id      = ipcp_id;
+    move.fd           = fd;
 
     ret = rl_write_msg(wfd, RLITE_MB(&move), 1);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&move));
@@ -387,8 +387,8 @@ __rina_flow_alloc_wait(int wfd, rl_port_t *port_id)
         goto out;
     }
 
-    assert(resp->msg_type == RLITE_KER_FA_RESP_ARRIVED);
-    assert(resp->event_id == RINA_FA_EVENT_ID);
+    assert(resp->hdr.msg_type == RLITE_KER_FA_RESP_ARRIVED);
+    assert(resp->hdr.event_id == RINA_FA_EVENT_ID);
 
     if (resp->response) {
         errno = EPERM;
@@ -607,7 +607,7 @@ rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
     if (!req) {
         goto out0;
     }
-    assert(req->msg_type == RLITE_KER_FA_REQ_ARRIVED);
+    assert(req->hdr.msg_type == RLITE_KER_FA_REQ_ARRIVED);
 
     if (remote_appl_fill(req->remote_appl, remote_appl)) {
         goto out1;

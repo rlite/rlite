@@ -229,26 +229,26 @@ rl_msg_serlen(struct rl_msg_layout *numtables, size_t num_entries,
     const struct rl_buf_field *bf;
     int i;
 
-    if (msg->msg_type >= num_entries) {
-        PE("Invalid numtables access [msg_type=%u]\n", msg->msg_type);
+    if (msg->hdr.msg_type >= num_entries) {
+        PE("Invalid numtables access [msg_type=%u]\n", msg->hdr.msg_type);
 
         return -1;
     }
 
-    ret = numtables[msg->msg_type].copylen;
+    ret = numtables[msg->hdr.msg_type].copylen;
 
     name = (struct rina_name *)(((void *)msg) + ret);
-    for (i = 0; i < numtables[msg->msg_type].names; i++, name++) {
+    for (i = 0; i < numtables[msg->hdr.msg_type].names; i++, name++) {
         ret += rina_name_serlen(name);
     }
 
     str = (string_t *)name;
-    for (i = 0; i < numtables[msg->msg_type].strings; i++, str++) {
+    for (i = 0; i < numtables[msg->hdr.msg_type].strings; i++, str++) {
         ret += sizeof(uint16_t) + string_prlen(*str);
     }
 
     bf = (const struct rl_buf_field *)str;
-    for (i = 0; i < numtables[msg->msg_type].buffers; i++, bf++) {
+    for (i = 0; i < numtables[msg->hdr.msg_type].buffers; i++, bf++) {
         ret += sizeof(bf->len) + bf->len;
     }
 
@@ -269,28 +269,30 @@ serialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
     const struct rl_buf_field *bf;
     int i;
 
-    if (msg->msg_type >= num_entries) {
-        PE("Invalid numtables access [msg_type=%u]\n", msg->msg_type);
+    if (msg->hdr.msg_type >= num_entries) {
+        PE("Invalid numtables access [msg_type=%u]\n", msg->hdr.msg_type);
 
         return -1;
     }
 
-    copylen = numtables[msg->msg_type].copylen;
+    ((struct rl_msg_base *)msg)->hdr.version = RL_API_VERSION;
+
+    copylen = numtables[msg->hdr.msg_type].copylen;
     memcpy(serbuf, msg, copylen);
 
     serptr = serbuf + copylen;
     name   = (struct rina_name *)(((void *)msg) + copylen);
-    for (i = 0; i < numtables[msg->msg_type].names; i++, name++) {
+    for (i = 0; i < numtables[msg->hdr.msg_type].names; i++, name++) {
         serialize_rina_name(&serptr, name);
     }
 
     str = (string_t *)(name);
-    for (i = 0; i < numtables[msg->msg_type].strings; i++, str++) {
+    for (i = 0; i < numtables[msg->hdr.msg_type].strings; i++, str++) {
         serialize_string(&serptr, *str);
     }
 
     bf = (const struct rl_buf_field *)str;
-    for (i = 0; i < numtables[msg->msg_type].buffers; i++, bf++) {
+    for (i = 0; i < numtables[msg->hdr.msg_type].buffers; i++, bf++) {
         serialize_buffer(&serptr, bf);
     }
 
@@ -317,16 +319,22 @@ deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
     int ret;
     int i;
 
-    if (bmsg->msg_type >= num_entries) {
-        PE("Invalid numtables access [msg_type=%u]\n", bmsg->msg_type);
+    if (bmsg->hdr.version != RL_API_VERSION) {
+        PE("API version mismatch: expected %u, requested %u\n", RL_API_VERSION,
+           bmsg->hdr.version);
+        return -1;
+    }
+
+    if (bmsg->hdr.msg_type >= num_entries) {
+        PE("Invalid numtables access [msg_type=%u]\n", bmsg->hdr.msg_type);
 
         return -1;
     }
 
-    copylen = numtables[bmsg->msg_type].copylen;
+    copylen = numtables[bmsg->hdr.msg_type].copylen;
     if (copylen > sleft) {
         PE("Serialized message shorter than copylen [msg_type=%u]\n",
-           bmsg->msg_type);
+           bmsg->hdr.msg_type);
         return -1;
     }
     if (copylen > dleft) {
@@ -339,7 +347,7 @@ deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
 
     desptr = serbuf + copylen;
     name   = (struct rina_name *)(msgbuf + copylen);
-    for (i = 0; i < numtables[bmsg->msg_type].names; i++, name++) {
+    for (i = 0; i < numtables[bmsg->hdr.msg_type].names; i++, name++) {
         if (dleft < sizeof(struct rina_name)) {
             PE("Message buffer too short\n");
             return -1;
@@ -352,7 +360,7 @@ deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
     }
 
     str = (string_t *)name;
-    for (i = 0; i < numtables[bmsg->msg_type].strings; i++, str++) {
+    for (i = 0; i < numtables[bmsg->hdr.msg_type].strings; i++, str++) {
         if (dleft < sizeof(string_t)) {
             PE("Message buffer too short\n");
             return -1;
@@ -365,7 +373,7 @@ deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
     }
 
     bf = (struct rl_buf_field *)str;
-    for (i = 0; i < numtables[bmsg->msg_type].buffers; i++, bf++) {
+    for (i = 0; i < numtables[bmsg->hdr.msg_type].buffers; i++, bf++) {
         if (dleft < sizeof(struct rl_buf_field)) {
             PE("Message buffer too short\n");
             return -1;
@@ -389,13 +397,13 @@ void
 rl_msg_free(struct rl_msg_layout *numtables, size_t num_entries,
             struct rl_msg_base *msg)
 {
-    unsigned int copylen = numtables[msg->msg_type].copylen;
+    unsigned int copylen = numtables[msg->hdr.msg_type].copylen;
     struct rina_name *name;
     string_t *str;
     int i;
 
-    if (msg->msg_type >= num_entries) {
-        PE("Invalid numtables access [msg_type=%u]\n", msg->msg_type);
+    if (msg->hdr.msg_type >= num_entries) {
+        PE("Invalid numtables access [msg_type=%u]\n", msg->hdr.msg_type);
 
         return;
     }
@@ -403,12 +411,12 @@ rl_msg_free(struct rl_msg_layout *numtables, size_t num_entries,
     /* Skip the copiable part and scan all the names contained in
      * the message. */
     name = (struct rina_name *)(((void *)msg) + copylen);
-    for (i = 0; i < numtables[msg->msg_type].names; i++, name++) {
+    for (i = 0; i < numtables[msg->hdr.msg_type].names; i++, name++) {
         rina_name_free(name);
     }
 
     str = (string_t *)(name);
-    for (i = 0; i < numtables[msg->msg_type].strings; i++, str++) {
+    for (i = 0; i < numtables[msg->hdr.msg_type].strings; i++, str++) {
         if (*str) {
             COMMON_FREE(*str);
         }

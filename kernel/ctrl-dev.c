@@ -851,12 +851,12 @@ application_del_by_rc(struct rl_ctrl *rc)
             app->ipcp->uipcp) {
             struct rl_kmsg_appl_register ntfy;
 
-            ntfy.msg_type  = RLITE_KER_APPL_REGISTER;
-            ntfy.event_id  = 0;
-            ntfy.dif_name  = app->ipcp->dif->name; /* borrow the string */
-            ntfy.reg       = false;
-            ntfy.appl_name = app->name;
-            app->name      = NULL; /* move */
+            ntfy.hdr.msg_type = RLITE_KER_APPL_REGISTER;
+            ntfy.hdr.event_id = 0;
+            ntfy.dif_name     = app->ipcp->dif->name; /* borrow the string */
+            ntfy.reg          = false;
+            ntfy.appl_name    = app->name;
+            app->name         = NULL; /* move */
             rl_upqueue_append(app->ipcp->uipcp,
                               (const struct rl_msg_base *)&ntfy, true);
             app->name      = ntfy.appl_name;
@@ -1170,8 +1170,8 @@ flow_del(struct flow_entry *entry)
     if (!ipcp->ops.flow_deallocated) {
         /* Prepare a flow deallocation message for the uipcp. */
         memset(&ntfy, 0, sizeof(ntfy));
-        ntfy.msg_type       = RLITE_KER_FLOW_DEALLOCATED;
-        ntfy.event_id       = 0;
+        ntfy.hdr.msg_type   = RLITE_KER_FLOW_DEALLOCATED;
+        ntfy.hdr.event_id   = 0;
         ntfy.ipcp_id        = ipcp->id;
         ntfy.local_port_id  = entry->local_port;
         ntfy.remote_port_id = entry->remote_port;
@@ -1489,9 +1489,9 @@ __ipcp_put(struct ipcp_entry *entry)
         struct rl_ctrl *rcur;
 
         memset(&upd, 0, sizeof(upd));
-        upd.msg_type    = RLITE_KER_IPCP_UPDATE;
-        upd.update_type = RL_IPCP_UPDATE_DEL;
-        upd.ipcp_id     = entry->id;
+        upd.hdr.msg_type = RLITE_KER_IPCP_UPDATE;
+        upd.update_type  = RL_IPCP_UPDATE_DEL;
+        upd.ipcp_id      = entry->id;
         /* All the other fields are zeroed, since they are
          * not useful to userspace. */
 
@@ -1600,7 +1600,7 @@ ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd,
 
     memset(upd, 0, sizeof(*upd));
 
-    upd->msg_type     = RLITE_KER_IPCP_UPDATE;
+    upd->hdr.msg_type = RLITE_KER_IPCP_UPDATE;
     upd->update_type  = update_type;
     upd->ipcp_id      = ipcp->id;
     upd->ipcp_addr    = ipcp->addr;
@@ -1681,9 +1681,9 @@ rl_ipcp_create(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     }
 
     memset(&resp, 0, sizeof(resp));
-    resp.msg_type = RLITE_KER_IPCP_CREATE_RESP;
-    resp.event_id = req->event_id;
-    resp.ipcp_id  = ipcp_id;
+    resp.hdr.msg_type = RLITE_KER_IPCP_CREATE_RESP;
+    resp.hdr.event_id = req->hdr.event_id;
+    resp.ipcp_id      = ipcp_id;
 
     /* Enqueue the response into the upqueue. */
     ret = rl_upqueue_append(rc, RLITE_MB(&resp), true);
@@ -1726,9 +1726,9 @@ rl_ipcp_destroy(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
      * opened ctrl device. */
     memset(&upd, 0, sizeof(upd));
-    upd.msg_type    = RLITE_KER_IPCP_UPDATE;
-    upd.update_type = RL_IPCP_UPDATE_UIPCP_DEL;
-    upd.ipcp_id     = req->ipcp_id;
+    upd.hdr.msg_type = RLITE_KER_IPCP_UPDATE;
+    upd.update_type  = RL_IPCP_UPDATE_UIPCP_DEL;
+    upd.ipcp_id      = req->ipcp_id;
     /* All the other fields are zeroed, since they are
      * not useful to userspace. */
 
@@ -1790,14 +1790,14 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
             memset(fqe, 0, sizeof(*fqe));
             list_add_tail(&fqe->node, &rc->flows_fetch_q);
 
-            fqe->resp.msg_type    = RLITE_KER_FLOW_FETCH_RESP;
-            fqe->resp.end         = 0;
-            fqe->resp.ipcp_id     = entry->txrx.ipcp->id;
-            fqe->resp.local_port  = entry->local_port;
-            fqe->resp.remote_port = entry->remote_port;
-            fqe->resp.local_addr  = entry->txrx.ipcp->addr;
-            fqe->resp.remote_addr = entry->remote_addr;
-            fqe->resp.spec        = entry->spec;
+            fqe->resp.hdr.msg_type = RLITE_KER_FLOW_FETCH_RESP;
+            fqe->resp.end          = 0;
+            fqe->resp.ipcp_id      = entry->txrx.ipcp->id;
+            fqe->resp.local_port   = entry->local_port;
+            fqe->resp.remote_port  = entry->remote_port;
+            fqe->resp.local_addr   = entry->txrx.ipcp->addr;
+            fqe->resp.remote_addr  = entry->remote_addr;
+            fqe->resp.spec         = entry->spec;
             fqe->resp.flow_control =
                 !!(entry->cfg.dtcp.flags & DTCP_CFG_FLOW_CTRL);
         }
@@ -1808,8 +1808,8 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
         } else {
             memset(fqe, 0, sizeof(*fqe));
             list_add_tail(&fqe->node, &rc->flows_fetch_q);
-            fqe->resp.msg_type = RLITE_KER_FLOW_FETCH_RESP;
-            fqe->resp.end      = 1;
+            fqe->resp.hdr.msg_type = RLITE_KER_FLOW_FETCH_RESP;
+            fqe->resp.end          = 1;
         }
     }
 
@@ -1817,8 +1817,8 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
         fqe = list_first_entry(&rc->flows_fetch_q, struct flows_fetch_q_entry,
                                node);
         list_del_init(&fqe->node);
-        fqe->resp.event_id = req->event_id;
-        ret                = rl_upqueue_append(rc, RLITE_MB(&fqe->resp), false);
+        fqe->resp.hdr.event_id = req->hdr.event_id;
+        ret = rl_upqueue_append(rc, RLITE_MB(&fqe->resp), false);
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&fqe->resp));
         rl_free(fqe, RL_MT_FFETCH);
     }
@@ -1874,10 +1874,10 @@ rl_reg_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
                 memset(fqe, 0, sizeof(*fqe));
                 list_add_tail(&fqe->node, &rc->regs_fetch_q);
 
-                fqe->resp.msg_type = RLITE_KER_REG_FETCH_RESP;
-                fqe->resp.end      = 0;
-                fqe->resp.ipcp_id  = ipcp->id;
-                fqe->resp.pending  = appl->state != APPL_REG_COMPLETE;
+                fqe->resp.hdr.msg_type = RLITE_KER_REG_FETCH_RESP;
+                fqe->resp.end          = 0;
+                fqe->resp.ipcp_id      = ipcp->id;
+                fqe->resp.pending      = appl->state != APPL_REG_COMPLETE;
                 fqe->resp.appl_name =
                     rl_strdup(appl->name, GFP_ATOMIC, RL_MT_UTILS);
             }
@@ -1890,8 +1890,8 @@ rl_reg_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
         } else {
             memset(fqe, 0, sizeof(*fqe));
             list_add_tail(&fqe->node, &rc->regs_fetch_q);
-            fqe->resp.msg_type = RLITE_KER_REG_FETCH_RESP;
-            fqe->resp.end      = 1;
+            fqe->resp.hdr.msg_type = RLITE_KER_REG_FETCH_RESP;
+            fqe->resp.end          = 1;
         }
     }
 
@@ -1899,8 +1899,8 @@ rl_reg_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
         fqe = list_first_entry(&rc->regs_fetch_q, struct regs_fetch_q_entry,
                                node);
         list_del_init(&fqe->node);
-        fqe->resp.event_id = req->event_id;
-        ret                = rl_upqueue_append(rc, RLITE_MB(&fqe->resp), false);
+        fqe->resp.hdr.event_id = req->hdr.event_id;
+        ret = rl_upqueue_append(rc, RLITE_MB(&fqe->resp), false);
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&fqe->resp));
         rl_free(fqe, RL_MT_FFETCH);
     }
@@ -2007,7 +2007,7 @@ rl_ipcp_pduft_mod(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
          * resources leak, because the pduft of a zombie IPCP is not flushed
          * anymore (so references to flows in the pduft will stay there forever,
          * and so the IPCPs bound to them). */
-        if (req->msg_type == RLITE_KER_IPCP_PDUFT_SET) {
+        if (req->hdr.msg_type == RLITE_KER_IPCP_PDUFT_SET) {
             ret = ipcp->ops.pduft_set(ipcp, req->dst_addr, flow);
         } else { /* RLITE_KER_IPCP_PDUFT_DEL */
             ret = ipcp->ops.pduft_del_addr(ipcp, req->dst_addr);
@@ -2250,8 +2250,8 @@ rl_flow_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     }
 
     memset(&resp, 0, sizeof(resp));
-    resp.msg_type = RLITE_KER_FLOW_STATS_RESP;
-    resp.event_id = req->event_id;
+    resp.hdr.msg_type = RLITE_KER_FLOW_STATS_RESP;
+    resp.hdr.event_id = req->hdr.event_id;
 
     if (flow->txrx.ipcp->ops.flow_get_stats) {
         ret = flow->txrx.ipcp->ops.flow_get_stats(flow, &resp.stats);
@@ -2356,7 +2356,7 @@ static int
 rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_appl_register *req = (struct rl_kmsg_appl_register *)bmsg;
-    uint32_t event_id                 = req->event_id;
+    uint32_t event_id                 = req->hdr.event_id;
     struct rl_ctrl *uipcp             = NULL;
     struct ipcp_entry *ipcp;
     int ret = 0;
@@ -2389,7 +2389,7 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     if (!ret && uipcp) {
         /* Reflect to userspace this (un)registration, so that
          * userspace IPCP can take appropriate actions. */
-        req->event_id = 0; /* clear it, not needed */
+        req->hdr.event_id = 0; /* clear it, not needed */
         rl_upqueue_append(uipcp, (const struct rl_msg_base *)req, true);
     }
 
@@ -2404,12 +2404,12 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             ret = 0;
         }
 
-        resp.msg_type  = RLITE_KER_APPL_REGISTER_RESP;
-        resp.event_id  = event_id;
-        resp.ipcp_id   = ipcp->id;
-        resp.reg       = req->reg;
-        resp.response  = ret ? RLITE_ERR : RLITE_SUCC;
-        resp.appl_name = rl_strdup(req->appl_name, GFP_ATOMIC, RL_MT_UTILS);
+        resp.hdr.msg_type = RLITE_KER_APPL_REGISTER_RESP;
+        resp.hdr.event_id = event_id;
+        resp.ipcp_id      = ipcp->id;
+        resp.reg          = req->reg;
+        resp.response     = ret ? RLITE_ERR : RLITE_SUCC;
+        resp.appl_name    = rl_strdup(req->appl_name, GFP_ATOMIC, RL_MT_UTILS);
 
         rl_upqueue_append(rc, (const struct rl_msg_base *)&resp, false);
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));
@@ -2452,8 +2452,8 @@ rl_appl_register_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
                "'%s'\n",
                resp->appl_name);
         } else {
-            ret            = 0;
-            resp->event_id = app->event_id;
+            ret                = 0;
+            resp->hdr.event_id = app->event_id;
 
             if (resp->response != 0) {
                 /* Userspace IPCP denied the registration. */
@@ -2523,10 +2523,10 @@ rl_append_allocate_flow_resp_arrived(struct rl_ctrl *rc, uint32_t event_id,
     struct rl_kmsg_fa_resp_arrived resp;
 
     memset(&resp, 0, sizeof(resp));
-    resp.msg_type = RLITE_KER_FA_RESP_ARRIVED;
-    resp.event_id = event_id;
-    resp.port_id  = port_id;
-    resp.response = response;
+    resp.hdr.msg_type = RLITE_KER_FA_RESP_ARRIVED;
+    resp.hdr.event_id = event_id;
+    resp.port_id      = port_id;
+    resp.response     = response;
 
     /* Enqueue the response into the upqueue. */
     return rl_upqueue_append(rc, RLITE_MB(&resp), maysleep);
@@ -2539,7 +2539,7 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct rl_kmsg_fa_req *req    = (struct rl_kmsg_fa_req *)bmsg;
     struct ipcp_entry *ipcp_entry = NULL;
     struct flow_entry *flow_entry = NULL;
-    uint32_t event_id             = req->event_id;
+    uint32_t event_id             = req->hdr.event_id;
     struct upper_ref upper        = {
         .rc = rc,
     };
@@ -2588,11 +2588,11 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             /* This IPCP handles the flow allocation in user-space. This is
              * currently true for normal IPCPs.
              * Reflect the flow allocation request message to userspace. */
-            req->event_id   = 0; /* clear it, not needed */
-            req->local_port = flow_entry->local_port;
-            req->local_cep  = flow_entry->local_cep;
-            req->uid        = flow_entry->uid; /* tell the uid to the uipcp */
-            ret             = rl_upqueue_append(ipcp_entry->uipcp,
+            req->hdr.event_id = 0; /* clear it, not needed */
+            req->local_port   = flow_entry->local_port;
+            req->local_cep    = flow_entry->local_cep;
+            req->uid          = flow_entry->uid; /* tell the uid to the uipcp */
+            ret               = rl_upqueue_append(ipcp_entry->uipcp,
                                     (const struct rl_msg_base *)req, true);
         }
     }
@@ -2695,9 +2695,9 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             /* This IPCP handles the flow allocation in user-space. This is
              * currently true for normal IPCPs.
              * Reflect the flow allocation response message to userspace. */
-            resp->event_id = 0;
-            resp->cep_id   = flow_entry->local_cep;
-            ret            = rl_upqueue_append(ipcp->uipcp,
+            resp->hdr.event_id = 0;
+            resp->cep_id       = flow_entry->local_cep;
+            ret                = rl_upqueue_append(ipcp->uipcp,
                                     (const struct rl_msg_base *)resp, true);
         }
     }
@@ -2760,11 +2760,11 @@ rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
        "port-id %u\n",
        ipcp->id, flow_entry->local_port);
 
-    req.msg_type  = RLITE_KER_FA_REQ_ARRIVED;
-    req.event_id  = 0;
-    req.kevent_id = kevent_id;
-    req.ipcp_id   = ipcp->id;
-    req.port_id   = flow_entry->local_port;
+    req.hdr.msg_type = RLITE_KER_FA_REQ_ARRIVED;
+    req.hdr.event_id = 0;
+    req.kevent_id    = kevent_id;
+    req.ipcp_id      = ipcp->id;
+    req.port_id      = flow_entry->local_port;
     req.local_appl =
         local_appl ? rl_strdup(local_appl, GFP_ATOMIC, RL_MT_UTILS) : NULL;
     req.remote_appl =
@@ -2938,13 +2938,14 @@ rl_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
     bmsg = RLITE_MB(rc->msgbuf);
 
     /* Demultiplex the message to the right message handler. */
-    if (bmsg->msg_type > RLITE_KER_MSG_MAX || !rc->handlers[bmsg->msg_type]) {
+    if (bmsg->hdr.msg_type > RLITE_KER_MSG_MAX ||
+        !rc->handlers[bmsg->hdr.msg_type]) {
         rl_free(kbuf, RL_MT_MISC);
         return -EINVAL;
     }
 
     /* Check permissions. */
-    switch (bmsg->msg_type) {
+    switch (bmsg->hdr.msg_type) {
     case RLITE_KER_IPCP_CREATE:
     case RLITE_KER_IPCP_DESTROY:
     case RLITE_KER_IPCP_CONFIG:
@@ -2967,7 +2968,7 @@ rl_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
     }
 
     /* Carry out the requested operation. */
-    ret = rc->handlers[bmsg->msg_type](rc, bmsg);
+    ret = rc->handlers[bmsg->hdr.msg_type](rc, bmsg);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, bmsg);
     rl_free(kbuf, RL_MT_MISC);
     if (ret) {

@@ -68,11 +68,11 @@ rl_conf_ipcp_create(const char *name, const char *dif_type,
     }
 
     memset(&msg, 0, sizeof(msg));
-    msg.msg_type = RLITE_KER_IPCP_CREATE;
-    msg.event_id = 1;
-    msg.name     = name ? rl_strdup(name, RL_MT_UTILS) : NULL;
-    msg.dif_type = rl_strdup(dif_type, RL_MT_UTILS);
-    msg.dif_name = rl_strdup(dif_name, RL_MT_UTILS);
+    msg.hdr.msg_type = RLITE_KER_IPCP_CREATE;
+    msg.hdr.event_id = 1;
+    msg.name         = name ? rl_strdup(name, RL_MT_UTILS) : NULL;
+    msg.dif_type     = rl_strdup(dif_type, RL_MT_UTILS);
+    msg.dif_name     = rl_strdup(dif_name, RL_MT_UTILS);
 
     ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
     if (ret < 0) {
@@ -112,9 +112,9 @@ rl_conf_ipcp_uipcp_wait(rl_ipcp_id_t ipcp_id)
     }
 
     memset(&msg, 0, sizeof(msg));
-    msg.msg_type = RLITE_KER_IPCP_UIPCP_WAIT;
-    msg.event_id = 1;
-    msg.ipcp_id  = ipcp_id;
+    msg.hdr.msg_type = RLITE_KER_IPCP_UIPCP_WAIT;
+    msg.hdr.event_id = 1;
+    msg.ipcp_id      = ipcp_id;
 
     ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
@@ -145,9 +145,9 @@ rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id, const int sync)
     }
 
     memset(&msg, 0, sizeof(msg));
-    msg.msg_type = RLITE_KER_IPCP_DESTROY;
-    msg.event_id = 1;
-    msg.ipcp_id  = ipcp_id;
+    msg.hdr.msg_type = RLITE_KER_IPCP_DESTROY;
+    msg.hdr.event_id = 1;
+    msg.ipcp_id      = ipcp_id;
 
     ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
@@ -164,7 +164,7 @@ rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id, const int sync)
             }
             break;
         }
-        assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
+        assert(upd->hdr.msg_type == RLITE_KER_IPCP_UPDATE);
 
         if (upd->update_type == RL_IPCP_UPDATE_DEL && upd->ipcp_id == ipcp_id) {
             break;
@@ -183,11 +183,11 @@ rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, rl_ipcp_id_t ipcp_id,
                     const char *param_name, const char *param_value)
 {
     memset(req, 0, sizeof(*req));
-    req->msg_type = RLITE_KER_IPCP_CONFIG;
-    req->event_id = 1;
-    req->ipcp_id  = ipcp_id;
-    req->name     = rl_strdup(param_name, RL_MT_UTILS);
-    req->value    = rl_strdup(param_value, RL_MT_UTILS);
+    req->hdr.msg_type = RLITE_KER_IPCP_CONFIG;
+    req->hdr.event_id = 1;
+    req->ipcp_id      = ipcp_id;
+    req->name         = rl_strdup(param_name, RL_MT_UTILS);
+    req->value        = rl_strdup(param_value, RL_MT_UTILS);
 
     return 0;
 }
@@ -275,13 +275,13 @@ rl_conf_flows_fetch(struct list_head *flows, rl_ipcp_id_t ipcp_id)
     }
 
     memset(&msg, 0, sizeof(msg));
-    msg.msg_type = RLITE_KER_FLOW_FETCH;
-    msg.ipcp_id  = ipcp_id;
+    msg.hdr.msg_type = RLITE_KER_FLOW_FETCH;
+    msg.ipcp_id      = ipcp_id;
 
     /* Fill the flows list. */
 
     while (!end) {
-        msg.event_id = event_id++;
+        msg.hdr.event_id = event_id++;
 
         ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
         if (ret < 0) {
@@ -294,7 +294,7 @@ rl_conf_flows_fetch(struct list_head *flows, rl_ipcp_id_t ipcp_id)
             end = 1;
 
         } else {
-            assert(resp->event_id == msg.event_id);
+            assert(resp->hdr.event_id == msg.hdr.event_id);
             /* Consume and free the response. */
             flow_fetch_append(flows, resp);
 
@@ -337,9 +337,9 @@ rl_conf_flow_get_info(rl_port_t port_id, struct rl_flow_stats *stats,
     }
 
     memset(&msg, 0, sizeof(msg));
-    msg.msg_type = RLITE_KER_FLOW_STATS_REQ;
-    msg.event_id = 1;
-    msg.port_id  = port_id;
+    msg.hdr.msg_type = RLITE_KER_FLOW_STATS_REQ;
+    msg.hdr.event_id = 1;
+    msg.port_id      = port_id;
 
     ret = rl_write_msg(fd, RLITE_MB(&msg), 1);
     if (ret < 0) {
@@ -352,7 +352,7 @@ rl_conf_flow_get_info(rl_port_t port_id, struct rl_flow_stats *stats,
         ret = -1;
         goto out;
     }
-    assert(resp->event_id == msg.event_id);
+    assert(resp->hdr.event_id == msg.hdr.event_id);
 
     if (stats) {
         *stats = resp->stats;
@@ -482,13 +482,13 @@ rl_conf_regs_fetch(struct list_head *regs, rl_ipcp_id_t ipcp_id)
     }
 
     memset(&msg, 0, sizeof(msg));
-    msg.msg_type = RLITE_KER_REG_FETCH;
-    msg.ipcp_id  = ipcp_id;
+    msg.hdr.msg_type = RLITE_KER_REG_FETCH;
+    msg.ipcp_id      = ipcp_id;
 
     /* Fill the regs list. */
 
     while (!end) {
-        msg.event_id = event_id++;
+        msg.hdr.event_id = event_id++;
 
         ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
         if (ret < 0) {
@@ -501,7 +501,7 @@ rl_conf_regs_fetch(struct list_head *regs, rl_ipcp_id_t ipcp_id)
             end = 1;
 
         } else {
-            assert(resp->event_id == msg.event_id);
+            assert(resp->hdr.event_id == msg.hdr.event_id);
             /* Consume and free the response. */
             reg_fetch_append(regs, resp);
 
@@ -558,9 +558,9 @@ rl_conf_ipcp_qos_supported(rl_ipcp_id_t ipcp_id, struct rina_flow_spec *spec)
     }
 
     memset(&msg, 0, sizeof(msg));
-    msg.msg_type = RLITE_KER_IPCP_QOS_SUPPORTED;
-    msg.event_id = 1;
-    msg.ipcp_id  = ipcp_id;
+    msg.hdr.msg_type = RLITE_KER_IPCP_QOS_SUPPORTED;
+    msg.hdr.event_id = 1;
+    msg.ipcp_id      = ipcp_id;
     memcpy(&msg.flowspec, spec, sizeof(*spec));
 
     ret = rl_write_msg(fd, RLITE_MB(&msg), 1);
@@ -583,8 +583,8 @@ rl_conf_memtrack_dump(void)
         return fd;
     }
 
-    msg.msg_type = RLITE_KER_MEMTRACK_DUMP;
-    msg.event_id = 1;
+    msg.hdr.msg_type = RLITE_KER_MEMTRACK_DUMP;
+    msg.hdr.event_id = 1;
 
     ret = rl_write_msg(fd, &msg, 1);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, &msg);
