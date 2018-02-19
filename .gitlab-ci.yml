@@ -24,4 +24,5 @@ build_user_script:
   script:
     - ./configure --no-kernel
     - make usr
+    - make test
     - make usr_install
