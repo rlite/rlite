@@ -1230,7 +1230,7 @@ after performing any modification to the software.
 ![Development and verification workflow](https://bitbucket.org/vmaffione/rina-images/downloads/verification-workflow-rlite.png)
 
 The demonstrator (`demo/demo.py`) and buildroot
-(https://github.com/vmaffione/buildroot/tree/rlite) are the main tools that
+(https://github.com/vmaffione/buildroot) are the main tools that
 are used to quickly verify the correctness of any software modification,
 as explained in the following (and illustrated in the diagram above).
 
