@@ -26,7 +26,7 @@ target_link_libraries(raft-test rlite-raft)
 install(TARGETS rina-api cdap rlite-conf DESTINATION usr/lib)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/CDAP.pb.h DESTINATION usr/include/rlite)
 
-add_test(NAME raft COMMAND ./raft-test)
+add_test(NAME raft COMMAND raft-test)
 
 add_subdirectory(swig)
 add_subdirectory(wpa-supplicant)

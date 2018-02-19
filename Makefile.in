@@ -13,6 +13,9 @@ ker:
 			WITH_SHIM_TCP4=@WITH_SHIM_TCP4@ \
 			modules
 
+test:
+	cd build && $(MAKE) test
+
 usr_count:
 	find common user include $(FINDCMD)
 
