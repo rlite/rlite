@@ -42,5 +42,7 @@ install(FILES ${RLITE_HEADERS} DESTINATION usr/include/rlite)
 install(FILES include/rina/cdap.hpp DESTINATION usr/include/rina)
 install(FILES "include/rina/api.h" DESTINATION usr/include/rina)
 
+enable_testing()
+
 add_subdirectory(user)
 add_subdirectory(tests)
