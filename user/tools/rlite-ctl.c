@@ -195,6 +195,9 @@ read_response(int sfd, response_handler_t handler)
         if (n < 0) {
             PE("read() error [%s]\n", strerror(errno));
             return n;
+        } else if (n == 0) {
+            PE("uipcps daemon unexpectedly closed the connection\n");
+            return -1;
         }
 
         read_ofs += n;
