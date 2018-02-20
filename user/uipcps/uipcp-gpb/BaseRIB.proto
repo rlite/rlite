@@ -167,8 +167,10 @@ message DFTSlice {  // carries information about
   repeated DFTEntry entries = 1;
 }
 
-message EnrollmentInfo {  // carries information about a member that
-                          // requests enrollment to a DIF
+/* Information exchanged between the enrollee and the enroller.
+ * Enrollee proposes address, and reportes its lower difs.
+ * Enroller returns the actual address. */
+message EnrollmentInfo {
   optional uint64 address = 1;
   repeated string lower_difs = 2;
   optional bool start_early = 3;
