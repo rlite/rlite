@@ -18,7 +18,7 @@ public:
     ~DistributedAddrAllocator() {}
 
     void dump(std::stringstream &ss) const override;
-    rlm_addr_t allocate() override;
+    int allocate(rlm_addr_t *addr) override;
     int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
                     std::shared_ptr<Neighbor> const &neigh,
                     rlm_addr_t src_addr) override;
@@ -64,8 +64,8 @@ DistributedAddrAllocator::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
     return ret;
 }
 
-rlm_addr_t
-DistributedAddrAllocator::allocate()
+int
+DistributedAddrAllocator::allocate(rlm_addr_t *result)
 {
     rlm_addr_t modulo = addr_alloc_table.size() + 1;
     const int inflate = 2;
@@ -116,7 +116,7 @@ DistributedAddrAllocator::allocate()
                 if (ret) {
                     UPE(rib->uipcp, "Failed to send msg to neighbor [%s]\n",
                         strerror(errno));
-                    return 0;
+                    return -1;
                 } else {
                     UPD(rib->uipcp,
                         "Sent address allocation request to neigh %s, "
@@ -143,7 +143,8 @@ DistributedAddrAllocator::allocate()
         }
     }
 
-    return addr;
+    *result = addr;
+    return 0;
 }
 
 int
@@ -309,7 +310,11 @@ class ManualAddrAllocator : public DistributedAddrAllocator {
 public:
     RL_NODEFAULT_NONCOPIABLE(ManualAddrAllocator);
     ManualAddrAllocator(uipcp_rib *_ur) : DistributedAddrAllocator(_ur) {}
-    rlm_addr_t allocate() override { return RL_ADDR_NULL; }
+    int allocate(rlm_addr_t *addr) override
+    {
+        *addr = RL_ADDR_NULL;
+        return 0;
+    }
 };
 
 void

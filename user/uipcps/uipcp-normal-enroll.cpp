@@ -727,10 +727,16 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
         }
 
         gpb::EnrollmentInfo enr_info;
+        rlm_addr_t addr;
         CDAPMessage m;
 
+        /* Return address. */
         enr_info.ParseFromArray(objbuf, objlen);
-        enr_info.set_address(rib->addr_allocate());
+        if (rib->addr_allocate(&addr)) {
+            UPE(rib->uipcp, "Address allocation failed\n");
+            return -1;
+        }
+        enr_info.set_address(addr);
 
         m.m_start_r();
         m.obj_class = obj_class::enrollment;
@@ -743,7 +749,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
         }
         UPD(rib->uipcp, "S --> I M_START_R(enrollment)\n");
 
-        /* Send DIF static information. */
+        /* Here we should send DIF static information and policies. */
 
         /* Stop the enrollment. */
         enr_info.set_start_early(true);
@@ -771,7 +777,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
         int ret;
 
         if (rm->op_code != gpb::M_STOP_R) {
-            UPE(rib->uipcp, "M_START_R expected\n");
+            UPE(rib->uipcp, "M_STOP_R expected\n");
             return -1;
         }
 
@@ -1876,7 +1882,11 @@ uipcp_rib::check_for_address_conflicts()
     if (need_to_change) {
         /* My address conflicts with someone else, and I am the
          * designated one to change it. */
-        rlm_addr_t newaddr = addra->allocate();
+        rlm_addr_t newaddr;
+
+        if (addra->allocate(&newaddr)) {
+            return;
+        }
 
         if (newaddr) {
             set_address(newaddr);
