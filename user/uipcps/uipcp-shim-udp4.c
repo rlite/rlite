@@ -51,6 +51,9 @@ struct udp4_endpoint {
     rl_port_t port_id;
     uint32_t kevent_id;
     int alloc_complete;
+    /* Temporary queue to store PDUs that arrive before flow allocation
+     * has completed. Those PDUs are then injected in the kernel through
+     * the loopback interface, see udp4_fwd_sdu(). */
     struct list_head sduq;
     int sduq_len;
 
@@ -165,6 +168,9 @@ ipaddr_to_rina_name(struct shim_udp4 *shim, char **name,
     return 0;
 }
 
+/* Fills information needed by the kernel to send UDP packets: file
+ * descriptor (to identify the UDP socket), destination IP and destination
+ * UDP port. */
 static void
 udp4_flow_config_fill(struct udp4_endpoint *ep, struct rl_flow_config *cfg)
 {
@@ -191,7 +197,8 @@ udp4_endpoint_lookup(struct shim_udp4 *shim,
     return NULL;
 }
 
-/* Open an UDP socket and add it to the list of endpoints. */
+/* Open an UDP socket and add it to the list of endpoints. The socket
+ * is bound in order to allocate an UDP port. */
 static struct udp4_endpoint *
 udp4_endpoint_open(struct shim_udp4 *shim)
 {
@@ -245,6 +252,9 @@ udp4_endpoint_close(struct udp4_endpoint *ep)
     rl_free(ep, RL_MT_SHIMDATA);
 }
 
+/* Forward the packet to the (in-kernel) socket receive queue associated
+ * to ep->fd. This can be done as soon as the kernel is able to read from
+ * the UDP socket, see rl_shim_udp4_flow_init().*/
 static int
 udp4_fwd_sdu(struct shim_udp4 *shim, struct udp4_endpoint *ep,
              const uint8_t *buf, int len)
@@ -252,7 +262,7 @@ udp4_fwd_sdu(struct shim_udp4 *shim, struct udp4_endpoint *ep,
     struct sockaddr_in dstaddr;
     socklen_t addrlen = sizeof(dstaddr);
 
-    /* Forward the packet to the receive queue associated to ep->fd. */
+    /* We need to get the UDP port bound to ep->fd. */
     if (getsockname(ep->fd, (struct sockaddr *)&dstaddr, &addrlen)) {
         UPE(shim->uipcp, "getsockname() failed [%d]\n", errno);
         return -1;
@@ -275,6 +285,14 @@ udp4_fwd_sdu(struct shim_udp4 *shim, struct udp4_endpoint *ep,
     return 0;
 }
 
+/* If we receive a packet from this UDP socket, it may be that it
+ * is the first UDP packet (incoming implicit flow allocation); or it
+ * may be that this is a later packet that arrives here because the
+ * remote peer (kernel) has not learned yet our UDP port (the one
+ * bound to our endpoint). The remote peer will learn that as soon
+ * as we send an UDP packet to it, by looking at the UDP source port.
+ * Whatever the case, we need to inject the packet to the kernel so
+ * that it can be received through the usual kernel machinery. */
 static void
 udp4_recv_dgram(struct uipcp *uipcp, int bfd, void *opaque)
 {
@@ -295,6 +313,7 @@ udp4_recv_dgram(struct uipcp *uipcp, int bfd, void *opaque)
 
     ep = udp4_endpoint_lookup(shim, &remote_addr);
     if (!ep) {
+        /* First packet: this is an implicit flow allocation request. */
         char *remote_appl, *local_appl;
         struct sockaddr_in bpaddr;
         struct rl_flow_config cfg;
@@ -319,14 +338,16 @@ udp4_recv_dgram(struct uipcp *uipcp, int bfd, void *opaque)
             goto skip;
         }
 
-        /* Open an UDP socket. */
+        /* Open an UDP socket associated to the remote address. */
         ep = udp4_endpoint_open(shim);
         if (!ep) {
             goto skip;
         }
-
-        ep->kevent_id = shim->kevent_id_cnt++;
         memcpy(&ep->remote_addr, &remote_addr, sizeof(remote_addr));
+
+        /* Generate a kevent_id, so that we can later match this flow
+         * allocation request in shim_udp4_fa_resp(). */
+        ep->kevent_id = shim->kevent_id_cnt++;
 
         /* Push the file descriptor and source address down to kernelspace. */
         udp4_flow_config_fill(ep, &cfg);
@@ -346,8 +367,13 @@ udp4_recv_dgram(struct uipcp *uipcp, int bfd, void *opaque)
         }
     }
 
+    /* TODO This alloc_complete and sduq thing may be useless, i.e., we may
+     * always call upd4_fwd_sdu(). In the very end rl_shim_udp4_flow_init() is
+     * called in the context of teh uipcp_issue_fa_req_arrived() call, so at
+     * this point the code is already ready to intercept UDP traffic from within
+     * the kernel. */
     if (!ep->alloc_complete) {
-        /* Put the SDU in a temporary queue. */
+        /* Store the SDU in a temporary queue. */
         struct udp4_sdu *sdu;
 
         if (ep->sduq_len > 64) {
@@ -418,7 +444,7 @@ udp4_bindpoint_open(struct shim_udp4 *shim, char *local_name)
     }
 
     /* The udp4_recv_dgram() callback will be invoked to receive UDP packets
-     * for port 0x0D1F. */
+     * for port 0x0d1f. */
     if (uipcp_loop_fdh_add(uipcp, bp->fd, udp4_recv_dgram, NULL)) {
         UPE(uipcp, "uipcp_loop_fdh_add() failed\n");
         goto err;
@@ -494,7 +520,7 @@ shim_udp4_fa_req(struct uipcp *uipcp, const struct rl_msg_base *msg)
 
     UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
-    /* Open an UDP socket. */
+    /* Open an UDP socket, binding an UDP port. */
     ep = udp4_endpoint_open(shim);
     if (!ep) {
         return -1;
@@ -508,8 +534,8 @@ shim_udp4_fa_req(struct uipcp *uipcp, const struct rl_msg_base *msg)
         return -1;
     }
 
-    /* We don't know the remote UDP port right now, so we specify
-     * the flow allocation port. The kernel will learn the remote port
+    /* We don't know the remote UDP port right now, so we specify the known
+     * port for flow allocation. The kernel will learn the remote port
      * when the first packet is received from the other side. */
     ep->remote_addr.sin_port = htons(RL_SHIM_UDP_PORT);
 
@@ -554,7 +580,7 @@ shim_udp4_fa_resp(struct uipcp *uipcp, const struct rl_msg_base *msg)
     /* Response is positive, allocation is now complete. */
     ep->alloc_complete = 1;
 
-    /* Foward any pending SDUs. */
+    /* Foward any SDU in the temporary queue. */
     list_for_each_entry_safe (sdu, tmp, &ep->sduq, node) {
         udp4_fwd_sdu(shim, ep, sdu->buf, sdu->len);
         list_del(&sdu->node);

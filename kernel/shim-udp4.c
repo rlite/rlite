@@ -133,6 +133,10 @@ peek_head_len(struct sock *sk)
 static void
 udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
 {
+    /* At the beginning the flow requestor does not know the UDP port of the
+     * server side endpoint, so it uses the known flow allocation port as a
+     * destination. The endpoint port is learned upon receiving the first
+     * packet (i.e., right now).*/
     bool update_port = (priv->remote_addr.sin_port == htons(RL_SHIM_UDP_PORT));
     struct flow_entry *flow = priv->flow;
     struct socket *sock     = priv->sock;
@@ -188,6 +192,7 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
         }
 
         if (unlikely(update_port)) {
+            /* Grab the right (source) UDP port used by the other side. */
             priv->remote_addr.sin_port = remote_addr.sin_port;
             PD("sock %p updated with port %u\n", priv->sock,
                ntohs(priv->remote_addr.sin_port));
@@ -272,6 +277,7 @@ rl_shim_udp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     priv->remote_addr.sin_port        = flow->cfg.inet_port;
     priv->remote_addr.sin_addr.s_addr = flow->cfg.inet_ip;
 
+    /* Intercept UDP traffic on this socket. */
     write_lock_bh(&sock->sk->sk_callback_lock);
     priv->sk_data_ready      = sock->sk->sk_data_ready;
     priv->sk_write_space     = sock->sk->sk_write_space;
