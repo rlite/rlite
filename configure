@@ -160,6 +160,16 @@ EOF
         }
 EOF
 
+    add_test 'HAVE_UDP_READER_QUEUE' <<EOF
+        #include <net/sock.h>
+        #include <linux/udp.h>
+
+        struct sk_buff_head *dummy(void) {
+            struct sock *sk = NULL;
+            return &udp_sk(sk)->reader_queue;
+        }
+EOF
+
     # Generate a Makefile for the tests.
     cat >> $KTESTDIR/Makefile <<EOF
 ifneq (\$(KERNELRELEASE),)

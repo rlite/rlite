@@ -39,6 +39,7 @@
 #include <linux/net.h>
 #include <linux/file.h>
 #include <linux/version.h>
+#include <linux/udp.h>
 #include <net/sock.h>
 
 struct rl_shim_udp4 {
@@ -111,7 +112,9 @@ rl_shim_udp4_destroy(struct ipcp_entry *ipcp)
     rl_free(priv, RL_MT_SHIM);
 }
 
-/* Taken from drivers/vhost/net.c. */
+/* Peek in the UDP socket receive queue to get the size of the
+ * next datagram. Conceptually equivalent to the SIOCINQ ioctl.
+ * The initial version of this function comes from drivers/vhost/net.c. */
 static inline int
 peek_head_len(struct sock *sk)
 {
@@ -119,9 +122,26 @@ peek_head_len(struct sock *sk)
     unsigned long flags;
     int len = 0;
 
+#ifdef RL_HAVE_UDP_READER_QUEUE
+    /* Newer kernels have and additional 'reader_queue' inside the
+     * UDP socket, to reduce contention between the ingress datapath
+     * and the reading process on the sk_receive_queue. We need to
+     * look here before looking into sk_receive_queue. */
+    spin_lock_irqsave(&udp_sk(sk)->reader_queue.lock, flags);
+    head = skb_peek(&udp_sk(sk)->reader_queue);
+    if (likely(head)) {
+        len = head->len;
+    }
+    spin_unlock_irqrestore(&udp_sk(sk)->reader_queue.lock, flags);
+
+    if (likely(len)) {
+        return len;
+    }
+#endif /* RL_HAVE_UDP_READER_QUEUE */
+
     spin_lock_irqsave(&sk->sk_receive_queue.lock, flags);
     head = skb_peek(&sk->sk_receive_queue);
-    if (likely(head)) {
+    if (head) {
         len = head->len;
     }
     spin_unlock_irqrestore(&sk->sk_receive_queue.lock, flags);
