@@ -37,12 +37,6 @@
 #include "rlite/list.h"
 #include "uipcp-container.h"
 
-struct udp4_sdu {
-    struct list_head node;
-    int len;
-    uint8_t buf[0];
-};
-
 /* Structure associated to a flow, contains information about the
  * remote UDP endpoint. */
 struct udp4_endpoint {
@@ -50,13 +44,6 @@ struct udp4_endpoint {
     struct sockaddr_in remote_addr;
     rl_port_t port_id;
     uint32_t kevent_id;
-    int alloc_complete;
-    /* Temporary queue to store PDUs that arrive before flow allocation
-     * has completed. Those PDUs are then injected in the kernel through
-     * the loopback interface, see udp4_fwd_sdu(). */
-    struct list_head sduq;
-    int sduq_len;
-
     struct list_head node;
 };
 
@@ -211,9 +198,6 @@ udp4_endpoint_open(struct shim_udp4 *shim)
     }
     memset(ep, 0, sizeof(*ep));
 
-    list_init(&ep->sduq);
-    ep->sduq_len = 0;
-
     ep->fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (ep->fd < 0) {
         UPE(shim->uipcp, "socket() failed [%d]\n", errno);
@@ -240,13 +224,6 @@ udp4_endpoint_open(struct shim_udp4 *shim)
 static void
 udp4_endpoint_close(struct udp4_endpoint *ep)
 {
-    struct udp4_sdu *sdu, *tmp;
-
-    list_for_each_entry_safe (sdu, tmp, &ep->sduq, node) {
-        list_del(&sdu->node);
-        rl_free(sdu, RL_MT_SHIMDATA);
-    }
-
     close(ep->fd);
     list_del(&ep->node);
     rl_free(ep, RL_MT_SHIMDATA);
@@ -367,35 +344,8 @@ udp4_recv_dgram(struct uipcp *uipcp, int bfd, void *opaque)
         }
     }
 
-    /* TODO This alloc_complete and sduq thing may be useless, i.e., we may
-     * always call upd4_fwd_sdu(). In the very end rl_shim_udp4_flow_init() is
-     * called in the context of teh uipcp_issue_fa_req_arrived() call, so at
-     * this point the code is already ready to intercept UDP traffic from within
-     * the kernel. */
-    if (!ep->alloc_complete) {
-        /* Store the SDU in a temporary queue. */
-        struct udp4_sdu *sdu;
-
-        if (ep->sduq_len > 64) {
-            UPD(uipcp, "Queue overrun, dropping\n");
-            return;
-        }
-
-        sdu = rl_alloc(sizeof(*sdu) + payload_len, RL_MT_SHIMDATA);
-        if (!sdu) {
-            UPE(uipcp, "Out of memory\n");
-            return;
-        }
-
-        sdu->len = payload_len;
-        memcpy(sdu->buf, payload, payload_len);
-        list_add_tail(&sdu->node, &ep->sduq);
-        ep->sduq_len++;
-
-        UPD(uipcp, "Queuing %d bytes\n", sdu->len);
-    } else {
-        udp4_fwd_sdu(shim, ep, payload, payload_len);
-    }
+    /* Inject the UDP packet into the kernel. */
+    udp4_fwd_sdu(shim, ep, payload, payload_len);
 }
 
 static struct udp4_bindpoint *
@@ -544,8 +494,6 @@ shim_udp4_fa_req(struct uipcp *uipcp, const struct rl_msg_base *msg)
     udp4_flow_config_fill(ep, &cfg);
     uipcp_issue_fa_resp_arrived(uipcp, ep->port_id, 0, 0, 0, 0, &cfg);
 
-    ep->alloc_complete = 1; /* Actually useless for the client. */
-
     return 0;
 }
 
@@ -554,7 +502,6 @@ shim_udp4_fa_resp(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     struct shim_udp4 *shim       = SHIM(uipcp);
     struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)msg;
-    struct udp4_sdu *sdu, *tmp;
     struct udp4_endpoint *ep;
 
     UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
@@ -573,19 +520,6 @@ shim_udp4_fa_resp(struct uipcp *uipcp, const struct rl_msg_base *msg)
         UPD(uipcp, "Removing endpoint [port=%u,kevent_id=%u,sfd=%d]\n",
             ep->port_id, ep->kevent_id, ep->fd);
         udp4_endpoint_close(ep);
-
-        return 0;
-    }
-
-    /* Response is positive, allocation is now complete. */
-    ep->alloc_complete = 1;
-
-    /* Foward any SDU in the temporary queue. */
-    list_for_each_entry_safe (sdu, tmp, &ep->sduq, node) {
-        udp4_fwd_sdu(shim, ep, sdu->buf, sdu->len);
-        list_del(&sdu->node);
-        ep->sduq_len--;
-        rl_free(sdu, RL_MT_SHIMDATA);
     }
 
     return 0;
