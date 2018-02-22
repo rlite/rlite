@@ -211,6 +211,7 @@ client(struct echo_async *rea)
             if (time(NULL) - fsms[i].last_activity >= TIMEOUT_SECS) {
                 PRINTF("Flow %d timed out\n", i);
                 shutdown_flow(fsms + i);
+                return -1;
             }
         }
     }
