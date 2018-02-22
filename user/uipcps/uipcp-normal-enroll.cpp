@@ -682,7 +682,6 @@ finish:
 
 err:
     enrollment_abort();
-    rib->unlock();
 }
 
 /* Default policy for the enrollment slave (enroller). */
@@ -910,7 +909,6 @@ finish:
 
 err:
     enrollment_abort();
-    rib->unlock();
 }
 
 EnrollmentResources *
