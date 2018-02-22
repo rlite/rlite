@@ -366,8 +366,6 @@ if args.backend == 'tap':
 
 if not args.enrollment_order:
     args.enrollment_order = 'sequential' if len(demo.vms) <= VMTHRESH else 'parallel'
-if args.dump_initscripts:
-    args.enrollment_order = 'parallel'
 
 demo.enrollment_order = args.enrollment_order
 demo.realize_config()
