@@ -19,7 +19,7 @@ ip link set rinau.veth1 up
 ip addr add 10.11.12.13/24 dev rinau.veth0
 ip addr add 10.11.12.14/24 dev rinau.veth1
 cp /etc/hosts /etc/hosts.save
-echo "10.11.12.13 rpinstance5" >> /etc/hosts
+echo "10.11.12.13 rpinstance5" > /etc/hosts
 
 # Create a shim-udp4 for each end of the pair. DIF should be
 # the same, but we'll cheat only for the purpose of testing.
