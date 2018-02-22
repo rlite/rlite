@@ -589,8 +589,9 @@ for vmname in sorted(demo.vms):
 
     # Update /etc/hosts file with DIF mappings
     for sh in demo.dns_mappings:
+        outs += '$SUDO rm /etc/hosts\n'
         for nm in demo.dns_mappings[sh]:
-            outs += 'echo "%(ip)s %(name)s" >> /etc/hosts\n' \
+            outs += "$SUDO sh -c 'echo \"%(ip)s %(name)s\" >> /etc/hosts'\n" \
                     % {'ip': prefix_prune_size(demo.dns_mappings[sh][nm]['ip']),
                             'name': demo.dns_mappings[sh][nm]['name']}
 
