@@ -33,6 +33,9 @@ message(STATUS "RLITE HEADERS: ${RLITE_HEADERS}")
 add_definitions("-Wall -g -Werror")
 if(DEBUG STREQUAL "y")
     add_definitions("-DRL_DEBUG")
+    # Enable address sanitizer
+    set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+    set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
     message(STATUS "Configuring for debug mode")
 endif()
 
