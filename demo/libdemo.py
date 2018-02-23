@@ -204,7 +204,7 @@ class Demo:
                     self.dns_mappings[shim][vm] = {'ip': ip}
                 continue
 
-            m = re.match(r'\s*dif\s+([\w-]+)\s+([\w-]+)\s+(\w.*)$', line)
+            m = re.match(r'\s*dif\s+([\w-]+)\s+([\w.-]+)\s+(\w.*)$', line)
             if m:
                 dif = m.group(1)
                 vm = m.group(2)
