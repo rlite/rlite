@@ -484,6 +484,7 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     setup_timer(&dtp->rtx_tmr, rtx_tmr_cb, (unsigned long)flow);
     setup_timer(&dtp->a_tmr, a_tmr_cb, (unsigned long)flow);
 #endif /* !RL_HAVE_TIMER_SETUP */
+    dtp->flags |= DTP_F_TIMERS_INITIALIZED;
 
     dtp->rtt        = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_rtx_timeout);
     dtp->rtt_stddev = 1;
