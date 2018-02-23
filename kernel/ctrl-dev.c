@@ -1000,7 +1000,7 @@ flows_putq_drain(
             flow->expires = ~0U;
             __flow_put(flow, false); /* match flows_putq_add() */
             if (flow->flags & RL_FLOW_NEVER_BOUND) {
-                PI("Removing flow %u since it was never bound\n",
+                PW("Removing flow %u since it was never bound\n",
                    flow->local_port);
             }
             __flow_put(flow, false);
