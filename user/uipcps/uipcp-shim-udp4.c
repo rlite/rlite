@@ -137,7 +137,7 @@ ipaddr_to_rina_name(struct shim_udp4 *shim, char **name,
     }
 
     ret = getnameinfo((const struct sockaddr *)addr, sizeof(*addr), host,
-                      hostlen, NULL, 0, 0);
+                      hostlen, NULL, 0, NI_NAMEREQD);
     if (ret) {
         rl_free(host, RL_MT_SHIMDATA);
         UPE(shim->uipcp, "getnameinfo() failed [%s]\n", gai_strerror(ret));
