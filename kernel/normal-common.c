@@ -31,6 +31,8 @@
 void
 dtp_init(struct dtp *dtp)
 {
+    /* The DTP struct is already zeroed on the allocation of the container
+     * struct flow_entry. */
     spin_lock_init(&dtp->lock);
     rb_list_init(&dtp->cwq);
     dtp->cwq_len = dtp->max_cwq_len = 0;
@@ -38,6 +40,7 @@ dtp_init(struct dtp *dtp)
     dtp->seqq_len = 0;
     rb_list_init(&dtp->rtxq);
     dtp->rtxq_len = dtp->max_rtxq_len = 0;
+    dtp->flags                        = 0;
 }
 EXPORT_SYMBOL(dtp_init);
 
@@ -46,10 +49,12 @@ dtp_fini(struct dtp *dtp)
 {
     struct rl_buf *rb, *tmp;
 
-    del_timer_sync(&dtp->snd_inact_tmr);
-    del_timer_sync(&dtp->rcv_inact_tmr);
-    del_timer_sync(&dtp->rtx_tmr);
-    del_timer_sync(&dtp->a_tmr);
+    if (dtp->flags & DTP_F_TIMERS_INITIALIZED) {
+        del_timer_sync(&dtp->snd_inact_tmr);
+        del_timer_sync(&dtp->rcv_inact_tmr);
+        del_timer_sync(&dtp->rtx_tmr);
+        del_timer_sync(&dtp->a_tmr);
+    }
 
     spin_lock_bh(&dtp->lock);
 

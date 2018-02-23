@@ -578,6 +578,7 @@ struct dtp {
 
 #define DTP_F_DRF_SET (1 << 0)
 #define DTP_F_DRF_EXPECTED (1 << 1)
+#define DTP_F_TIMERS_INITIALIZED (1 << 2)
     uint8_t flags;
 };
 
