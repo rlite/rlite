@@ -322,6 +322,11 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
     int ret;
 
     remote_addr = rib->lookup_node_address(remote_node);
+    if (remote_addr == RL_ADDR_NULL) {
+        UPE(rib->uipcp, "Cannot find address for node %s\n",
+            remote_node.c_str());
+        return -1;
+    }
 
     freq->set_allocated_src_app(
         apname2gpb(req->local_appl)); /* req->local_appl may be nullptr */
