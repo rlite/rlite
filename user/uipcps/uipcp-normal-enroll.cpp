@@ -834,9 +834,17 @@ EnrollmentResources::enroller_thread()
         /* Rewrite the m.src_appl just in case the enrollee used the N-DIF
          * name as a neighbor name */
         if (m.src_appl != rib->myname) {
-            UPI(rib->uipcp, "M_CONNECT_R::src_appl overwritten %s --> %s\n",
+            UPI(rib->uipcp, "M_CONNECT::src_appl overwritten %s --> %s\n",
                 m.src_appl.c_str(), rib->uipcp->name);
             m.src_appl = rib->myname;
+        }
+
+        if (m.dst_appl != neigh->ipcp_name) {
+            UPE(rib->uipcp,
+                "M_CONNECT::dst_appl (%s) is not consistent with "
+                "neighbor name (%s)\n",
+                m.dst_appl.c_str(), neigh->ipcp_name.c_str());
+            goto err;
         }
 
         ret = nf->send_to_port_id(&m, rm->invoke_id);
