@@ -296,6 +296,11 @@ By default **rlite-node-config** starts with a reset operation to remove all
 the existing IPCPs, and then reads the initscript stored at
 `/etc/rina/initscript`.
 
+Note that the `.DIF` and `.IPCP` suffixes are not required for DIF and IPCP
+names; however, they are widely used in the following examples and tutorial
+with the only purpose of clarify which names refer to IPC processes and which
+ones refer to DIFs.
+
 
 ### 4.5. Other tools
 
