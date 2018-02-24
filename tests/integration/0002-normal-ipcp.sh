@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Create a normal IPCP
 rlite-ctl ipcp-create x normal xx || exit 1

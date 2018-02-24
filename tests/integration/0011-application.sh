@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Create an IPCP and register three applications
 rlite-ctl ipcp-create x normal dd || exit 1
