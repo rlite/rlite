@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/bin/sh
 
-function cleanup() {
+cleanup() {
     local ret=0
     pkill rina-echo-async
     rlite-ctl reset || ret=1
@@ -11,7 +11,7 @@ function cleanup() {
     [ "$ret" != 0 ] && return 1 || return 0
 }
 
-function abort() {
+abort() {
     cleanup
     exit 1
 }

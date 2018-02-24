@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Check that we could not destroy something that does not exist
 rlite-ctl ipcp-destroy x && exit 1

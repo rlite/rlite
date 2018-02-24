@@ -21,4 +21,4 @@ script:
   - make test
   - sudo make install
   - sudo make depmod
-  - tests/run-integration-tests.sh
+  - sudo tests/run-integration-tests.sh

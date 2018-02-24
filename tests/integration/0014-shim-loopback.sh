@@ -1,11 +1,11 @@
-#!/bin/bash
+#!/bin/sh
 
-function cleanup() {
+cleanup() {
 	pkill rinaperf
 	return 0
 }
 
-function abort() {
+abort() {
 	cleanup
 	exit 1
 }

@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/bin/sh
 
-function abort() {
+abort() {
     exit 1
 }
 
