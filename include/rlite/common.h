@@ -279,7 +279,7 @@ struct rl_flow_dtp {
 
     /* Receiver state. */
     rlm_seq_t rcv_lwe;
-    rlm_seq_t rcv_lwe_priv;
+    rlm_seq_t rcv_next_seq_num;
     rlm_seq_t rcv_rwe;
     rlm_seq_t max_seq_num_rcvd;
     rlm_seq_t last_lwe_sent;

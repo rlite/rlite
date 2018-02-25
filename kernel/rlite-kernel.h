@@ -565,7 +565,7 @@ struct dtp {
 
     /* Receiver state. */
     rlm_seq_t rcv_lwe;
-    rlm_seq_t rcv_lwe_priv;
+    rlm_seq_t rcv_next_seq_num;
     rlm_seq_t rcv_rwe;
     rlm_seq_t max_seq_num_rcvd;
     rlm_seq_t next_snd_ctl_seq;

@@ -195,8 +195,8 @@ dtp_rcv_reset(struct flow_entry *flow)
     struct dtp *dtp        = &flow->dtp;
 
     dtp->flags |= DTP_F_DRF_EXPECTED;
-    dtp->rcv_lwe = dtp->rcv_lwe_priv = dtp->rcv_rwe = 0;
-    dtp->max_seq_num_rcvd                           = -1;
+    dtp->rcv_lwe = dtp->rcv_next_seq_num = dtp->rcv_rwe = 0;
+    dtp->max_seq_num_rcvd                               = -1;
 #if 0
     /* This is reset in the receive datapath (see rl_normal_sdu_rx) */
     dtp->next_snd_ctl_seq = 0;
@@ -925,7 +925,7 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
     return rb;
 }
 
-/* This must be called under DTP lock and after rcv_lwe_priv and rcv_lwe
+/* This must be called under DTP lock and after rcv_next_seq_num and rcv_lwe
  * have been updated.
  */
 static struct rl_buf *
@@ -946,7 +946,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 (long unsigned)(flow->dtp.rcv_lwe + win_size));
             flow->dtp.rcv_rwe = flow->dtp.rcv_lwe + win_size;
 
-            if ((flow->dtp.rcv_lwe <
+            if ((flow->dtp.rcv_lwe < /* TODO rcv_next_seq_num */
                  flow->dtp.last_lwe_sent + (win_size >> 1)) &&
                 !ack_immediate && a) {
                 NPD("ACK delayed %lu %lu %lu\n",
@@ -966,7 +966,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
      * way policies are more visible. */
     if (dc->flags & DTCP_CFG_RTX_CTRL) {
         /* POL: RcvrAck */
-        ack_nack_seq_num = flow->dtp.rcv_lwe_priv;
+        ack_nack_seq_num = flow->dtp.rcv_next_seq_num;
         pdu_type         = PDU_T_CTRL | PDU_T_ACK_BIT | PDU_T_ACK;
         if (dc->flags & DTCP_CFG_FLOW_CTRL) {
             pdu_type |= PDU_T_CTRL | PDU_T_FC_BIT;
@@ -1044,11 +1044,11 @@ seqq_pop_many(struct dtp *dtp, rl_seq_t max_sdu_gap, struct rb_list *qrbs)
     rb_list_foreach_safe (qrb, tmp, &dtp->seqq) {
         struct rina_pci *pci = RL_BUF_PCI(qrb);
 
-        if (pci->seqnum - dtp->rcv_lwe_priv <= max_sdu_gap) {
+        if (pci->seqnum - dtp->rcv_next_seq_num <= max_sdu_gap) {
             rb_list_del(qrb);
             dtp->seqq_len--;
             rb_list_enq(qrb, qrbs);
-            dtp->rcv_lwe_priv = pci->seqnum + 1;
+            dtp->rcv_next_seq_num = pci->seqnum + 1;
             RPD(2, "[%lu] popped out from seqq\n", (long unsigned)pci->seqnum);
         }
     }
@@ -1347,8 +1347,8 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 
         /* Init receiver state. The rcv_rwe is not initialized here, but the
          * first time sdu_rx_sv_update is called. */
-        dtp->last_lwe_sent = dtp->rcv_lwe = dtp->rcv_lwe_priv = seqnum + 1;
-        dtp->max_seq_num_rcvd                                 = seqnum;
+        dtp->last_lwe_sent = dtp->rcv_lwe = dtp->rcv_next_seq_num = seqnum + 1;
+        dtp->max_seq_num_rcvd                                     = seqnum;
 
         crb = sdu_rx_sv_update(ipcp, flow, false);
 
@@ -1385,7 +1385,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         goto snd_crb;
     }
 
-    if (unlikely(seqnum < dtp->rcv_lwe_priv)) {
+    if (unlikely(seqnum < dtp->rcv_next_seq_num)) {
         /* This is a duplicate. Probably we sould not drop it
          * if the flow configuration does not require it. */
         RPD(2, "Dropping duplicate PDU [seq=%lu]\n", (long unsigned)seqnum);
@@ -1393,12 +1393,12 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         flow->stats.rx_err++;
 
         if ((flow->cfg.dtcp.flags & DTCP_CFG_RTX_CTRL) &&
-            dtp->rcv_lwe_priv >= dtp->last_lwe_sent) {
+            dtp->rcv_next_seq_num >= dtp->last_lwe_sent) {
             /* Send ACK control PDU. */
             crb = ctrl_pdu_alloc(
                 ipcp, flow,
                 PDU_T_CTRL | PDU_T_ACK_BIT | PDU_T_ACK | PDU_T_FC_BIT,
-                dtp->rcv_lwe_priv);
+                dtp->rcv_next_seq_num);
         }
 
         spin_unlock_bh(&dtp->lock);
@@ -1406,13 +1406,13 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         goto snd_crb;
     }
 
-    if (unlikely(dtp->rcv_lwe_priv < seqnum &&
+    if (unlikely(dtp->rcv_next_seq_num < seqnum &&
                  seqnum <= dtp->max_seq_num_rcvd)) {
         /* This may go in a gap or be a duplicate
          * amongst the gaps. */
 
         NPD("Possible gap fill, RLWE_PRIV would jump %lu --> %lu\n",
-            (long unsigned)dtp->rcv_lwe_priv, (unsigned long)seqnum + 1);
+            (long unsigned)dtp->rcv_next_seq_num, (unsigned long)seqnum + 1);
 
     } else if (seqnum == dtp->max_seq_num_rcvd + 1) {
         /* In order PDU. */
@@ -1420,14 +1420,14 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
     } else {
         /* Out of order. */
         RPD(2, "Out of order packet, RLWE_PRIV would jump %lu --> %lu\n",
-            (long unsigned)dtp->rcv_lwe_priv, (unsigned long)seqnum + 1);
+            (long unsigned)dtp->rcv_next_seq_num, (unsigned long)seqnum + 1);
     }
 
     if (seqnum > dtp->max_seq_num_rcvd) {
         dtp->max_seq_num_rcvd = seqnum;
     }
 
-    gap = seqnum - dtp->rcv_lwe_priv;
+    gap = seqnum - dtp->rcv_next_seq_num;
 
     /* Here we may have received a PDU that it's not the next expected
      * sequence number or generally that does no meet the max_sdu_gap
@@ -1457,9 +1457,9 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         struct rb_list qrbs;
         struct rl_buf *qrb, *tmp;
 
-        /* Update rcv_lwe_priv only if this PDU is going to be
+        /* Update rcv_next_seq_num only if this PDU is going to be
          * delivered. */
-        dtp->rcv_lwe_priv = seqnum + 1;
+        dtp->rcv_next_seq_num = seqnum + 1;
 
         seqq_pop_many(dtp, flow->cfg.max_sdu_gap, &qrbs);
 
@@ -1469,7 +1469,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
          * have to ACK here, since rl_normal_sdu_rx_consumed() won't be
          * called. */
         if (flow->upper.ipcp) {
-            dtp->rcv_lwe = dtp->rcv_lwe_priv;
+            dtp->rcv_lwe = dtp->rcv_next_seq_num;
         }
         crb = sdu_rx_sv_update(ipcp, flow, false);
 
