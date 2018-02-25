@@ -936,32 +936,32 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
 {
     const struct dtcp_config *dc = &flow->cfg.dtcp;
     unsigned int a               = flow->cfg.dtcp.initial_a;
+    rl_seq_t win_size            = dc->fc.cfg.w.initial_credit;
     uint8_t pdu_type             = 0;
 
-    if (dc->flags & DTCP_CFG_FLOW_CTRL) {
-        /* POL: RcvrFlowControl */
-        if (likely(dc->fc.fc_type == RLITE_FC_T_WIN)) {
-            rl_seq_t win_size = dc->fc.cfg.w.initial_credit;
+    /* POL: RcvrFlowControl, ReceivingFlowControl, RcvrAck */
+    if ((dc->flags & DTCP_CFG_FLOW_CTRL) &&
+        (dc->fc.fc_type == RLITE_FC_T_WIN)) {
+	/* Update the rcv_rwe, as rcv_lwe may have changed. */
+        NPD("rcv_rwe [%lu] --> [%lu]\n", (long unsigned)flow->dtp.rcv_rwe,
+            (long unsigned)(flow->dtp.rcv_lwe + win_size));
+        flow->dtp.rcv_rwe = flow->dtp.rcv_lwe + win_size;
 
-            NPD("rcv_rwe [%lu] --> [%lu]\n", (long unsigned)flow->dtp.rcv_rwe,
-                (long unsigned)(flow->dtp.rcv_lwe + win_size));
-            flow->dtp.rcv_rwe = flow->dtp.rcv_lwe + win_size;
-
-            /* We send an ack if explicitly asked for (ack_immediate == true),
-             * or if we have more than an half window of PDUs that have been
-             * correctly delivered but yet unacked, i.e.
-             *     rcv_next_seq_num >= last_lwe_sent + win_size/2
-             */
-            if ((flow->dtp.rcv_lwe <
-                 flow->dtp.last_lwe_sent + (win_size >> 1)) &&
-                !ack_immediate && a) {
-                NPD("ACK delayed %lu %lu %lu\n",
-                    (long unsigned)flow->dtp.last_lwe_sent,
-                    (long unsigned)flow->dtp.rcv_lwe,
-                    (long unsigned)(flow->dtp.last_lwe_sent + (win_size >> 1)));
-                goto no_ack;
-            }
-            NPD("ACK immediate %lu %lu %lu\n",
+        /* We send a flow control ack if explicitly asked for
+	 * (ack_immediate == true), or if we have more than an half window
+	 * of PDUs that have been correctly consumed but yet not published to
+	 * the sender, i.e.
+         *     rcv_lwe >= last_lwe_sent + win_size/2
+         */
+        if ((flow->dtp.rcv_lwe >= flow->dtp.last_lwe_sent + (win_size >> 1)) ||
+            ack_immediate || !a) {
+            pdu_type |= PDU_T_CTRL | PDU_T_FC_BIT;
+            NPD("FC ACK immediate %lu %lu %lu\n",
+                (long unsigned)flow->dtp.last_lwe_sent,
+                (long unsigned)flow->dtp.rcv_lwe,
+                (long unsigned)(flow->dtp.last_lwe_sent + (win_size >> 1)));
+        } else {
+            NPD("FC ACK delayed %lu %lu %lu\n",
                 (long unsigned)flow->dtp.last_lwe_sent,
                 (long unsigned)flow->dtp.rcv_lwe,
                 (long unsigned)(flow->dtp.last_lwe_sent + (win_size >> 1)));
@@ -971,28 +971,38 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
     /* I know, the following code can be easily simplified, but this
      * way policies are more visible. */
     if (dc->flags & DTCP_CFG_RTX_CTRL) {
-        /* POL: RcvrAck */
-        pdu_type = PDU_T_CTRL | PDU_T_ACK_BIT | PDU_T_ACK;
-        if (dc->flags & DTCP_CFG_FLOW_CTRL) {
-            pdu_type |= PDU_T_CTRL | PDU_T_FC_BIT;
+        if ((flow->dtp.rcv_next_seq_num >=
+             flow->dtp.last_seq_num_acked + (win_size >> 1)) ||
+            ack_immediate || !a) {
+		/* We send a retransmission ack if explicitly asked for
+		 * (ack_immediate == true), or if we have more than an half
+		 * window of PDUs that have been correctly delivered to the
+		 * receive queue, but yet unacked, i.e.
+		 *     rcv_next_seq_num >= last_seq_num_acked + win_size/2
+		 */
+            pdu_type |= PDU_T_CTRL | PDU_T_ACK_BIT | PDU_T_ACK;
+            NPD("RTX ACK immediate %lu %lu %lu\n",
+                (long unsigned)flow->dtp.last_seq_num_acked,
+                (long unsigned)flow->dtp.rcv_next_seq_num,
+                (long unsigned)(flow->dtp.last_seq_num_acked +
+                                (win_size >> 1)));
+        } else {
+            NPD("RTX ACK delayed %lu %lu %lu\n",
+                (long unsigned)flow->dtp.last_seq_num_acked,
+                (long unsigned)flow->dtp.rcv_next_seq_num,
+                (long unsigned)(flow->dtp.last_seq_num_acked +
+                                (win_size >> 1)));
         }
-
-    } else if (dc->flags & DTCP_CFG_FLOW_CTRL) {
-        /* POL: ReceivingFlowControl */
-        /* Send a flow control only control PDU. */
-        pdu_type = PDU_T_CTRL | PDU_T_FC_BIT;
     }
 
     if (pdu_type) {
-        /* Stop the A timer, we are going to send an ACK. */
+        /* Stop the A timer, we are going to send a control PDU. */
         del_timer(&flow->dtp.a_tmr);
         return ctrl_pdu_alloc(ipcp, flow, pdu_type);
     }
 
-no_ack:
-    /* We are not sending an immediate ACK, so we need
-     * to start the A timer (if it was not already
-     * started) */
+    /* We are not sending an immediate control PDU, so we need
+     * to start the A timer (if it was not already started). */
     if (a && !timer_pending(&flow->dtp.a_tmr)) {
         mod_timer(&flow->dtp.a_tmr, jiffies + msecs_to_jiffies(a));
         RPV(1, "start A timer\n");
@@ -1545,7 +1555,8 @@ rl_normal_sdu_rx_consumed(struct flow_entry *flow, rlm_seq_t seqnum)
 
     spin_lock_bh(&dtp->lock);
 
-    /* Update the advertised rcv_lwe and possibly send an ACK control PDU. */
+    /* Update the advertised rcv_lwe and possibly send a an FC ACK
+     * control PDU. */
     dtp->rcv_lwe = seqnum + 1;
     crb          = sdu_rx_sv_update(ipcp, flow, /*ack_immediate=*/false);
 
