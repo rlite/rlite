@@ -552,6 +552,11 @@ rl_conf_ipcp_qos_supported(rl_ipcp_id_t ipcp_id, struct rina_flow_spec *spec)
     int ret;
     int fd;
 
+    if (spec->version != RINA_FLOW_SPEC_VERSION) {
+        errno = EINVAL;
+        return -1;
+    }
+
     fd = rina_open();
     if (fd < 0) {
         return fd;
