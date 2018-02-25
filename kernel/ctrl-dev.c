@@ -2271,7 +2271,7 @@ rl_flow_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     resp.dtp.rtt                    = dtp->rtt;
     resp.dtp.rtt_stddev             = dtp->rtt_stddev;
     resp.dtp.rcv_lwe                = dtp->rcv_lwe;
-    resp.dtp.rcv_lwe_priv           = dtp->rcv_lwe_priv;
+    resp.dtp.rcv_next_seq_num       = dtp->rcv_next_seq_num;
     resp.dtp.rcv_rwe                = dtp->rcv_rwe;
     resp.dtp.max_seq_num_rcvd       = dtp->max_seq_num_rcvd;
     resp.dtp.next_snd_ctl_seq       = dtp->next_snd_ctl_seq;
