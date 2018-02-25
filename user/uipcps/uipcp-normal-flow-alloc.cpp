@@ -321,6 +321,12 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
     string dest_appl = string(req->remote_appl);
     int ret;
 
+    if (req->flowspec.version != RINA_FLOW_SPEC_VERSION) {
+        UPE(rib->uipcp, "Version mismatch in flow spec (got %u, "
+		"expected %u)\n", req->flowspec.version, RINA_FLOW_SPEC_VERSION);
+	return -1;
+    }
+
     remote_addr = rib->lookup_node_address(remote_node);
     if (remote_addr == RL_ADDR_NULL) {
         UPE(rib->uipcp, "Cannot find address for node %s\n",
