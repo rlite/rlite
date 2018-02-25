@@ -568,8 +568,9 @@ struct dtp {
     rlm_seq_t rcv_next_seq_num;
     rlm_seq_t rcv_rwe;
     rlm_seq_t max_seq_num_rcvd;
-    rlm_seq_t next_snd_ctl_seq;
     rlm_seq_t last_lwe_sent;
+    rlm_seq_t last_seq_num_acked;
+    rlm_seq_t next_snd_ctl_seq;
     struct timer_list rcv_inact_tmr;
     struct rb_list seqq;
     unsigned int seqq_len;
