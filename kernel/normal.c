@@ -204,7 +204,8 @@ dtp_rcv_reset(struct flow_entry *flow)
     if (dc->fc.fc_type == RLITE_FC_T_WIN) {
         dtp->rcv_rwe += dc->fc.cfg.w.initial_credit;
     }
-    dtp->last_lwe_sent = 0;
+    dtp->last_lwe_sent      = 0;
+    dtp->last_seq_num_acked = 0;
 }
 
 static void
@@ -323,7 +324,7 @@ a_tmr_cb(
     RPV(1, "A tmr callback\n");
 
     spin_lock_bh(&dtp->lock);
-    crb = sdu_rx_sv_update(ipcp, flow, true);
+    crb = sdu_rx_sv_update(ipcp, flow, /*ack_immediate=*/true);
     spin_unlock_bh(&dtp->lock);
 
     if (crb) {
@@ -915,8 +916,9 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
         pcic->base.pdu_len           = rb->len;
         pcic->base.seqnum            = flow->dtp.next_snd_ctl_seq++;
         pcic->last_ctrl_seq_num_rcvd = flow->dtp.last_ctrl_seq_num_rcvd;
-        pcic->ack_nack_seq_num       = ack_nack_seq_num;
-        pcic->new_rwe                = flow->dtp.rcv_rwe;
+        pcic->ack_nack_seq_num       = flow->dtp.last_seq_num_acked =
+            ack_nack_seq_num;
+        pcic->new_rwe = flow->dtp.rcv_rwe;
         pcic->new_lwe = flow->dtp.last_lwe_sent = flow->dtp.rcv_lwe;
         pcic->my_rwe                            = flow->dtp.snd_rwe;
         pcic->my_lwe                            = flow->dtp.snd_lwe;
@@ -939,14 +941,19 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     if (dc->flags & DTCP_CFG_FLOW_CTRL) {
         /* POL: RcvrFlowControl */
-        if (dc->fc.fc_type == RLITE_FC_T_WIN) {
+        if (likely(dc->fc.fc_type == RLITE_FC_T_WIN)) {
             rl_seq_t win_size = dc->fc.cfg.w.initial_credit;
 
             NPD("rcv_rwe [%lu] --> [%lu]\n", (long unsigned)flow->dtp.rcv_rwe,
                 (long unsigned)(flow->dtp.rcv_lwe + win_size));
             flow->dtp.rcv_rwe = flow->dtp.rcv_lwe + win_size;
 
-            if ((flow->dtp.rcv_lwe < /* TODO rcv_next_seq_num */
+            /* We send an ack if explicitly asked for (ack_immediate == true),
+             * or if we have more than an half window of PDUs that have been
+             * correctly delivered but yet unacked, i.e.
+             *     rcv_next_seq_num >= last_lwe_sent + win_size/2
+             */
+            if ((flow->dtp.rcv_lwe <
                  flow->dtp.last_lwe_sent + (win_size >> 1)) &&
                 !ack_immediate && a) {
                 NPD("ACK delayed %lu %lu %lu\n",
@@ -1347,10 +1354,11 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 
         /* Init receiver state. The rcv_rwe is not initialized here, but the
          * first time sdu_rx_sv_update is called. */
-        dtp->last_lwe_sent = dtp->rcv_lwe = dtp->rcv_next_seq_num = seqnum + 1;
-        dtp->max_seq_num_rcvd                                     = seqnum;
+        dtp->last_lwe_sent = dtp->rcv_lwe = dtp->rcv_next_seq_num =
+            dtp->last_seq_num_acked       = seqnum + 1;
+        dtp->max_seq_num_rcvd             = seqnum;
 
-        crb = sdu_rx_sv_update(ipcp, flow, false);
+        crb = sdu_rx_sv_update(ipcp, flow, /*ack_immediate=*/false);
 
         flow->stats.rx_pkt++;
         flow->stats.rx_byte += rb->len;
@@ -1471,7 +1479,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         if (flow->upper.ipcp) {
             dtp->rcv_lwe = dtp->rcv_next_seq_num;
         }
-        crb = sdu_rx_sv_update(ipcp, flow, false);
+        crb = sdu_rx_sv_update(ipcp, flow, /*ack_immediate=*/false);
 
         flow->stats.rx_pkt++;
         flow->stats.rx_byte += rb->len;
@@ -1507,7 +1515,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
             (long unsigned)seqnum);
         rl_buf_free(rb);
         rb  = NULL;
-        crb = sdu_rx_sv_update(ipcp, flow, false);
+        crb = sdu_rx_sv_update(ipcp, flow, /*ack_immediate=*/false);
         flow->stats.rx_err++;
 
     } else {
@@ -1540,9 +1548,9 @@ rl_normal_sdu_rx_consumed(struct flow_entry *flow, rlm_seq_t seqnum)
 
     spin_lock_bh(&dtp->lock);
 
-    /* Update the advertised RCVLWE and send an ACK control PDU. */
+    /* Update the advertised rcv_lwe and possibly send an ACK control PDU. */
     dtp->rcv_lwe = seqnum + 1;
-    crb          = sdu_rx_sv_update(ipcp, flow, false);
+    crb          = sdu_rx_sv_update(ipcp, flow, /*ack_immediate=*/false);
 
     spin_unlock_bh(&dtp->lock);
 
