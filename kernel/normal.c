@@ -896,7 +896,7 @@ rl_normal_qos_supported(struct ipcp_entry *ipcp, struct rina_flow_spec *spec)
 
 static struct rl_buf *
 ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
-               uint8_t pdu_type, rl_seq_t ack_nack_seq_num)
+               uint8_t pdu_type)
 {
     struct rl_buf *rb =
         rl_buf_alloc(sizeof(struct rina_pci_ctrl), ipcp->txhdroom,
@@ -917,7 +917,7 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
         pcic->base.seqnum            = flow->dtp.next_snd_ctl_seq++;
         pcic->last_ctrl_seq_num_rcvd = flow->dtp.last_ctrl_seq_num_rcvd;
         pcic->ack_nack_seq_num       = flow->dtp.last_seq_num_acked =
-            ack_nack_seq_num;
+            flow->dtp.rcv_next_seq_num;
         pcic->new_rwe = flow->dtp.rcv_rwe;
         pcic->new_lwe = flow->dtp.last_lwe_sent = flow->dtp.rcv_lwe;
         pcic->my_rwe                            = flow->dtp.snd_rwe;
@@ -936,7 +936,6 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
 {
     const struct dtcp_config *dc = &flow->cfg.dtcp;
     unsigned int a               = flow->cfg.dtcp.initial_a;
-    rl_seq_t ack_nack_seq_num    = 0;
     uint8_t pdu_type             = 0;
 
     if (dc->flags & DTCP_CFG_FLOW_CTRL) {
@@ -973,8 +972,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
      * way policies are more visible. */
     if (dc->flags & DTCP_CFG_RTX_CTRL) {
         /* POL: RcvrAck */
-        ack_nack_seq_num = flow->dtp.rcv_next_seq_num;
-        pdu_type         = PDU_T_CTRL | PDU_T_ACK_BIT | PDU_T_ACK;
+        pdu_type = PDU_T_CTRL | PDU_T_ACK_BIT | PDU_T_ACK;
         if (dc->flags & DTCP_CFG_FLOW_CTRL) {
             pdu_type |= PDU_T_CTRL | PDU_T_FC_BIT;
         }
@@ -988,7 +986,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
     if (pdu_type) {
         /* Stop the A timer, we are going to send an ACK. */
         del_timer(&flow->dtp.a_tmr);
-        return ctrl_pdu_alloc(ipcp, flow, pdu_type, ack_nack_seq_num);
+        return ctrl_pdu_alloc(ipcp, flow, pdu_type);
     }
 
 no_ack:
@@ -1405,8 +1403,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
             /* Send ACK control PDU. */
             crb = ctrl_pdu_alloc(
                 ipcp, flow,
-                PDU_T_CTRL | PDU_T_ACK_BIT | PDU_T_ACK | PDU_T_FC_BIT,
-                dtp->rcv_next_seq_num);
+                PDU_T_CTRL | PDU_T_ACK_BIT | PDU_T_ACK | PDU_T_FC_BIT);
         }
 
         spin_unlock_bh(&dtp->lock);
