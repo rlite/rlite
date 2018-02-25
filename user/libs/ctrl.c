@@ -427,6 +427,11 @@ __rina_flow_alloc(const char *dif_name, const char *local_appl,
         return -1;
     }
 
+    if (flowspec && flowspec->version != RINA_FLOW_SPEC_VERSION) {
+        errno = EINVAL;
+        return -1;
+    }
+
     ret = rl_fa_req_fill(&req, RINA_FA_EVENT_ID, dif_name, local_appl,
                          remote_appl, flowspec, upper_ipcp_id);
     if (ret) {
@@ -581,6 +586,10 @@ rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
     }
 
     if (spec) {
+	if (spec->version != RINA_FLOW_SPEC_VERSION) {
+		errno = EINVAL;
+		return -1;
+	}
         memset(spec, 0, sizeof(*spec));
     }
 
