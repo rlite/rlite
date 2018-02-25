@@ -91,7 +91,7 @@ dtp_dump(struct dtp *dtp)
            "    flags=%08x\n"
            "    snd_lwe=%lu\n"
            "    snd_rwe=%lu\n"
-           "    next_seq_num_to_send=%lu\n"
+           "    next_seq_num_to_use=%lu\n"
            "    last_seq_num_sent=%lu\n"
            "    last_ctrl_seq_num_rcvd=%lu\n"
            "    cwq_len=%lu\n"
@@ -110,7 +110,7 @@ dtp_dump(struct dtp *dtp)
            "    seqq_len=%lu\n",
            (long unsigned)flow->local_port, dtp->flags,
            (long unsigned)dtp->snd_lwe, (long unsigned)dtp->snd_rwe,
-           (long unsigned)dtp->next_seq_num_to_send,
+           (long unsigned)dtp->next_seq_num_to_use,
            (long unsigned)dtp->last_seq_num_sent,
            (long unsigned)dtp->last_ctrl_seq_num_rcvd,
            (long unsigned)dtp->cwq_len, (long unsigned)dtp->max_cwq_len,

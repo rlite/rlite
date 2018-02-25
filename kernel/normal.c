@@ -178,8 +178,8 @@ dtp_snd_reset(struct flow_entry *flow)
 
     dtp->flags |= DTP_F_DRF_SET;
     /* InitialSeqNumPolicy */
-    dtp->next_seq_num_to_send = 0;
-    dtp->snd_lwe = dtp->snd_rwe = dtp->next_seq_num_to_send;
+    dtp->next_seq_num_to_use = 0;
+    dtp->snd_lwe = dtp->snd_rwe = dtp->next_seq_num_to_use;
     dtp->last_seq_num_sent      = -1;
     dtp->last_ctrl_seq_num_rcvd = 0;
     if (dc->fc.fc_type == RLITE_FC_T_WIN) {
@@ -652,7 +652,7 @@ static inline bool
 flow_blocked(struct rl_flow_config *cfg, struct dtp *dtp)
 {
     return (cfg->dtcp.fc.fc_type == RLITE_FC_T_WIN &&
-            dtp->next_seq_num_to_send > dtp->snd_rwe &&
+            dtp->next_seq_num_to_use > dtp->snd_rwe &&
             dtp->cwq_len >= dtp->max_cwq_len) ||
            ((cfg->dtcp.flags & DTCP_CFG_RTX_CTRL) &&
             dtp->rtxq_len >= dtp->max_rtxq_len);
@@ -738,7 +738,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     pci->pdu_type  = PDU_T_DT;
     pci->pdu_flags = 0;
     pci->pdu_len   = rb->len;
-    pci->seqnum    = dtp->next_seq_num_to_send++;
+    pci->seqnum    = dtp->next_seq_num_to_use++;
 
     flow->stats.tx_pkt++;
     flow->stats.tx_byte += rb->len;
@@ -750,7 +750,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     if (!dtcp_present) {
         /* DTCP not present */
-        dtp->snd_lwe           = dtp->next_seq_num_to_send; /* WFS */
+        dtp->snd_lwe           = dtp->next_seq_num_to_use; /* WFS */
         dtp->last_seq_num_sent = pci->seqnum;
 
     } else {
@@ -767,7 +767,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
             } else {
                 /* PDU in the sender window. */
                 /* POL: TxControl. */
-                dtp->snd_lwe           = dtp->next_seq_num_to_send;
+                dtp->snd_lwe           = dtp->next_seq_num_to_use;
                 dtp->last_seq_num_sent = pci->seqnum;
                 NPD("sending [%lu] through sender window\n",
                     (long unsigned)pci->seqnum);

@@ -2261,7 +2261,7 @@ rl_flow_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     dtp                             = &flow->dtp;
     resp.dtp.snd_lwe                = dtp->snd_lwe;
     resp.dtp.snd_rwe                = dtp->snd_rwe;
-    resp.dtp.next_seq_num_to_send   = dtp->next_seq_num_to_send;
+    resp.dtp.next_seq_num_to_use    = dtp->next_seq_num_to_use;
     resp.dtp.last_seq_num_sent      = dtp->last_seq_num_sent;
     resp.dtp.last_ctrl_seq_num_rcvd = dtp->last_ctrl_seq_num_rcvd;
     resp.dtp.cwq_len                = dtp->cwq_len;
