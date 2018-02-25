@@ -197,7 +197,6 @@ dtp_rcv_reset(struct flow_entry *flow)
     dtp->flags |= DTP_F_DRF_EXPECTED;
     dtp->rcv_lwe = dtp->rcv_lwe_priv = dtp->rcv_rwe = 0;
     dtp->max_seq_num_rcvd                           = -1;
-    dtp->last_snd_data_ack                          = 0;
 #if 0
     /* This is reset in the receive datapath (see rl_normal_sdu_rx) */
     dtp->next_snd_ctl_seq = 0;
@@ -1394,15 +1393,12 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         flow->stats.rx_err++;
 
         if ((flow->cfg.dtcp.flags & DTCP_CFG_RTX_CTRL) &&
-            dtp->rcv_lwe_priv >= dtp->last_snd_data_ack) {
+            dtp->rcv_lwe_priv >= dtp->last_lwe_sent) {
             /* Send ACK control PDU. */
             crb = ctrl_pdu_alloc(
                 ipcp, flow,
                 PDU_T_CTRL | PDU_T_ACK_BIT | PDU_T_ACK | PDU_T_FC_BIT,
                 dtp->rcv_lwe_priv);
-            if (crb) {
-                dtp->last_snd_data_ack = dtp->rcv_lwe_priv;
-            }
         }
 
         spin_unlock_bh(&dtp->lock);
