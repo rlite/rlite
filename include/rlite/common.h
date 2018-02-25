@@ -267,7 +267,7 @@ struct rl_flow_dtp {
     /* Sender state. */
     rlm_seq_t snd_lwe;
     rlm_seq_t snd_rwe;
-    rlm_seq_t next_seq_num_to_send;
+    rlm_seq_t next_seq_num_to_use;
     rlm_seq_t last_seq_num_sent;
     rlm_seq_t last_ctrl_seq_num_rcvd;
     unsigned int cwq_len;
