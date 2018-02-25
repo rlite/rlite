@@ -85,18 +85,42 @@ EXPORT_SYMBOL(dtp_fini);
 void
 dtp_dump(struct dtp *dtp)
 {
-    printk("DTP(%p): flags=%x,snd_lwe=%lu,snd_rwe=%lu,next_seq_num_to_send=%lu,"
-           "last_seq_num_sent=%lu,rcv_lwe=%lu,rcv_rwe=%lu,"
-           "max_seq_num_rcvd=%lu,last_snd_data_ack=%lu,"
-           "next_snd_ctl_seq=%lu,last_ctrl_seq_num_rcvd=%lu\n",
-           dtp, dtp->flags, (long unsigned)dtp->snd_lwe,
-           (long unsigned)dtp->snd_rwe,
+    struct flow_entry *flow = container_of(dtp, struct flow_entry, dtp);
+
+    printk("DTP(port_id=%lu):\n"
+           "    flags=%08x\n"
+           "    snd_lwe=%lu\n"
+           "    snd_rwe=%lu\n"
+           "    next_seq_num_to_send=%lu\n"
+           "    last_seq_num_sent=%lu\n"
+           "    last_ctrl_seq_num_rcvd=%lu\n"
+           "    cwq_len=%lu\n"
+           "    max_cwq_len=%lu\n"
+           "    rtxq_len=%lu\n"
+           "    max_rtxq_len=%lu\n"
+           "    rtt=%lu\n"
+           "    rtt_stddev=%lu\n"
+           "    rcv_lwe=%lu\n"
+           "    rcv_lwe_priv=%lu\n"
+           "    rcv_rwe=%lu\n"
+           "    max_seq_num_rcvd=%lu\n"
+           "    last_snd_data_ack=%lu\n"
+           "    next_snd_ctl_seq=%lu\n"
+           "    last_lwe_sent=%lu\n"
+           "    seqq_len=%lu\n",
+           (long unsigned)flow->local_port, dtp->flags,
+           (long unsigned)dtp->snd_lwe, (long unsigned)dtp->snd_rwe,
            (long unsigned)dtp->next_seq_num_to_send,
-           (long unsigned)dtp->last_seq_num_sent, (long unsigned)dtp->rcv_lwe,
+           (long unsigned)dtp->last_seq_num_sent,
+           (long unsigned)dtp->last_ctrl_seq_num_rcvd,
+           (long unsigned)dtp->cwq_len, (long unsigned)dtp->max_cwq_len,
+           (long unsigned)dtp->rtxq_len, (long unsigned)dtp->max_rtxq_len,
+           (long unsigned)dtp->rtt, (long unsigned)dtp->rtt_stddev,
+           (long unsigned)dtp->rcv_lwe, (long unsigned)dtp->rcv_lwe_priv,
            (long unsigned)dtp->rcv_rwe, (long unsigned)dtp->max_seq_num_rcvd,
            (long unsigned)dtp->last_snd_data_ack,
            (long unsigned)dtp->next_snd_ctl_seq,
-           (long unsigned)dtp->last_ctrl_seq_num_rcvd);
+           (long unsigned)dtp->last_lwe_sent, (long unsigned)dtp->seqq_len);
 }
 EXPORT_SYMBOL(dtp_dump);
 
