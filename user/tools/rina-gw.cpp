@@ -289,7 +289,7 @@ accept_rina_flow(int fd, const InetName &inet)
 
     /* Accept the incoming flow request. */
     spec.version = RINA_FLOW_SPEC_VERSION;
-    rfd = rina_flow_accept(fd, /* source name */ NULL, &spec, 0);
+    rfd          = rina_flow_accept(fd, /* source name */ NULL, &spec, 0);
     if (rfd < 0) {
         perror("rina_flow_accept()");
         return 0;

@@ -586,10 +586,10 @@ rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
     }
 
     if (spec) {
-	if (spec->version != RINA_FLOW_SPEC_VERSION) {
-		errno = EINVAL;
-		return -1;
-	}
+        if (spec->version != RINA_FLOW_SPEC_VERSION) {
+            errno = EINVAL;
+            return -1;
+        }
         memset(spec, 0, sizeof(*spec));
     }
 
