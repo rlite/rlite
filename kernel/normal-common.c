@@ -48,7 +48,10 @@ void
 dtp_fini(struct dtp *dtp)
 {
     struct rl_buf *rb, *tmp;
+
+#if 0
     dtp_dump(dtp);
+#endif
     if (dtp->flags & DTP_F_TIMERS_INITIALIZED) {
         del_timer_sync(&dtp->snd_inact_tmr);
         del_timer_sync(&dtp->rcv_inact_tmr);
