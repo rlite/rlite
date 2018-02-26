@@ -512,7 +512,7 @@ perf_server(struct worker *w)
             n = poll(pfd, 2, RP_DATA_WAIT_MSECS);
             if (n < 0) {
                 perror("poll(flow)");
-
+                return -1;
             } else if (n == 0) {
                 /* Timeout */
                 timeout = 1;
@@ -522,16 +522,17 @@ perf_server(struct worker *w)
                 break;
             }
 
-            if (pfd[1].revents & POLLIN) {
-                /* Stop signal received. */
+            if (pfd[0].revents & POLLIN) {
+                /* Ready to read. */
+                n = read(w->dfd, buf, sizeof(buf));
+            } else {
+                /* Nothing to read and stop signal received. */
+                assert(pfd[1].revents & POLLIN);
                 if (verb) {
                     PRINTF("Stopped remotely\n");
                 }
                 break;
             }
-
-            /* Ready to read. */
-            n = read(w->dfd, buf, sizeof(buf));
         }
         if (n < 0) {
             perror("read(flow)");
