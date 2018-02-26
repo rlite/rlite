@@ -47,6 +47,7 @@ EXPORT_SYMBOL(dtp_init);
 void
 dtp_fini(struct dtp *dtp)
 {
+    struct flow_entry *flow = container_of(dtp, struct flow_entry, dtp);
     struct rl_buf *rb, *tmp;
 
 #if 0
@@ -61,8 +62,11 @@ dtp_fini(struct dtp *dtp)
 
     spin_lock_bh(&dtp->lock);
 
-    PD("dropping %u PDUs from cwq, %u from seqq, %u from rtxq\n", dtp->cwq_len,
-       dtp->seqq_len, dtp->rtxq_len);
+    if (dtp->cwq_len || dtp->seqq_len || dtp->rtxq_len || flow->txrx.rx_qsize) {
+        PD("dropping %u PDUs from cwq, %u from seqq, %u from rtxq, "
+           "and %u bytes from rxq\n",
+           dtp->cwq_len, dtp->seqq_len, dtp->rtxq_len, flow->txrx.rx_qsize);
+    }
     rb_list_foreach_safe (rb, tmp, &dtp->cwq) {
         rb_list_del(rb);
         rl_buf_free(rb);

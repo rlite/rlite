@@ -1125,6 +1125,8 @@ flow_del(struct flow_entry *entry)
     }
     dtp_fini(dtp);
 
+    /* dtp_fini() may print txrx.rx_qsize, so we purge the queue after
+     * calling that function. */
     rb_list_foreach_safe (rb, tmp, &entry->txrx.rx_q) {
         rb_list_del(rb);
         rl_buf_free(rb);
