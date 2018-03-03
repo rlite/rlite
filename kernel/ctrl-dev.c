@@ -885,7 +885,6 @@ flow_lookup(rl_port_t port_id)
 
     return NULL;
 }
-EXPORT_SYMBOL(flow_lookup);
 
 struct flow_entry *
 flow_get(rl_port_t port_id)
@@ -947,37 +946,47 @@ EXPORT_SYMBOL(flow_get_ref);
 static void
 flows_putq_add(struct flow_entry *flow, unsigned jdelta)
 {
+    struct flow_entry *cur;
+
+    if (flow->expires != ~0U) {
+        /* don't insert twice */
+        return;
+    }
+
+    flow->expires = jiffies + jdelta;
+    /* Insert flow in the putq, keeping the putq sorted
+     * by expiration time, in ascending order. */
+    list_for_each_entry (cur, &rl_dm.flows_putq, node_rm) {
+        if (time_after(cur->expires, flow->expires)) {
+            break;
+        }
+    }
+    /* Insert 'flow' right before 'cur'. */
+    list_add_tail_safe(&flow->node_rm, &cur->node_rm);
     flow->refcnt++;
     PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
-
-    if (flow->expires == ~0U) { /* don't insert twice */
-        struct flow_entry *cur;
-
-        flow->expires = jiffies + jdelta;
-        /* Insert flow in the putq, keeping the putq sorted
-         * by expiration time, in ascending order. */
-        list_for_each_entry (cur, &rl_dm.flows_putq, node_rm) {
-            if (time_after(cur->expires, flow->expires)) {
-                break;
-            }
-        }
-        /* Insert 'flow' right before 'cur'. */
-        list_add_tail_safe(&flow->node_rm, &cur->node_rm);
-        /* Adjust timer expiration according to the new first entry. */
-        cur = list_first_entry(&rl_dm.flows_putq, struct flow_entry, node_rm);
-        mod_timer(&rl_dm.flows_putq_tmr, cur->expires);
-    }
+    /* Adjust timer expiration according to the new first entry. */
+    cur = list_first_entry(&rl_dm.flows_putq, struct flow_entry, node_rm);
+    mod_timer(&rl_dm.flows_putq_tmr, cur->expires);
 }
 
 static void
 flows_putq_del(struct flow_entry *flow)
 {
+    bool dequeued = false;
+
     FLOCK();
-    flow->expires = ~0U;
-    list_del_init(&flow->node_rm);
+    if (flow->expires != ~0U) {
+        flow->expires = ~0U;
+        BUG_ON(list_empty(&flow->node_rm));
+        list_del_init(&flow->node_rm);
+        dequeued = true;
+    }
     FUNLOCK();
 
-    flow_put(flow);
+    if (dequeued) {
+        flow_put(flow);
+    }
 }
 
 static void
@@ -991,19 +1000,45 @@ flows_putq_drain(
 {
     struct flow_entry *flow, *tmp;
 
-    /* Call flow_put on all the expired flows, which are sorted in
-     * ascending expriration ordedr. */
+    /* Process all the expired flows, which are sorted in ascending expiration
+     * order. Flows with the RL_FLOW_DEL_POSTPONED bit set are deleted by
+     * calling __flow_put(). Flows with the RL_FLOW_EOF_PENDING bit set are
+     * marked with the EOF condition. */
     FLOCK();
     list_for_each_entry_safe (flow, tmp, &rl_dm.flows_putq, node_rm) {
         if (!time_before(jiffies, flow->expires)) {
+            bool eof  = false;
+            bool drop = false;
+
             list_del_init(&flow->node_rm);
             flow->expires = ~0U;
-            __flow_put(flow, false); /* match flows_putq_add() */
-            if (flow->flags & RL_FLOW_NEVER_BOUND) {
-                PW("Removing flow %u since it was never bound\n",
-                   flow->local_port);
+
+            spin_lock_bh(&flow->txrx.rx_lock);
+            if (flow->flags & RL_FLOW_DEL_POSTPONED) {
+                /* Drop this flow now. */
+                if (flow->flags & RL_FLOW_NEVER_BOUND) {
+                    PW("Removing flow %u since it was never bound\n",
+                       flow->local_port);
+                }
+                drop = true;
+            } else if (flow->flags & RL_FLOW_EOF_PENDING) {
+                /* Set the EOF condition on the flow. */
+                PD("Setting EOF on flow %u\n", flow->local_port);
+                flow->txrx.flags |= RL_TXRX_EOF;
+                eof = true;
             }
-            __flow_put(flow, false);
+            spin_unlock_bh(&flow->txrx.rx_lock);
+
+            if (drop) {
+                __flow_put(flow, false);
+            } else if (eof) {
+                /* Wake up readers and pollers, so that they can read the EOF.
+                 */
+                wake_up_interruptible_poll(&flow->txrx.rx_wqh,
+                                           POLLIN | POLLRDNORM | POLLRDBAND);
+            }
+
+            __flow_put(flow, false); /* match flows_putq_add() */
         } else {
             /* We can stop here. */
             break;
@@ -1044,9 +1079,8 @@ __flow_put(struct flow_entry *entry, bool lock)
     }
 
     ipcp = entry->txrx.ipcp;
-    entry->flags |= RL_FLOW_DEALLOCATED;
 
-    /* We postpone flow removal, at least for MPL, and also allow
+    /* We postpone flow removal, at least for MPL, also to allow
      * cwq and rtxq to be drained. We check the flag
      * to make sure that this flow_entry() invocation is not due to a
      * postponed removal, so that we avoid postponing forever. */
@@ -1071,7 +1105,7 @@ __flow_put(struct flow_entry *entry, bool lock)
          * to 1 and let the delayed remove function do its job. */
         entry->refcnt++;
         PV("FLOWREFCNT %u ++: %u\n", entry->local_port, entry->refcnt);
-        flows_putq_add(entry, msecs_to_jiffies(5000) /* should be MPL */);
+        flows_putq_add(entry, msecs_to_jiffies(5000) /* TODO MPL */);
         if (lock) {
             FUNLOCK();
         }
@@ -2187,25 +2221,21 @@ rl_uipcp_fa_resp_arrived(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     return ret;
 }
 
-/* May be called under FLOCK. */
+/* Acquires rxq lock and FLOCK. */
 void
 rl_flow_shutdown(struct flow_entry *flow)
 {
-    int deallocated = 0;
+    bool eof_pending = false;
 
     spin_lock_bh(&flow->txrx.rx_lock);
     if (flow->flags & RL_FLOW_ALLOCATED) {
-        /* Set the EOF condition on the flow. */
-        flow->txrx.flags |= RL_TXRX_EOF;
-        flow->flags |= RL_FLOW_DEALLOCATED;
-        deallocated = 1;
+        flow->flags |= RL_FLOW_EOF_PENDING;
+        eof_pending = true;
     }
     spin_unlock_bh(&flow->txrx.rx_lock);
 
-    if (deallocated) {
-        /* Wake up readers and pollers, so that they can read the EOF. */
-        wake_up_interruptible_poll(&flow->txrx.rx_wqh,
-                                   POLLIN | POLLRDNORM | POLLRDBAND);
+    if (eof_pending) {
+        flows_putq_add(flow, msecs_to_jiffies(5000) /* TODO MPL */);
     }
 }
 EXPORT_SYMBOL(rl_flow_shutdown);

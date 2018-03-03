@@ -255,15 +255,15 @@ rl_shim_loopback_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
     return 0;
 }
 
-/* Called under FLOCK. */
 static int
 rl_shim_loopback_flow_deallocated(struct ipcp_entry *ipcp,
                                   struct flow_entry *flow)
 {
-    struct flow_entry *remote_flow = flow_lookup(flow->remote_port);
+    struct flow_entry *remote_flow = flow_get(flow->remote_port);
 
     if (remote_flow) {
         rl_flow_shutdown(remote_flow);
+        flow_put(remote_flow);
     }
 
     return 0;

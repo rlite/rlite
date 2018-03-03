@@ -608,11 +608,6 @@ rl_io_ioctl_bind(struct rl_io *rio, struct rl_ioctl_info *info)
         PE("Flow %u not allocated\n", info->port_id);
         goto err;
     }
-
-    if (flow->flags & RL_FLOW_DEALLOCATED) {
-        PE("Flow %u deallocated\n", info->port_id);
-        goto err;
-    }
     spin_unlock_bh(&flow->txrx.rx_lock);
 
     /* Bind the flow to this file descriptor. */

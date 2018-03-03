@@ -611,10 +611,10 @@ struct flow_entry {
 #define RL_FLOW_NEVER_BOUND (1 << 0)   /* flow was never bound with ioctl */
 #define RL_FLOW_PENDING (1 << 1)       /* flow allocation is pending */
 #define RL_FLOW_ALLOCATED (1 << 2)     /* flow has been allocated */
-#define RL_FLOW_DEALLOCATED (1 << 3)   /* flow has been deallocated */
+#define RL_FLOW_EOF_PENDING (1 << 3)   /* EOF postponed on this flow */
 #define RL_FLOW_DEL_POSTPONED (1 << 4) /* flow removal has been postponed */
 #define RL_FLOW_INITIATOR (1 << 5)     /* local node initiated this flow */
-    uint8_t flags;
+    uint16_t flags;
     struct hlist_node node;
     struct hlist_node node_cep;
 };
