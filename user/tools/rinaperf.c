@@ -139,6 +139,12 @@ struct rinaperf {
 
 static struct rinaperf _rp;
 
+static int
+is_reliable_spec(const struct rina_flow_spec *spec)
+{
+    return spec->max_sdu_gap == 0 && spec->in_order_delivery == 1;
+}
+
 static void
 worker_init(struct worker *w, struct rinaperf *rp)
 {
@@ -540,16 +546,29 @@ perf_server(struct worker *w)
                 if (verb) {
                     PRINTF("Stopped remotely\n");
                 }
+                pfd[1].events = 0; /* Not interested anymore. */
 
                 ret = config_msg_read(w->cfd, &stop);
                 if (ret) {
                     return ret;
                 }
 
-                printf("Packets received %u/%llu\n", (unsigned)i,
-                       (long long unsigned)stop.cnt);
+                if (!stop.cnt) {
+                    /* Just stop the loop. */
+                    break;
+                }
 
-                break;
+                /* The stop.cnt field contains the number of expected
+                 * packets. We reset 'limit' to the expected count,
+                 * adjust 'i' and keep going. */
+                limit = stop.cnt;
+                if (i != stop.cnt) {
+                    PRINTF(
+                        "%llu packets still expected, stop delayed\n",
+                        (long long unsigned)stop.cnt - (long long unsigned)i);
+                }
+                i--;
+                continue;
             }
         }
         if (n < 0) {
@@ -806,11 +825,15 @@ client_worker_function(void *opaque)
         usleep(100000);
     }
 
-    /* Send the stop opcode on the control file descriptor. */
+    /* Send the stop opcode on the control file descriptor. With reliable
+     * flows we also send the expected packet count, so that the receiver
+     * can try to receive more from the data file descriptor. */
     memset(&cfg, 0, sizeof(cfg));
     cfg.opcode = htole32(RP_OPCODE_STOP);
-    cfg.cnt    = htole64(w->test_config.cnt);
-    ret        = write(w->cfd, &cfg, sizeof(cfg));
+    if (is_reliable_spec(&rp->flowspec)) {
+        cfg.cnt = htole64(w->test_config.cnt);
+    }
+    ret = write(w->cfd, &cfg, sizeof(cfg));
     if (ret != sizeof(cfg)) {
         if (ret < 0) {
             perror("write(stop)");
@@ -1344,7 +1367,8 @@ main(int argc, char **argv)
             break;
 
         case 'g': /* Set max_sdu_gap flow specification parameter. */
-            rp->flowspec.max_sdu_gap = atoll(optarg);
+            rp->flowspec.max_sdu_gap       = atoll(optarg);
+            rp->flowspec.in_order_delivery = 1;
             break;
 
         case 'B': /* Set the average bandwidth parameter. */
