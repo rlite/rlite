@@ -179,6 +179,8 @@ stoppable_usleep(struct rinaperf *rp, unsigned int usecs)
     }
 }
 
+static int config_msg_read(int cfd, struct rp_config_msg *cfg);
+
 /* Used for both ping and rr tests. */
 static int
 ping_client(struct worker *w)
@@ -279,6 +281,8 @@ ping_client(struct worker *w)
     w->result.pps /= ns;
     w->result.bps     = w->result.pps * 8 * size;
     w->result.latency = i ? ((ns / i) - interval * 1000) : 0;
+
+    w->test_config.cnt = i; /* write back packet count */
 
     return 0;
 }
@@ -423,6 +427,8 @@ perf_client(struct worker *w)
         w->result.bps = w->result.pps * 8 * size;
     }
 
+    w->test_config.cnt = i; /* write back packet count */
+
     return 0;
 }
 
@@ -526,11 +532,23 @@ perf_server(struct worker *w)
                 /* Ready to read. */
                 n = read(w->dfd, buf, sizeof(buf));
             } else {
+                struct rp_config_msg stop;
+                int ret;
+
                 /* Nothing to read and stop signal received. */
                 assert(pfd[1].revents & POLLIN);
                 if (verb) {
                     PRINTF("Stopped remotely\n");
                 }
+
+                ret = config_msg_read(w->cfd, &stop);
+                if (ret) {
+                    return ret;
+                }
+
+                printf("Packets received %u/%llu\n", (unsigned)i,
+                       (long long unsigned)stop.cnt);
+
                 break;
             }
         }
@@ -791,6 +809,7 @@ client_worker_function(void *opaque)
     /* Send the stop opcode on the control file descriptor. */
     memset(&cfg, 0, sizeof(cfg));
     cfg.opcode = htole32(RP_OPCODE_STOP);
+    cfg.cnt    = htole64(w->test_config.cnt);
     ret        = write(w->cfd, &cfg, sizeof(cfg));
     if (ret != sizeof(cfg)) {
         if (ret < 0) {
@@ -845,6 +864,30 @@ out:
     return NULL;
 }
 
+static int
+config_msg_read(int cfd, struct rp_config_msg *cfg)
+{
+    int ret = read(cfd, cfg, sizeof(*cfg));
+
+    if (ret != sizeof(*cfg)) {
+        if (ret < 0) {
+            perror("read(cfg)");
+        } else {
+            PRINTF("Error reading test configuration: wrong length %d "
+                   "(should be %lu)\n",
+                   ret, (unsigned long int)sizeof(*cfg));
+        }
+        return -1;
+    }
+
+    cfg->opcode = le32toh(cfg->opcode);
+    cfg->ticket = le32toh(cfg->ticket);
+    cfg->cnt    = le64toh(cfg->cnt);
+    cfg->size   = le32toh(cfg->size);
+
+    return 0;
+}
+
 static void *
 server_worker_function(void *opaque)
 {
@@ -872,22 +915,10 @@ server_worker_function(void *opaque)
         goto out;
     }
 
-    ret = read(w->cfd, &cfg, sizeof(cfg));
-    if (ret != sizeof(cfg)) {
-        if (ret < 0) {
-            perror("read(cfg)");
-        } else {
-            PRINTF("Error reading test configuration: wrong length %d "
-                   "(should be %lu)\n",
-                   ret, (unsigned long int)sizeof(cfg));
-        }
+    ret = config_msg_read(w->cfd, &cfg);
+    if (ret) {
         goto out;
     }
-
-    cfg.opcode = le32toh(cfg.opcode);
-    cfg.ticket = le32toh(cfg.ticket);
-    cfg.cnt    = le64toh(cfg.cnt);
-    cfg.size   = le32toh(cfg.size);
 
     if (cfg.opcode >= RP_OPCODE_STOP) {
         PRINTF("Invalid test configuration: test type %u is invalid\n",
