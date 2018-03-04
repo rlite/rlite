@@ -1092,7 +1092,6 @@ main(int argc, char **argv)
 
     list_init(&uipcps->uipcps);
     pthread_mutex_init(&uipcps->lock, NULL);
-    list_init(&uipcps->ipcp_nodes);
     list_init(&uipcps->periodic_tasks);
     uipcps->num_periodic_tasks = 0;
     uipcps->n_uipcps           = 0;

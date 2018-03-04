@@ -47,10 +47,6 @@ struct uipcps {
     pthread_mutex_t lock;
     int n_uipcps;
 
-    /* List of IPCP "nodes", used for topological sorting and computation
-     * of IPCP hdroom and maximum SDU size. */
-    struct list_head ipcp_nodes;
-
     /* Main loop thread, listening for IPCP updates (e.g. new IPCPs, deleted
      * IPCPs, IPCP configuration, etc). */
     pthread_t th;
@@ -193,10 +189,11 @@ struct periodic_task *periodic_task_register(struct uipcp *uipcp,
 void periodic_task_unregister(struct periodic_task *task);
 
 struct ipcp_node {
-    rl_ipcp_id_t id;
+    rl_ipcp_id_t id;     /* TODO remove, redundant */
     unsigned int marked; /* used to visit the graph */
     unsigned int refcnt;
     unsigned int update_kern_tx; /* should we push MSS/txhdroom to kernel ? */
+
     unsigned int update_kern_rx; /* should we push rxhdroom to kernel ? */
     unsigned int txhdroom;
     unsigned int rxhdroom;
@@ -206,8 +203,6 @@ struct ipcp_node {
 
     struct list_head lowers;
     struct list_head uppers;
-
-    struct list_head node;
 };
 
 struct flow_edge {
@@ -249,6 +244,10 @@ struct uipcp {
     struct uipcp_ops ops;
     void *priv;
     unsigned int refcnt;
+
+    /* Topological information, used for topological sorting and computation
+     * of IPCP hdroom and maximum SDU size. */
+    struct ipcp_node topo;
 
     /* Siblings. */
     struct list_head node;
