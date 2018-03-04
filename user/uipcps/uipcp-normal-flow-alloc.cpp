@@ -381,11 +381,10 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
     freq->set_create_flow_retries(0);
     freq->set_hop_cnt(0);
 
-    obj_name << obj_name::flows << "/" << freq->src_addr() << "-"
-             << req->local_port;
+    obj_name << ObjName << "/" << freq->src_addr() << "-" << req->local_port;
 
     m = make_unique<CDAPMessage>();
-    m->m_create(obj_class::flow, obj_name.str());
+    m->m_create(FlowObjClass, obj_name.str());
 
     freq->invoke_id = 0; /* invoke_id is actually set in send_to_dst_addr() */
     freq->flags     = RL_FLOWREQ_INITIATOR | RL_FLOWREQ_SEND_DEL;
@@ -426,15 +425,14 @@ LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
     freq->set_dst_port(resp->port_id);
     freq->mutable_connections(0)->set_dst_cep(resp->cep_id);
 
-    obj_name << obj_name::flows << "/" << freq->src_addr() << "-"
-             << freq->src_port();
+    obj_name << ObjName << "/" << freq->src_addr() << "-" << freq->src_port();
 
     if (resp->response) {
         reason = "Application refused the accept the flow request";
     }
 
     m = make_unique<CDAPMessage>();
-    m->m_create_r(obj_class::flow, obj_name.str(), 0, resp->response ? -1 : 0,
+    m->m_create_r(FlowObjClass, obj_name.str(), 0, resp->response ? -1 : 0,
                   reason);
     m->invoke_id = freq->invoke_id;
 
@@ -547,12 +545,12 @@ LocalFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     /* Lookup the corresponding FlowRequest, depending on whether we were
      * the initiator or not. */
     if (req->initiator) {
-        obj_name_ext << obj_name::flows << "/" << rib->myaddr << "-"
+        obj_name_ext << ObjName << "/" << rib->myaddr << "-"
                      << req->local_port_id;
         obj_name = obj_name_ext.str();
         obj_name_ext << "L";
     } else {
-        obj_name_ext << obj_name::flows << "/" << req->remote_addr << "-"
+        obj_name_ext << ObjName << "/" << req->remote_addr << "-"
                      << req->remote_port_id;
         obj_name = obj_name_ext.str();
         obj_name_ext << "R";
@@ -583,7 +581,7 @@ LocalFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 
     /* We should wait 2 MPL here before notifying the peer. */
     m = make_unique<CDAPMessage>();
-    m->m_delete(obj_class::flow, obj_name);
+    m->m_delete(FlowObjClass, obj_name);
 
     return rib->send_to_dst_addr(std::move(m), remote_addr);
 }
@@ -597,7 +595,7 @@ LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm)
     unsigned addr, port;
     char separator;
 
-    decode << rm->obj_name.substr(obj_name::flows.size() + 1);
+    decode << rm->obj_name.substr(ObjName.size() + 1);
     decode >> addr >> separator >> port;
     /* TODO the following is wrong when flows are local to the node, as
      * local and remote address are the same. */

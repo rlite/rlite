@@ -177,8 +177,7 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
     UPD(uipcp, "Application %s %sregistered\n", appl_name.c_str(),
         req->reg ? "" : "un");
 
-    rib->neighs_sync_obj_all(req->reg != 0, obj_class::dft, obj_name::dft,
-                             &dft_slice);
+    rib->neighs_sync_obj_all(req->reg != 0, ObjClass, ObjName, &dft_slice);
 
     return 0;
 }
@@ -272,13 +271,13 @@ FullyReplicatedDFT::rib_handler(const CDAPMessage *rm,
     /* Propagate the DFT entries update to the other neighbors,
      * except for who told us. */
     if (prop_dft_add.entries_size() > 0) {
-        rib->neighs_sync_obj_excluding(neigh, true, obj_class::dft,
-                                       obj_name::dft, &prop_dft_add);
+        rib->neighs_sync_obj_excluding(neigh, true, ObjClass, ObjName,
+                                       &prop_dft_add);
     }
 
     if (prop_dft_del.entries_size() > 0) {
-        rib->neighs_sync_obj_excluding(neigh, false, obj_class::dft,
-                                       obj_name::dft, &prop_dft_del);
+        rib->neighs_sync_obj_excluding(neigh, false, ObjClass, ObjName,
+                                       &prop_dft_del);
     }
 
     return 0;
@@ -314,7 +313,7 @@ FullyReplicatedDFT::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
             eit++;
         }
 
-        ret |= nf->sync_obj(true, obj_class::dft, obj_name::dft, &dft_slice);
+        ret |= nf->sync_obj(true, ObjClass, ObjName, &dft_slice);
     }
 
     return ret;
@@ -339,8 +338,8 @@ FullyReplicatedDFT::neighs_refresh(size_t limit)
         }
 
         if (dft_slice.entries_size()) {
-            ret |= rib->neighs_sync_obj_all(true, obj_class::dft, obj_name::dft,
-                                            &dft_slice);
+            ret |=
+                rib->neighs_sync_obj_all(true, ObjClass, ObjName, &dft_slice);
         }
     }
 
@@ -422,6 +421,11 @@ class CentralizedFaultTolerantDFT : public DFT {
                         std::shared_ptr<Neighbor> const &neigh,
                         rlm_addr_t src_addr);
         void dump(std::stringstream &ss) const { impl->dump(ss); };
+
+        static std::string ReqVoteObjClass;
+        static std::string ReqVoteRespObjClass;
+        static std::string AppendEntriesObjClass;
+        static std::string AppendEntriesRespObjClass;
     };
     std::unique_ptr<Replica> raft;
 
@@ -510,6 +514,14 @@ public:
         return client->rib_handler(rm, nf, neigh, src_addr);
     }
 };
+
+std::string CentralizedFaultTolerantDFT::Replica::ReqVoteObjClass = "raft_rv";
+std::string CentralizedFaultTolerantDFT::Replica::ReqVoteRespObjClass =
+    "raft_rv_r";
+std::string CentralizedFaultTolerantDFT::Replica::AppendEntriesObjClass =
+    "raft_ae";
+std::string CentralizedFaultTolerantDFT::Replica::AppendEntriesRespObjClass =
+    "raft_ae_r";
 
 int
 CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
@@ -619,7 +631,7 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
             int invoke_id;
             int ret;
 
-            m->m_read(obj_class::dft, obj_name::dft + "/" + appl_name);
+            m->m_read(ObjClass, ObjName + "/" + appl_name);
             op_code = m->op_code;
 
             m->invoke_id = invoke_id =
@@ -666,9 +678,9 @@ CentralizedFaultTolerantDFT::Client::appl_register(
             int ret;
 
             if (req->reg) {
-                m->m_write(obj_class::dft, obj_name::dft);
+                m->m_write(ObjClass, ObjName);
             } else {
-                m->m_delete(obj_class::dft, obj_name::dft);
+                m->m_delete(ObjClass, ObjName);
             }
             op_code = m->op_code;
             dft_entry.set_ipcp_name(parent->rib->myname);
@@ -808,13 +820,13 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
             mm->set_last_log_index(rv->last_log_index);
             mm->set_last_log_term(rv->last_log_term);
             obj       = std::move(mm);
-            obj_class = obj_class::raft_req_vote;
+            obj_class = ReqVoteObjClass;
         } else if (rvr) {
             auto mm = make_unique<gpb::RaftRequestVoteResp>();
             mm->set_term(rvr->term);
             mm->set_vote_granted(rvr->vote_granted);
             obj       = std::move(mm);
-            obj_class = obj_class::raft_req_vote_resp;
+            obj_class = ReqVoteRespObjClass;
         } else if (ae) {
             auto mm = make_unique<gpb::RaftAppendEntries>();
             mm->set_term(ae->term);
@@ -828,7 +840,7 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
                 ge->set_buffer(p.second.get(), sizeof(Command));
             }
             obj       = std::move(mm);
-            obj_class = obj_class::raft_append_entries;
+            obj_class = AppendEntriesObjClass;
         } else if (aer) {
             auto mm = make_unique<gpb::RaftAppendEntriesResp>();
             mm->set_term(aer->term);
@@ -836,12 +848,12 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
             mm->set_log_index(aer->log_index);
             mm->set_success(aer->success);
             obj       = std::move(mm);
-            obj_class = obj_class::raft_append_entries_resp;
+            obj_class = AppendEntriesRespObjClass;
         } else {
             assert(false);
         }
 
-        m->m_write(obj_class, obj_name::dft);
+        m->m_write(obj_class, ObjName);
         ret |= parent->rib->send_to_dst_node(std::move(m), pair.first,
                                              obj.get(), nullptr);
     }
@@ -954,7 +966,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
         return 0;
     }
 
-    if (rm->obj_class == obj_class::dft && rm->is_response()) {
+    if (rm->obj_class == ObjClass && rm->is_response()) {
         /* This is a response to a request done by us with the
          * role of simple clients. We forward it to the client
          * handler. */
@@ -962,7 +974,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
     }
 
     /* We don't expect an obj_value if this is a DFT read request. */
-    if (!(rm->obj_class == obj_class::dft && rm->op_code == gpb::M_READ)) {
+    if (!(rm->obj_class == ObjClass && rm->op_code == gpb::M_READ)) {
         rm->get_obj_value(objbuf, objlen);
         if (!objbuf) {
             UPE(uipcp, "No object value found\n");
@@ -970,7 +982,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
         }
     }
 
-    if (rm->obj_class == obj_class::dft) {
+    if (rm->obj_class == ObjClass) {
         if (!leader()) {
             /* We are not the leader, we could forward it to the leader node.
              */
@@ -1032,7 +1044,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
 
     } else {
         /* This is a message belonging to the raft protocol. */
-        if (rm->obj_class == obj_class::raft_req_vote) {
+        if (rm->obj_class == ReqVoteObjClass) {
             auto rv = make_unique<raft::RaftRequestVote>();
 
             gpb::RaftRequestVote mm;
@@ -1043,7 +1055,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
             rv->last_log_term  = mm.last_log_term();
             ret                = request_vote_input(*rv, &out);
 
-        } else if (rm->obj_class == obj_class::raft_req_vote_resp) {
+        } else if (rm->obj_class == ReqVoteRespObjClass) {
             auto rvr = make_unique<raft::RaftRequestVoteResp>();
 
             gpb::RaftRequestVoteResp mm;
@@ -1052,7 +1064,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
             rvr->vote_granted = mm.vote_granted();
             ret               = request_vote_resp_input(*rvr, &out);
 
-        } else if (rm->obj_class == obj_class::raft_append_entries) {
+        } else if (rm->obj_class == AppendEntriesObjClass) {
             auto ae = make_unique<raft::RaftAppendEntries>();
 
             gpb::RaftAppendEntries mm;
@@ -1071,7 +1083,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
             }
             ret = append_entries_input(*ae, &out);
 
-        } else if (rm->obj_class == obj_class::raft_append_entries_resp) {
+        } else if (rm->obj_class == AppendEntriesRespObjClass) {
             auto aer = make_unique<raft::RaftAppendEntriesResp>();
 
             gpb::RaftAppendEntriesResp mm;
