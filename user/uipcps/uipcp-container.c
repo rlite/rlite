@@ -1182,7 +1182,7 @@ topo_visit(struct uipcps *uipcps)
             nexts = &ipn->uppers;
 
             list_for_each_entry (e, prevs, node) {
-                if (!e->ipcp->marked) {
+                if (!e->uipcp->topo.marked) {
                     no_prevs = 0;
                     break;
                 }
@@ -1203,13 +1203,17 @@ topo_visit(struct uipcps *uipcps)
         ipn->marked = 1;
 
         list_for_each_entry (e, nexts, node) {
-            if (e->ipcp->txhdroom < ipn->txhdroom + e->ipcp->hdrsize) {
-                e->ipcp->txhdroom = ipn->txhdroom + e->ipcp->hdrsize;
+            if (e->uipcp->topo.txhdroom <
+                ipn->txhdroom + e->uipcp->topo.hdrsize) {
+                e->uipcp->topo.txhdroom =
+                    ipn->txhdroom + e->uipcp->topo.hdrsize;
             }
-            if (e->ipcp->max_sdu_size > ipn->max_sdu_size - e->ipcp->hdrsize) {
-                e->ipcp->max_sdu_size = ipn->max_sdu_size - e->ipcp->hdrsize;
-                if (e->ipcp->max_sdu_size < 0) {
-                    e->ipcp->max_sdu_size = 0;
+            if (e->uipcp->topo.max_sdu_size >
+                ipn->max_sdu_size - e->uipcp->topo.hdrsize) {
+                e->uipcp->topo.max_sdu_size =
+                    ipn->max_sdu_size - e->uipcp->topo.hdrsize;
+                if (e->uipcp->topo.max_sdu_size < 0) {
+                    e->uipcp->topo.max_sdu_size = 0;
                 }
             }
         }
@@ -1256,7 +1260,7 @@ topo_visit(struct uipcps *uipcps)
             nexts = &ipn->lowers;
 
             list_for_each_entry (e, prevs, node) {
-                if (!e->ipcp->marked) {
+                if (!e->uipcp->topo.marked) {
                     no_prevs = 0;
                     break;
                 }
@@ -1280,10 +1284,11 @@ topo_visit(struct uipcps *uipcps)
             int rxcredit = (int)ipn->rxcredit - ipn->hdrsize;
 
             assert(rxcredit >= 0);
-            if (rxcredit > e->ipcp->rxcredit) {
-                e->ipcp->rxcredit = rxcredit;
-                assert(e->ipcp->rxcredit >= e->ipcp->txhdroom);
-                e->ipcp->rxhdroom = e->ipcp->rxcredit - e->ipcp->txhdroom;
+            if (rxcredit > e->uipcp->topo.rxcredit) {
+                e->uipcp->topo.rxcredit = rxcredit;
+                assert(e->uipcp->topo.rxcredit >= e->uipcp->topo.txhdroom);
+                e->uipcp->topo.rxhdroom =
+                    e->uipcp->topo.rxcredit - e->uipcp->topo.txhdroom;
             }
         }
     }
@@ -1367,12 +1372,12 @@ topo_compute(struct uipcps *uipcps)
         PV_S("NODE %u, mss = %u\n", uipcp->id, ipn->max_sdu_size);
         PV_S("    uppers = [");
         list_for_each_entry (e, &ipn->uppers, node) {
-            PV_S("%u, ", container_of(e->ipcp, struct uipcp, topo)->id);
+            PV_S("%u, ", e->uipcp->id);
         }
         PV_S("]\n");
         PV_S("    lowers = [");
         list_for_each_entry (e, &ipn->lowers, node) {
-            PV_S("%u, ", container_of(e->ipcp, struct uipcp, topo)->id);
+            PV_S("%u, ", e->uipcp->id);
         }
         PV_S("]\n");
     }
@@ -1383,29 +1388,13 @@ topo_compute(struct uipcps *uipcps)
 }
 
 /* Called under uipcps lock. */
-static struct ipcp_node *
-topo_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int create)
-{
-    struct uipcp *uipcp;
-
-    uipcp = uipcp_lookup(uipcps, ipcp_id);
-    if (!uipcp) {
-        PE("uipcp %u not found\n", ipcp_id);
-        return NULL;
-    }
-
-    return &uipcp->topo;
-}
-
-/* Called under uipcps lock. */
 static int
-topo_edge_add(struct ipcp_node *ipcp, struct ipcp_node *neigh,
-              struct list_head *edges)
+topo_edge_add(struct uipcp *uipcp, struct uipcp *neigh, struct list_head *edges)
 {
     struct flow_edge *e;
 
     list_for_each_entry (e, edges, node) {
-        if (e->ipcp == neigh) {
+        if (e->uipcp == neigh) {
             goto ok;
         }
     }
@@ -1417,25 +1406,23 @@ topo_edge_add(struct ipcp_node *ipcp, struct ipcp_node *neigh,
     }
     memset(e, 0, sizeof(*e));
 
-    e->ipcp   = neigh;
+    e->uipcp  = neigh;
     e->refcnt = 0;
     list_add_tail(&e->node, edges);
 ok:
     e->refcnt++;
-    neigh->refcnt++;
 
     return 0;
 }
 
 /* Called under uipcps lock. */
 static int
-topo_edge_del(struct ipcp_node *ipcp, struct ipcp_node *neigh,
-              struct list_head *edges)
+topo_edge_del(struct uipcp *uipcp, struct uipcp *neigh, struct list_head *edges)
 {
     struct flow_edge *e;
 
     list_for_each_entry (e, edges, node) {
-        if (e->ipcp == neigh) {
+        if (e->uipcp == neigh) {
             e->refcnt--;
             if (e->refcnt == 0) {
                 /* This list_del is safe only because we exit
@@ -1443,15 +1430,12 @@ topo_edge_del(struct ipcp_node *ipcp, struct ipcp_node *neigh,
                 list_del(&e->node);
                 rl_free(e, RL_MT_TOPO);
             }
-            neigh->refcnt--;
 
             return 0;
         }
     }
 
-    PE("Cannot find neigh %u for node %u\n",
-       container_of(neigh, struct uipcp, topo)->id,
-       container_of(ipcp, struct uipcp, topo)->id);
+    PE("Cannot find neigh %u for node %u\n", neigh->id, uipcp->id);
 
     return -1;
 }
@@ -1460,21 +1444,21 @@ int
 topo_lower_flow_added(struct uipcps *uipcps, unsigned int upper_id,
                       unsigned int lower_id)
 {
-    struct ipcp_node *upper;
-    struct ipcp_node *lower;
+    struct uipcp *upper;
+    struct uipcp *lower;
 
     pthread_mutex_lock(&uipcps->lock);
 
-    upper = topo_node_get(uipcps, upper_id, 1);
-    lower = topo_node_get(uipcps, lower_id, 1);
+    upper = uipcp_lookup(uipcps, upper_id);
+    lower = uipcp_lookup(uipcps, lower_id);
     if (!upper || !lower) {
         pthread_mutex_unlock(&uipcps->lock);
         return -1;
     }
 
-    if (topo_edge_add(upper, lower, &upper->lowers) ||
-        topo_edge_add(lower, upper, &lower->uppers)) {
-        topo_edge_del(upper, lower, &upper->lowers);
+    if (topo_edge_add(upper, lower, &upper->topo.lowers) ||
+        topo_edge_add(lower, upper, &lower->topo.uppers)) {
+        topo_edge_del(upper, lower, &upper->topo.lowers);
         pthread_mutex_unlock(&uipcps->lock);
         return -1;
     }
@@ -1492,13 +1476,13 @@ int
 topo_lower_flow_removed(struct uipcps *uipcps, unsigned int upper_id,
                         unsigned int lower_id)
 {
-    struct ipcp_node *upper;
-    struct ipcp_node *lower;
+    struct uipcp *upper;
+    struct uipcp *lower;
 
     pthread_mutex_lock(&uipcps->lock);
 
-    upper = topo_node_get(uipcps, upper_id, 0);
-    lower = topo_node_get(uipcps, lower_id, 0);
+    upper = uipcp_lookup(uipcps, upper_id);
+    lower = uipcp_lookup(uipcps, lower_id);
     if (lower == NULL) {
         pthread_mutex_unlock(&uipcps->lock);
         PE("Could not find node %u\n", lower_id);
@@ -1511,8 +1495,8 @@ topo_lower_flow_removed(struct uipcps *uipcps, unsigned int upper_id,
         return -1;
     }
 
-    topo_edge_del(upper, lower, &upper->lowers);
-    topo_edge_del(lower, upper, &lower->uppers);
+    topo_edge_del(upper, lower, &upper->topo.lowers);
+    topo_edge_del(lower, upper, &lower->topo.uppers);
 
     PD("Removed flow (%d -> %d)\n", upper_id, lower_id);
     /* Graph changed, recompute. */
@@ -1527,7 +1511,6 @@ topo_lower_flow_removed(struct uipcps *uipcps, unsigned int upper_id,
 int
 uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 {
-    struct ipcp_node *node;
     struct uipcp *uipcp;
     int mss_changed;
 
@@ -1562,11 +1545,6 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     uipcp->pcisizes     = upd->pcisizes;
 
     if (!mss_changed) {
-        goto out;
-    }
-
-    node = topo_node_get(uipcps, upd->ipcp_id, 1);
-    if (!node) {
         goto out;
     }
 

@@ -190,7 +190,6 @@ void periodic_task_unregister(struct periodic_task *task);
 
 struct ipcp_node {
     unsigned int marked; /* used to visit the graph */
-    unsigned int refcnt;
     unsigned int update_kern_tx; /* should we push MSS/txhdroom to kernel ? */
 
     unsigned int update_kern_rx; /* should we push rxhdroom to kernel ? */
@@ -205,7 +204,7 @@ struct ipcp_node {
 };
 
 struct flow_edge {
-    struct ipcp_node *ipcp;
+    struct uipcp *uipcp;
     unsigned int refcnt;
 
     struct list_head node;
