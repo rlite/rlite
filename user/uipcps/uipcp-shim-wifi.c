@@ -269,7 +269,8 @@ handover_signal_strength(struct uipcp *const uipcp)
         }
 
         list_for_each_entry (e, &ipn->uppers, node) {
-            struct uipcp *u = uipcp_get_by_id(uipcps, e->ipcp->id);
+            struct uipcp *u = uipcp_get_by_id(
+                uipcps, container_of(e->ipcp, struct uipcp, topo)->id);
             if (u) {
                 tmplist[n++] = u;
             }
