@@ -719,6 +719,11 @@ struct uipcp_rib {
                           std::shared_ptr<Neighbor> const &neigh,
                           rlm_addr_t src_addr);
 
+    int policy_handler(const CDAPMessage *rm,
+                       std::shared_ptr<NeighFlow> const &nf,
+                       std::shared_ptr<Neighbor> const &neigh,
+                       rlm_addr_t src_addr);
+
     void neighs_refresh();
     void neighs_refresh_tmr_restart();
     void age_incr_tmr_restart();

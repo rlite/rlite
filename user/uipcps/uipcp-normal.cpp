@@ -469,6 +469,12 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     handlers.insert(make_pair(StatusObjName, &uipcp_rib::status_handler));
     handlers.insert(make_pair(AddrAllocator::ObjName,
                               &uipcp_rib::addr_alloc_table_handler));
+    handlers.insert(
+        make_pair(DFT::ObjName + "/policy", &uipcp_rib::policy_handler));
+    handlers.insert(
+        make_pair(LFDB::ObjName + "/policy", &uipcp_rib::policy_handler));
+    handlers.insert(make_pair(AddrAllocator::ObjName + "/policy",
+                              &uipcp_rib::policy_handler));
 
     /* Start timers for periodic tasks. */
     age_incr_tmr_restart();
@@ -1554,6 +1560,42 @@ uipcp_rib::policy_param_list(
     }
 
     return ret;
+}
+
+int
+uipcp_rib::policy_handler(const CDAPMessage *rm,
+                          std::shared_ptr<NeighFlow> const &nf,
+                          std::shared_ptr<Neighbor> const &neigh,
+                          rlm_addr_t src_addr)
+{
+    std::string basename = rm->obj_name.substr(0, rm->obj_name.rfind("/"));
+    std::string policy_name;
+    std::string component;
+
+    /* We only support M_WRITE for now. */
+    if (rm->op_code != gpb::M_WRITE) {
+        UPE(uipcp, "M_WRITE expected\n");
+        return 0;
+    }
+
+    rm->get_obj_value(policy_name);
+    if (policy_name.empty()) {
+        UPE(uipcp, "No policy specified\n");
+        return 0;
+    }
+
+    if (basename == DFT::ObjName) {
+        component = "dft";
+    } else if (basename == LFDB::ObjName) {
+        component = "routing";
+    } else if (basename == AddrAllocator::ObjName) {
+        component = "address-allocator";
+    } else {
+        UPE(uipcp, "Unknown component basename %s\n", basename.c_str());
+        return 0;
+    }
+
+    return policy_mod(component, policy_name);
 }
 
 template <class T>
