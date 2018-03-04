@@ -189,7 +189,6 @@ struct periodic_task *periodic_task_register(struct uipcp *uipcp,
 void periodic_task_unregister(struct periodic_task *task);
 
 struct ipcp_node {
-    rl_ipcp_id_t id;     /* TODO remove, redundant */
     unsigned int marked; /* used to visit the graph */
     unsigned int refcnt;
     unsigned int update_kern_tx; /* should we push MSS/txhdroom to kernel ? */

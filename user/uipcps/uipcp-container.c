@@ -900,7 +900,6 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     uipcp->priv   = NULL;
     uipcp->refcnt = 1; /* Cogito, ergo sum. */
 
-    uipcp->topo.id = upd->ipcp_id;
     list_init(&uipcp->topo.lowers);
     list_init(&uipcp->topo.uppers);
 
@@ -1311,9 +1310,10 @@ topo_update_kern(struct uipcps *uipcps)
             continue;
         }
 
-        ret = rl_conf_ipcp_config(ipn->id, "txhdroom", strbuf);
+        ret = rl_conf_ipcp_config(uipcp->id, "txhdroom", strbuf);
         if (ret) {
-            PE("'ipcp-config %u txhdroom %u' failed\n", ipn->id, ipn->txhdroom);
+            PE("'ipcp-config %u txhdroom %u' failed\n", uipcp->id,
+               ipn->txhdroom);
         }
 
         ret = snprintf(strbuf, sizeof(strbuf), "%u", ipn->max_sdu_size);
@@ -1322,9 +1322,10 @@ topo_update_kern(struct uipcps *uipcps)
             continue;
         }
 
-        ret = rl_conf_ipcp_config(ipn->id, "mss", strbuf);
+        ret = rl_conf_ipcp_config(uipcp->id, "mss", strbuf);
         if (ret) {
-            PE("'ipcp-config %u mss %u' failed\n", ipn->id, ipn->max_sdu_size);
+            PE("'ipcp-config %u mss %u' failed\n", uipcp->id,
+               ipn->max_sdu_size);
         }
     }
 
@@ -1341,9 +1342,10 @@ topo_update_kern(struct uipcps *uipcps)
             continue;
         }
 
-        ret = rl_conf_ipcp_config(ipn->id, "rxhdroom", strbuf);
+        ret = rl_conf_ipcp_config(uipcp->id, "rxhdroom", strbuf);
         if (ret) {
-            PE("'ipcp-config %u rxhdroom %u' failed\n", ipn->id, ipn->rxhdroom);
+            PE("'ipcp-config %u rxhdroom %u' failed\n", uipcp->id,
+               ipn->rxhdroom);
         }
     }
 
@@ -1362,15 +1364,15 @@ topo_compute(struct uipcps *uipcps)
     list_for_each_entry (uipcp, &uipcps->uipcps, node) {
         struct ipcp_node *ipn = &uipcp->topo;
 
-        PV_S("NODE %u, mss = %u\n", ipn->id, ipn->max_sdu_size);
+        PV_S("NODE %u, mss = %u\n", uipcp->id, ipn->max_sdu_size);
         PV_S("    uppers = [");
         list_for_each_entry (e, &ipn->uppers, node) {
-            PV_S("%u, ", e->ipcp->id);
+            PV_S("%u, ", container_of(e->ipcp, struct uipcp, topo)->id);
         }
         PV_S("]\n");
         PV_S("    lowers = [");
         list_for_each_entry (e, &ipn->lowers, node) {
-            PV_S("%u, ", e->ipcp->id);
+            PV_S("%u, ", container_of(e->ipcp, struct uipcp, topo)->id);
         }
         PV_S("]\n");
     }
@@ -1447,7 +1449,9 @@ topo_edge_del(struct ipcp_node *ipcp, struct ipcp_node *neigh,
         }
     }
 
-    PE("Cannot find neigh %u for node %u\n", neigh->id, ipcp->id);
+    PE("Cannot find neigh %u for node %u\n",
+       container_of(neigh, struct uipcp, topo)->id,
+       container_of(ipcp, struct uipcp, topo)->id);
 
     return -1;
 }
