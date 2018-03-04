@@ -24,7 +24,11 @@ public:
                     rlm_addr_t src_addr) override;
     int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
                    unsigned int limit) const override;
+
+    static std::string ReqObjClass;
 };
+
+std::string DistributedAddrAllocator::ReqObjClass = "aareq";
 
 void
 DistributedAddrAllocator::dump(std::stringstream &ss) const
@@ -57,8 +61,7 @@ DistributedAddrAllocator::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
             ati++;
         }
 
-        ret |= nf->sync_obj(true, obj_class::addr_alloc_table,
-                            obj_name::addr_alloc_table, &l);
+        ret |= nf->sync_obj(true, ObjClass, ObjName, &l);
     }
 
     return ret;
@@ -108,8 +111,7 @@ DistributedAddrAllocator::allocate(rlm_addr_t *result)
                 CDAPMessage m;
                 int ret;
 
-                m.m_create(obj_class::addr_alloc_req,
-                           obj_name::addr_alloc_table);
+                m.m_create(ReqObjClass, ObjName);
                 aar.set_requestor(rib->myname);
                 aar.set_address(addr);
                 ret = kvn.second->mgmt_conn()->send_to_port_id(&m, 0, &aar);
@@ -175,7 +177,7 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
         return 0;
     }
 
-    if (rm->obj_class == obj_class::addr_alloc_req) {
+    if (rm->obj_class == ReqObjClass) {
         /* This is an address allocation request or a negative
          * address allocation response. */
         bool propagate = false;
@@ -213,8 +215,7 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
                     "Address allocation request conflicts, (addr=%lu,"
                     "requestor=%s)\n",
                     (long unsigned)aar.address(), aar.requestor().c_str());
-                m->m_delete(obj_class::addr_alloc_req,
-                            obj_name::addr_alloc_table);
+                m->m_delete(ReqObjClass, ObjName);
                 ret =
                     rib->send_to_dst_node(std::move(m), aar.requestor(), &aar);
                 if (ret) {
@@ -260,7 +261,7 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
                                            rm->obj_name, &aar);
         }
 
-    } else if (rm->obj_class == obj_class::addr_alloc_table) {
+    } else if (rm->obj_class == ObjClass) {
         /* This is a synchronization operation targeting our
          * address allocation table. */
         gpb::AddrAllocEntries aal;

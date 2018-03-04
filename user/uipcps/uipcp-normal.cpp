@@ -44,40 +44,36 @@
 
 using namespace std;
 
-namespace obj_class {
-string adata                    = "a_data";
-string dft                      = "dft";
-string neighbors                = "neighbors";
-string enrollment               = "enrollment";
-string status                   = "operational_status";
-string address                  = "address";
-string lfdb                     = "fsodb"; /* Lower Flow DB */
-string flows                    = "flows"; /* Supported flows */
-string flow                     = "flow";
-string keepalive                = "keepalive";
-string lowerflow                = "lowerflow";
-string addr_alloc_table         = "addr_alloc_table";
-string addr_alloc_req           = "addr_alloc_req";
-string raft_req_vote            = "raft_rv";
-string raft_req_vote_resp       = "raft_rv_r";
-string raft_append_entries      = "raft_ae";
-string raft_append_entries_resp = "raft_ae_r";
-}; // namespace obj_class
+#if 0
+string address      = "/daf/mgmt/naming/address";
+string whatevercast = "/daf/mgmt/naming/whatevercast";
+#endif
 
-namespace obj_name {
-string adata            = "a_data";
-string dft              = "/dif/mgmt/fa/" + obj_class::dft;
-string neighbors        = "/daf/mgmt/" + obj_class::neighbors;
-string enrollment       = "/daf/mgmt/" + obj_class::enrollment;
-string status           = "/daf/mgmt/" + obj_class::status;
-string address          = "/daf/mgmt/naming/" + obj_class::address;
-string lfdb             = "/dif/mgmt/pduft/linkstate/" + obj_class::lfdb;
-string whatevercast     = "/daf/mgmt/naming/whatevercast";
-string flows            = "/dif/ra/fa/" + obj_class::flows;
-string keepalive        = "/daf/mgmt/" + obj_class::keepalive;
-string lowerflow        = "/daf/mgmt/" + obj_class::lowerflow;
-string addr_alloc_table = "/dif/ra/aa/" + obj_class::addr_alloc_table;
-}; // namespace obj_name
+std::string DFT::ObjClass  = "dft";
+std::string DFT::ObjName   = "/dif/mgmt/fa/" + DFT::ObjClass;
+std::string LFDB::ObjClass = "fsodb"; /* Lower Flow DB */
+std::string LFDB::ObjName  = "/dif/mgmt/pduft/linkstate/" + LFDB::ObjClass;
+std::string AddrAllocator::ObjClass = "table";
+std::string AddrAllocator::ObjName =
+    "/dif/ra/addralloc/" + AddrAllocator::ObjClass;
+std::string FlowAllocator::FlowObjClass = "flow";
+std::string FlowAllocator::ObjClass     = "flows";
+std::string FlowAllocator::ObjName = "/dif/ra/fa/" + FlowAllocator::ObjClass;
+std::string Neighbor::ObjClass     = "neighbors";
+std::string Neighbor::ObjName      = "/daf/mgmt/" + Neighbor::ObjClass;
+std::string NeighFlow::KeepaliveObjClass = "keepalive";
+std::string NeighFlow::KeepaliveObjName =
+    "/daf/mgmt/" + NeighFlow::KeepaliveObjClass;
+std::string uipcp_rib::StatusObjClass = "operational_status";
+std::string uipcp_rib::StatusObjName = "/daf/mgmt/" + uipcp_rib::StatusObjClass;
+std::string uipcp_rib::ADataObjClass = "a_data";
+std::string uipcp_rib::ADataObjName  = "a_data";
+std::string uipcp_rib::EnrollmentObjClass = "enrollment";
+std::string uipcp_rib::EnrollmentObjName =
+    "/daf/mgmt/" + uipcp_rib::EnrollmentObjClass;
+std::string uipcp_rib::LowerFlowObjClass = "lowerflow";
+std::string uipcp_rib::LowerFlowObjName =
+    "/daf/mgmt/" + uipcp_rib::LowerFlowObjClass;
 
 std::unordered_map<std::string, std::set<PolicyBuilder>>
     uipcp_rib::available_policies;
@@ -203,8 +199,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
             m->op_code == gpb::M_CONNECT && m->dst_appl == myname;
         src_appl = m->src_appl;
 
-        if (m->obj_class == obj_class::adata &&
-            m->obj_name == obj_name::adata) {
+        if (m->obj_class == ADataObjClass && m->obj_name == ADataObjName) {
             /* A-DATA message, does not belong to any CDAP
              * session. */
             const char *objbuf;
@@ -284,8 +279,8 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
 
         if (neigh->enrollment_complete() && nf != neigh->mgmt_conn() &&
             !neigh->mgmt_conn()->initiator && m->op_code == gpb::M_START &&
-            m->obj_name == obj_name::enrollment &&
-            m->obj_class == obj_class::enrollment) {
+            m->obj_name == uipcp_rib::EnrollmentObjName &&
+            m->obj_class == uipcp_rib::EnrollmentObjClass) {
             /* We thought we were already enrolled to this neighbor, but
              * he is trying to start again the enrollment procedure on a
              * different flow. We therefore assume that the neighbor
@@ -463,15 +458,16 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     policy_mod("routing", "link-state");
 
     /* Insert the handlers for the RIB objects. */
-    handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
+    handlers.insert(make_pair(DFT::ObjName, &uipcp_rib::dft_handler));
     handlers.insert(
-        make_pair(obj_name::neighbors, &uipcp_rib::neighbors_handler));
-    handlers.insert(make_pair(obj_name::lfdb, &uipcp_rib::lfdb_handler));
-    handlers.insert(make_pair(obj_name::flows, &uipcp_rib::flows_handler));
+        make_pair(Neighbor::ObjName, &uipcp_rib::neighbors_handler));
+    handlers.insert(make_pair(LFDB::ObjName, &uipcp_rib::lfdb_handler));
     handlers.insert(
-        make_pair(obj_name::keepalive, &uipcp_rib::keepalive_handler));
-    handlers.insert(make_pair(obj_name::status, &uipcp_rib::status_handler));
-    handlers.insert(make_pair(obj_name::addr_alloc_table,
+        make_pair(FlowAllocator::ObjName, &uipcp_rib::flows_handler));
+    handlers.insert(
+        make_pair(NeighFlow::KeepaliveObjName, &uipcp_rib::keepalive_handler));
+    handlers.insert(make_pair(StatusObjName, &uipcp_rib::status_handler));
+    handlers.insert(make_pair(AddrAllocator::ObjName,
                               &uipcp_rib::addr_alloc_table_handler));
 
     /* Start timers for periodic tasks. */
@@ -919,7 +915,7 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
         delete[] serbuf;
     }
 
-    am.m_write(obj_class::adata, obj_name::adata);
+    am.m_write(ADataObjClass, ADataObjName);
 
     if (obj_serialize(&am, &adata)) {
         UPE(uipcp, "serialization failed\n");

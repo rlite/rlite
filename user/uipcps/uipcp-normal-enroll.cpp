@@ -419,7 +419,7 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
             enr_info.add_lower_difs(dif);
         }
 
-        m.m_start(obj_class::enrollment, obj_name::enrollment);
+        m.m_start(uipcp_rib::EnrollmentObjClass, uipcp_rib::EnrollmentObjName);
         ret = nf->send_to_port_id(&m, 0, &enr_info);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
@@ -443,10 +443,11 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
             return -1;
         }
 
-        if (rm->obj_class != obj_class::enrollment ||
-            rm->obj_name != obj_name::enrollment) {
+        if (rm->obj_class != uipcp_rib::EnrollmentObjClass ||
+            rm->obj_name != uipcp_rib::EnrollmentObjName) {
             UPE(rib->uipcp, "%s:%s object expected\n",
-                obj_name::enrollment.c_str(), obj_class::enrollment.c_str());
+                uipcp_rib::EnrollmentObjName.c_str(),
+                uipcp_rib::EnrollmentObjClass.c_str());
             return -1;
         }
 
@@ -498,10 +499,11 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
             return -1;
         }
 
-        if (rm->obj_class != obj_class::enrollment ||
-            rm->obj_name != obj_name::enrollment) {
+        if (rm->obj_class != uipcp_rib::EnrollmentObjClass ||
+            rm->obj_name != uipcp_rib::EnrollmentObjName) {
             UPE(rib->uipcp, "%s:%s object expected\n",
-                obj_name::enrollment.c_str(), obj_class::enrollment.c_str());
+                uipcp_rib::EnrollmentObjName.c_str(),
+                uipcp_rib::EnrollmentObjClass.c_str());
             return -1;
         }
 
@@ -529,8 +531,8 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
         /* Here we may M_READ from the slave. */
 
         m.m_stop_r();
-        m.obj_class = obj_class::enrollment;
-        m.obj_name  = obj_name::enrollment;
+        m.obj_class = uipcp_rib::EnrollmentObjClass;
+        m.obj_name  = uipcp_rib::EnrollmentObjName;
 
         ret = nf->send_to_port_id(&m, rm->invoke_id);
         if (ret) {
@@ -615,7 +617,8 @@ EnrollmentResources::enrollee_thread()
              *
              * This is not a complete enrollment, but only the allocation
              * of a lower flow. */
-            m.m_start(obj_class::lowerflow, obj_name::lowerflow);
+            m.m_start(uipcp_rib::LowerFlowObjClass,
+                      uipcp_rib::LowerFlowObjName);
             ret = nf->send_to_port_id(&m);
             if (ret) {
                 UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
@@ -634,10 +637,11 @@ EnrollmentResources::enrollee_thread()
                 goto err;
             }
 
-            if (rm->obj_class != obj_class::lowerflow ||
-                rm->obj_name != obj_name::lowerflow) {
+            if (rm->obj_class != uipcp_rib::LowerFlowObjClass ||
+                rm->obj_name != uipcp_rib::LowerFlowObjName) {
                 UPE(rib->uipcp, "%s:%s object expected\n",
-                    obj_name::lowerflow.c_str(), obj_class::lowerflow.c_str());
+                    uipcp_rib::LowerFlowObjName.c_str(),
+                    uipcp_rib::LowerFlowObjClass.c_str());
                 goto err;
             }
 
@@ -710,10 +714,11 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
             return -1;
         }
 
-        if (rm->obj_class != obj_class::enrollment ||
-            rm->obj_name != obj_name::enrollment) {
+        if (rm->obj_class != uipcp_rib::EnrollmentObjClass ||
+            rm->obj_name != uipcp_rib::EnrollmentObjName) {
             UPE(rib->uipcp, "%s:%s object expected\n",
-                obj_name::enrollment.c_str(), obj_class::enrollment.c_str());
+                uipcp_rib::EnrollmentObjName.c_str(),
+                uipcp_rib::EnrollmentObjClass.c_str());
             return -1;
         }
 
@@ -738,8 +743,8 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
         enr_info.set_address(addr);
 
         m.m_start_r();
-        m.obj_class = obj_class::enrollment;
-        m.obj_name  = obj_name::enrollment;
+        m.obj_class = uipcp_rib::EnrollmentObjClass;
+        m.obj_name  = uipcp_rib::EnrollmentObjName;
 
         ret = nf->send_to_port_id(&m, rm->invoke_id, &enr_info);
         if (ret) {
@@ -754,7 +759,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
         enr_info.set_start_early(true);
 
         m = CDAPMessage();
-        m.m_stop(obj_class::enrollment, obj_name::enrollment);
+        m.m_stop(uipcp_rib::EnrollmentObjClass, uipcp_rib::EnrollmentObjName);
 
         ret = nf->send_to_port_id(&m, 0, &enr_info);
         if (ret) {
@@ -790,7 +795,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
 
         /* This is not required if the initiator is allowed to start
          * early. */
-        m.m_start(obj_class::status, obj_name::status);
+        m.m_start(uipcp_rib::StatusObjClass, uipcp_rib::StatusObjName);
 
         ret = nf->send_to_port_id(&m);
         if (ret) {
@@ -860,8 +865,8 @@ EnrollmentResources::enroller_thread()
         goto err;
     }
 
-    if (rm->obj_class == obj_class::lowerflow &&
-        rm->obj_name == obj_name::lowerflow) {
+    if (rm->obj_class == uipcp_rib::LowerFlowObjClass &&
+        rm->obj_name == uipcp_rib::LowerFlowObjName) {
         /* (3LF) S <-- I: M_START
          * (4LF) S --> I: M_START_R
          * This is not a complete enrollment, but only a lower flow
@@ -877,8 +882,8 @@ EnrollmentResources::enroller_thread()
         UPD(rib->uipcp, "S <-- I M_START(lowerflow)\n");
 
         m.m_start_r();
-        m.obj_class = obj_class::lowerflow;
-        m.obj_name  = obj_name::lowerflow;
+        m.obj_class = uipcp_rib::LowerFlowObjClass;
+        m.obj_name  = uipcp_rib::LowerFlowObjName;
 
         ret = nf->send_to_port_id(&m, rm->invoke_id);
         if (ret) {
@@ -1024,8 +1029,8 @@ uipcp_rib::sync_rib(const std::shared_ptr<NeighFlow> &nf)
                 cit++;
             }
 
-            ret |= nf->sync_obj(true, obj_class::neighbors, obj_name::neighbors,
-                                &ncl);
+            ret |=
+                nf->sync_obj(true, Neighbor::ObjClass, Neighbor::ObjName, &ncl);
         }
 
         /* Remove myself. */
@@ -1074,8 +1079,7 @@ uipcp_rib::neighs_refresh()
         gpb::NeighborCandidateList ncl;
 
         *ncl.add_candidates() = neighbor_cand_get();
-        neighs_sync_obj_all(true, obj_class::neighbors, obj_name::neighbors,
-                            &ncl);
+        neighs_sync_obj_all(true, Neighbor::ObjClass, Neighbor::ObjName, &ncl);
     }
     neighs_refresh_tmr_restart();
 }
@@ -1090,7 +1094,7 @@ uipcp_rib::keepalive_timeout(const std::shared_ptr<NeighFlow> &nf)
     UPV(uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
         static_cast<string>(neigh_name).c_str());
 
-    m.m_read(obj_class::keepalive, obj_name::keepalive);
+    m.m_read(NeighFlow::KeepaliveObjClass, NeighFlow::KeepaliveObjName);
 
     ret = nf->send_to_port_id(&m);
     if (ret) {
@@ -1292,8 +1296,8 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm,
     if (propagate) {
         /* Propagate the updated information to the other neighbors,
          * so that they can update their Neighbor objects. */
-        neighs_sync_obj_excluding(neigh, add, obj_class::neighbors,
-                                  obj_name::neighbors, &prop_ncl);
+        neighs_sync_obj_excluding(neigh, add, Neighbor::ObjClass,
+                                  Neighbor::ObjName, &prop_ncl);
         /* Update the routing, as node addressing information has changed. */
         lfdb->update_routing();
     }
@@ -1327,7 +1331,7 @@ uipcp_rib::keepalive_handler(const CDAPMessage *rm,
 
     /* Just reply back to tell the neighbor we are alive. */
 
-    m.m_read_r(obj_class::keepalive, obj_name::keepalive);
+    m.m_read_r(NeighFlow::KeepaliveObjClass, NeighFlow::KeepaliveObjName);
 
     ret = nf->send_to_port_id(&m, rm->invoke_id);
     if (ret) {

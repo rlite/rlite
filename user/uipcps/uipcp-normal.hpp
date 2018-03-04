@@ -50,41 +50,6 @@
 #include "uipcp-container.h"
 #include "BaseRIB.pb.h"
 
-namespace obj_class {
-extern std::string adata;
-extern std::string dft;
-extern std::string neighbors;
-extern std::string enrollment;
-extern std::string status;
-extern std::string address;
-extern std::string lfdb;  /* Lower Flow DB */
-extern std::string flows; /* Supported flows */
-extern std::string flow;
-extern std::string keepalive;
-extern std::string lowerflow;
-extern std::string addr_alloc_req;
-extern std::string addr_alloc_table;
-extern std::string raft_req_vote;
-extern std::string raft_req_vote_resp;
-extern std::string raft_append_entries;
-extern std::string raft_append_entries_resp;
-}; // namespace obj_class
-
-namespace obj_name {
-extern std::string adata;
-extern std::string dft;
-extern std::string neighbors;
-extern std::string enrollment;
-extern std::string status;
-extern std::string address;
-extern std::string lfdb;
-extern std::string whatevercast;
-extern std::string flows;
-extern std::string keepalive;
-extern std::string lowerflow;
-extern std::string addr_alloc_table;
-}; // namespace obj_name
-
 #ifdef RL_MEMTRACK
 #define rl_new(_exp, _ty)                                                      \
     ({                                                                         \
@@ -222,6 +187,9 @@ struct NeighFlow {
     int sync_obj(bool create, const std::string &obj_class,
                  const std::string &obj_name,
                  const ::google::protobuf::MessageLite *obj = nullptr);
+
+    static std::string KeepaliveObjName;
+    static std::string KeepaliveObjClass;
 };
 
 /* Holds the information about a neighbor IPCP. */
@@ -273,6 +241,9 @@ struct Neighbor {
     bool has_flows() const { return !flows.empty(); }
     bool enrollment_complete();
     int flow_alloc(const char *supp_dif_name);
+
+    static std::string ObjName;
+    static std::string ObjClass;
 };
 
 #ifdef RL_DEBUG
@@ -313,6 +284,9 @@ struct DFT {
         return 0;
     }
     virtual int neighs_refresh(size_t limit) { return 0; }
+
+    static std::string ObjName;
+    static std::string ObjClass;
 };
 
 /* Allocation and deallocation of N-flows used applications. */
@@ -343,6 +317,10 @@ struct FlowAllocator {
     int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
                     std::shared_ptr<Neighbor> const &neigh,
                     rlm_addr_t src_addr);
+
+    static std::string ObjName;
+    static std::string ObjClass;
+    static std::string FlowObjClass;
 };
 
 /* Lower Flows Database and dissemination of routing information,
@@ -374,6 +352,9 @@ struct LFDB {
                            unsigned int limit) const = 0;
     virtual int neighs_refresh(size_t limit)         = 0;
     virtual void age_incr()                          = 0;
+
+    static std::string ObjName;
+    static std::string ObjClass;
 };
 
 /* Address allocation for the members of the N-DIF. */
@@ -393,6 +374,9 @@ struct AddrAllocator {
                             rlm_addr_t src_addr)     = 0;
     virtual int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
                            unsigned int limit) const = 0;
+
+    static std::string ObjName;
+    static std::string ObjClass;
 };
 
 /* Object used to store policy names and allocate/switch policies. */
@@ -604,6 +588,15 @@ struct uipcp_rib {
     /* Time window to compute statistics about management traffic (in seconds).
      */
     static constexpr int kNeighFlowStatsPeriod = 20;
+
+    static std::string StatusObjClass;
+    static std::string StatusObjName;
+    static std::string ADataObjClass;
+    static std::string ADataObjName;
+    static std::string EnrollmentObjClass;
+    static std::string EnrollmentObjName;
+    static std::string LowerFlowObjClass;
+    static std::string LowerFlowObjName;
 
     RL_NODEFAULT_NONCOPIABLE(uipcp_rib);
     uipcp_rib(struct uipcp *_u);

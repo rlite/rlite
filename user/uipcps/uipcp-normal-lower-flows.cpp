@@ -273,7 +273,7 @@ FullyReplicatedLFDB::update_local(const string &node_name)
     lf->set_age(0);
 
     sm = make_unique<CDAPMessage>();
-    sm->m_create(obj_class::lfdb, obj_name::lfdb);
+    sm->m_create(ObjClass, ObjName);
     rib->send_to_myself(std::move(sm), &lfl);
 }
 
@@ -326,8 +326,8 @@ FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm,
 
     if (modified) {
         /* Send the received lower flows to the other neighbors. */
-        rib->neighs_sync_obj_excluding(neigh, add_f, obj_class::lfdb,
-                                       obj_name::lfdb, &prop_lfl);
+        rib->neighs_sync_obj_excluding(neigh, add_f, ObjClass, ObjName,
+                                       &prop_lfl);
 
         /* Update the routing table. */
         re.update_kernel_routing(rib->myname);
@@ -384,9 +384,9 @@ FullyReplicatedLFDB::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
                                 unsigned int limit) const
 {
     gpb::LowerFlowList lfl;
-    auto func = std::bind(&NeighFlow::sync_obj, nf, true, obj_class::lfdb,
-                          obj_name::lfdb, &lfl);
-    int ret   = 0;
+    auto func =
+        std::bind(&NeighFlow::sync_obj, nf, true, ObjClass, ObjName, &lfl);
+    int ret = 0;
 
     for (const auto &kvi : db) {
         for (const auto &kvj : kvi.second) {
@@ -432,8 +432,7 @@ FullyReplicatedLFDB::neighs_refresh(size_t limit)
             *lfl.add_flows() = jt->second;
             jt++;
         }
-        ret |= rib->neighs_sync_obj_all(true, obj_class::lfdb, obj_name::lfdb,
-                                        &lfl);
+        ret |= rib->neighs_sync_obj_all(true, ObjClass, ObjName, &lfl);
     }
 
     return ret;
@@ -489,8 +488,8 @@ FullyReplicatedLFDB::age_incr()
     }
 
     if (prop_lfl.flows_size() > 0) {
-        rib->neighs_sync_obj_all(/*create=*/false, obj_class::lfdb,
-                                 obj_name::lfdb, &prop_lfl);
+        rib->neighs_sync_obj_all(/*create=*/false, ObjClass, ObjName,
+                                 &prop_lfl);
         /* Update the routing table. */
         re.update_kernel_routing(rib->myname);
     }
@@ -524,8 +523,8 @@ FullyReplicatedLFDB::neigh_disconnected(const std::string &neigh_name)
     }
 
     if (prop_lfl.flows_size() > 0) {
-        rib->neighs_sync_obj_all(/*create=*/false, obj_class::lfdb,
-                                 obj_name::lfdb, &prop_lfl);
+        rib->neighs_sync_obj_all(/*create=*/false, ObjClass, ObjName,
+                                 &prop_lfl);
         /* Update the routing table. */
         re.update_kernel_routing(rib->myname);
     }
