@@ -9,6 +9,6 @@ rlite-ctl ipcp-enroller-enable x || exit 1
 rlite-ctl ipcp-enroller-enable z || exit 1
 rlite-ctl ipcp-register x zz || exit 1
 rlite-ctl ipcp-register y zz || exit 1
-rlite-ctl ipcp-enroll y dd zz x
+rlite-ctl ipcp-enroll y dd zz x || exit 1
 # Reset to wait for all the flows to go away
 rlite-ctl reset
