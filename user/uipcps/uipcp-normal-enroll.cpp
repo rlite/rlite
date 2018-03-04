@@ -489,7 +489,7 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
 
         /* Here M_CREATE messages from the slave are accepted and
          * dispatched to the RIB. */
-        if (rm->op_code == gpb::M_CREATE) {
+        if (rm->op_code == gpb::M_CREATE || rm->op_code == gpb::M_WRITE) {
             rib->cdap_dispatch(rm.get(), nf, neigh, RL_ADDR_NULL);
             continue;
         }
@@ -753,7 +753,24 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
         }
         UPD(rib->uipcp, "S --> I M_START_R(enrollment)\n");
 
-        /* Here we should send DIF static information and policies. */
+        /* Here we should send DIF static information. */
+
+        /* Send policies. */
+        list<pair<std::string, std::string>> components_pairs = {
+            {DFT::ObjName, "dft"},
+            {LFDB::ObjName, "routing"},
+            {AddrAllocator::ObjName, "address-allocator"}};
+        for (const auto &p : components_pairs) {
+            m = CDAPMessage();
+            m.m_write("policy", p.first + "/policy");
+            m.set_obj_value(rib->policies[p.second]);
+            ret = nf->send_to_port_id(&m);
+            if (ret) {
+                UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
+                    strerror(errno));
+                return -1;
+            }
+        }
 
         /* Stop the enrollment. */
         enr_info.set_start_early(true);
