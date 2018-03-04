@@ -256,7 +256,8 @@ handover_signal_strength(struct uipcp *const uipcp)
     {
         /* Collect all the uppers of 'uipcp', and put them in a temporary list.
          */
-        struct ipcp_node *ipn;
+        struct ipcp_node *ipn = &uipcp->topo;
+        struct flow_edge *e;
 
         pthread_mutex_lock(&uipcps->lock);
         tmplist =
@@ -267,17 +268,10 @@ handover_signal_strength(struct uipcp *const uipcp)
             goto out;
         }
 
-        list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
-            struct flow_edge *e;
-            if (ipn->id != uipcp->id) {
-                continue; /* not me */
-            }
-
-            list_for_each_entry (e, &ipn->uppers, node) {
-                struct uipcp *u = uipcp_get_by_id(uipcps, e->ipcp->id);
-                if (u) {
-                    tmplist[n++] = u;
-                }
+        list_for_each_entry (e, &ipn->uppers, node) {
+            struct uipcp *u = uipcp_get_by_id(uipcps, e->ipcp->id);
+            if (u) {
+                tmplist[n++] = u;
             }
         }
         assert(n <= uipcps->n_uipcps);

@@ -900,6 +900,10 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     uipcp->priv   = NULL;
     uipcp->refcnt = 1; /* Cogito, ergo sum. */
 
+    uipcp->topo.id = upd->ipcp_id;
+    list_init(&uipcp->topo.lowers);
+    list_init(&uipcp->topo.uppers);
+
     if (!ops) {
         /* This is IPCP without userspace implementation.
          * We have created an entry, there is nothing more
@@ -1130,24 +1134,20 @@ ipcp_hdrlen(struct uipcp *uipcp)
 static void
 topo_visit(struct uipcps *uipcps)
 {
-    struct ipcp_node *ipn;
+    struct uipcp *uipcp;
     struct flow_edge *e;
 
     /*
      * Stage 1: compute txhdroom and mss.
      */
-    list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
-        struct uipcp *uipcp = uipcp_lookup(uipcps, ipn->id);
+    list_for_each_entry (uipcp, &uipcps->uipcps, node) {
+        struct ipcp_node *ipn = &uipcp->topo;
 
         /* Start from safe values. */
         ipn->marked         = 0;
         ipn->update_kern_tx = 0;
         ipn->txhdroom       = 0;
         ipn->max_sdu_size   = 65536;
-
-        if (!uipcp) {
-            continue; /* This should not ever happen. */
-        }
 
         ipn->hdrsize = ipcp_hdrlen(uipcp);
         if (list_empty(&ipn->lowers)) {
@@ -1167,12 +1167,14 @@ topo_visit(struct uipcps *uipcps)
     for (;;) {
         struct ipcp_node *next = NULL;
         struct list_head *prevs, *nexts;
+        struct ipcp_node *ipn = NULL;
 
         /* Scan all the nodes that have not been marked (visited) yet,
          * looking for a node that has no unmarked "lowers".  */
-        list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
+        list_for_each_entry (uipcp, &uipcps->uipcps, node) {
             int no_prevs = 1;
 
+            ipn = &uipcp->topo;
             if (ipn->marked) {
                 continue;
             }
@@ -1217,7 +1219,9 @@ topo_visit(struct uipcps *uipcps)
     /*
      *  Stage 2: compute rxhdroom.
      */
-    list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
+    list_for_each_entry (uipcp, &uipcps->uipcps, node) {
+        struct ipcp_node *ipn = &uipcp->topo;
+
         /* Start from safe values. */
         ipn->marked         = 0;
         ipn->rxhdroom       = 0;
@@ -1237,12 +1241,14 @@ topo_visit(struct uipcps *uipcps)
     for (;;) {
         struct ipcp_node *next = NULL;
         struct list_head *prevs, *nexts;
+        struct ipcp_node *ipn = NULL;
 
         /* Scan all the nodes that have not been marked (visited) yet,
          * looking for a node that has no unmarked "uppers".  */
-        list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
+        list_for_each_entry (uipcp, &uipcps->uipcps, node) {
             int no_prevs = 1;
 
+            ipn = &uipcp->topo;
             if (ipn->marked) {
                 continue;
             }
@@ -1288,11 +1294,13 @@ topo_visit(struct uipcps *uipcps)
 static int
 topo_update_kern(struct uipcps *uipcps)
 {
-    struct ipcp_node *ipn;
+    struct uipcp *uipcp;
     char strbuf[10];
     int ret;
 
-    list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
+    list_for_each_entry (uipcp, &uipcps->uipcps, node) {
+        struct ipcp_node *ipn = &uipcp->topo;
+
         if (!ipn->update_kern_tx) {
             continue; /* nothing to do */
         }
@@ -1320,7 +1328,9 @@ topo_update_kern(struct uipcps *uipcps)
         }
     }
 
-    list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
+    list_for_each_entry (uipcp, &uipcps->uipcps, node) {
+        struct ipcp_node *ipn = &uipcp->topo;
+
         if (!ipn->update_kern_rx) {
             continue; /* nothing to do */
         }
@@ -1344,12 +1354,14 @@ topo_update_kern(struct uipcps *uipcps)
 static int
 topo_compute(struct uipcps *uipcps)
 {
-    struct ipcp_node *ipn;
+    struct uipcp *uipcp;
     struct flow_edge *e;
 
     topo_visit(uipcps);
 
-    list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
+    list_for_each_entry (uipcp, &uipcps->uipcps, node) {
+        struct ipcp_node *ipn = &uipcp->topo;
+
         PV_S("NODE %u, mss = %u\n", ipn->id, ipn->max_sdu_size);
         PV_S("    uppers = [");
         list_for_each_entry (e, &ipn->uppers, node) {
@@ -1372,47 +1384,15 @@ topo_compute(struct uipcps *uipcps)
 static struct ipcp_node *
 topo_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int create)
 {
-    struct ipcp_node *ipn;
+    struct uipcp *uipcp;
 
-    list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
-        if (ipn->id == ipcp_id) {
-            return ipn;
-        }
-    }
-
-    if (!create) {
+    uipcp = uipcp_lookup(uipcps, ipcp_id);
+    if (!uipcp) {
+        PE("uipcp %u not found\n", ipcp_id);
         return NULL;
     }
 
-    ipn = rl_alloc(sizeof(*ipn), RL_MT_TOPO);
-    if (!ipn) {
-        PE("Out of memory\n");
-        return NULL;
-    }
-    memset(ipn, 0, sizeof(*ipn));
-
-    ipn->id     = ipcp_id;
-    ipn->refcnt = 0;
-    list_init(&ipn->lowers);
-    list_init(&ipn->uppers);
-    list_add_tail(&ipn->node, &uipcps->ipcp_nodes);
-
-    return ipn;
-}
-
-/* Called under uipcps lock. */
-static void
-topo_node_put(struct uipcps *uipcps, struct ipcp_node *ipn)
-{
-    if (ipn->refcnt) {
-        return;
-    }
-
-    assert(list_empty(&ipn->uppers));
-    assert(list_empty(&ipn->lowers));
-
-    list_del(&ipn->node);
-    rl_free(ipn, RL_MT_TOPO);
+    return &uipcp->topo;
 }
 
 /* Called under uipcps lock. */
@@ -1529,9 +1509,6 @@ topo_lower_flow_removed(struct uipcps *uipcps, unsigned int upper_id,
 
     topo_edge_del(upper, lower, &upper->lowers);
     topo_edge_del(lower, upper, &lower->uppers);
-
-    topo_node_put(uipcps, upper);
-    topo_node_put(uipcps, lower);
 
     PD("Removed flow (%d -> %d)\n", upper_id, lower_id);
     /* Graph changed, recompute. */
