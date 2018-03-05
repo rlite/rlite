@@ -1155,6 +1155,9 @@ uipcp_rib::policy_mod(const std::string &component,
     policies[component] = policy_name;
     UPD(uipcp, "set %s policy to %s\n", component.c_str(), policy_name.c_str());
     policy_builder->builder(this);
+    if (component == "dft") {
+        dft->reconfigure();
+    }
 
     return ret;
 }
@@ -1215,9 +1218,9 @@ uipcp_rib::policy_param_mod(const std::string &component,
         UPD(uipcp, "set %s policy param %s <== '%s'\n", component.c_str(),
             param_name.c_str(), param_value.c_str());
 
-        /* Invoke the param_changed() method if available. */
+        /* Invoke the reconfigure() method if available. */
         if (component == "dft") {
-            dft->param_changed(param_name);
+            dft->reconfigure();
         }
     }
 

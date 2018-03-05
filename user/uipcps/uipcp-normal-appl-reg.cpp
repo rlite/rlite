@@ -479,7 +479,7 @@ class CentralizedFaultTolerantDFT : public DFT {
 public:
     RL_NODEFAULT_NONCOPIABLE(CentralizedFaultTolerantDFT);
     CentralizedFaultTolerantDFT(uipcp_rib *_ur) : DFT(_ur) {}
-    int param_changed(const std::string &param_name) override;
+    int reconfigure() override;
     void dump(std::stringstream &ss) const override
     {
         if (raft) {
@@ -524,18 +524,18 @@ std::string CentralizedFaultTolerantDFT::Replica::AppendEntriesRespObjClass =
     "raft_ae_r";
 
 int
-CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
+CentralizedFaultTolerantDFT::reconfigure()
 {
     list<raft::ReplicaId> peers;
-    string param_value;
+    string replicas;
 
-    if (param_name != "replicas") {
-        return -1;
+    replicas = rib->get_param_value<std::string>("dft", "replicas");
+    if (replicas.empty()) {
+        UPW(rib->uipcp, "replicas param not configured\n");
+    } else {
+        UPD(rib->uipcp, "replicas = %s\n", replicas.c_str());
     }
-
-    param_value = rib->get_param_value<std::string>("dft", "replicas");
-    UPD(rib->uipcp, "replicas = %s\n", param_value.c_str());
-    peers = strsplit(param_value, ',');
+    peers = strsplit(replicas, ',');
 
     /* Create the client anyway. */
     client = make_unique<Client>(this, peers);
