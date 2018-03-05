@@ -75,6 +75,10 @@ std::string uipcp_rib::LowerFlowObjClass = "lowerflow";
 std::string uipcp_rib::LowerFlowObjName =
     "/daf/mgmt/" + uipcp_rib::LowerFlowObjClass;
 
+std::string DFT::CompName           = "dft";
+std::string LFDB::CompName          = "routing";
+std::string AddrAllocator::CompName = "address-allocator";
+
 std::unordered_map<std::string, std::set<PolicyBuilder>>
     uipcp_rib::available_policies;
 
@@ -427,10 +431,10 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     }
 #endif /* RL_USE_QOS_CUBES */
 
-    params_map["address-allocator"]["nack-wait-secs"] =
+    params_map[AddrAllocator::CompName]["nack-wait-secs"] =
         PolicyParam(kAddrAllocDistrNackWaitSecs, kAddrAllocDistrNackWaitSecsMin,
                     kAddrAllocDistrNackWaitSecsMax);
-    params_map["dft"]["replicas"]         = PolicyParam(string());
+    params_map[DFT::CompName]["replicas"] = PolicyParam(string());
     params_map["enrollment"]["timeout"]   = PolicyParam(kEnrollTimeout);
     params_map["enrollment"]["keepalive"] = PolicyParam(kKeepaliveTimeout);
     params_map["enrollment"]["keepalive-thresh"] =
@@ -449,13 +453,13 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map["resource-allocator"]["reliable-n-flows"]   = PolicyParam(false);
     params_map["resource-allocator"]["broadcast-enroller"] = PolicyParam(true);
     params_map["rib-daemon"]["refresh-intval"] = PolicyParam(kRIBRefreshIntval);
-    params_map["routing"]["age-incr-intval"]   = PolicyParam(kAgeIncrIntval);
-    params_map["routing"]["age-max"]           = PolicyParam(kAgeMax);
+    params_map[LFDB::CompName]["age-incr-intval"] = PolicyParam(kAgeIncrIntval);
+    params_map[LFDB::CompName]["age-max"]         = PolicyParam(kAgeMax);
 
     policy_mod("flow-allocator", "local");
-    policy_mod("address-allocator", "distributed");
-    policy_mod("dft", "fully-replicated");
-    policy_mod("routing", "link-state");
+    policy_mod(AddrAllocator::CompName, "distributed");
+    policy_mod(DFT::CompName, "fully-replicated");
+    policy_mod(LFDB::CompName, "link-state");
 
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(DFT::ObjName, &uipcp_rib::dft_handler));
@@ -1155,7 +1159,7 @@ uipcp_rib::policy_mod(const std::string &component,
     policies[component] = policy_name;
     UPD(uipcp, "set %s policy to %s\n", component.c_str(), policy_name.c_str());
     policy_builder->builder(this);
-    if (component == "dft") {
+    if (component == DFT::CompName) {
         dft->reconfigure();
     }
 
@@ -1219,7 +1223,7 @@ uipcp_rib::policy_param_mod(const std::string &component,
             param_name.c_str(), param_value.c_str());
 
         /* Invoke the reconfigure() method if available. */
-        if (component == "dft") {
+        if (component == DFT::CompName) {
             dft->reconfigure();
         }
     }
@@ -1588,11 +1592,11 @@ uipcp_rib::policy_handler(const CDAPMessage *rm,
     }
 
     if (basename == DFT::ObjName) {
-        component = "dft";
+        component = DFT::CompName;
     } else if (basename == LFDB::ObjName) {
-        component = "routing";
+        component = LFDB::CompName;
     } else if (basename == AddrAllocator::ObjName) {
-        component = "address-allocator";
+        component = AddrAllocator::CompName;
     } else {
         UPE(uipcp, "Unknown component basename %s\n", basename.c_str());
         return 0;
