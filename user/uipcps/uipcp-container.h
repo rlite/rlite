@@ -352,7 +352,7 @@ int uipcp_loop_schedule_canc(struct uipcp *uipcp, int id);
 
 #define UPV(_u, FMT, ...)                                                      \
     if (rl_verbosity >= RL_VERB_VERY)                                          \
-    UPRINT(_u, "DBG", FMT, ##__VA_ARGS__)
+    UPRINT(_u, "VRB", FMT, ##__VA_ARGS__)
 
 #define UPW(_u, FMT, ...) UPRINT(_u, "WRN", FMT, ##__VA_ARGS__)
 
