@@ -287,6 +287,7 @@ struct DFT {
 
     static std::string ObjName;
     static std::string ObjClass;
+    static std::string CompName;
 };
 
 /* Allocation and deallocation of N-flows used applications. */
@@ -355,6 +356,7 @@ struct LFDB {
 
     static std::string ObjName;
     static std::string ObjClass;
+    static std::string CompName;
 };
 
 /* Address allocation for the members of the N-DIF. */
@@ -377,6 +379,7 @@ struct AddrAllocator {
 
     static std::string ObjName;
     static std::string ObjClass;
+    static std::string CompName;
 };
 
 /* Object used to store policy names and allocate/switch policies. */
