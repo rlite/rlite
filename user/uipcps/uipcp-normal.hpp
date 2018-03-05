@@ -269,7 +269,7 @@ struct DFT {
     DFT(uipcp_rib *_ur) : rib(_ur) {}
     virtual ~DFT() {}
 
-    virtual int param_changed(const std::string &param_name) { return 0; }
+    virtual int reconfigure() { return 0; }
     virtual void dump(std::stringstream &ss) const                        = 0;
     virtual int lookup_req(const std::string &appl_name, std::string *dst_node,
                            const std::string &preferred, uint32_t cookie) = 0;

@@ -539,7 +539,8 @@ class Demo:
                     })
 
                 for p in self.dif_policies[dif]:
-                    if len(p['nodes']) == 0 or vmname in p.nodes:
+                    if (len(p['nodes']) == 0 and dif not in vm['enrolling']) \
+                            or (len(p['nodes']) > 0 and vmname in p.nodes):
                         ctrl_cmds.append(
                             'dif-policy-mod %(dif)s.DIF %(comp)s %(policy)s\n'
                             % {
@@ -547,6 +548,7 @@ class Demo:
                                 'comp': p['path'],
                                 'policy': p['ps']
                             })
+                    if len(p['nodes']) == 0 or vmname in p.nodes:
                         for param in p['parms']:
                             pname, pvalue = param.split('=')
 
