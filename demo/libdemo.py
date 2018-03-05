@@ -521,13 +521,13 @@ class Demo:
                         })
                 if self.reliable_flows:
                     ctrl_cmds.append(
-                        'dif-policy-param-mod %(dif)s.DIF resource-allocator reliable-flows true\n'
+                        'dif-policy-param-mod %(dif)s.DIF resalloc reliable-flows true\n'
                         % {
                             'dif': dif
                         })
                 if self.reliable_n_flows:
                     ctrl_cmds.append(
-                        'dif-policy-param-mod %(dif)s.DIF resource-allocator reliable-n-flows true\n'
+                        'dif-policy-param-mod %(dif)s.DIF resalloc reliable-n-flows true\n'
                         % {
                             'dif': dif
                         })

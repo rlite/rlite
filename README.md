@@ -984,16 +984,16 @@ of a normal IPCP process:
 | enrollment          | *                 | keepalive          | Neighbor keepalive timeout in seconds (0 to disable). |
 | enrollment          | *                 | keepalive-thresh   | Number of allowed unacked keepalive requests. If exceeded, the N-1 low is pruned. |
 | enrollment          | *                 | auto-reconnect     | Automatically re-enroll to neighbors pruned because unresponsive. |
-| flow-allocator      | local             | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
-| flow-allocator      | local             | max-rtxq-len       | Maximum size of the retransmission queue (in PDUs). |
-| flow-allocator      | local             | initial-rtx-timeout| Initial value for the DTCP retransmission timer (in milliseconds). |
-| flow-allocator      | local             | initial-a          | Initial value for the DTCP A timer (in milliseconds). |
-| flow-allocator      | local             | initial-credit     | Initial size of the DTCP flow control window (in PDUs). |
-| flow-allocator      | local             | max-cwq-len        | Maximum size of the DTCP closed window queue (in PDUs). |
-| resource-allocator  | *                 | reliable-flows     | Use reliable N-flows if reliable N-1-flows are not available (boolean). |
-| resource-allocator  | *                 | reliable-n-flows   | Use dedicated reliable N-1-flows for management traffic rather than reusing kernel-bound unreliable N-1 flows if possible (boolean). |
-| resource-allocator  | *                 | broadcast-enroller | Let the IPCP register the name of the DIF (DAF name) in addition to the IPCP name (boolean). |
-| rib-daemon          | *                 | refresh-intval     | Time interval (in seconds) between two consecutive periodic RIB synchronizations. |
+| flowalloc           | local             | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
+| flowalloc           | local             | max-rtxq-len       | Maximum size of the retransmission queue (in PDUs). |
+| flowalloc           | local             | initial-rtx-timeout| Initial value for the DTCP retransmission timer (in milliseconds). |
+| flowalloc           | local             | initial-a          | Initial value for the DTCP A timer (in milliseconds). |
+| flowalloc           | local             | initial-credit     | Initial size of the DTCP flow control window (in PDUs). |
+| flowalloc           | local             | max-cwq-len        | Maximum size of the DTCP closed window queue (in PDUs). |
+| resalloc            | *                 | reliable-flows     | Use reliable N-flows if reliable N-1-flows are not available (boolean). |
+| resalloc            | *                 | reliable-n-flows   | Use dedicated reliable N-1-flows for management traffic rather than reusing kernel-bound unreliable N-1 flows if possible (boolean). |
+| resalloc            | *                 | broadcast-enroller | Let the IPCP register the name of the DIF (DAF name) in addition to the IPCP name (boolean). |
+| ribd                | *                 | refresh-intval     | Time interval (in seconds) between two consecutive periodic RIB synchronizations. |
 | routing             | *                 | age-incr-intval    | Time interval (in seconds) between two consecutive increments of the age of LFDB entries. |
 | routing             | *                 | age-incr-max       | Maximum age (in seconds) allowed for an LFDB entry before being discarded. |
 
@@ -1004,7 +1004,7 @@ distributed address allocation policy of a normal IPCP process
 
 This is an example how to enable reliable flows in the resource allocator
 
-    # rlite-ctl dif-policy-param-mod n.DIF resource-allocator reliable-flows true
+    # rlite-ctl dif-policy-param-mod n.DIF resalloc reliable-flows true
 
 ## 7. Tools
 This section documents useful programs that are part of the *rlite*

@@ -287,7 +287,6 @@ struct DFT {
 
     static std::string TableName;
     static std::string ObjClass;
-    static std::string CompName;
     static std::string Prefix;
 };
 
@@ -323,7 +322,7 @@ struct FlowAllocator {
     static std::string TableName;
     static std::string ObjClass;
     static std::string FlowObjClass;
-    static std::string CompName;
+    static std::string Prefix;
 };
 
 /* Lower Flows Database and dissemination of routing information,
@@ -358,7 +357,6 @@ struct LFDB {
 
     static std::string TableName;
     static std::string ObjClass;
-    static std::string CompName;
     static std::string Prefix;
 };
 
@@ -382,7 +380,6 @@ struct AddrAllocator {
 
     static std::string TableName;
     static std::string ObjClass;
-    static std::string CompName;
     static std::string Prefix;
 };
 
@@ -602,8 +599,11 @@ struct uipcp_rib {
     static std::string ADataObjName;
     static std::string EnrollmentObjClass;
     static std::string EnrollmentObjName;
+    static std::string EnrollmentPrefix;
     static std::string LowerFlowObjClass;
     static std::string LowerFlowObjName;
+    static std::string ResourceAllocPrefix;
+    static std::string RibDaemonPrefix;
 
     RL_NODEFAULT_NONCOPIABLE(uipcp_rib);
     uipcp_rib(struct uipcp *_u);

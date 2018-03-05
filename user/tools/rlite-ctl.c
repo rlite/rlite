@@ -671,6 +671,23 @@ regs_show(int argc, char **argv, struct cmd_descriptor *cd)
     return 0;
 }
 
+static char *
+component_name_wrap(const char *name)
+{
+    int len    = strlen(name) + 30;
+    char *wrap = malloc(len);
+
+    if (!wrap) {
+        perror("malloc()");
+        return NULL;
+    }
+    strcpy(wrap, "/mgmt/");
+    strcat(wrap, name);
+//    strcat(wrap, "/policy");
+
+    return wrap;
+}
+
 static int
 ipcp_policy_mod(int argc, char **argv, struct cmd_descriptor *cd)
 {
@@ -703,7 +720,7 @@ ipcp_policy_mod(int argc, char **argv, struct cmd_descriptor *cd)
 
     req.hdr.msg_type = RLITE_U_IPCP_POLICY_MOD;
     req.hdr.event_id = 0;
-    req.comp_name    = strdup(comp_name);
+    req.comp_name    = component_name_wrap(comp_name);
     req.policy_name  = strdup(policy_name);
 
     return request_response(RLITE_MB(&req), NULL);
@@ -743,7 +760,7 @@ ipcp_policy_param_mod(int argc, char **argv, struct cmd_descriptor *cd)
 
     req.hdr.msg_type = RLITE_U_IPCP_POLICY_PARAM_MOD;
     req.hdr.event_id = 0;
-    req.comp_name    = strdup(comp_name);
+    req.comp_name    = component_name_wrap(comp_name);
     req.param_name   = strdup(param_name);
     req.param_value  = strdup(param_value);
 
@@ -952,7 +969,7 @@ ipcp_policy_list(int argc, char **argv, struct cmd_descriptor *cd)
 
     req.hdr.msg_type = RLITE_U_IPCP_POLICY_LIST_REQ;
     req.hdr.event_id = 0;
-    req.comp_name    = comp_name ? strdup(comp_name) : NULL;
+    req.comp_name    = comp_name ? component_name_wrap(comp_name) : NULL;
 
     return request_response(RLITE_MB(&req), ipcp_rib_show_handler);
 }
@@ -1001,7 +1018,7 @@ ipcp_policy_param_list(int argc, char **argv, struct cmd_descriptor *cd)
 
     req.hdr.msg_type = RLITE_U_IPCP_POLICY_PARAM_LIST_REQ;
     req.hdr.event_id = 0;
-    req.comp_name    = comp_name ? strdup(comp_name) : NULL;
+    req.comp_name    = comp_name ? component_name_wrap(comp_name) : NULL;
     req.param_name   = param_name ? strdup(param_name) : NULL;
 
     return request_response(RLITE_MB(&req), ipcp_rib_show_handler);

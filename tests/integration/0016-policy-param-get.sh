@@ -10,10 +10,10 @@ rlite-ctl dif-policy-param-list dd | wc -l | grep -q "\<18\>" || exit 1
 rlite-ctl dif-policy-param-list dd addralloc | wc -l | grep -q "\<1\>" || exit 1
 rlite-ctl dif-policy-param-list dd dft | wc -l | grep -q "\<1\>" || exit 1
 rlite-ctl dif-policy-param-list dd enrollment | wc -l | grep -q "\<4\>" || exit 1
-rlite-ctl dif-policy-param-list dd flow-allocator | wc -l | grep -q "\<6\>" || exit 1
-rlite-ctl dif-policy-param-list dd resource-allocator | wc -l | grep -q "\<3\>" || exit 1
+rlite-ctl dif-policy-param-list dd flowalloc | wc -l | grep -q "\<6\>" || exit 1
+rlite-ctl dif-policy-param-list dd resalloc | wc -l | grep -q "\<3\>" || exit 1
 rlite-ctl dif-policy-param-list dd routing | wc -l | grep -q "\<2\>" || exit 1
-rlite-ctl dif-policy-param-list dd rib-daemon | wc -l | grep -q "\<1\>" || exit 1
+rlite-ctl dif-policy-param-list dd ribd | wc -l | grep -q "\<1\>" || exit 1
 
 # Run a list of set operations followed by a correspondent get, checking
 # that the value got stored in the RIB.
@@ -29,26 +29,26 @@ rlite-ctl dif-policy-param-mod dd enrollment keepalive-thresh 21 || exit 1
 rlite-ctl dif-policy-param-list dd enrollment keepalive-thresh | grep 21 || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment auto-reconnect false || exit 1
 rlite-ctl dif-policy-param-list dd enrollment auto-reconnect | grep false || exit 1
-rlite-ctl dif-policy-param-mod dd flow-allocator force-flow-control true || exit 1
-rlite-ctl dif-policy-param-list dd flow-allocator force-flow-control | grep true || exit 1
-rlite-ctl dif-policy-param-mod dd flow-allocator initial-a 41 || exit 1
-rlite-ctl dif-policy-param-list dd flow-allocator initial-a | grep 41 || exit 1
-rlite-ctl dif-policy-param-mod dd flow-allocator initial-credit 184 || exit 1
-rlite-ctl dif-policy-param-list dd flow-allocator initial-credit | grep 184 || exit 1
-rlite-ctl dif-policy-param-mod dd flow-allocator initial-rtx-timeout 1791 || exit 1
-rlite-ctl dif-policy-param-list dd flow-allocator initial-rtx-timeout | grep 1791 || exit 1
-rlite-ctl dif-policy-param-mod dd flow-allocator max-cwq-len 2961 || exit 1
-rlite-ctl dif-policy-param-mod dd flow-allocator max-rtxq-len 915 || exit 1
-rlite-ctl dif-policy-param-list dd flow-allocator max-cwq-len | grep 2961 || exit 1
-rlite-ctl dif-policy-param-list dd flow-allocator max-rtxq-len | grep 915 || exit 1
-rlite-ctl dif-policy-param-mod dd resource-allocator reliable-flows true || exit 1
-rlite-ctl dif-policy-param-list dd resource-allocator reliable-flows | grep true || exit 1
-rlite-ctl dif-policy-param-mod dd resource-allocator reliable-n-flows true || exit 1
-rlite-ctl dif-policy-param-list dd resource-allocator reliable-n-flows | grep true || exit 1
-rlite-ctl dif-policy-param-mod dd resource-allocator broadcast-enroller true || exit 1
-rlite-ctl dif-policy-param-list dd resource-allocator broadcast-enroller | grep true || exit 1
-rlite-ctl dif-policy-param-mod dd rib-daemon refresh-intval 916 || exit 1
-rlite-ctl dif-policy-param-list dd rib-daemon refresh-intval | grep 916 || exit 1
+rlite-ctl dif-policy-param-mod dd flowalloc force-flow-control true || exit 1
+rlite-ctl dif-policy-param-list dd flowalloc force-flow-control | grep true || exit 1
+rlite-ctl dif-policy-param-mod dd flowalloc initial-a 41 || exit 1
+rlite-ctl dif-policy-param-list dd flowalloc initial-a | grep 41 || exit 1
+rlite-ctl dif-policy-param-mod dd flowalloc initial-credit 184 || exit 1
+rlite-ctl dif-policy-param-list dd flowalloc initial-credit | grep 184 || exit 1
+rlite-ctl dif-policy-param-mod dd flowalloc initial-rtx-timeout 1791 || exit 1
+rlite-ctl dif-policy-param-list dd flowalloc initial-rtx-timeout | grep 1791 || exit 1
+rlite-ctl dif-policy-param-mod dd flowalloc max-cwq-len 2961 || exit 1
+rlite-ctl dif-policy-param-mod dd flowalloc max-rtxq-len 915 || exit 1
+rlite-ctl dif-policy-param-list dd flowalloc max-cwq-len | grep 2961 || exit 1
+rlite-ctl dif-policy-param-list dd flowalloc max-rtxq-len | grep 915 || exit 1
+rlite-ctl dif-policy-param-mod dd resalloc reliable-flows true || exit 1
+rlite-ctl dif-policy-param-list dd resalloc reliable-flows | grep true || exit 1
+rlite-ctl dif-policy-param-mod dd resalloc reliable-n-flows true || exit 1
+rlite-ctl dif-policy-param-list dd resalloc reliable-n-flows | grep true || exit 1
+rlite-ctl dif-policy-param-mod dd resalloc broadcast-enroller true || exit 1
+rlite-ctl dif-policy-param-list dd resalloc broadcast-enroller | grep true || exit 1
+rlite-ctl dif-policy-param-mod dd ribd refresh-intval 916 || exit 1
+rlite-ctl dif-policy-param-list dd ribd refresh-intval | grep 916 || exit 1
 rlite-ctl dif-policy-param-mod dd routing age-incr-intval 107 || exit 1
 rlite-ctl dif-policy-param-mod dd routing age-max 771 || exit 1
 rlite-ctl dif-policy-param-list dd routing age-incr-intval | grep 107 || exit 1

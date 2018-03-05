@@ -207,7 +207,7 @@ NeighFlow::keepalive_tmr_start()
 {
     /* Keepalive timeout is expressed in seconds. */
     unsigned int keepalive =
-        rib->get_param_value<int>("enrollment", "keepalive");
+        rib->get_param_value<int>(uipcp_rib::EnrollmentPrefix, "keepalive");
 
     if (keepalive == 0) {
         /* no keepalive */
@@ -383,7 +383,8 @@ EnrollmentResources::next_enroll_msg(std::unique_lock<std::mutex> &lk)
     std::unique_ptr<const CDAPMessage> msg;
 
     while (msgs.empty()) {
-        int to = neigh->rib->get_param_value<int>("enrollment", "timeout");
+        int to = neigh->rib->get_param_value<int>(uipcp_rib::EnrollmentPrefix,
+                                                  "timeout");
         std::cv_status cvst;
 
         cvst = msgs_avail.wait_for(lk, std::chrono::milliseconds(to));
@@ -757,9 +758,9 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
 
         /* Send policies. */
         list<pair<std::string, std::string>> components_pairs = {
-            {DFT::Prefix, DFT::CompName},
-            {LFDB::Prefix, LFDB::CompName},
-            {AddrAllocator::Prefix, AddrAllocator::CompName}};
+            {DFT::Prefix, DFT::Prefix},
+            {LFDB::Prefix, LFDB::Prefix},
+            {AddrAllocator::Prefix, AddrAllocator::Prefix}};
         for (const auto &p : components_pairs) {
             m = CDAPMessage();
             m.m_write("policy", p.first + "/policy");
@@ -1074,7 +1075,7 @@ uipcp_rib::neighs_refresh_tmr_restart()
 {
     sync_timer = make_unique<TimeoutEvent>(
         std::chrono::seconds(
-            get_param_value<int>("rib-daemon", "refresh-intval")),
+            get_param_value<int>(uipcp_rib::RibDaemonPrefix, "refresh-intval")),
         uipcp, this, [](struct uipcp *uipcp, void *arg) {
             uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
             rib->sync_timer->fired();
@@ -1121,7 +1122,7 @@ uipcp_rib::keepalive_timeout(const std::shared_ptr<NeighFlow> &nf)
     nf->pending_keepalive_reqs++;
 
     if (nf->pending_keepalive_reqs >
-        get_param_value<int>("enrollment", "keepalive-thresh")) {
+        get_param_value<int>(uipcp_rib::EnrollmentPrefix, "keepalive-thresh")) {
         /* We assume the neighbor is not alive on this flow, so
          * we prune the flow. */
         UPI(uipcp,
@@ -1498,7 +1499,8 @@ Neighbor::flow_alloc(const char *supp_dif)
         (rl_conf_ipcp_qos_supported(lower_ipcp_id_, &relspec) == 0);
     UPD(rib->uipcp, "N-1 DIF %s has%s reliable flows\n", supp_dif,
         (use_reliable_flow ? "" : " not"));
-    if (!rib->get_param_value<bool>("resource-allocator", "reliable-flows")) {
+    if (!rib->get_param_value<bool>(uipcp_rib::ResourceAllocPrefix,
+                                    "reliable-flows")) {
         /* Force unreliable flows even if we have reliable ones. */
         use_reliable_flow = false;
     }
@@ -1714,7 +1716,7 @@ uipcp_rib::trigger_re_enrollments()
 {
     list<pair<string, string>> re_enrollments;
 
-    if (!get_param_value<bool>("enrollment", "auto-reconnect")) {
+    if (!get_param_value<bool>(uipcp_rib::EnrollmentPrefix, "auto-reconnect")) {
         /* Don't try to re-enroll automatically to neighbors
          * listed in uipcp_rib::neighbors_deleted. */
         return;
@@ -1792,7 +1794,8 @@ uipcp_rib::allocate_n_flows()
 {
     list<string> n_flow_allocations;
 
-    if (!get_param_value<bool>("resource-allocator", "reliable-n-flows")) {
+    if (!get_param_value<bool>(uipcp_rib::ResourceAllocPrefix,
+                               "reliable-n-flows")) {
         /* Reliable N-flows feature disabled. */
         return;
     }
@@ -1925,6 +1928,8 @@ uipcp_rib::check_for_address_conflicts()
 void
 uipcp_rib::ra_lib_init()
 {
-    available_policies["enrollment"].insert(PolicyBuilder("default"));
-    available_policies["resource-allocator"].insert(PolicyBuilder("default"));
+    available_policies[uipcp_rib::EnrollmentPrefix].insert(
+        PolicyBuilder("default"));
+    available_policies[uipcp_rib::ResourceAllocPrefix].insert(
+        PolicyBuilder("default"));
 }

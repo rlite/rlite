@@ -443,7 +443,7 @@ uipcp_rib::age_incr_tmr_restart()
 {
     age_incr_timer = make_unique<TimeoutEvent>(
         std::chrono::seconds(
-            get_param_value<int>(LFDB::CompName, "age-incr-intval")),
+            get_param_value<int>(LFDB::Prefix, "age-incr-intval")),
         uipcp, this, [](struct uipcp *uipcp, void *arg) {
             uipcp_rib *rib = (uipcp_rib *)arg;
             rib->age_incr_timer->fired();
@@ -457,8 +457,8 @@ FullyReplicatedLFDB::age_incr()
 {
     std::lock_guard<std::mutex> guard(rib->mutex);
     unsigned int age_inc_intval =
-        rib->get_param_value<int>(LFDB::CompName, "age-incr-intval");
-    unsigned int age_max = rib->get_param_value<int>(LFDB::CompName, "age-max");
+        rib->get_param_value<int>(LFDB::Prefix, "age-incr-intval");
+    unsigned int age_max = rib->get_param_value<int>(LFDB::Prefix, "age-max");
     gpb::LowerFlowList prop_lfl;
 
     for (auto &kvi : db) {
@@ -905,7 +905,7 @@ void
 uipcp_rib::lfdb_lib_init()
 {
     auto builder = [](uipcp_rib *rib) {
-        std::string policy_name = rib->policies[LFDB::CompName];
+        std::string policy_name = rib->policies[LFDB::Prefix];
         struct FullyReplicatedLFDB *lfdbd;
 
         if (rib->lfdb == nullptr) {
@@ -930,8 +930,8 @@ uipcp_rib::lfdb_lib_init()
             assert(false);
         }
     };
-    available_policies[LFDB::CompName].insert(
+    available_policies[LFDB::Prefix].insert(
         PolicyBuilder("link-state", builder));
-    available_policies[LFDB::CompName].insert(
+    available_policies[LFDB::Prefix].insert(
         PolicyBuilder("link-state-lfa", builder));
 }
