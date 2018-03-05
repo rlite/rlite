@@ -757,9 +757,9 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
 
         /* Send policies. */
         list<pair<std::string, std::string>> components_pairs = {
-            {DFT::TableName, DFT::CompName},
-            {LFDB::TableName, LFDB::CompName},
-            {AddrAllocator::TableName, AddrAllocator::CompName}};
+            {DFT::Prefix, DFT::CompName},
+            {LFDB::Prefix, LFDB::CompName},
+            {AddrAllocator::Prefix, AddrAllocator::CompName}};
         for (const auto &p : components_pairs) {
             m = CDAPMessage();
             m.m_write("policy", p.first + "/policy");

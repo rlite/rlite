@@ -49,13 +49,20 @@ string address      = "/daf/mgmt/naming/address";
 string whatevercast = "/daf/mgmt/naming/whatevercast";
 #endif
 
-std::string DFT::ObjClass            = "dft_entries";
-std::string DFT::TableName           = "/mgmt/dft/table";
-std::string LFDB::ObjClass           = "lfdb_entries";
-std::string LFDB::TableName          = "/mgmt/routing/lfdb"; /* Lower Flow DB */
-std::string AddrAllocator::ObjClass  = "aa_entries";
-std::string AddrAllocator::TableName = "/mgmt/addralloc/table";
+std::string DFT::ObjClass   = "dft_entries";
+std::string DFT::CompName   = "dft";
+std::string DFT::Prefix     = "/mgmt/" + DFT::CompName;
+std::string DFT::TableName  = DFT::Prefix + "/table";
+std::string LFDB::ObjClass  = "lfdb_entries";
+std::string LFDB::CompName  = "routing";
+std::string LFDB::Prefix    = "/mgmt/" + LFDB::CompName;
+std::string LFDB::TableName = LFDB::Prefix + "/lfdb"; /* Lower Flow DB */
+std::string AddrAllocator::ObjClass      = "aa_entries";
+std::string AddrAllocator::CompName      = "addralloc";
+std::string AddrAllocator::Prefix        = "/mgmt/" + AddrAllocator::CompName;
+std::string AddrAllocator::TableName     = AddrAllocator::Prefix + "/table";
 std::string FlowAllocator::FlowObjClass  = "flow";
+std::string FlowAllocator::CompName      = "flow-allocator";
 std::string FlowAllocator::TableName     = "/mgmt/fa/flows";
 std::string Neighbor::ObjClass           = "neigh_entries";
 std::string Neighbor::TableName          = "/mgmt/neighbors/entries";
@@ -72,11 +79,6 @@ std::string uipcp_rib::EnrollmentObjName =
 std::string uipcp_rib::LowerFlowObjClass = "lowerflow";
 std::string uipcp_rib::LowerFlowObjName =
     "/mgmt/" + uipcp_rib::LowerFlowObjClass;
-
-std::string DFT::CompName           = "dft";
-std::string LFDB::CompName          = "routing";
-std::string AddrAllocator::CompName = "addralloc";
-std::string FlowAllocator::CompName = "flow-allocator";
 
 std::unordered_map<std::string, std::set<PolicyBuilder>>
     uipcp_rib::available_policies;
@@ -476,11 +478,23 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     handlers.insert(make_pair(AddrAllocator::TableName,
                               &uipcp_rib::addr_alloc_table_handler));
     handlers.insert(
-        make_pair(DFT::TableName + "/policy", &uipcp_rib::policy_handler));
+        make_pair(DFT::Prefix + "/policy", &uipcp_rib::policy_handler));
     handlers.insert(
-        make_pair("/mgmt/routing/policy", &uipcp_rib::policy_handler));
-    handlers.insert(make_pair(AddrAllocator::TableName + "/policy",
+        make_pair(LFDB::Prefix + "/policy", &uipcp_rib::policy_handler));
+    handlers.insert(make_pair(AddrAllocator::Prefix + "/policy",
                               &uipcp_rib::policy_handler));
+
+    if (rl_verbosity >= RL_VERB_VERY) {
+        /* Dump the available RIB paths (alphabetically sorted). */
+        std::list<std::string> paths;
+        for (const auto &kv : handlers) {
+            paths.push_back(kv.first);
+        }
+        paths.sort();
+        for (const auto &path : paths) {
+            UPV(uipcp, "Path %s\n", path.c_str());
+        }
+    }
 
     /* Start timers for periodic tasks. */
     age_incr_tmr_restart();
@@ -1593,11 +1607,11 @@ uipcp_rib::policy_handler(const CDAPMessage *rm,
         return 0;
     }
 
-    if (basename == DFT::TableName) {
+    if (basename == DFT::Prefix) {
         component = DFT::CompName;
-    } else if (basename == LFDB::TableName) {
+    } else if (basename == LFDB::Prefix) {
         component = LFDB::CompName;
-    } else if (basename == AddrAllocator::TableName) {
+    } else if (basename == AddrAllocator::Prefix) {
         component = AddrAllocator::CompName;
     } else {
         UPE(uipcp, "Unknown component basename %s\n", basename.c_str());
