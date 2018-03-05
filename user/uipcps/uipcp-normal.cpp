@@ -49,35 +49,33 @@ string address      = "/daf/mgmt/naming/address";
 string whatevercast = "/daf/mgmt/naming/whatevercast";
 #endif
 
-std::string DFT::ObjClass   = "dft";
-std::string DFT::TableName  = "/dif/mgmt/fa/" + DFT::ObjClass;
-std::string LFDB::ObjClass  = "fsodb"; /* Lower Flow DB */
-std::string LFDB::TableName = "/dif/mgmt/pduft/linkstate/" + LFDB::ObjClass;
-std::string AddrAllocator::ObjClass = "table";
-std::string AddrAllocator::TableName =
-    "/dif/ra/addralloc/" + AddrAllocator::ObjClass;
-std::string FlowAllocator::FlowObjClass = "flow";
-std::string FlowAllocator::ObjClass     = "flows";
-std::string FlowAllocator::TableName = "/dif/ra/fa/" + FlowAllocator::ObjClass;
-std::string Neighbor::ObjClass       = "neighbors";
-std::string Neighbor::TableName      = "/daf/mgmt/" + Neighbor::ObjClass;
+std::string DFT::ObjClass            = "dft_entries";
+std::string DFT::TableName           = "/mgmt/dft/table";
+std::string LFDB::ObjClass           = "lfdb_entries";
+std::string LFDB::TableName          = "/mgmt/routing/lfdb"; /* Lower Flow DB */
+std::string AddrAllocator::ObjClass  = "aa_entries";
+std::string AddrAllocator::TableName = "/mgmt/addralloc/table";
+std::string FlowAllocator::FlowObjClass  = "flow";
+std::string FlowAllocator::TableName     = "/mgmt/fa/flows";
+std::string Neighbor::ObjClass           = "neigh_entries";
+std::string Neighbor::TableName          = "/mgmt/neighbors/entries";
 std::string NeighFlow::KeepaliveObjClass = "keepalive";
 std::string NeighFlow::KeepaliveObjName =
-    "/daf/mgmt/" + NeighFlow::KeepaliveObjClass;
+    "/mgmt/" + NeighFlow::KeepaliveObjClass;
 std::string uipcp_rib::StatusObjClass = "operational_status";
-std::string uipcp_rib::StatusObjName = "/daf/mgmt/" + uipcp_rib::StatusObjClass;
-std::string uipcp_rib::ADataObjClass = "a_data";
-std::string uipcp_rib::ADataObjName  = "a_data";
+std::string uipcp_rib::StatusObjName  = "/mgmt/" + uipcp_rib::StatusObjClass;
+std::string uipcp_rib::ADataObjClass  = "a_data";
+std::string uipcp_rib::ADataObjName   = "/a_data";
 std::string uipcp_rib::EnrollmentObjClass = "enrollment";
 std::string uipcp_rib::EnrollmentObjName =
-    "/daf/mgmt/" + uipcp_rib::EnrollmentObjClass;
+    "/mgmt/" + uipcp_rib::EnrollmentObjClass;
 std::string uipcp_rib::LowerFlowObjClass = "lowerflow";
 std::string uipcp_rib::LowerFlowObjName =
-    "/daf/mgmt/" + uipcp_rib::LowerFlowObjClass;
+    "/mgmt/" + uipcp_rib::LowerFlowObjClass;
 
 std::string DFT::CompName           = "dft";
 std::string LFDB::CompName          = "routing";
-std::string AddrAllocator::CompName = "address-allocator";
+std::string AddrAllocator::CompName = "addralloc";
 std::string FlowAllocator::CompName = "flow-allocator";
 
 std::unordered_map<std::string, std::set<PolicyBuilder>>
@@ -480,7 +478,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     handlers.insert(
         make_pair(DFT::TableName + "/policy", &uipcp_rib::policy_handler));
     handlers.insert(
-        make_pair(LFDB::TableName + "/policy", &uipcp_rib::policy_handler));
+        make_pair("/mgmt/routing/policy", &uipcp_rib::policy_handler));
     handlers.insert(make_pair(AddrAllocator::TableName + "/policy",
                               &uipcp_rib::policy_handler));
 

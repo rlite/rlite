@@ -7,7 +7,7 @@ rlite-ctl ipcp-enroller-enable x || exit 1
 # List per-component parameters, checking that the number of lines is correct
 rlite-ctl dif-policy-param-list dd
 rlite-ctl dif-policy-param-list dd | wc -l | grep -q "\<18\>" || exit 1
-rlite-ctl dif-policy-param-list dd address-allocator | wc -l | grep -q "\<1\>" || exit 1
+rlite-ctl dif-policy-param-list dd addralloc | wc -l | grep -q "\<1\>" || exit 1
 rlite-ctl dif-policy-param-list dd dft | wc -l | grep -q "\<1\>" || exit 1
 rlite-ctl dif-policy-param-list dd enrollment | wc -l | grep -q "\<4\>" || exit 1
 rlite-ctl dif-policy-param-list dd flow-allocator | wc -l | grep -q "\<6\>" || exit 1
@@ -17,8 +17,8 @@ rlite-ctl dif-policy-param-list dd rib-daemon | wc -l | grep -q "\<1\>" || exit 
 
 # Run a list of set operations followed by a correspondent get, checking
 # that the value got stored in the RIB.
-rlite-ctl dif-policy-param-mod dd address-allocator nack-wait-secs 76 || exit 1
-rlite-ctl dif-policy-param-list dd address-allocator nack-wait-secs | grep 76 || exit 1
+rlite-ctl dif-policy-param-mod dd addralloc nack-wait-secs 76 || exit 1
+rlite-ctl dif-policy-param-list dd addralloc nack-wait-secs | grep 76 || exit 1
 rlite-ctl dif-policy-param-mod dd dft replicas r1,r2,r3,r4,r5 || exit 1
 rlite-ctl dif-policy-param-list dd dft replicas | grep "r1,r2,r3,r4,r5" || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment timeout 300 || exit 1

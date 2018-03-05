@@ -914,7 +914,7 @@ DIF.
 This step is not necessary, since a simple default policy for distributed
 address allocation is already available.
 To deactivate automatic address allocation, you need to set the **manual**
-policy for the **address-allocator** component using **rlite-ctl** program,
+policy for the **addralloc** component using **rlite-ctl** program,
 and configure addresses manually like in the following example:
 
     $ sudo rlite-ctl dif-policy-mod n.DIF adddress-allocator manual
@@ -961,8 +961,8 @@ components of a normal IPCP process:
 
 | Component           | Policy name      | Description                       |
 | ------------------- | -----------------|-----------------------------------|
-| address-allocator   | manual           | Manual address allocation         |
-| address-allocator   | distributed      | Automated address allocation      |
+| addralloc           | manual           | Manual address allocation         |
+| addralloc           | distributed      | Automated address allocation      |
 | dft                 | fully-replicated | Every node has a full copy of the DFT |
 | dft                 | centralized-fault-tolerant | DFT stored by a fault-tolerant cluster of replicas |
 | routing             | link-state       | Link state routing algorithm      |
@@ -978,7 +978,7 @@ of a normal IPCP process:
 
 | Component           | Policy            | Parameter          | Description     |
 | --------------------| ------------------|--------------------|-----------------|
-| address-allocator   | distributed       | nack-wait-secs     | Time to wait for a NACK before deciding that the address is good. |
+| addralloc   | distributed       | nack-wait-secs     | Time to wait for a NACK before deciding that the address is good. |
 | dft                 | centralized-fault-tolerant | replicas  | Name of the IPCPs that constitute the fault-tolerant cluster. |
 | enrollment          | *                 | timeout            | Enrollment timeout in milliseconds. |
 | enrollment          | *                 | keepalive          | Neighbor keepalive timeout in seconds (0 to disable). |
@@ -1000,7 +1000,7 @@ of a normal IPCP process:
 This is an example of how to change the nack-wait-secs parameter of the
 distributed address allocation policy of a normal IPCP process
 
-    # rlite-ctl dif-policy-param-mod n.DIF address-allocator nack-wait-secs 4
+    # rlite-ctl dif-policy-param-mod n.DIF addralloc nack-wait-secs 4
 
 This is an example how to enable reliable flows in the resource allocator
 
