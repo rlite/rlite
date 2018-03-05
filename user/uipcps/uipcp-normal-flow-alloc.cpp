@@ -247,7 +247,7 @@ LocalFlowAllocator::policies2flowcfg(struct rl_flow_config *cfg,
         p.dtcp_cfg().rtx_ctrl_cfg().initial_rtx_timeout();
     if (p.dtcp_cfg().rtx_ctrl()) {
         cfg->dtcp.rtx.max_rtxq_len =
-            rib->get_param_value<int>("flow-allocator", "max-rtxq-len");
+            rib->get_param_value<int>(FlowAllocator::CompName, "max-rtxq-len");
     }
 }
 
@@ -258,10 +258,10 @@ void
 LocalFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
                                      struct rl_flow_config *cfg) const
 {
-    bool force_flow_control =
-        rib->get_param_value<bool>("flow-allocator", "force-flow-control");
+    bool force_flow_control = rib->get_param_value<bool>(
+        FlowAllocator::CompName, "force-flow-control");
     unsigned initial_a =
-        rib->get_param_value<int>("flow-allocator", "initial-a");
+        rib->get_param_value<int>(FlowAllocator::CompName, "initial-a");
 
     memset(cfg, 0, sizeof(*cfg));
 
@@ -273,13 +273,13 @@ LocalFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
     if (spec->max_sdu_gap == 0) {
         /* We need retransmission control. */
         cfg->dtcp.flags |= DTCP_CFG_RTX_CTRL;
-        cfg->in_order_delivery          = 1;
-        cfg->dtcp.rtx.max_time_to_retry = 15; /* unused for now */
-        cfg->dtcp.rtx.data_rxms_max     = RL_DATA_RXMS_MAX_DFLT;
-        cfg->dtcp.rtx.initial_rtx_timeout =
-            rib->get_param_value<int>("flow-allocator", "initial-rtx-timeout");
+        cfg->in_order_delivery            = 1;
+        cfg->dtcp.rtx.max_time_to_retry   = 15; /* unused for now */
+        cfg->dtcp.rtx.data_rxms_max       = RL_DATA_RXMS_MAX_DFLT;
+        cfg->dtcp.rtx.initial_rtx_timeout = rib->get_param_value<int>(
+            FlowAllocator::CompName, "initial-rtx-timeout");
         cfg->dtcp.rtx.max_rtxq_len =
-            rib->get_param_value<int>("flow-allocator", "max-rtxq-len");
+            rib->get_param_value<int>(FlowAllocator::CompName, "max-rtxq-len");
         cfg->dtcp.initial_a = initial_a;
     }
 
@@ -293,9 +293,9 @@ LocalFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
          * retransmission control is needed. */
         cfg->dtcp.flags |= DTCP_CFG_FLOW_CTRL;
         cfg->dtcp.fc.cfg.w.max_cwq_len =
-            rib->get_param_value<int>("flow-allocator", "max-cwq-len");
-        cfg->dtcp.fc.cfg.w.initial_credit =
-            rib->get_param_value<int>("flow-allocator", "initial-credit");
+            rib->get_param_value<int>(FlowAllocator::CompName, "max-cwq-len");
+        cfg->dtcp.fc.cfg.w.initial_credit = rib->get_param_value<int>(
+            FlowAllocator::CompName, "initial-credit");
         cfg->dtcp.fc.fc_type = RLITE_FC_T_WIN;
         cfg->dtcp.initial_a  = initial_a;
     }
@@ -699,7 +699,7 @@ LocalFlowAllocator::dump_memtrack(std::stringstream &ss) const
 void
 uipcp_rib::fa_lib_init()
 {
-    available_policies["flow-allocator"].insert(
+    available_policies[FlowAllocator::CompName].insert(
         PolicyBuilder("local", [](uipcp_rib *rib) {
             rib->fa = make_unique<LocalFlowAllocator>(rib);
         }));
