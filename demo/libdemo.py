@@ -366,7 +366,7 @@ class Demo:
                 self.dif_policies[dif] = []
                 if self.addr_alloc_policy == "manual":
                     self.dif_policies[dif].append({
-                        'path': 'address-allocator',
+                        'path': 'addralloc',
                         'nodes': [],
                         'ps': 'manual',
                         'parms': []
@@ -514,7 +514,7 @@ class Demo:
                     nack_wait_secs = 5 if self.enrollment_order == 'parallel' and len(
                         self.vms) > 30 else 1
                     ctrl_cmds.append(
-                        'dif-policy-param-mod %(dif)s.DIF address-allocator nack-wait-secs %(nws)d\n'
+                        'dif-policy-param-mod %(dif)s.DIF addralloc nack-wait-secs %(nws)d\n'
                         % {
                             'dif': dif,
                             'nws': nack_wait_secs
