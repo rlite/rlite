@@ -49,18 +49,18 @@ string address      = "/daf/mgmt/naming/address";
 string whatevercast = "/daf/mgmt/naming/whatevercast";
 #endif
 
-std::string DFT::ObjClass  = "dft";
-std::string DFT::ObjName   = "/dif/mgmt/fa/" + DFT::ObjClass;
-std::string LFDB::ObjClass = "fsodb"; /* Lower Flow DB */
-std::string LFDB::ObjName  = "/dif/mgmt/pduft/linkstate/" + LFDB::ObjClass;
+std::string DFT::ObjClass   = "dft";
+std::string DFT::TableName  = "/dif/mgmt/fa/" + DFT::ObjClass;
+std::string LFDB::ObjClass  = "fsodb"; /* Lower Flow DB */
+std::string LFDB::TableName = "/dif/mgmt/pduft/linkstate/" + LFDB::ObjClass;
 std::string AddrAllocator::ObjClass = "table";
-std::string AddrAllocator::ObjName =
+std::string AddrAllocator::TableName =
     "/dif/ra/addralloc/" + AddrAllocator::ObjClass;
 std::string FlowAllocator::FlowObjClass = "flow";
 std::string FlowAllocator::ObjClass     = "flows";
-std::string FlowAllocator::ObjName = "/dif/ra/fa/" + FlowAllocator::ObjClass;
-std::string Neighbor::ObjClass     = "neighbors";
-std::string Neighbor::ObjName      = "/daf/mgmt/" + Neighbor::ObjClass;
+std::string FlowAllocator::TableName = "/dif/ra/fa/" + FlowAllocator::ObjClass;
+std::string Neighbor::ObjClass       = "neighbors";
+std::string Neighbor::TableName      = "/daf/mgmt/" + Neighbor::ObjClass;
 std::string NeighFlow::KeepaliveObjClass = "keepalive";
 std::string NeighFlow::KeepaliveObjName =
     "/daf/mgmt/" + NeighFlow::KeepaliveObjClass;
@@ -462,22 +462,22 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     policy_mod(LFDB::CompName, "link-state");
 
     /* Insert the handlers for the RIB objects. */
-    handlers.insert(make_pair(DFT::ObjName, &uipcp_rib::dft_handler));
+    handlers.insert(make_pair(DFT::TableName, &uipcp_rib::dft_handler));
     handlers.insert(
-        make_pair(Neighbor::ObjName, &uipcp_rib::neighbors_handler));
-    handlers.insert(make_pair(LFDB::ObjName, &uipcp_rib::lfdb_handler));
+        make_pair(Neighbor::TableName, &uipcp_rib::neighbors_handler));
+    handlers.insert(make_pair(LFDB::TableName, &uipcp_rib::lfdb_handler));
     handlers.insert(
-        make_pair(FlowAllocator::ObjName, &uipcp_rib::flows_handler));
+        make_pair(FlowAllocator::TableName, &uipcp_rib::flows_handler));
     handlers.insert(
         make_pair(NeighFlow::KeepaliveObjName, &uipcp_rib::keepalive_handler));
     handlers.insert(make_pair(StatusObjName, &uipcp_rib::status_handler));
-    handlers.insert(make_pair(AddrAllocator::ObjName,
+    handlers.insert(make_pair(AddrAllocator::TableName,
                               &uipcp_rib::addr_alloc_table_handler));
     handlers.insert(
-        make_pair(DFT::ObjName + "/policy", &uipcp_rib::policy_handler));
+        make_pair(DFT::TableName + "/policy", &uipcp_rib::policy_handler));
     handlers.insert(
-        make_pair(LFDB::ObjName + "/policy", &uipcp_rib::policy_handler));
-    handlers.insert(make_pair(AddrAllocator::ObjName + "/policy",
+        make_pair(LFDB::TableName + "/policy", &uipcp_rib::policy_handler));
+    handlers.insert(make_pair(AddrAllocator::TableName + "/policy",
                               &uipcp_rib::policy_handler));
 
     /* Start timers for periodic tasks. */
@@ -1591,11 +1591,11 @@ uipcp_rib::policy_handler(const CDAPMessage *rm,
         return 0;
     }
 
-    if (basename == DFT::ObjName) {
+    if (basename == DFT::TableName) {
         component = DFT::CompName;
-    } else if (basename == LFDB::ObjName) {
+    } else if (basename == LFDB::TableName) {
         component = LFDB::CompName;
-    } else if (basename == AddrAllocator::ObjName) {
+    } else if (basename == AddrAllocator::TableName) {
         component = AddrAllocator::CompName;
     } else {
         UPE(uipcp, "Unknown component basename %s\n", basename.c_str());

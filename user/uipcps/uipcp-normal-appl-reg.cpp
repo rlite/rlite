@@ -177,7 +177,7 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
     UPD(uipcp, "Application %s %sregistered\n", appl_name.c_str(),
         req->reg ? "" : "un");
 
-    rib->neighs_sync_obj_all(req->reg != 0, ObjClass, ObjName, &dft_slice);
+    rib->neighs_sync_obj_all(req->reg != 0, ObjClass, TableName, &dft_slice);
 
     return 0;
 }
@@ -271,12 +271,12 @@ FullyReplicatedDFT::rib_handler(const CDAPMessage *rm,
     /* Propagate the DFT entries update to the other neighbors,
      * except for who told us. */
     if (prop_dft_add.entries_size() > 0) {
-        rib->neighs_sync_obj_excluding(neigh, true, ObjClass, ObjName,
+        rib->neighs_sync_obj_excluding(neigh, true, ObjClass, TableName,
                                        &prop_dft_add);
     }
 
     if (prop_dft_del.entries_size() > 0) {
-        rib->neighs_sync_obj_excluding(neigh, false, ObjClass, ObjName,
+        rib->neighs_sync_obj_excluding(neigh, false, ObjClass, TableName,
                                        &prop_dft_del);
     }
 
@@ -313,7 +313,7 @@ FullyReplicatedDFT::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
             eit++;
         }
 
-        ret |= nf->sync_obj(true, ObjClass, ObjName, &dft_slice);
+        ret |= nf->sync_obj(true, ObjClass, TableName, &dft_slice);
     }
 
     return ret;
@@ -339,7 +339,7 @@ FullyReplicatedDFT::neighs_refresh(size_t limit)
 
         if (dft_slice.entries_size()) {
             ret |=
-                rib->neighs_sync_obj_all(true, ObjClass, ObjName, &dft_slice);
+                rib->neighs_sync_obj_all(true, ObjClass, TableName, &dft_slice);
         }
     }
 
@@ -631,7 +631,7 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
             int invoke_id;
             int ret;
 
-            m->m_read(ObjClass, ObjName + "/" + appl_name);
+            m->m_read(ObjClass, TableName + "/" + appl_name);
             op_code = m->op_code;
 
             m->invoke_id = invoke_id =
@@ -678,9 +678,9 @@ CentralizedFaultTolerantDFT::Client::appl_register(
             int ret;
 
             if (req->reg) {
-                m->m_write(ObjClass, ObjName);
+                m->m_write(ObjClass, TableName);
             } else {
-                m->m_delete(ObjClass, ObjName);
+                m->m_delete(ObjClass, TableName);
             }
             op_code = m->op_code;
             dft_entry.set_ipcp_name(parent->rib->myname);
@@ -853,7 +853,7 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
             assert(false);
         }
 
-        m->m_write(obj_class, ObjName);
+        m->m_write(obj_class, TableName);
         ret |= parent->rib->send_to_dst_node(std::move(m), pair.first,
                                              obj.get(), nullptr);
     }

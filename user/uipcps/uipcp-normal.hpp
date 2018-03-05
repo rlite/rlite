@@ -242,7 +242,7 @@ struct Neighbor {
     bool enrollment_complete();
     int flow_alloc(const char *supp_dif_name);
 
-    static std::string ObjName;
+    static std::string TableName;
     static std::string ObjClass;
 };
 
@@ -285,7 +285,7 @@ struct DFT {
     }
     virtual int neighs_refresh(size_t limit) { return 0; }
 
-    static std::string ObjName;
+    static std::string TableName;
     static std::string ObjClass;
     static std::string CompName;
 };
@@ -319,7 +319,7 @@ struct FlowAllocator {
                     std::shared_ptr<Neighbor> const &neigh,
                     rlm_addr_t src_addr);
 
-    static std::string ObjName;
+    static std::string TableName;
     static std::string ObjClass;
     static std::string FlowObjClass;
 };
@@ -354,7 +354,7 @@ struct LFDB {
     virtual int neighs_refresh(size_t limit)         = 0;
     virtual void age_incr()                          = 0;
 
-    static std::string ObjName;
+    static std::string TableName;
     static std::string ObjClass;
     static std::string CompName;
 };
@@ -377,7 +377,7 @@ struct AddrAllocator {
     virtual int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
                            unsigned int limit) const = 0;
 
-    static std::string ObjName;
+    static std::string TableName;
     static std::string ObjClass;
     static std::string CompName;
 };

@@ -273,7 +273,7 @@ FullyReplicatedLFDB::update_local(const string &node_name)
     lf->set_age(0);
 
     sm = make_unique<CDAPMessage>();
-    sm->m_create(ObjClass, ObjName);
+    sm->m_create(ObjClass, TableName);
     rib->send_to_myself(std::move(sm), &lfl);
 }
 
@@ -326,7 +326,7 @@ FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm,
 
     if (modified) {
         /* Send the received lower flows to the other neighbors. */
-        rib->neighs_sync_obj_excluding(neigh, add_f, ObjClass, ObjName,
+        rib->neighs_sync_obj_excluding(neigh, add_f, ObjClass, TableName,
                                        &prop_lfl);
 
         /* Update the routing table. */
@@ -385,7 +385,7 @@ FullyReplicatedLFDB::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
 {
     gpb::LowerFlowList lfl;
     auto func =
-        std::bind(&NeighFlow::sync_obj, nf, true, ObjClass, ObjName, &lfl);
+        std::bind(&NeighFlow::sync_obj, nf, true, ObjClass, TableName, &lfl);
     int ret = 0;
 
     for (const auto &kvi : db) {
@@ -432,7 +432,7 @@ FullyReplicatedLFDB::neighs_refresh(size_t limit)
             *lfl.add_flows() = jt->second;
             jt++;
         }
-        ret |= rib->neighs_sync_obj_all(true, ObjClass, ObjName, &lfl);
+        ret |= rib->neighs_sync_obj_all(true, ObjClass, TableName, &lfl);
     }
 
     return ret;
@@ -488,7 +488,7 @@ FullyReplicatedLFDB::age_incr()
     }
 
     if (prop_lfl.flows_size() > 0) {
-        rib->neighs_sync_obj_all(/*create=*/false, ObjClass, ObjName,
+        rib->neighs_sync_obj_all(/*create=*/false, ObjClass, TableName,
                                  &prop_lfl);
         /* Update the routing table. */
         re.update_kernel_routing(rib->myname);
@@ -523,7 +523,7 @@ FullyReplicatedLFDB::neigh_disconnected(const std::string &neigh_name)
     }
 
     if (prop_lfl.flows_size() > 0) {
-        rib->neighs_sync_obj_all(/*create=*/false, ObjClass, ObjName,
+        rib->neighs_sync_obj_all(/*create=*/false, ObjClass, TableName,
                                  &prop_lfl);
         /* Update the routing table. */
         re.update_kernel_routing(rib->myname);
