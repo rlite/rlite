@@ -78,6 +78,7 @@ std::string uipcp_rib::LowerFlowObjName =
 std::string DFT::CompName           = "dft";
 std::string LFDB::CompName          = "routing";
 std::string AddrAllocator::CompName = "address-allocator";
+std::string FlowAllocator::CompName = "flow-allocator";
 
 std::unordered_map<std::string, std::set<PolicyBuilder>>
     uipcp_rib::available_policies;
@@ -439,16 +440,19 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map["enrollment"]["keepalive"] = PolicyParam(kKeepaliveTimeout);
     params_map["enrollment"]["keepalive-thresh"] =
         PolicyParam(kKeepaliveThresh);
-    params_map["enrollment"]["auto-reconnect"]         = PolicyParam(true);
-    params_map["flow-allocator"]["force-flow-control"] = PolicyParam(false);
-    params_map["flow-allocator"]["max-cwq-len"] =
+    params_map["enrollment"]["auto-reconnect"] = PolicyParam(true);
+    params_map[FlowAllocator::CompName]["force-flow-control"] =
+        PolicyParam(false);
+    params_map[FlowAllocator::CompName]["max-cwq-len"] =
         PolicyParam(kFlowControlMaxCwqLen);
-    params_map["flow-allocator"]["initial-credit"] =
+    params_map[FlowAllocator::CompName]["initial-credit"] =
         PolicyParam(kFlowControlInitialCredit);
-    params_map["flow-allocator"]["initial-a"] = PolicyParam(kATimerMsecsDflt);
-    params_map["flow-allocator"]["initial-rtx-timeout"] =
+    params_map[FlowAllocator::CompName]["initial-a"] =
+        PolicyParam(kATimerMsecsDflt);
+    params_map[FlowAllocator::CompName]["initial-rtx-timeout"] =
         PolicyParam(kRtxTimerMsecsDflt);
-    params_map["flow-allocator"]["max-rtxq-len"] = PolicyParam(kRtxQueueMaxLen);
+    params_map[FlowAllocator::CompName]["max-rtxq-len"] =
+        PolicyParam(kRtxQueueMaxLen);
     params_map["resource-allocator"]["reliable-flows"]     = PolicyParam(false);
     params_map["resource-allocator"]["reliable-n-flows"]   = PolicyParam(false);
     params_map["resource-allocator"]["broadcast-enroller"] = PolicyParam(true);
@@ -456,7 +460,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map[LFDB::CompName]["age-incr-intval"] = PolicyParam(kAgeIncrIntval);
     params_map[LFDB::CompName]["age-max"]         = PolicyParam(kAgeMax);
 
-    policy_mod("flow-allocator", "local");
+    policy_mod(FlowAllocator::CompName, "local");
     policy_mod(AddrAllocator::CompName, "distributed");
     policy_mod(DFT::CompName, "fully-replicated");
     policy_mod(LFDB::CompName, "link-state");

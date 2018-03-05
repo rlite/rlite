@@ -322,6 +322,7 @@ struct FlowAllocator {
     static std::string TableName;
     static std::string ObjClass;
     static std::string FlowObjClass;
+    static std::string CompName;
 };
 
 /* Lower Flows Database and dissemination of routing information,
