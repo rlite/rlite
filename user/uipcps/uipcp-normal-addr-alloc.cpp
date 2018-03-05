@@ -74,7 +74,7 @@ DistributedAddrAllocator::allocate(rlm_addr_t *result)
     const int inflate = 2;
     rlm_addr_t addr   = RL_ADDR_NULL;
     int nack_wait_secs =
-        rib->get_param_value<int>(AddrAllocator::CompName, "nack-wait-secs");
+        rib->get_param_value<int>(AddrAllocator::Prefix, "nack-wait-secs");
 
     if ((modulo << inflate) <= modulo) { /* overflow */
         modulo = ~((rlm_addr_t)0);
@@ -321,11 +321,11 @@ public:
 void
 uipcp_rib::addra_lib_init()
 {
-    available_policies[AddrAllocator::CompName].insert(
+    available_policies[AddrAllocator::Prefix].insert(
         PolicyBuilder("manual", [](uipcp_rib *rib) {
             rib->addra = make_unique<ManualAddrAllocator>(rib);
         }));
-    available_policies[AddrAllocator::CompName].insert(
+    available_policies[AddrAllocator::Prefix].insert(
         PolicyBuilder("distributed", [](uipcp_rib *rib) {
             rib->addra = make_unique<DistributedAddrAllocator>(rib);
         }));

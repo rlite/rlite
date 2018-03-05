@@ -50,20 +50,17 @@ string whatevercast = "/daf/mgmt/naming/whatevercast";
 #endif
 
 std::string DFT::ObjClass   = "dft_entries";
-std::string DFT::CompName   = "dft";
-std::string DFT::Prefix     = "/mgmt/" + DFT::CompName;
+std::string DFT::Prefix     = "/mgmt/dft";
 std::string DFT::TableName  = DFT::Prefix + "/table";
 std::string LFDB::ObjClass  = "lfdb_entries";
-std::string LFDB::CompName  = "routing";
-std::string LFDB::Prefix    = "/mgmt/" + LFDB::CompName;
+std::string LFDB::Prefix    = "/mgmt/routing";
 std::string LFDB::TableName = LFDB::Prefix + "/lfdb"; /* Lower Flow DB */
 std::string AddrAllocator::ObjClass      = "aa_entries";
-std::string AddrAllocator::CompName      = "addralloc";
-std::string AddrAllocator::Prefix        = "/mgmt/" + AddrAllocator::CompName;
+std::string AddrAllocator::Prefix        = "/mgmt/addralloc";
 std::string AddrAllocator::TableName     = AddrAllocator::Prefix + "/table";
 std::string FlowAllocator::FlowObjClass  = "flow";
-std::string FlowAllocator::CompName      = "flow-allocator";
-std::string FlowAllocator::TableName     = "/mgmt/fa/flows";
+std::string FlowAllocator::Prefix        = "/mgmt/flowalloc";
+std::string FlowAllocator::TableName     = FlowAllocator::Prefix + "/flows";
 std::string Neighbor::ObjClass           = "neigh_entries";
 std::string Neighbor::TableName          = "/mgmt/neighbors/entries";
 std::string NeighFlow::KeepaliveObjClass = "keepalive";
@@ -79,6 +76,9 @@ std::string uipcp_rib::EnrollmentObjName =
 std::string uipcp_rib::LowerFlowObjClass = "lowerflow";
 std::string uipcp_rib::LowerFlowObjName =
     "/mgmt/" + uipcp_rib::LowerFlowObjClass;
+std::string uipcp_rib::EnrollmentPrefix    = "/mgmt/enrollment";
+std::string uipcp_rib::ResourceAllocPrefix = "/mgmt/resalloc";
+std::string uipcp_rib::RibDaemonPrefix     = "/mgmt/ribd";
 
 std::unordered_map<std::string, std::set<PolicyBuilder>>
     uipcp_rib::available_policies;
@@ -432,38 +432,45 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     }
 #endif /* RL_USE_QOS_CUBES */
 
-    params_map[AddrAllocator::CompName]["nack-wait-secs"] =
+    params_map[AddrAllocator::Prefix]["nack-wait-secs"] =
         PolicyParam(kAddrAllocDistrNackWaitSecs, kAddrAllocDistrNackWaitSecsMin,
                     kAddrAllocDistrNackWaitSecsMax);
-    params_map[DFT::CompName]["replicas"] = PolicyParam(string());
-    params_map["enrollment"]["timeout"]   = PolicyParam(kEnrollTimeout);
-    params_map["enrollment"]["keepalive"] = PolicyParam(kKeepaliveTimeout);
-    params_map["enrollment"]["keepalive-thresh"] =
+    params_map[DFT::Prefix]["replicas"] = PolicyParam(string());
+    params_map[uipcp_rib::EnrollmentPrefix]["timeout"] =
+        PolicyParam(kEnrollTimeout);
+    params_map[uipcp_rib::EnrollmentPrefix]["keepalive"] =
+        PolicyParam(kKeepaliveTimeout);
+    params_map[uipcp_rib::EnrollmentPrefix]["keepalive-thresh"] =
         PolicyParam(kKeepaliveThresh);
-    params_map["enrollment"]["auto-reconnect"] = PolicyParam(true);
-    params_map[FlowAllocator::CompName]["force-flow-control"] =
+    params_map[uipcp_rib::EnrollmentPrefix]["auto-reconnect"] =
+        PolicyParam(true);
+    params_map[FlowAllocator::Prefix]["force-flow-control"] =
         PolicyParam(false);
-    params_map[FlowAllocator::CompName]["max-cwq-len"] =
+    params_map[FlowAllocator::Prefix]["max-cwq-len"] =
         PolicyParam(kFlowControlMaxCwqLen);
-    params_map[FlowAllocator::CompName]["initial-credit"] =
+    params_map[FlowAllocator::Prefix]["initial-credit"] =
         PolicyParam(kFlowControlInitialCredit);
-    params_map[FlowAllocator::CompName]["initial-a"] =
+    params_map[FlowAllocator::Prefix]["initial-a"] =
         PolicyParam(kATimerMsecsDflt);
-    params_map[FlowAllocator::CompName]["initial-rtx-timeout"] =
+    params_map[FlowAllocator::Prefix]["initial-rtx-timeout"] =
         PolicyParam(kRtxTimerMsecsDflt);
-    params_map[FlowAllocator::CompName]["max-rtxq-len"] =
+    params_map[FlowAllocator::Prefix]["max-rtxq-len"] =
         PolicyParam(kRtxQueueMaxLen);
-    params_map["resource-allocator"]["reliable-flows"]     = PolicyParam(false);
-    params_map["resource-allocator"]["reliable-n-flows"]   = PolicyParam(false);
-    params_map["resource-allocator"]["broadcast-enroller"] = PolicyParam(true);
-    params_map["rib-daemon"]["refresh-intval"] = PolicyParam(kRIBRefreshIntval);
-    params_map[LFDB::CompName]["age-incr-intval"] = PolicyParam(kAgeIncrIntval);
-    params_map[LFDB::CompName]["age-max"]         = PolicyParam(kAgeMax);
+    params_map[uipcp_rib::ResourceAllocPrefix]["reliable-flows"] =
+        PolicyParam(false);
+    params_map[uipcp_rib::ResourceAllocPrefix]["reliable-n-flows"] =
+        PolicyParam(false);
+    params_map[uipcp_rib::ResourceAllocPrefix]["broadcast-enroller"] =
+        PolicyParam(true);
+    params_map[uipcp_rib::RibDaemonPrefix]["refresh-intval"] =
+        PolicyParam(kRIBRefreshIntval);
+    params_map[LFDB::Prefix]["age-incr-intval"] = PolicyParam(kAgeIncrIntval);
+    params_map[LFDB::Prefix]["age-max"]         = PolicyParam(kAgeMax);
 
-    policy_mod(FlowAllocator::CompName, "local");
-    policy_mod(AddrAllocator::CompName, "distributed");
-    policy_mod(DFT::CompName, "fully-replicated");
-    policy_mod(LFDB::CompName, "link-state");
+    policy_mod(FlowAllocator::Prefix, "local");
+    policy_mod(AddrAllocator::Prefix, "distributed");
+    policy_mod(DFT::Prefix, "fully-replicated");
+    policy_mod(LFDB::Prefix, "link-state");
 
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(DFT::TableName, &uipcp_rib::dft_handler));
@@ -790,7 +797,8 @@ uipcp_rib::update_lower_difs(int reg, string lower_dif)
         lower_difs.erase(lit);
     }
 
-    if (get_param_value<bool>("resource-allocator", "reliable-n-flows")) {
+    if (get_param_value<bool>(uipcp_rib::ResourceAllocPrefix,
+                              "reliable-n-flows")) {
         /* Check whether we need to do or undo self-registration. */
         struct rina_flow_spec relspec;
 
@@ -840,7 +848,8 @@ uipcp_rib::register_to_lower_one(const char *lower_dif, bool reg)
     UPD(uipcp, "IPCP name %s %s DIF %s\n", uipcp->name,
         reg ? "registered into" : "unregistered from", lower_dif);
 
-    if (get_param_value<bool>("resource-allocator", "broadcast-enroller")) {
+    if (get_param_value<bool>(uipcp_rib::ResourceAllocPrefix,
+                              "broadcast-enroller")) {
         /* Also register the N-DIF name, i.e. the name of the DIF that
          * this IPCP is part of. If this fails broadcast enrollment won't work.
          * However it is not an hard failure, as unicast enrollment is still
@@ -1175,7 +1184,7 @@ uipcp_rib::policy_mod(const std::string &component,
     policies[component] = policy_name;
     UPD(uipcp, "set %s policy to %s\n", component.c_str(), policy_name.c_str());
     policy_builder->builder(this);
-    if (component == DFT::CompName) {
+    if (component == DFT::Prefix) {
         dft->reconfigure();
     }
 
@@ -1199,9 +1208,10 @@ uipcp_rib::policy_param_mod(const std::string &component,
         return -1;
     }
 
-    if (component == "resource-allocator" && param_name == "reliable-n-flows" &&
-        param_value == "true" &&
-        !get_param_value<bool>("resource-allocator", "reliable-flows")) {
+    if (component == uipcp_rib::ResourceAllocPrefix &&
+        param_name == "reliable-n-flows" && param_value == "true" &&
+        !get_param_value<bool>(uipcp_rib::ResourceAllocPrefix,
+                               "reliable-flows")) {
         UPE(uipcp, "Cannot enable reliable N-flows as reliable "
                    "flows are disabled.\n");
         return -1;
@@ -1239,7 +1249,7 @@ uipcp_rib::policy_param_mod(const std::string &component,
             param_name.c_str(), param_value.c_str());
 
         /* Invoke the reconfigure() method if available. */
-        if (component == DFT::CompName) {
+        if (component == DFT::Prefix) {
             dft->reconfigure();
         }
     }
@@ -1446,7 +1456,8 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
             uipcp->name, dif_name);
     }
 
-    if (!get_param_value<bool>("resource-allocator", "reliable-n-flows")) {
+    if (!get_param_value<bool>(uipcp_rib::ResourceAllocPrefix,
+                               "reliable-n-flows")) {
         return 0;
     }
 
@@ -1591,7 +1602,7 @@ uipcp_rib::policy_handler(const CDAPMessage *rm,
                           std::shared_ptr<Neighbor> const &neigh,
                           rlm_addr_t src_addr)
 {
-    std::string basename = rm->obj_name.substr(0, rm->obj_name.rfind("/"));
+    std::string prefix = rm->obj_name.substr(0, rm->obj_name.rfind("/"));
     std::string policy_name;
     std::string component;
 
@@ -1607,18 +1618,7 @@ uipcp_rib::policy_handler(const CDAPMessage *rm,
         return 0;
     }
 
-    if (basename == DFT::Prefix) {
-        component = DFT::CompName;
-    } else if (basename == LFDB::Prefix) {
-        component = LFDB::CompName;
-    } else if (basename == AddrAllocator::Prefix) {
-        component = AddrAllocator::CompName;
-    } else {
-        UPE(uipcp, "Unknown component basename %s\n", basename.c_str());
-        return 0;
-    }
-
-    return policy_mod(component, policy_name);
+    return policy_mod(prefix, policy_name);
 }
 
 template <class T>

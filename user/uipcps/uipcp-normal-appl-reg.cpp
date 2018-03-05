@@ -529,7 +529,7 @@ CentralizedFaultTolerantDFT::reconfigure()
     list<raft::ReplicaId> peers;
     string replicas;
 
-    replicas = rib->get_param_value<std::string>(DFT::CompName, "replicas");
+    replicas = rib->get_param_value<std::string>(DFT::Prefix, "replicas");
     if (replicas.empty()) {
         UPW(rib->uipcp, "replicas param not configured\n");
     } else {
@@ -1110,11 +1110,11 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
 void
 uipcp_rib::dft_lib_init()
 {
-    available_policies[DFT::CompName].insert(
+    available_policies[DFT::Prefix].insert(
         PolicyBuilder("fully-replicated", [](uipcp_rib *rib) {
             rib->dft = make_unique<FullyReplicatedDFT>(rib);
         }));
-    available_policies[DFT::CompName].insert(
+    available_policies[DFT::Prefix].insert(
         PolicyBuilder("centralized-fault-tolerant", [](uipcp_rib *rib) {
             rib->dft = make_unique<CentralizedFaultTolerantDFT>(rib);
         }));
