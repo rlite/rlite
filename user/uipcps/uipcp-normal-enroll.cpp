@@ -757,9 +757,9 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
 
         /* Send policies. */
         list<pair<std::string, std::string>> components_pairs = {
-            {DFT::ObjName, DFT::CompName},
-            {LFDB::ObjName, LFDB::CompName},
-            {AddrAllocator::ObjName, AddrAllocator::CompName}};
+            {DFT::TableName, DFT::CompName},
+            {LFDB::TableName, LFDB::CompName},
+            {AddrAllocator::TableName, AddrAllocator::CompName}};
         for (const auto &p : components_pairs) {
             m = CDAPMessage();
             m.m_write("policy", p.first + "/policy");
@@ -1046,8 +1046,8 @@ uipcp_rib::sync_rib(const std::shared_ptr<NeighFlow> &nf)
                 cit++;
             }
 
-            ret |=
-                nf->sync_obj(true, Neighbor::ObjClass, Neighbor::ObjName, &ncl);
+            ret |= nf->sync_obj(true, Neighbor::ObjClass, Neighbor::TableName,
+                                &ncl);
         }
 
         /* Remove myself. */
@@ -1096,7 +1096,8 @@ uipcp_rib::neighs_refresh()
         gpb::NeighborCandidateList ncl;
 
         *ncl.add_candidates() = neighbor_cand_get();
-        neighs_sync_obj_all(true, Neighbor::ObjClass, Neighbor::ObjName, &ncl);
+        neighs_sync_obj_all(true, Neighbor::ObjClass, Neighbor::TableName,
+                            &ncl);
     }
     neighs_refresh_tmr_restart();
 }
@@ -1314,7 +1315,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm,
         /* Propagate the updated information to the other neighbors,
          * so that they can update their Neighbor objects. */
         neighs_sync_obj_excluding(neigh, add, Neighbor::ObjClass,
-                                  Neighbor::ObjName, &prop_ncl);
+                                  Neighbor::TableName, &prop_ncl);
         /* Update the routing, as node addressing information has changed. */
         lfdb->update_routing();
     }

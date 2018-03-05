@@ -61,7 +61,7 @@ DistributedAddrAllocator::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
             ati++;
         }
 
-        ret |= nf->sync_obj(true, ObjClass, ObjName, &l);
+        ret |= nf->sync_obj(true, ObjClass, TableName, &l);
     }
 
     return ret;
@@ -111,7 +111,7 @@ DistributedAddrAllocator::allocate(rlm_addr_t *result)
                 CDAPMessage m;
                 int ret;
 
-                m.m_create(ReqObjClass, ObjName);
+                m.m_create(ReqObjClass, TableName);
                 aar.set_requestor(rib->myname);
                 aar.set_address(addr);
                 ret = kvn.second->mgmt_conn()->send_to_port_id(&m, 0, &aar);
@@ -215,7 +215,7 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
                     "Address allocation request conflicts, (addr=%lu,"
                     "requestor=%s)\n",
                     (long unsigned)aar.address(), aar.requestor().c_str());
-                m->m_delete(ReqObjClass, ObjName);
+                m->m_delete(ReqObjClass, TableName);
                 ret =
                     rib->send_to_dst_node(std::move(m), aar.requestor(), &aar);
                 if (ret) {
