@@ -3,6 +3,8 @@
 ## Table of contents
 ````
 1. Introduction
+    11. Features at a glance
+    12. Basic performance evaluation
 2. Software requirements
 3. Build instructions
 4. Overview of the software components
@@ -66,7 +68,33 @@ in many different ways. The **shim-udp4** (section 6.2) enables RINA over IP;
 finally, **rina-gw** (section 7.1) allows to deploy RINA next to IP.
 
 
-### 1.1. Performance evaluation
+### 1.1. Features at a glance
+
+The prototype supports the following features (and more):
+
+* Arbitrary composition and stacking of IPC layers (DIFs).
+* Programmability of the layer constants (e.g. bit-width of addresses,
+  sequence numbers and other protocol fields).
+* Programmability of some layer components (i.e. support for policies).
+* Ability to run over legacy media like Ethernet, WiFi or UDP.
+* Enrollment procedure for a node to join an existing layer; the new
+  member receives the layer configuration (e.g. policies and other
+  parameters) and the current dynamic information.
+* Support for flow control and retransmission control.
+* Inspection tools to show current status of a layer, e.g., the current
+  configuration and dynamic information (RIB contents), the active flows,
+  the locally registered applications, etc.
+* A POSIX-like C API for network applications, plus the associated
+  bindings for the Python scripting language.
+* Tools to interoperate with IP networks.
+* Example applications, including throughput and latency benchmarking.
+* A simple tool to realize the RINA configuration specified by a
+  given configuration file.
+* An implementation of the CDAP protocol.
+* Support for integration tests and tests based on emulated networks.
+
+
+### 1.2. Basic performance evaluation
 
 This section reports the results of some experiments to evaluate the
 performance of the current implementation.
@@ -213,7 +241,6 @@ For the normal IPCP, uipcps daemon implements the following components:
 * Application registration and unregistration.
 * Flow allocation with support for QoS.
 * Address allocation for the DIF members.
-* Codecs for RIB objects.
 
 Run
 
