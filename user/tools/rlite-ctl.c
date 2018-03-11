@@ -1137,6 +1137,18 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .func     = ipcp_unregister,
     },
     {
+        .name     = "ipcp-enroller-enable",
+        .usage    = "IPCP_NAME",
+        .num_args = 1,
+        .func     = ipcp_enroller_enable,
+    },
+    {
+        .name     = "ipcp-enroller-disable",
+        .usage    = "IPCP_NAME",
+        .num_args = 1,
+        .func     = ipcp_enroller_disable,
+    },
+    {
         .name     = "ipcp-enroll",
         .usage    = "IPCP_NAME DIF_NAME SUPP_DIF_NAME [NEIGH_IPCP_NAME]",
         .num_args = 3,
@@ -1153,6 +1165,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage    = "IPCP_NAME DIF_NAME SUPP_DIF_NAME [NEIGH_IPCP_NAME]",
         .num_args = 3,
         .func     = ipcp_lower_flow_alloc,
+    },
+    {
+        .name     = "ipcp-neigh-disconnect",
+        .usage    = "IPCP_NAME NEIGH_NAME",
+        .num_args = 2,
+        .func     = ipcp_neigh_disconnect,
     },
     {
         .name     = "ipcps-show",
@@ -1215,34 +1233,16 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .func     = ipcp_policy_param_list,
     },
     {
-        .name     = "ipcp-enroller-enable",
-        .usage    = "IPCP_NAME",
-        .num_args = 1,
-        .func     = ipcp_enroller_enable,
-    },
-    {
-        .name     = "ipcp-enroller-disable",
-        .usage    = "IPCP_NAME",
-        .num_args = 1,
-        .func     = ipcp_enroller_disable,
-    },
-    {
-        .name     = "probe",
-        .usage    = "",
-        .num_args = 0,
-        .func     = probe,
-    },
-    {
         .name     = "terminate",
         .usage    = "",
         .num_args = 0,
         .func     = terminate,
     },
     {
-        .name     = "ipcp-neigh-disconnect",
-        .usage    = "IPCP_NAME NEIGH_NAME",
-        .num_args = 2,
-        .func     = ipcp_neigh_disconnect,
+        .name     = "probe",
+        .usage    = "",
+        .num_args = 0,
+        .func     = probe,
     },
 #if 0
     {
