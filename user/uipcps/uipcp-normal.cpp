@@ -589,16 +589,12 @@ uipcp_rib::~uipcp_rib()
 }
 
 void
-uipcp_rib::rib_handler_register(std::string rib_path, RibHandler h,
-                                std::vector<gpb::OpCode> accepted)
+uipcp_rib::rib_handler_register(std::string rib_path, RibHandler h)
 {
     RibHandlerInfo info;
 
-    info.handler           = h;
-    info.accepted_op_codes = 0;
-    for (auto op_code : accepted) {
-        info.accepted_op_codes |= (1 << op_code);
-    }
+    info.handler = h;
+
     handlers.insert(make_pair(rib_path, info));
 }
 #ifdef RL_USE_QOS_CUBES
