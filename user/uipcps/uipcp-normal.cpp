@@ -588,6 +588,19 @@ uipcp_rib::~uipcp_rib()
     unlock();
 }
 
+void
+uipcp_rib::rib_handler_register(std::string rib_path, RibHandler h,
+                                std::vector<gpb::opCode_t> accepted)
+{
+    RibHandlerInfo info;
+
+    info.handler           = h;
+    info.accepted_op_codes = 0;
+    for (auto op_code : accepted) {
+        info.accepted_op_codes |= (1 << op_code);
+    }
+    handlers.insert(make_pair(rib_path, info));
+}
 #ifdef RL_USE_QOS_CUBES
 static inline string
 u82boolstr(uint8_t v)
@@ -1042,7 +1055,7 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm,
             rm->obj_name.c_str());
         rm->dump();
     } else {
-        ret = (hi->second)(*this, rm, nf, neigh, src_addr);
+        ret = (hi->second.handler)(*this, rm, nf, neigh, src_addr);
     }
 
     return ret;
