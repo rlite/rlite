@@ -128,7 +128,7 @@ public:
     /* Helper function to send M_CONNECT and wait for the M_CONNECT_R
      * response. */
     int connect(const std::string &src, const std::string &dst,
-                gpb::authTypes_t auth_mech,
+                gpb::AuthType auth_mech,
                 const struct CDAPAuthValue *auth_value);
 
     /* Helper function to wait for M_CONNECT and send the M_CONNECT_R
@@ -148,19 +148,19 @@ int msg_ser_stateless(CDAPMessage *m, char **buf, size_t *len);
 
 /* Internal representation of a CDAP message. */
 struct CDAPMessage {
-    int abs_syntax             = 0;
-    gpb::authTypes_t auth_mech = gpb::AUTH_NONE;
+    int abs_syntax          = 0;
+    gpb::AuthType auth_mech = gpb::AUTH_NONE;
     CDAPAuthValue auth_value;
     std::string src_appl;
     std::string dst_appl;
     std::string filter;
-    gpb::flagValues_t flags = gpb::F_NO_FLAGS;
-    int invoke_id           = 0;
+    gpb::CDAPFlags flags = gpb::F_NO_FLAGS;
+    int invoke_id        = 0;
     std::string obj_class;
     long obj_inst = 0;
     std::string obj_name;
-    gpb::opCode_t op_code = gpb::M_CONNECT;
-    int result            = 0;
+    gpb::OpCode op_code = gpb::M_CONNECT;
+    int result          = 0;
     std::string result_reason;
     int scope    = 0;
     long version = 0;
@@ -200,7 +200,7 @@ struct CDAPMessage {
     void set_obj_value(std::unique_ptr<char[]> buf, size_t len); /* ownership */
 #endif
 
-    int m_connect(gpb::authTypes_t auth_mech,
+    int m_connect(gpb::AuthType auth_mech,
                   const struct CDAPAuthValue *auth_value,
                   const std::string &local_appl,
                   const std::string &remote_appl);
@@ -265,16 +265,16 @@ struct CDAPMessage {
 
     void clear() { *this = CDAPMessage(); }
 
-    static std::string opcode_repr(gpb::opCode_t);
+    static std::string opcode_repr(gpb::OpCode);
 
 private:
     int m_common(const std::string &obj_class, const std::string &obj_name,
                  long obj_inst, int scope, const std::string &filter,
-                 gpb::opCode_t op_code);
+                 gpb::OpCode op_code);
 
     int m_common_r(const std::string &obj_class, const std::string &obj_name,
                    long obj_inst, int result, const std::string &result_reason,
-                   gpb::opCode_t op_code);
+                   gpb::OpCode op_code);
 
     int __m_write(const std::string &obj_class, const std::string &obj_name,
                   long obj_inst, int scope, const std::string &filter);

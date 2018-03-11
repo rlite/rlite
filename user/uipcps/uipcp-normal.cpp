@@ -590,7 +590,7 @@ uipcp_rib::~uipcp_rib()
 
 void
 uipcp_rib::rib_handler_register(std::string rib_path, RibHandler h,
-                                std::vector<gpb::opCode_t> accepted)
+                                std::vector<gpb::OpCode> accepted)
 {
     RibHandlerInfo info;
 

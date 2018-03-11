@@ -688,7 +688,7 @@ struct uipcp_rib {
                       rlm_addr_t src_addr);
 
     void rib_handler_register(std::string rib_path, RibHandler h,
-                              std::vector<gpb::opCode_t> accepted = {});
+                              std::vector<gpb::OpCode> accepted = {});
 
     /* RIB handlers for received CDAP messages. */
     int dft_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
