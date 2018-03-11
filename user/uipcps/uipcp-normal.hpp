@@ -453,8 +453,12 @@ struct uipcp_rib {
                                          std::shared_ptr<NeighFlow> const &nf,
                                          std::shared_ptr<Neighbor> const &neigh,
                                          rlm_addr_t src_addr)>;
+    struct RibHandlerInfo {
+        RibHandler handler;
+        uint64_t accepted_op_codes;
+    };
 
-    std::unordered_map<std::string, RibHandler> handlers;
+    std::unordered_map<std::string, RibHandlerInfo> handlers;
 
     /* Positive if this IPCP is enrolled to the DIF, zero otherwise.
      * When we allocate a flow towards a candidate neighbor, we don't
@@ -683,10 +687,8 @@ struct uipcp_rib {
                       std::shared_ptr<Neighbor> const &neigh,
                       rlm_addr_t src_addr);
 
-    void rib_handler_register(std::string rib_path, RibHandler h)
-    {
-        handlers.insert(make_pair(rib_path, h));
-    }
+    void rib_handler_register(std::string rib_path, RibHandler h,
+                              std::vector<gpb::opCode_t> accepted = {});
 
     /* RIB handlers for received CDAP messages. */
     int dft_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
