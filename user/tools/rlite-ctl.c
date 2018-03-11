@@ -683,7 +683,6 @@ component_name_wrap(const char *name)
     }
     strcpy(wrap, "/mgmt/");
     strcat(wrap, name);
-//    strcat(wrap, "/policy");
 
     return wrap;
 }

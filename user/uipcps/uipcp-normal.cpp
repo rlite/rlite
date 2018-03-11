@@ -490,6 +490,8 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
         make_pair(LFDB::Prefix + "/policy", &uipcp_rib::policy_handler));
     handlers.insert(make_pair(AddrAllocator::Prefix + "/policy",
                               &uipcp_rib::policy_handler));
+    handlers.insert(
+        make_pair(DFT::Prefix + "/params", &uipcp_rib::policy_param_handler));
 
     if (rl_verbosity >= RL_VERB_VERY) {
         /* Dump the available RIB paths (alphabetically sorted). */
@@ -1040,7 +1042,8 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm,
     }
 
     if (hi == handlers.end()) {
-        UPE(uipcp, "Unable to handle CDAP message\n");
+        UPE(uipcp, "Unable to handle CDAP message for '%s'\n",
+            rm->obj_name.c_str());
         rm->dump();
     } else {
         ret = (this->*(hi->second))(rm, nf, neigh, src_addr);
@@ -1621,6 +1624,29 @@ uipcp_rib::policy_handler(const CDAPMessage *rm,
     return policy_mod(prefix, policy_name);
 }
 
+int
+uipcp_rib::policy_param_handler(const CDAPMessage *rm,
+                                std::shared_ptr<NeighFlow> const &nf,
+                                std::shared_ptr<Neighbor> const &neigh,
+                                rlm_addr_t src_addr)
+{
+    std::string prefix = rm->obj_name.substr(0, rm->obj_name.rfind("/"));
+    std::string obj_value;
+
+    if (rm->op_code != gpb::M_WRITE) {
+        UPE(uipcp, "M_WRITE expected\n");
+        return -1;
+    }
+    rm->get_obj_value(obj_value);
+    if (obj_value.empty()) {
+        UPE(uipcp, "No object value for %s/%s\n", rm->obj_name.c_str(),
+            rm->obj_class.c_str());
+        return -1;
+    }
+
+    return policy_param_mod(prefix, rm->obj_class, obj_value);
+}
+
 template <class T>
 T
 uipcp_rib::get_param_value(const std::string &component,
@@ -1657,6 +1683,15 @@ uipcp_rib::get_param_value<string>(const std::string &component,
     assert(params_map.count(component) &&
            params_map[component].count(param_name));
     return params_map[component][param_name].get_string_value();
+}
+
+PolicyParamType
+uipcp_rib::get_param_type(const std::string &component,
+                          const std::string &param_name)
+{
+    assert(params_map.count(component) &&
+           params_map[component].count(param_name));
+    return params_map[component][param_name].type;
 }
 
 PolicyParam::PolicyParam() { type = PolicyParamType::UNDEFINED; }
