@@ -756,20 +756,49 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
 
         /* Here we should send DIF static information. */
 
-        /* Send policies. */
-        list<pair<std::string, std::string>> components_pairs = {
-            {DFT::Prefix, DFT::Prefix},
-            {LFDB::Prefix, LFDB::Prefix},
-            {AddrAllocator::Prefix, AddrAllocator::Prefix}};
-        for (const auto &p : components_pairs) {
-            m = CDAPMessage();
-            m.m_write("policy", p.first + "/policy");
-            m.set_obj_value(rib->policies[p.second]);
-            ret = nf->send_to_port_id(&m);
-            if (ret) {
-                UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
-                    strerror(errno));
-                return -1;
+        {
+            /* Send component policies. */
+            list<std::string> components = {DFT::Prefix, LFDB::Prefix,
+                                            AddrAllocator::Prefix};
+            for (const auto &c : components) {
+                m = CDAPMessage();
+                m.m_write("policy", c + "/policy");
+                m.set_obj_value(rib->policies[c]);
+                ret = nf->send_to_port_id(&m);
+                if (ret) {
+                    UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
+                        strerror(errno));
+                    return -1;
+                }
+            }
+        }
+
+        {
+            /* Send component parameters. */
+            list<std::string> components = {DFT::Prefix};
+            for (const auto &c : components) {
+                for (const auto &kv : rib->params_map[c]) {
+                    std::string val;
+
+                    m = CDAPMessage();
+                    m.m_write(kv.first, c + "/params");
+                    switch (rib->get_param_type(c, kv.first)) {
+                    case PolicyParamType::STRING:
+                        val = rib->get_param_value<string>(c, kv.first);
+                        break;
+                    default:
+                        assert(false);
+                    }
+                    if (!val.empty()) {
+                        m.set_obj_value(val);
+                        ret = nf->send_to_port_id(&m);
+                        if (ret) {
+                            UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
+                                strerror(errno));
+                            return -1;
+                        }
+                    }
+                }
             }
         }
 
