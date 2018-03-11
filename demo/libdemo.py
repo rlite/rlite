@@ -539,6 +539,9 @@ class Demo:
                     })
 
                 for p in self.dif_policies[dif]:
+                    # If policy-wide DIF (len(p['nodes']) == 0), only
+                    # configure the enrollment master. Otherwise configure
+                    # all the specified nodes.
                     if (len(p['nodes']) == 0 and dif not in vm['enrolling']) \
                             or (len(p['nodes']) > 0 and vmname in p.nodes):
                         ctrl_cmds.append(
@@ -548,7 +551,6 @@ class Demo:
                                 'comp': p['path'],
                                 'policy': p['ps']
                             })
-                    if len(p['nodes']) == 0 or vmname in p.nodes:
                         for param in p['parms']:
                             pname, pvalue = param.split('=')
 
