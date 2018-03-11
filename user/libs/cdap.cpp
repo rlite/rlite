@@ -59,7 +59,7 @@ static const char *opcode_names_table[] = {
 };
 
 std::string
-CDAPMessage::opcode_repr(gpb::opCode_t op_code)
+CDAPMessage::opcode_repr(gpb::OpCode op_code)
 {
     if (static_cast<int>(op_code) <= gpb::M_STOP_R) {
         return opcode_names_table[op_code];
@@ -90,11 +90,11 @@ struct CDAPValidationTable {
 
     CDAPValidationTable();
 
-    bool check(int field, const char *flname, gpb::opCode_t op, bool observed);
+    bool check(int field, const char *flname, gpb::OpCode op, bool observed);
 };
 
 bool
-CDAPValidationTable::check(int field, const char *flname, gpb::opCode_t op,
+CDAPValidationTable::check(int field, const char *flname, gpb::OpCode op,
                            bool observed)
 {
     char expected = tab[(MAX_CDAP_OPCODE + 1) * field + op];
@@ -157,17 +157,17 @@ CDAPValidationTable::CDAPValidationTable()
     ENTRY_FILL(Filter, M_STOP_R, MUST_NOT_EXIST);
 
     /* invoke_id */
-    ENTRY_FILL(InvokeID, M_CONNECT, MUST_EXIST);
-    ENTRY_FILL(InvokeID, M_CONNECT_R, MUST_EXIST);
-    ENTRY_FILL(InvokeID, M_RELEASE_R, MUST_EXIST);
-    ENTRY_FILL(InvokeID, M_CREATE_R, MUST_EXIST);
-    ENTRY_FILL(InvokeID, M_DELETE_R, MUST_EXIST);
-    ENTRY_FILL(InvokeID, M_READ_R, MUST_EXIST);
-    ENTRY_FILL(InvokeID, M_CANCELREAD, MUST_EXIST);
-    ENTRY_FILL(InvokeID, M_CANCELREAD_R, MUST_EXIST);
-    ENTRY_FILL(InvokeID, M_WRITE_R, MUST_EXIST);
-    ENTRY_FILL(InvokeID, M_START_R, MUST_EXIST);
-    ENTRY_FILL(InvokeID, M_STOP_R, MUST_EXIST);
+    ENTRY_FILL(InvokeId, M_CONNECT, MUST_EXIST);
+    ENTRY_FILL(InvokeId, M_CONNECT_R, MUST_EXIST);
+    ENTRY_FILL(InvokeId, M_RELEASE_R, MUST_EXIST);
+    ENTRY_FILL(InvokeId, M_CREATE_R, MUST_EXIST);
+    ENTRY_FILL(InvokeId, M_DELETE_R, MUST_EXIST);
+    ENTRY_FILL(InvokeId, M_READ_R, MUST_EXIST);
+    ENTRY_FILL(InvokeId, M_CANCELREAD, MUST_EXIST);
+    ENTRY_FILL(InvokeId, M_CANCELREAD_R, MUST_EXIST);
+    ENTRY_FILL(InvokeId, M_WRITE_R, MUST_EXIST);
+    ENTRY_FILL(InvokeId, M_START_R, MUST_EXIST);
+    ENTRY_FILL(InvokeId, M_STOP_R, MUST_EXIST);
 
     /* obj_class */
     ENTRY_FILL(ObjClass, M_CONNECT, MUST_NOT_EXIST);
@@ -267,7 +267,7 @@ CDAPConn::reset()
 
 int
 CDAPConn::connect(const std::string &src, const std::string &dst,
-                  gpb::authTypes_t auth_mech,
+                  gpb::AuthType auth_mech,
                   const struct CDAPAuthValue *auth_value)
 {
     std::unique_ptr<CDAPMessage> rm;
@@ -632,19 +632,19 @@ CDAPMessage::set_obj_value(std::unique_ptr<char[]> buf, size_t len)
 
 CDAPMessage::CDAPMessage(const gpb::CDAPMessage &gm)
 {
-    gpb::objVal_t objvalue = gm.objvalue();
+    gpb::ObjValue objvalue = gm.obj_value();
     string apn, api, aen, aei;
 
-    abs_syntax = gm.abssyntax();
-    op_code    = gm.opcode();
-    if (gm.has_invokeid()) {
-        invoke_id = gm.invokeid();
+    abs_syntax = gm.abs_syntax();
+    op_code    = gm.op_code();
+    if (gm.has_invoke_id()) {
+        invoke_id = gm.invoke_id();
     }
     flags     = gm.flags();
-    obj_class = gm.objclass();
-    obj_name  = gm.objname();
-    if (gm.has_objinst()) {
-        obj_inst = gm.objinst();
+    obj_class = gm.obj_class();
+    obj_name  = gm.obj_name();
+    if (gm.has_obj_inst()) {
+        obj_inst = gm.obj_inst();
     }
 
     /* Convert object value. */
@@ -706,29 +706,29 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage &gm)
         filter = gm.filter();
     }
 
-    if (gm.has_authmech()) {
-        auth_mech = gm.authmech();
-        if (gm.has_authvalue()) {
-            auth_value.name     = gm.authvalue().authname();
-            auth_value.password = gm.authvalue().authpassword();
-            auth_value.other    = gm.authvalue().authother();
+    if (gm.has_auth_mech()) {
+        auth_mech = gm.auth_mech();
+        if (gm.has_auth_value()) {
+            auth_value.name     = gm.auth_value().auth_name();
+            auth_value.password = gm.auth_value().auth_password();
+            auth_value.other    = gm.auth_value().auth_other();
         }
     }
 
-    apn      = gm.has_destapname() ? gm.destapname() : string();
-    api      = gm.has_destapinst() ? gm.destapinst() : string();
-    aen      = gm.has_destaename() ? gm.destaename() : string();
-    aei      = gm.has_destaeinst() ? gm.destaeinst() : string();
+    apn      = gm.has_dest_ap_name() ? gm.dest_ap_name() : string();
+    api      = gm.has_dest_ap_inst() ? gm.dest_ap_inst() : string();
+    aen      = gm.has_dest_ae_name() ? gm.dest_ae_name() : string();
+    aei      = gm.has_dest_ae_inst() ? gm.dest_ae_inst() : string();
     dst_appl = rina_string_from_components(apn, api, aen, aei);
 
-    apn      = gm.has_srcapname() ? gm.srcapname() : string();
-    api      = gm.has_srcapinst() ? gm.srcapinst() : string();
-    aen      = gm.has_srcaename() ? gm.srcaename() : string();
-    aei      = gm.has_srcaeinst() ? gm.srcaeinst() : string();
+    apn      = gm.has_src_ap_name() ? gm.src_ap_name() : string();
+    api      = gm.has_src_ap_inst() ? gm.src_ap_inst() : string();
+    aen      = gm.has_src_ae_name() ? gm.src_ae_name() : string();
+    aei      = gm.has_src_ae_inst() ? gm.src_ae_inst() : string();
     src_appl = rina_string_from_components(apn, api, aen, aei);
 
-    if (gm.has_resultreason()) {
-        result_reason = gm.resultreason();
+    if (gm.has_result_reason()) {
+        result_reason = gm.result_reason();
     }
     version = gm.version();
 }
@@ -738,19 +738,19 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage &gm)
 CDAPMessage::operator gpb::CDAPMessage() const
 {
     gpb::CDAPMessage gm;
-    gpb::objVal_t *objvalue = new gpb::objVal_t();
+    gpb::ObjValue *objvalue = new gpb::ObjValue();
     string apn, api, aen, aei;
 
-    gm.set_abssyntax(abs_syntax);
-    gm.set_opcode(op_code);
+    gm.set_abs_syntax(abs_syntax);
+    gm.set_op_code(op_code);
     if (invoke_id) {
-        gm.set_invokeid(invoke_id);
+        gm.set_invoke_id(invoke_id);
     }
     gm.set_flags(flags);
-    gm.set_objclass(obj_class);
-    gm.set_objname(obj_name);
+    gm.set_obj_class(obj_class);
+    gm.set_obj_name(obj_name);
     if (obj_inst) {
-        gm.set_objinst(obj_inst);
+        gm.set_obj_inst(obj_inst);
     }
 
     /* Convert object value. */
@@ -788,7 +788,7 @@ CDAPMessage::operator gpb::CDAPMessage() const
     }
 
     if (obj_value.ty != ObjValType::NONE) {
-        gm.set_allocated_objvalue(objvalue);
+        gm.set_allocated_obj_value(objvalue);
     } else {
         delete objvalue;
     }
@@ -801,32 +801,32 @@ CDAPMessage::operator gpb::CDAPMessage() const
         gm.set_filter(filter);
     }
     if (auth_mech != gpb::AUTH_NONE) {
-        gpb::authValue_t *authvalue = new gpb::authValue_t();
-        gm.set_authmech(auth_mech);
-        authvalue->set_authname(auth_value.name);
-        authvalue->set_authpassword(auth_value.password);
-        authvalue->set_authother(auth_value.other);
-        gm.set_allocated_authvalue(authvalue);
+        gpb::AuthValue *authvalue = new gpb::AuthValue();
+        gm.set_auth_mech(auth_mech);
+        authvalue->set_auth_name(auth_value.name);
+        authvalue->set_auth_password(auth_value.password);
+        authvalue->set_auth_other(auth_value.other);
+        gm.set_allocated_auth_value(authvalue);
     }
 
     if (!dst_appl.empty()) {
         rina_components_from_string(dst_appl, apn, api, aen, aei);
-        gm.set_destapname(apn);
-        gm.set_destapinst(api);
-        gm.set_destaename(aen);
-        gm.set_destaeinst(aei);
+        gm.set_dest_ap_name(apn);
+        gm.set_dest_ap_inst(api);
+        gm.set_dest_ae_name(aen);
+        gm.set_dest_ae_inst(aei);
     }
 
     if (!src_appl.empty()) {
         rina_components_from_string(src_appl, apn, api, aen, aei);
-        gm.set_srcapname(apn);
-        gm.set_srcapinst(api);
-        gm.set_srcaename(aen);
-        gm.set_srcaeinst(aei);
+        gm.set_src_ap_name(apn);
+        gm.set_src_ap_inst(api);
+        gm.set_src_ae_name(aen);
+        gm.set_src_ae_inst(aei);
     }
 
     if (!result_reason.empty()) {
-        gm.set_resultreason(result_reason);
+        gm.set_result_reason(result_reason);
     }
     gm.set_version(version);
 
@@ -857,7 +857,7 @@ CDAPMessage::valid(bool check_invoke_id) const
 
     if (check_invoke_id) {
         ret = ret &&
-              vt.check(FLNUM(InvokeID), "invoke_id", op_code, invoke_id != 0);
+              vt.check(FLNUM(InvokeId), "invoke_id", op_code, invoke_id != 0);
     }
 
     ret = ret && vt.check(FLNUM(ObjClass), "obj_class", op_code,
@@ -1207,7 +1207,7 @@ CDAPConn::msg_recv()
 }
 
 int
-CDAPMessage::m_connect(gpb::authTypes_t auth_mech_,
+CDAPMessage::m_connect(gpb::AuthType auth_mech_,
                        const struct CDAPAuthValue *auth_value_,
                        const std::string &local_appl,
                        const std::string &remote_appl)
@@ -1265,7 +1265,7 @@ CDAPMessage::m_release_r(int result_, const std::string &result_reason_)
 int
 CDAPMessage::m_common(const std::string &obj_class_,
                       const std::string &obj_name_, long obj_inst_, int scope_,
-                      const std::string &filter_, gpb::opCode_t op_code_)
+                      const std::string &filter_, gpb::OpCode op_code_)
 {
     clear();
     op_code   = op_code_;
@@ -1282,7 +1282,7 @@ int
 CDAPMessage::m_common_r(const std::string &obj_class_,
                         const std::string &obj_name_, long obj_inst_,
                         int result_, const std::string &result_reason_,
-                        gpb::opCode_t op_code_)
+                        gpb::OpCode op_code_)
 {
     clear();
     op_code   = op_code_;

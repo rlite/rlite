@@ -379,13 +379,13 @@ class CentralizedFaultTolerantDFT : public DFT {
         /* Support for client commands that are pending, waiting for
          * being applied to the replicated state machine. */
         struct PendingReq {
-            gpb::opCode_t op_code;
+            gpb::OpCode op_code;
             std::string obj_name;
             std::string obj_class;
             int invoke_id;
             rlm_addr_t requestor_addr;
             PendingReq() = default;
-            PendingReq(gpb::opCode_t op, const std::string &oname,
+            PendingReq(gpb::OpCode op, const std::string &oname,
                        const std::string &oclass, int iid, rlm_addr_t addr)
                 : op_code(op),
                   obj_name(oname),
@@ -439,13 +439,13 @@ class CentralizedFaultTolerantDFT : public DFT {
         std::unique_ptr<TimeoutEvent> timer;
 
         struct PendingReq {
-            gpb::opCode_t op_code;
+            gpb::OpCode op_code;
             std::string appl_name;
             raft::ReplicaId replica;
             uint32_t kevent_id;
             std::chrono::system_clock::time_point t;
             PendingReq() = default;
-            PendingReq(gpb::opCode_t op, const std::string &a,
+            PendingReq(gpb::OpCode op, const std::string &a,
                        const raft::ReplicaId &r, uint32_t event_id)
                 : op_code(op), appl_name(a), replica(r), kevent_id(event_id)
             {
@@ -627,7 +627,7 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
     for (const auto &r : replicas) {
         if (leader_id.empty() || r == leader_id) {
             auto m = make_unique<CDAPMessage>();
-            gpb::opCode_t op_code;
+            gpb::OpCode op_code;
             int invoke_id;
             int ret;
 
@@ -672,7 +672,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
     for (const auto &r : replicas) {
         if (leader_id.empty() || r == leader_id) {
             auto m = make_unique<CDAPMessage>();
-            gpb::opCode_t op_code;
+            gpb::OpCode op_code;
             gpb::DFTEntry dft_entry;
             int invoke_id;
             int ret;
