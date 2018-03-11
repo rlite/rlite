@@ -25,6 +25,7 @@
 #include <iostream>
 #include <string>
 #include <memory>
+#include <thread>
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -49,11 +50,12 @@ test_cdap_server(int port)
     char bufin[4096];
     struct sockaddr_in remote;
     std::unique_ptr<CDAPMessage> m;
+    long obj_inst_cnt = 15;
+    bool stop         = false;
     int pipefds[2];
     int one = 1;
     int ld;
     int n, k;
-    long obj_inst_cnt = 15;
 
     if (pipe(pipefds) < 0) {
         perror("pipe()");
@@ -83,7 +85,7 @@ test_cdap_server(int port)
 
     addrlen = sizeof(remote);
 
-    while (1) {
+    while (!stop) {
         CDAPMessage rm;
         int pn;
 
@@ -134,6 +136,7 @@ test_cdap_server(int port)
 
         case gpb::M_RELEASE:
             rm.m_release_r(0, string());
+            stop = true;
             break;
 
         case gpb::M_CREATE:
@@ -426,25 +429,20 @@ void
 usage()
 {
     PI("CDAP test program\n");
-    PI("    ./test-cdap [-l]\n");
+    PI("    ./test-cdap [-p UDP_PORT]\n");
 }
 
 int
 main(int argc, char **argv)
 {
     int port = 23872;
-    int listen;
     int opt;
 
-    while ((opt = getopt(argc, argv, "hlp:")) != -1) {
+    while ((opt = getopt(argc, argv, "hp:")) != -1) {
         switch (opt) {
         case 'h':
             usage();
             return 0;
-
-        case 'l':
-            listen = 1;
-            break;
 
         case 'p':
             port = atoi(optarg);
@@ -461,11 +459,8 @@ main(int argc, char **argv)
         }
     }
 
-    if (listen) {
-        test_cdap_server(port);
-    } else {
-        test_cdap_client(port);
-    }
+    std::thread srv(test_cdap_server, port);
+    srv.detach();
 
-    return 0;
+    return test_cdap_client(port);
 }
