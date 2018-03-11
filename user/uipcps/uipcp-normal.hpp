@@ -449,10 +449,12 @@ struct uipcp_rib {
 
     struct periodic_task *tasks = nullptr;
 
-    typedef int (uipcp_rib::*rib_handler_t)(
-        const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-        std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr);
-    std::unordered_map<std::string, rib_handler_t> handlers;
+    using RibHandler = std::function<int(uipcp_rib &, const CDAPMessage *rm,
+                                         std::shared_ptr<NeighFlow> const &nf,
+                                         std::shared_ptr<Neighbor> const &neigh,
+                                         rlm_addr_t src_addr)>;
+
+    std::unordered_map<std::string, RibHandler> handlers;
 
     /* Positive if this IPCP is enrolled to the DIF, zero otherwise.
      * When we allocate a flow towards a candidate neighbor, we don't
@@ -680,6 +682,11 @@ struct uipcp_rib {
                       std::shared_ptr<NeighFlow> const &nf,
                       std::shared_ptr<Neighbor> const &neigh,
                       rlm_addr_t src_addr);
+
+    void rib_handler_register(std::string rib_path, RibHandler h)
+    {
+        handlers.insert(make_pair(rib_path, h));
+    }
 
     /* RIB handlers for received CDAP messages. */
     int dft_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,

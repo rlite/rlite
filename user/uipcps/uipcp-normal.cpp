@@ -473,25 +473,21 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     policy_mod(LFDB::Prefix, "link-state");
 
     /* Insert the handlers for the RIB objects. */
-    handlers.insert(make_pair(DFT::TableName, &uipcp_rib::dft_handler));
-    handlers.insert(
-        make_pair(Neighbor::TableName, &uipcp_rib::neighbors_handler));
-    handlers.insert(make_pair(LFDB::TableName, &uipcp_rib::lfdb_handler));
-    handlers.insert(
-        make_pair(FlowAllocator::TableName, &uipcp_rib::flows_handler));
-    handlers.insert(
-        make_pair(NeighFlow::KeepaliveObjName, &uipcp_rib::keepalive_handler));
-    handlers.insert(make_pair(StatusObjName, &uipcp_rib::status_handler));
-    handlers.insert(make_pair(AddrAllocator::TableName,
-                              &uipcp_rib::addr_alloc_table_handler));
-    handlers.insert(
-        make_pair(DFT::Prefix + "/policy", &uipcp_rib::policy_handler));
-    handlers.insert(
-        make_pair(LFDB::Prefix + "/policy", &uipcp_rib::policy_handler));
-    handlers.insert(make_pair(AddrAllocator::Prefix + "/policy",
-                              &uipcp_rib::policy_handler));
-    handlers.insert(
-        make_pair(DFT::Prefix + "/params", &uipcp_rib::policy_param_handler));
+    rib_handler_register(DFT::TableName, &uipcp_rib::dft_handler);
+    rib_handler_register(Neighbor::TableName, &uipcp_rib::neighbors_handler);
+    rib_handler_register(LFDB::TableName, &uipcp_rib::lfdb_handler);
+    rib_handler_register(FlowAllocator::TableName, &uipcp_rib::flows_handler);
+    rib_handler_register(NeighFlow::KeepaliveObjName,
+                         &uipcp_rib::keepalive_handler);
+    rib_handler_register(StatusObjName, &uipcp_rib::status_handler);
+    rib_handler_register(AddrAllocator::TableName,
+                         &uipcp_rib::addr_alloc_table_handler);
+    rib_handler_register(DFT::Prefix + "/policy", &uipcp_rib::policy_handler);
+    rib_handler_register(LFDB::Prefix + "/policy", &uipcp_rib::policy_handler);
+    rib_handler_register(AddrAllocator::Prefix + "/policy",
+                         &uipcp_rib::policy_handler);
+    rib_handler_register(DFT::Prefix + "/params",
+                         &uipcp_rib::policy_param_handler);
 
     if (rl_verbosity >= RL_VERB_VERY) {
         /* Dump the available RIB paths (alphabetically sorted). */
@@ -1046,7 +1042,7 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm,
             rm->obj_name.c_str());
         rm->dump();
     } else {
-        ret = (this->*(hi->second))(rm, nf, neigh, src_addr);
+        ret = (hi->second)(*this, rm, nf, neigh, src_addr);
     }
 
     return ret;
