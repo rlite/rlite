@@ -593,11 +593,9 @@ u82boolstr(uint8_t v)
 }
 #endif
 
-char *
-uipcp_rib::dump() const
+void
+uipcp_rib::dump(std::stringstream &ss) const
 {
-    stringstream ss;
-
 #ifdef RL_USE_QOS_CUBES
     ss << "QoS cubes" << endl;
     for (map<string, struct rl_flow_config>::const_iterator i =
@@ -727,8 +725,6 @@ uipcp_rib::dump() const
           "invoke_id_mgr object"
        << endl;
 #endif /* RL_MEMTRACK */
-
-    return rl_strdup(ss.str().c_str(), RL_MT_UTILS);
 }
 
 void
@@ -1947,8 +1943,11 @@ normal_ipcp_rib_show(struct uipcp *uipcp)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(rib->mutex);
+    stringstream ss;
 
-    return rib->dump();
+    rib->dump(ss);
+
+    return rl_strdup(ss.str().c_str(), RL_MT_UTILS);
 }
 
 static char *
