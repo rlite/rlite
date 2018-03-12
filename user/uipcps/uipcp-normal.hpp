@@ -615,6 +615,7 @@ struct uipcp_rib {
     ~uipcp_rib();
 
     char *dump() const;
+    void dump_rib_paths(std::stringstream &ss) const;
 
     std::shared_ptr<Neighbor> get_neighbor(const std::string &neigh_name,
                                            bool create);

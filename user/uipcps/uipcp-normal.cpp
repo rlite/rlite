@@ -489,18 +489,6 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     rib_handler_register(DFT::Prefix + "/params",
                          &uipcp_rib::policy_param_handler);
 
-    if (rl_verbosity >= RL_VERB_VERY) {
-        /* Dump the available RIB paths (alphabetically sorted). */
-        std::list<std::string> paths;
-        for (const auto &kv : handlers) {
-            paths.push_back(kv.first);
-        }
-        paths.sort();
-        for (const auto &path : paths) {
-            UPV(uipcp, "Path %s\n", path.c_str());
-        }
-    }
-
     /* Start timers for periodic tasks. */
     age_incr_tmr_restart();
     neighs_refresh_tmr_restart();
@@ -742,6 +730,22 @@ uipcp_rib::dump() const
 
     return rl_strdup(ss.str().c_str(), RL_MT_UTILS);
 }
+
+void
+uipcp_rib::dump_rib_paths(std::stringstream &ss) const
+{
+    /* Dump the available RIB paths (alphabetically sorted). */
+    std::list<std::string> paths;
+
+    ss << "Active RIB paths:" << std::endl;
+    for (const auto &kv : handlers) {
+        paths.push_back(kv.first);
+    }
+    paths.sort();
+    for (const auto &path : paths) {
+        ss << "    " << path << std::endl;
+    }
+};
 
 void
 uipcp_rib::update_address(rlm_addr_t new_addr)
@@ -1959,6 +1963,18 @@ normal_ipcp_routing_show(struct uipcp *uipcp)
     return rl_strdup(ss.str().c_str(), RL_MT_UTILS);
 }
 
+static char *
+normal_ipcp_rib_paths_show(struct uipcp *uipcp)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    std::lock_guard<std::mutex> guard(rib->mutex);
+    stringstream ss;
+
+    rib->dump_rib_paths(ss);
+
+    return rl_strdup(ss.str().c_str(), RL_MT_UTILS);
+}
+
 static int
 normal_policy_mod(struct uipcp *uipcp,
                   const struct rl_cmsg_ipcp_policy_mod *req)
@@ -2075,6 +2091,7 @@ struct uipcp_ops normal_ops = {
     .lower_flow_alloc     = normal_ipcp_enroll,
     .rib_show             = normal_ipcp_rib_show,
     .routing_show         = normal_ipcp_routing_show,
+    .rib_paths_show       = normal_ipcp_rib_paths_show,
     .appl_register        = normal_appl_register,
     .fa_req               = normal_fa_req,
     .fa_resp              = normal_fa_resp,
