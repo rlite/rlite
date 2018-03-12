@@ -68,8 +68,11 @@ std::string NeighFlow::KeepaliveObjName =
     "/mgmt/" + NeighFlow::KeepaliveObjClass;
 std::string uipcp_rib::StatusObjClass = "operational_status";
 std::string uipcp_rib::StatusObjName  = "/mgmt/" + uipcp_rib::StatusObjClass;
-std::string uipcp_rib::ADataObjClass  = "a_data";
-std::string uipcp_rib::ADataObjName   = "/a_data";
+std::string uipcp_rib::DTConstantsObjClass = "dtconstants";
+std::string uipcp_rib::DTConstantsObjName =
+    "/mgmt/" + uipcp_rib::DTConstantsObjClass;
+std::string uipcp_rib::ADataObjClass      = "a_data";
+std::string uipcp_rib::ADataObjName       = "/a_data";
 std::string uipcp_rib::EnrollmentObjClass = "enrollment";
 std::string uipcp_rib::EnrollmentObjName =
     "/mgmt/" + uipcp_rib::EnrollmentObjClass;
@@ -431,6 +434,22 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
         throw std::exception();
     }
 #endif /* RL_USE_QOS_CUBES */
+
+    dt_constants.set_max_pdu_size(65536);
+    dt_constants.set_address_width(4);
+    dt_constants.set_port_id_width(2);
+    dt_constants.set_cep_id_width(2);
+    dt_constants.set_qos_id_width(1);
+    dt_constants.set_seq_num_width(4);
+    dt_constants.set_length_width(2);
+    dt_constants.set_seq_rollover_thresh(1 << 31);
+    dt_constants.set_max_pdu_lifetime(4000 /* ms */);
+    dt_constants.set_concatenation_enabled(false);
+    dt_constants.set_fragmentation_enabled(false);
+    dt_constants.set_integrity_enabled(false);
+    dt_constants.set_max_rtx_time(1000 /* ms */);
+    dt_constants.set_max_ack_delay(200 /* ms */);
+    dt_constants.set_ctrl_seq_num_width(dt_constants.seq_num_width());
 
     params_map[AddrAllocator::Prefix]["nack-wait-secs"] =
         PolicyParam(kAddrAllocDistrNackWaitSecs, kAddrAllocDistrNackWaitSecsMin,
