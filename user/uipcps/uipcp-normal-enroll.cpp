@@ -473,6 +473,14 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
         if (enr_info.address()) {
             rib->set_address(enr_info.address());
         }
+
+        /* We require the slave to specify the EFCP data transfer constants. */
+        if (!enr_info.has_dt_constants()) {
+            UPE(rib->uipcp, "M_START_R does not contain EFCP data "
+                            "transfer constants\n");
+            return -1;
+        }
+        rib->dt_constants = enr_info.dt_constants();
     }
 
     for (;;) {
@@ -519,12 +527,6 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
         gpb::EnrollmentInfo enr_info;
 
         enr_info.ParseFromArray(objbuf, objlen);
-
-        /* Update our address according to what received from the
-         * neighbor. */
-        if (enr_info.address()) {
-            rib->set_address(enr_info.address());
-        }
 
         /* If operational state indicates that we (the initiator) are already
          * DIF member, we can send our dynamic information to the slave. */
@@ -704,7 +706,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
     {
         /* (3) S <-- I: M_START
          * (4) S --> I: M_START_R
-         * (5) S --> I: M_CREATE
+         * (5) S --> I: M_CREATE or M_WRITE
          * (6) S --> I: M_STOP */
         const char *objbuf;
         size_t objlen;
@@ -742,6 +744,10 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
             return -1;
         }
         enr_info.set_address(addr);
+
+        /* Return EFCP data transfer constants. */
+        enr_info.set_allocated_dt_constants(
+            new gpb::DataTransferConstants(rib->dt_constants));
 
         m.m_start_r();
         m.obj_class = uipcp_rib::EnrollmentObjClass;
@@ -803,6 +809,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
         }
 
         /* Stop the enrollment. */
+        enr_info = gpb::EnrollmentInfo();
         enr_info.set_start_early(true);
 
         m = CDAPMessage();

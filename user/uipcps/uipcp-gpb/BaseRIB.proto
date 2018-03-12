@@ -16,6 +16,49 @@ message APName {
   optional string ae_instance = 4;
 }
 
+/* The constants to be used by EFCP. */
+message DataTransferConstants {
+  optional uint32 max_pdu_size = 1; /* The maximum size of a PDU, in bytes */
+  optional uint32 address_width =
+      2; /* The length of the address field in EFCP PDUs, in bytes */
+  optional uint32 port_id_width =
+      3; /* The length of the port_id field in EFCP PDUs, in bytes */
+  optional uint32 cep_id_width = 4; /* The length of the Connection Endpoint Id
+                                       field in EFCP PDUs, in bytes */
+  optional uint32 qos_id_width =
+      5; /* The length of the qos_id field in EFCP PDUs, in bytes */
+  optional uint32 seq_num_width =
+      6; /* The length of the seq_num field in EFCP PDUs, in bytes */
+  optional uint32 length_width =
+      7; /* The length of the length field in EFCP PDUs, in bytes */
+  optional uint64 seq_rollover_thresh =
+      8; /* The sequence number after which the Flow Allocator instance should
+            create a new EFCP connection */
+  optional uint32 max_pdu_lifetime =
+      9; /* The maximum time a PDU can "live" within the DIF, in milliseconds */
+  optional bool concatenation_enabled =
+      10; /* True if multiple SDUs can be delimited and concatenated
+             within a single PDU. */
+  optional bool fragmentation_enabled =
+      11; /* True if multiple SDUs can be fragmented and reassembled
+             within a single PDU */
+  optional bool integrity_enabled =
+      12; /* True if the PDUs in this DIF have CRC, TTL, and/or encryption */
+  optional uint32 max_rtx_time =
+      13; /* The maximum time DTCP tries to keep retransmitting a PDU,
+             before discarding it (i.e. R in delta-T) */
+  optional uint32 max_ack_delay =
+      14; /* The maximum time the receiving side of a DTCP connection will take
+             to ACK a PDU once it has received it (i.e. A in delta-T) */
+  optional uint32 rate_width = 15;  /* The length of the rate field in the FC
+                                       PDUs (for rate based flow control) */
+  optional uint32 frame_width = 16; /* The length of the frame field in the FC
+                                       PDUs (for rate based flow control) */
+  optional uint32 ctrl_seq_num_width =
+      17; /* The length of the ctrl_seq_num
+             field in EFCP(DTCP) PDUs, in bytes */
+}
+
 message PolicyDescr {                // Describes a policy
   optional string name = 1;          // The name of the policy
   optional string impl_name = 2;     // The name of the implementation of the
@@ -168,12 +211,14 @@ message DFTSlice {  // carries information about
 }
 
 /* Information exchanged between the enrollee and the enroller.
- * Enrollee proposes address, and reportes its lower difs.
- * Enroller returns the actual address. */
+ * Enrollee proposes address, and reports its lower difs.
+ * Enroller returns the actual address and the EFCP data transfer
+ * constants. */
 message EnrollmentInfo {
   optional uint64 address = 1;
   repeated string lower_difs = 2;
   optional bool start_early = 3;
+  optional DataTransferConstants dt_constants = 4;
 }
 
 message ConnId {  // information to identify a connection
@@ -278,49 +323,6 @@ message QosSpec {            // The QoS parameters requested by an application
   repeated Property extra_parameters = 13;  // the extra parameters specified
                                             // by the application process that
                                             // requested this flow
-}
-
-/* The constants to be used by EFCP. */
-message DataTransferConstants {
-  optional uint32 max_pdu_size = 1; /* The maximum size of a PDU, in bytes */
-  optional uint32 address_width =
-      2; /* The length of the address field in EFCP PDUs, in bytes */
-  optional uint32 port_id_width =
-      3; /* The length of the port_id field in EFCP PDUs, in bytes */
-  optional uint32 cep_id_width = 4; /* The length of the Connection Endpoint Id
-                                       field in EFCP PDUs, in bytes */
-  optional uint32 qos_id_width =
-      5; /* The length of the qos_id field in EFCP PDUs, in bytes */
-  optional uint32 seq_num_width =
-      6; /* The length of the seq_num field in EFCP PDUs, in bytes */
-  optional uint32 length_width =
-      7; /* The length of the length field in EFCP PDUs, in bytes */
-  optional uint64 seq_rollover_thresh =
-      8; /* The sequence number after which the Flow Allocator instance should
-            create a new EFCP connection */
-  optional uint32 max_pdu_lifetime =
-      9; /* The maximum time a PDU can "live" within the DIF, in milliseconds */
-  optional bool concatenation_enabled =
-      10; /* True if multiple SDUs can be delimited and concatenated
-             within a single PDU. */
-  optional bool fragmentation_enabled =
-      11; /* True if multiple SDUs can be fragmented and reassembled
-             within a single PDU */
-  optional bool integrity_enabled =
-      12; /* True if the PDUs in this DIF have CRC, TTL, and/or encryption */
-  optional uint32 max_rtx_time =
-      13; /* The maximum time DTCP tries to keep retransmitting a PDU,
-             before discarding it (i.e. R in delta-T) */
-  optional uint32 max_ack_delay =
-      14; /* The maximum time the receiving side of a DTCP connection will take
-             to ACK a PDU once it has received it (i.e. A in delta-T) */
-  optional uint32 rate_width = 15;  /* The length of the rate field in the FC
-                                       PDUs (for rate based flow control) */
-  optional uint32 frame_width = 16; /* The length of the frame field in the FC
-                                       PDUs (for rate based flow control) */
-  optional uint32 ctrl_seq_num_width =
-      17; /* The length of the ctrl_seq_num
-             field in EFCP(DTCP) PDUs, in bytes */
 }
 
 message AData {

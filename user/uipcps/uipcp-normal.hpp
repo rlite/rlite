@@ -479,6 +479,12 @@ struct uipcp_rib {
     /* Lower DIFs. */
     std::list<std::string> lower_difs;
 
+    /* EFCP Data Transfer constants used by this DIF. */
+    gpb::DataTransferConstants dt_constants;
+
+    /* A map of current policies. */
+    std::unordered_map<std::string, std::string> policies;
+
     /* A map containing the values for policy parameters
      * that can be tuned by the administrator. */
     std::unordered_map<std::string,
@@ -509,9 +515,6 @@ struct uipcp_rib {
     EnrollmentResources *enrollment_rsrc_get(
         std::shared_ptr<NeighFlow> const &nf,
         std::shared_ptr<Neighbor> const &neigh, bool initiator);
-
-    /* A map of current policies. */
-    std::unordered_map<std::string, std::string> policies;
 
     /* Table of flow allocation requests that are pending because they are
      * waiting for DFT resolution. See uipcp_rib::fa_req(). */
@@ -600,6 +603,8 @@ struct uipcp_rib {
 
     static std::string StatusObjClass;
     static std::string StatusObjName;
+    static std::string DTConstantsObjClass;
+    static std::string DTConstantsObjName;
     static std::string ADataObjClass;
     static std::string ADataObjName;
     static std::string EnrollmentObjClass;
