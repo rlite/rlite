@@ -52,6 +52,8 @@ enum {
     RLITE_U_IPCP_POLICY_PARAM_LIST_RESP, /* 18 */
     RLITE_U_TERMINATE,                   /* 19 */
     RLITE_U_IPCP_NEIGH_DISCONNECT,       /* 20 */
+    RLITE_U_IPCP_RIB_PATHS_SHOW_REQ,     /* 21 */
+    RLITE_U_IPCP_RIB_PATHS_SHOW_RESP,    /* 22 */
 
     RLITE_U_MSG_MAX,
 };

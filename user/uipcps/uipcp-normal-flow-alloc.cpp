@@ -684,6 +684,7 @@ LocalFlowAllocator::dump(std::stringstream &ss) const
         }
         ss << "]" << endl;
     }
+    ss << endl;
 }
 
 void

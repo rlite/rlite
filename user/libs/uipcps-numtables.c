@@ -130,6 +130,18 @@ struct rl_msg_layout rl_uipcps_numtables[] = {
                        2 * sizeof(char *),
             .strings = 2,
         },
+    [RLITE_U_IPCP_RIB_PATHS_SHOW_REQ] =
+        {
+            .copylen =
+                sizeof(struct rl_cmsg_ipcp_rib_show_req) - 1 * sizeof(char *),
+            .strings = 1,
+        },
+    [RLITE_U_IPCP_RIB_PATHS_SHOW_RESP] =
+        {
+            .copylen = sizeof(struct rl_cmsg_ipcp_rib_show_resp) -
+                       1 * sizeof(struct rl_buf_field),
+            .buffers = 1,
+        },
     [RLITE_U_MEMTRACK_DUMP] =
         {
             .copylen = sizeof(struct rl_msg_base),
