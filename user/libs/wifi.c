@@ -70,9 +70,9 @@ wpasup_get_ctrl_dir_from_config(const char *config)
 
     config_fd = fopen(config, "r");
     if (!config_fd) {
-        PE("Could not open config file\n"
-           "Please make sure there is a config file located at %s"
-           " and that it is accessible\n",
+        PE("Could not open wpa_supplicant config file\n"
+           "Please make sure there is an accessible config file "
+           "located at %s\n",
            RL_WPA_SUPPLICANT_CONF_PATH);
         return NULL;
     }
