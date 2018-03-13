@@ -415,7 +415,7 @@ udp4_tx_worker(struct work_struct *w)
             break;
         }
 
-        if (sk_stream_wspace(qe->flow_priv->sock->sk) < qe->rb->len ||
+        if (!sock_writeable(qe->flow_priv->sock->sk) ||
             udp4_xmit(qe->flow_priv, qe->rb) == -EAGAIN) {
             /* Cannot backpressure here, we have to drop */
             RPD(2, "Dropping SDU [len=%d]\n", (int)qe->rb->len);
@@ -432,7 +432,7 @@ rl_shim_udp4_flow_writeable(struct flow_entry *flow)
 {
     struct shim_udp4_flow *flow_priv = flow->priv;
 
-    return sk_stream_wspace(flow_priv->sock->sk) > 0;
+    return sock_writeable(flow_priv->sock->sk);
 }
 
 static int
@@ -442,7 +442,7 @@ rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct shim_udp4_flow *flow_priv = flow->priv;
     struct rl_shim_udp4 *shim        = ipcp->priv;
 
-    if (sk_stream_wspace(flow_priv->sock->sk) < rb->len) {
+    if (!sock_writeable(flow_priv->sock->sk)) {
         /* Backpressure: We will be called again. */
         return -EAGAIN;
     }
