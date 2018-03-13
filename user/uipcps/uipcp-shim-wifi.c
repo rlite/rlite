@@ -119,6 +119,7 @@ shim_wifi_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *cmsg,
     ctrl_conn = wifi_init(shim->ifname);
     if (!ctrl_conn) {
         rl_free(shim->cur_ssid, RL_MT_SHIM);
+        shim->cur_ssid = NULL;
         return -1;
     }
 
