@@ -57,7 +57,8 @@ struct echo_async {
     const char *srv_appl_name;
     char *dif_name;
     struct rina_flow_spec flowspec;
-    int p; /* parallel clients */
+    int background; /* server runs in background */
+    int p;          /* parallel clients */
 };
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -219,6 +220,32 @@ client(struct echo_async *rea)
     return 0;
 }
 
+/* Turn this program into a daemon process. */
+static void
+daemonize(void)
+{
+    pid_t pid = fork();
+    pid_t sid;
+
+    if (pid < 0) {
+        perror("fork(daemonize)");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid > 0) {
+        /* This is the parent. We can terminate it. */
+        exit(0);
+    }
+
+    /* Execution continues only in the child's context. */
+    sid = setsid();
+    if (sid < 0) {
+        exit(EXIT_FAILURE);
+    }
+
+    chdir("/");
+}
+
 static int
 server(struct echo_async *rea)
 {
@@ -300,6 +327,9 @@ server(struct echo_async *rea)
                     }
                     fsms[i].fd    = rea->cfd;
                     fsms[i].state = SELFD_S_ACCEPT;
+                    if (rea->background) {
+                        daemonize();
+                    }
                 }
                 break;
 
@@ -394,32 +424,6 @@ server(struct echo_async *rea)
     return 0;
 }
 
-/* Turn this program into a daemon process. */
-static void
-daemonize(void)
-{
-    pid_t pid = fork();
-    pid_t sid;
-
-    if (pid < 0) {
-        perror("fork(daemonize)");
-        exit(EXIT_FAILURE);
-    }
-
-    if (pid > 0) {
-        /* This is the parent. We can terminate it. */
-        exit(0);
-    }
-
-    /* Execution continues only in the child's context. */
-    sid = setsid();
-    if (sid < 0) {
-        exit(EXIT_FAILURE);
-    }
-
-    chdir("/");
-}
-
 static void
 sigint_handler(int signum)
 {
@@ -450,12 +454,12 @@ main(int argc, char **argv)
     struct echo_async rea;
     const char *dif_name = NULL;
     int listen           = 0;
-    int background       = 0;
     int ret;
     int opt;
 
     memset(&rea, 0, sizeof(rea));
 
+    rea.background    = 0;
     rea.cli_appl_name = "rina-echo-async|client";
     rea.srv_appl_name = "rina-echo-async|server";
     rea.p             = 1;
@@ -498,7 +502,7 @@ main(int argc, char **argv)
             break;
 
         case 'w':
-            background = 1;
+            rea.background = 1;
             break;
 
         default:
@@ -533,9 +537,6 @@ main(int argc, char **argv)
     rea.dif_name = dif_name ? strdup(dif_name) : NULL;
 
     if (listen) {
-        if (background) {
-            daemonize();
-        }
         return server(&rea);
     }
 
