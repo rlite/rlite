@@ -157,15 +157,15 @@ Download the repo and enter the root directory
     $ git clone https://github.com/vmaffione/rlite.git
     $ cd rlite
 
-Run the configure script
+Run the configure script (as a normal user)
 
     $ ./configure
 
-Build both kernel-space and user-space software
+Build both kernel-space and user-space software (as a normal user)
 
     $ make
 
-Install *rlite* on the system
+Install *rlite* on the system (as root user)
 
     # make install depmod
 
