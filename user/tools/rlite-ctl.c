@@ -614,7 +614,7 @@ flow_dump(int argc, char **argv, struct cmd_descriptor *cd)
 
     printf("    snd_lwe                = %lu\n"
            "    snd_rwe                = %lu\n"
-           "    next_seq_num_to_use   = %lu\n"
+           "    next_seq_num_to_use    = %lu\n"
            "    last_seq_num_sent      = %lu\n"
            "    last_ctrl_seq_num_rcvd = %lu\n"
            "    cwq_len                = %lu [max=%lu]\n"
@@ -625,7 +625,7 @@ flow_dump(int argc, char **argv, struct cmd_descriptor *cd)
            "    rcv_rwe                = %lu\n"
            "    max_seq_num_rcvd       = %lu\n"
            "    last_lwe_sent          = %lu\n"
-           "    last_seq_num_acked    = %lu\n"
+           "    last_seq_num_acked     = %lu\n"
            "    next_snd_ctl_seq       = %lu\n"
            "    seqq_len               = %lu\n",
            (unsigned long)dtp.snd_lwe, (unsigned long)dtp.snd_rwe,
