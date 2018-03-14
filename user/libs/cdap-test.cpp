@@ -26,8 +26,10 @@
 #include <string>
 #include <memory>
 #include <thread>
+#include <condition_variable>
+#include <mutex>
 #include <unistd.h>
-#include <stdlib.h>
+#include <cstdlib>
 #include <errno.h>
 
 #include <sys/types.h>  /* system data type definitions */
@@ -39,6 +41,11 @@
 #include "rlite/utils.h"
 
 using namespace std;
+
+/* Synchronization for the client to start after the server has started. */
+static std::condition_variable server_ready_cond;
+static std::mutex mtx;
+static bool server_ready = false;
 
 #define TEST_VERSION 132
 
@@ -81,6 +88,13 @@ test_cdap_server(int port)
     if (bind(ld, (struct sockaddr *)&skaddr, sizeof(skaddr)) < 0) {
         perror("bind()");
         return -1;
+    }
+
+    {
+        /* Notify the client. */
+        std::unique_lock<std::mutex> lock(mtx);
+        server_ready = true;
+        server_ready_cond.notify_one();
     }
 
     addrlen = sizeof(remote);
@@ -392,6 +406,14 @@ test_cdap_client(int port)
 {
     struct sockaddr_in server;
     int sk;
+
+    {
+        /* Wait for the server. */
+        std::unique_lock<std::mutex> lock(mtx);
+        while (!server_ready) {
+            server_ready_cond.wait(lock);
+        }
+    }
 
     if ((sk = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("socket()");
