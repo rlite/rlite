@@ -109,14 +109,15 @@ struct rinaperf {
     const char *cli_appl_name;
     const char *srv_appl_name;
     const char *dif_name;
-    int cfd;          /* Control file descriptor */
-    int parallel;     /* num of parallel clients */
-    int duration;     /* duration of client test (secs) */
-    int use_mss_size; /* use flow MSS as packet size */
-    int verbose;
+    int cfd;                /* control file descriptor */
+    int parallel;           /* num of parallel clients */
+    int duration;           /* duration of client test (secs) */
+    int use_mss_size;       /* use flow MSS as packet size */
+    int verbose;            /* be verbose */
     int stop_pipe[2];       /* to stop client threads */
     int cli_stop;           /* another way to stop client threads */
     int cli_flow_allocated; /* client flows allocated ? */
+    int background;         /* server runs as a daemon process */
 
     /* Synchronization between client threads and main thread. */
     sem_t cli_barrier;
@@ -1067,6 +1068,32 @@ out:
     return NULL;
 }
 
+/* Turn this program into a daemon process. */
+static void
+daemonize(void)
+{
+    pid_t pid = fork();
+    pid_t sid;
+
+    if (pid < 0) {
+        perror("fork(daemonize)");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid > 0) {
+        /* This is the parent. We can terminate it. */
+        exit(0);
+    }
+
+    /* Execution continues only in the child's context. */
+    sid = setsid();
+    if (sid < 0) {
+        exit(EXIT_FAILURE);
+    }
+
+    chdir("/");
+}
+
 static int
 server(struct rinaperf *rp)
 {
@@ -1078,6 +1105,10 @@ server(struct rinaperf *rp)
     if (ret) {
         perror("rina_register()");
         return ret;
+    }
+
+    if (rp->background) {
+        daemonize();
     }
 
     for (;;) {
@@ -1162,32 +1193,6 @@ server(struct rinaperf *rp)
     }
 
     return 0;
-}
-
-/* Turn this program into a daemon process. */
-static void
-daemonize(void)
-{
-    pid_t pid = fork();
-    pid_t sid;
-
-    if (pid < 0) {
-        perror("fork(daemonize)");
-        exit(EXIT_FAILURE);
-    }
-
-    if (pid > 0) {
-        /* This is the parent. We can terminate it. */
-        exit(0);
-    }
-
-    /* Execution continues only in the child's context. */
-    sid = setsid();
-    if (sid < 0) {
-        exit(EXIT_FAILURE);
-    }
-
-    chdir("/");
 }
 
 static void
@@ -1294,7 +1299,6 @@ main(int argc, char **argv)
     int size               = sizeof(uint16_t);
     int interval           = 0;
     int burst              = 1;
-    int background         = 0;
     struct worker wt; /* template */
     int ret;
     int opt;
@@ -1317,6 +1321,7 @@ main(int argc, char **argv)
     sem_init(&rp->workers_free, 0, RP_MAX_WORKERS);
     sem_init(&rp->cli_barrier, 0, 0);
     pthread_mutex_init(&rp->ticket_lock, NULL);
+    rp->background = 0;
 
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_unreliable(&rp->flowspec);
@@ -1408,7 +1413,7 @@ main(int argc, char **argv)
             break;
 
         case 'w':
-            background = 1;
+            rp->background = 1;
             break;
 
         case 'v':
@@ -1569,9 +1574,5 @@ main(int argc, char **argv)
     }
 
     /* Server mode. */
-    if (background) {
-        daemonize();
-    }
-
     return server(rp);
 }
