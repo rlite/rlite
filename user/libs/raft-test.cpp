@@ -50,6 +50,7 @@ logfile(const string &replica)
 }
 
 class TestReplica : public RaftSM {
+    /* Commands committed to the replicated state machine. */
     list<uint32_t> committed_commands;
     list<string> peers;
     bool failed = false;
@@ -66,7 +67,7 @@ public:
     }
     ~TestReplica() { shutdown(); }
 
-    /* Apply a command to the replicated state machine. */
+    /* Apply (commit) a command to the replicated state machine. */
     virtual int apply(LogIndex index, const char *const serbuf) override
     {
         uint32_t cmd = *(reinterpret_cast<const uint32_t *>(serbuf));
@@ -75,7 +76,8 @@ public:
     }
 
     /* Called to emulate failure of a replica. The replica won't receive
-     * messages until respawn. */
+     * messages until respawn. We clearly need to discard the replicated
+     * state machine. */
     void fail()
     {
         failed = true;
@@ -92,6 +94,8 @@ public:
         return init(peers, out);
     };
 
+    /* Checks that committed commands are all there, and in the expected
+     * order. Currently unused. */
     bool check(uint32_t num_commands) const
     {
         uint32_t expected = 1;
@@ -125,8 +129,8 @@ public:
             got.insert(cmd);
             M = std::max(M, cmd);
         }
-        for (uint32_t cmd = 1; cmd < M; cmd++) {
-            if (got.count(cmd) == 0) {
+        for (uint32_t cmd = 1; cmd <= M; cmd++) {
+            if (got.count(cmd) == 0) { /* we miss this one */
                 acc.insert(cmd);
             }
         }
@@ -490,6 +494,7 @@ run_simulation(const list<TestEvent> &external_events)
                  * The get_missing_commands() method returns meaningful
                  * results only if the cluster has committed something. */
                 set<uint32_t> missing_commands;
+
                 for (const auto &kv : replicas) {
                     missing_commands = kv.second->get_missing_commands(
                         std::move(missing_commands));
