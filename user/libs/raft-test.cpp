@@ -496,9 +496,12 @@ run_simulation(const list<TestEvent> &external_events)
         }
     }
 
-    /* If some requests where discarded (e.g. because of log conflicts),
-     * we carry out a relaxed check. We only make sure that the list of
-     * committed commands is the same for all the replicas. */
+    /* Make sure that the list of committed commands is the same for all the
+     * replicas and that no command is missing. Commands may have been
+     * committed in a different order from the original, because requests
+     * may have been discarded (e.g. because of log conflicts) and
+     * retransmitted. In any case, the order must be consistent across
+     * replicas. */
     const TestReplica *prev = nullptr;
     assert(replicas.size() > 0);
     for (const auto &kv : replicas) {
