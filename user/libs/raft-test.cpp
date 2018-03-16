@@ -218,7 +218,7 @@ run_simulation(const list<TestEvent> &external_events)
     list<TestEvent> events             = external_events;
     chrono::milliseconds t             = chrono::milliseconds(0); /* time */
     chrono::milliseconds t_last_ievent = t; /* time of last interesting event */
-    uint32_t input_counter             = 1;
+    uint32_t input_counter             = 0;
     map<unsigned int, TestReplica *> failed_replicas;
     bool retransmit_check = true;
     RaftSMOutput output;
@@ -229,7 +229,7 @@ run_simulation(const list<TestEvent> &external_events)
     /* Assign a progressive command number to each client request. */
     for (auto &e : events) {
         if (e.event_type == TestEventType::ClientRequest) {
-            e.cmd = input_counter++;
+            e.cmd = ++input_counter;
         }
     }
 
@@ -529,7 +529,7 @@ run_simulation(const list<TestEvent> &external_events)
                  * commands. */
                 set<uint32_t> missing_commands =
                     kv.second->get_missing_commands(std::move(set<uint32_t>()),
-                                                    input_counter - 1);
+                                                    input_counter);
 
                 for (const auto cmd : missing_commands) {
                     cout << "Replica " << kv.first << " misses command " << cmd
