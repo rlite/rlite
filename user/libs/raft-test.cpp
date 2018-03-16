@@ -121,15 +121,15 @@ public:
 
     /* Go over the commands committed so far, and check if there
      * are any missing numbers (adding them to the output argument). */
-    set<uint32_t> get_missing_commands(set<uint32_t> acc, uint32_t M = 0) const
+    set<uint32_t> get_missing_commands(set<uint32_t> acc, uint32_t Max) const
     {
         set<uint32_t> got;
 
         for (auto cmd : committed_commands) {
             got.insert(cmd);
-            M = std::max(M, cmd);
+            Max = std::max(Max, cmd);
         }
-        for (uint32_t cmd = 1; cmd <= M; cmd++) {
+        for (uint32_t cmd = 1; cmd <= Max; cmd++) {
             if (got.count(cmd) == 0) { /* we miss this one */
                 acc.insert(cmd);
             }
@@ -470,51 +470,30 @@ run_simulation(const list<TestEvent> &external_events)
             }
         }
 
-        if (retransmit_check) {
-            auto failures_or_recoveries = [&events]() -> bool {
-                for (const auto &e : events) {
-                    if (e.event_type == TestEventType::SMFailure ||
-                        e.event_type == TestEventType::SMRespawn) {
-                        return true;
-                    }
-                }
-                return false;
-            };
-            auto anything_committed = [&replicas]() -> bool {
-                for (const auto &kv : replicas) {
-                    if (kv.second->something_committed()) {
-                        return true;
-                    }
-                }
-                return false;
-            };
-            if (!failures_or_recoveries() && anything_committed()) {
-                /* No more failures or recoveries are scheduled, so this is
-                 * a good time to issue retransmissions, if needed.
-                 * The get_missing_commands() method returns meaningful
-                 * results only if the cluster has committed something. */
-                set<uint32_t> missing_commands;
-
-                for (const auto &kv : replicas) {
-                    missing_commands = kv.second->get_missing_commands(
-                        std::move(missing_commands));
-                }
-                for (const auto cmd : missing_commands) {
-                    TestEvent se =
-                        TestEvent::CreateRequestEvent(t_next.count() + 1);
-                    se.cmd = cmd;
-                    events.push_back(se);
-                    cout << "Retransmit client request " << cmd << endl;
-                }
-
-                /* No need to keep checking. */
-                retransmit_check = false;
-            }
-        }
-
         /* Update time and Raft state machine output. */
         t      = t_next;
         output = std::move(output_next);
+
+        /* In case this should be the last iteration, check if any
+         * retransmissions are needed, and schedule them. */
+        if (retransmit_check && should_stop(t_last_ievent + grace_period)) {
+            set<uint32_t> missing_commands;
+
+            for (const auto &kv : replicas) {
+                missing_commands = kv.second->get_missing_commands(
+                    std::move(missing_commands), input_counter);
+            }
+            for (const auto cmd : missing_commands) {
+                TestEvent se =
+                    TestEvent::CreateRequestEvent(t_next.count() + 1);
+                se.cmd = cmd;
+                events.push_back(se);
+                cout << "Retransmit client request " << cmd << endl;
+            }
+
+            /* No need to keep checking. */
+            retransmit_check = false;
+        }
     }
 
     /* If some requests where discarded (e.g. because of log conflicts),
