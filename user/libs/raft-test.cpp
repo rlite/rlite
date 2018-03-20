@@ -50,6 +50,7 @@ logfile(const string &replica)
 }
 
 class TestReplica : public RaftSM {
+    /* Commands committed to the replicated state machine. */
     list<uint32_t> committed_commands;
     list<string> peers;
     bool failed = false;
@@ -66,7 +67,7 @@ public:
     }
     ~TestReplica() { shutdown(); }
 
-    /* Apply a command to the replicated state machine. */
+    /* Apply (commit) a command to the replicated state machine. */
     virtual int apply(LogIndex index, const char *const serbuf) override
     {
         uint32_t cmd = *(reinterpret_cast<const uint32_t *>(serbuf));
@@ -75,7 +76,8 @@ public:
     }
 
     /* Called to emulate failure of a replica. The replica won't receive
-     * messages until respawn. */
+     * messages until respawn. We clearly need to discard the replicated
+     * state machine. */
     void fail()
     {
         failed = true;
@@ -92,6 +94,8 @@ public:
         return init(peers, out);
     };
 
+    /* Checks that committed commands are all there, and in the expected
+     * order. Currently unused. */
     bool check(uint32_t num_commands) const
     {
         uint32_t expected = 1;
@@ -117,16 +121,16 @@ public:
 
     /* Go over the commands committed so far, and check if there
      * are any missing numbers (adding them to the output argument). */
-    set<uint32_t> get_missing_commands(set<uint32_t> acc, uint32_t M = 0) const
+    set<uint32_t> get_missing_commands(set<uint32_t> acc, uint32_t Max) const
     {
         set<uint32_t> got;
 
         for (auto cmd : committed_commands) {
             got.insert(cmd);
-            M = std::max(M, cmd);
+            Max = std::max(Max, cmd);
         }
-        for (uint32_t cmd = 1; cmd < M; cmd++) {
-            if (got.count(cmd) == 0) {
+        for (uint32_t cmd = 1; cmd <= Max; cmd++) {
+            if (got.count(cmd) == 0) { /* we miss this one */
                 acc.insert(cmd);
             }
         }
@@ -214,7 +218,7 @@ run_simulation(const list<TestEvent> &external_events)
     list<TestEvent> events             = external_events;
     chrono::milliseconds t             = chrono::milliseconds(0); /* time */
     chrono::milliseconds t_last_ievent = t; /* time of last interesting event */
-    uint32_t input_counter             = 1;
+    uint32_t input_counter             = 0;
     map<unsigned int, TestReplica *> failed_replicas;
     bool retransmit_check = true;
     RaftSMOutput output;
@@ -225,7 +229,7 @@ run_simulation(const list<TestEvent> &external_events)
     /* Assign a progressive command number to each client request. */
     for (auto &e : events) {
         if (e.event_type == TestEventType::ClientRequest) {
-            e.cmd = input_counter++;
+            e.cmd = ++input_counter;
         }
     }
 
@@ -466,55 +470,38 @@ run_simulation(const list<TestEvent> &external_events)
             }
         }
 
-        if (retransmit_check) {
-            auto failures_or_recoveries = [&events]() -> bool {
-                for (const auto &e : events) {
-                    if (e.event_type == TestEventType::SMFailure ||
-                        e.event_type == TestEventType::SMRespawn) {
-                        return true;
-                    }
-                }
-                return false;
-            };
-            auto anything_committed = [&replicas]() -> bool {
-                for (const auto &kv : replicas) {
-                    if (kv.second->something_committed()) {
-                        return true;
-                    }
-                }
-                return false;
-            };
-            if (!failures_or_recoveries() && anything_committed()) {
-                /* No more failures or recoveries are scheduled, so this is
-                 * a good time to issue retransmissions, if needed.
-                 * The get_missing_commands() method returns meaningful
-                 * results only if the cluster has committed something. */
-                set<uint32_t> missing_commands;
-                for (const auto &kv : replicas) {
-                    missing_commands = kv.second->get_missing_commands(
-                        std::move(missing_commands));
-                }
-                for (const auto cmd : missing_commands) {
-                    TestEvent se =
-                        TestEvent::CreateRequestEvent(t_next.count() + 1);
-                    se.cmd = cmd;
-                    events.push_back(se);
-                    cout << "Retransmit client request " << cmd << endl;
-                }
-
-                /* No need to keep checking. */
-                retransmit_check = false;
-            }
-        }
-
         /* Update time and Raft state machine output. */
         t      = t_next;
         output = std::move(output_next);
+
+        /* In case this should be the last iteration, check if any
+         * retransmissions are needed, and schedule them. */
+        if (retransmit_check && should_stop(t_last_ievent + grace_period)) {
+            set<uint32_t> missing_commands;
+
+            for (const auto &kv : replicas) {
+                missing_commands = kv.second->get_missing_commands(
+                    std::move(missing_commands), input_counter);
+            }
+            for (const auto cmd : missing_commands) {
+                TestEvent se =
+                    TestEvent::CreateRequestEvent(t_next.count() + 1);
+                se.cmd = cmd;
+                events.push_back(se);
+                cout << "Retransmit client request " << cmd << endl;
+            }
+
+            /* No need to keep checking. */
+            retransmit_check = false;
+        }
     }
 
-    /* If some requests where discarded (e.g. because of log conflicts),
-     * we carry out a relaxed check. We only make sure that the list of
-     * committed commands is the same for all the replicas. */
+    /* Make sure that the list of committed commands is the same for all the
+     * replicas and that no command is missing. Commands may have been
+     * committed in a different order from the original, because requests
+     * may have been discarded (e.g. because of log conflicts) and
+     * retransmitted. In any case, the order must be consistent across
+     * replicas. */
     const TestReplica *prev = nullptr;
     assert(replicas.size() > 0);
     for (const auto &kv : replicas) {
@@ -524,7 +511,7 @@ run_simulation(const list<TestEvent> &external_events)
                  * commands. */
                 set<uint32_t> missing_commands =
                     kv.second->get_missing_commands(std::move(set<uint32_t>()),
-                                                    input_counter - 1);
+                                                    input_counter);
 
                 for (const auto cmd : missing_commands) {
                     cout << "Replica " << kv.first << " misses command " << cmd
