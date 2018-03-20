@@ -629,14 +629,12 @@ RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
 
         resp->vote_granted = false;
     } else {
-        /* We grant our vote if we haven't voted for anyone in this term (or
-         * we already voted for the candidate) and the candidate's log is at
-         * least as up-to-date as ours. */
+        /* We grant our vote if we haven't voted for anyone in this term and
+         * the candidate's log is at least as up-to-date as ours. */
         resp->vote_granted =
-            (voted_for.empty() || voted_for == msg.candidate_id) &&
-            (msg.last_log_term > last_log_term ||
-             (msg.last_log_term == last_log_term &&
-              msg.last_log_index >= last_log_index));
+            voted_for.empty() && (msg.last_log_term > last_log_term ||
+                                  (msg.last_log_term == last_log_term &&
+                                   msg.last_log_index >= last_log_index));
     }
 
     if (resp->vote_granted && voted_for.empty()) {
