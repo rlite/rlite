@@ -637,7 +637,7 @@ RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
                                    msg.last_log_index >= last_log_index));
     }
 
-    if (resp->vote_granted && voted_for.empty()) {
+    if (resp->vote_granted) {
         /* Register the vote on peristent memory. */
         if ((ret = vote_for_candidate(msg.candidate_id))) {
             return ret;

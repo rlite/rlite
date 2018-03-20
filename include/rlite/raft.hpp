@@ -172,7 +172,7 @@ class RaftSM {
      * term (or NULL if none). */
     ReplicaId voted_for;
 
-    /* Log entries (only on disc). Each entry containes a command for the
+    /* Log entries (only on disc). Each entry contains a command for the
      * replicated state machine and the term when entry was received by the
      * leader. The first index in the log is 1 (and not 0). */
 
