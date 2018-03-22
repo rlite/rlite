@@ -79,11 +79,11 @@ typedef uint32_t rlm_qosid_t;
 
 /* Data transfer constants used by a normal IPCP. */
 struct pci_sizes {
-    rlm_addr_t addr;
-    rlm_seq_t seq;
-    rlm_pdulen_t pdulen;
-    rlm_cepid_t cepid;
-    rlm_qosid_t qosid;
+    uint16_t addr;
+    uint16_t seq;
+    uint16_t pdulen;
+    uint16_t cepid;
+    uint16_t qosid;
 };
 
 /* Actual values for data transfer constants: can be redefined at
