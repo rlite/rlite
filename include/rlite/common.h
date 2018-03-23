@@ -98,7 +98,7 @@ struct pci_sizes {
 #define rl_pdulen_t uint16_t
 #endif
 #ifndef rl_cepid_t
-#define rl_cepid_t uint32_t
+#define rl_cepid_t uint16_t
 #endif
 #ifndef rl_qosid_t
 #define rl_qosid_t uint16_t

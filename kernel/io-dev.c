@@ -288,7 +288,7 @@ rl_io_write_iter(struct kiocb *iocb,
     mgmt_sdu = (rio->mode == RLITE_IO_MODE_IPCP_MGMT);
 
     if (unlikely(mgmt_sdu)) {
-    /* Copy in the management header. */
+        /* Copy in the management header. */
 #ifdef RL_HAVE_CHRDEV_RW_ITER
         if (copy_from_iter(&mhdr, sizeof(mhdr), from) != sizeof(mhdr)) {
             PE("copy_from_iter(mgmthdr)\n");
@@ -320,7 +320,7 @@ rl_io_write_iter(struct kiocb *iocb,
             break;
         }
 
-            /* Copy in the userspace SDU. */
+        /* Copy in the userspace SDU. */
 #ifdef RL_HAVE_CHRDEV_RW_ITER
         if (unlikely(copy_from_iter(RL_BUF_DATA(rb), copylen, from) !=
                      copylen)) {

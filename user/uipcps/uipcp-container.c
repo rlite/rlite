@@ -1125,8 +1125,7 @@ ipcp_hdrlen(struct uipcp *uipcp)
 {
     struct pci_sizes *sz = &uipcp->pcisizes;
 
-    return 2 * sz->addr + 2 * sz->cepid + sz->qosid + 1 + 1 + sz->pdulen +
-           sz->seq;
+    return 8 + 2 * sz->addr + 2 * sz->cepid + sz->qosid + sz->pdulen + sz->seq;
 }
 
 /* Called under uipcps lock. */

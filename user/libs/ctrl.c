@@ -251,9 +251,9 @@ rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
     resp->response      = response;
 }
 
-    /*
-     * POSIX-like API
-     */
+/*
+ * POSIX-like API
+ */
 
 #include "rina/api.h"
 
