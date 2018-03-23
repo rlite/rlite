@@ -41,16 +41,18 @@
  * accept struct layouts where the compiler does not insert any
  * padding. */
 struct rina_pci {
-    /* We miss the version field. */
+    uint8_t pdu_version;
+    uint8_t pdu_type;
+    uint16_t pdu_flags;
+    uint16_t pdu_csum;
+    uint16_t pdu_ttl;
     rl_seq_t seqnum;
-    rl_cepid_t dst_cep;
-    rl_cepid_t src_cep;
     rl_addr_t dst_addr;
     rl_addr_t src_addr;
+    rl_cepid_t dst_cep;
+    rl_cepid_t src_cep;
     rl_pdulen_t pdu_len;
     rl_qosid_t qosid;
-    uint8_t pdu_type;
-    uint8_t pdu_flags;
 } __attribute__((__packed__));
 
 /* PCI header to be used for control PDUs. */
@@ -121,8 +123,8 @@ rina_pci_dump(struct rina_pci *pci)
  * RL_PCI_CTRL_LEN != sizeof(struct rina_pci_ctrl), since
  * compiler may need to insert padding. */
 #define RL_PCI_LEN                                                             \
-    (2 * sizeof(rl_addr_t) + 2 * sizeof(rl_cepid_t) + sizeof(rl_qosid_t) + 1 + \
-     1 + sizeof(rl_pdulen_t) + sizeof(rl_seq_t))
+    (8 + 2 * sizeof(rl_addr_t) + 2 * sizeof(rl_cepid_t) + sizeof(rl_qosid_t) + \
+     sizeof(rl_pdulen_t) + sizeof(rl_seq_t))
 
 #define RL_PCI_CTRL_LEN (RL_PCI_LEN + 6 * sizeof(rl_seq_t))
 
