@@ -1126,7 +1126,7 @@ implemented using a **tun** device. The iporinad programs implements the
 encapsulation and decapsulation by forwarding the IP traffic from the tun
 device towards the associated RINA flow endpoint, and the other way around.
 
-The iporinad daemon creates tunnel towards its peers and advertises IP routes
+The iporinad daemon creates tunnels towards its peers and advertises IP routes
 according to its configuration file.
 In the following example, two iporinad daemons run on different edge nodes
 that belong to the same DIF _n.DIF_. In this case, _n.DIF_ is the RINA network
