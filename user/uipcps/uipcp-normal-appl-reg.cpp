@@ -436,6 +436,8 @@ class CentralizedFaultTolerantDFT : public DFT {
         /* The leader, if we know who it is, otherwise the empty
          * string. */
         raft::ReplicaId leader_id;
+        /* The replica that responded first to an M_READ, if any. */
+        raft::ReplicaId reader_id;
         std::unique_ptr<TimeoutEvent> timer;
 
         struct PendingReq {
@@ -472,7 +474,10 @@ class CentralizedFaultTolerantDFT : public DFT {
         int process_timeout();
 
         /* For external hints. */
-        void set_leader_id(const raft::ReplicaId &name) { leader_id = name; }
+        void set_leader_id(const raft::ReplicaId &name)
+        {
+            leader_id = reader_id = name;
+        }
     };
     std::unique_ptr<Client> client;
 
@@ -587,8 +592,15 @@ CentralizedFaultTolerantDFT::Client::mod_pending_timer()
                 mit->second.appl_name.c_str());
             if (mit->second.replica == leader_id) {
                 /* We got a timeout on the leader, let's forget about it. */
+                UPD(parent->rib->uipcp, "Forgetting about raft leader %s\n",
+                    leader_id.c_str());
                 leader_id.clear();
-                UPD(parent->rib->uipcp, "Forgetting about raft leader\n");
+            } else if (mit->second.replica == reader_id) {
+                /* We got a timeout on the selected reader,
+                 * let's forget about it. */
+                UPD(parent->rib->uipcp, "Forgetting about selected reader %s\n",
+                    reader_id.c_str());
+                reader_id.clear();
             }
             mit = pending.erase(mit);
         } else {
@@ -621,11 +633,11 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
                                                 const std::string &preferred,
                                                 uint32_t cookie)
 {
-    /* Prepare an M_READ for a read operation. If we know who is the leader,
-     * we send it to the leader only; otherwise we send it to all the replicas.
+    /* Prepare an M_READ for a read operation. If we have a selected reader,
+     * we send it to the reader only; otherwise we send it to all the replicas.
      */
     for (const auto &r : replicas) {
-        if (leader_id.empty() || r == leader_id) {
+        if (reader_id.empty() || r == reader_id) {
             auto m = make_unique<CDAPMessage>();
             gpb::OpCode op_code;
             int invoke_id;
@@ -754,11 +766,19 @@ CentralizedFaultTolerantDFT::Client::rib_handler(
         return 0;
     }
 
-    /* We assume it was the leader to answer. So now we know who the leader is.
-     */
-    if (leader_id != pi->second.replica) {
-        leader_id = pi->second.replica;
-        UPD(uipcp, "Raft leader discovered: %s\n", leader_id.c_str());
+    if (rm->op_code == gpb::M_READ_R) {
+        /* The first reader that answers becomes our selected reader. */
+        if (reader_id.empty()) {
+            reader_id = pi->second.replica;
+            UPD(uipcp, "Selected reader: %s\n", reader_id.c_str());
+        }
+    } else {
+        /* We assume it was the leader to answer. So now we know who the
+         * leader is. */
+        if (leader_id.empty()) {
+            leader_id = pi->second.replica;
+            UPD(uipcp, "Raft leader discovered: %s\n", leader_id.c_str());
+        }
     }
 
     switch (rm->op_code) {
@@ -986,26 +1006,16 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
     }
 
     if (rm->obj_class == ObjClass) {
-        if (!leader()) {
-            /* We are not the leader. */
-            if (leader_elected()) {
-                /* We know that a leader has been elected. We could forward
-                 * the request to the leader, but for now we just ignore and
-                 * rely on the client to multicast. */
-                UPD(uipcp, "Ignoring request, let the leader answer\n");
-                return 0;
-            } else if (rm->op_code != gpb::M_READ) {
-                /* There is no leader and this is not a read request. We
-                 * need to deny the request to preserve consistency. */
-                UPW(uipcp, "Dropping M_WRITE/M_DELETE request because no "
-                           "leader has been elected\n");
-                return 0;
-            }
+        if (!leader() && rm->op_code != gpb::M_READ) {
+            /* We are not the leader this is not a read request. We
+             * need to deny the request to preserve consistency. */
+            UPD(uipcp, "Ignoring request, let the leader answer\n");
+            return 0;
         }
 
         /* Either we are the leader (so we can go ahead and serve the request),
-         * or there is no leader and this is a read request that we can serve
-         * because it's ok to be eventually consistent. */
+         * or this is a read request that we can serve because it's ok to be
+         * eventually consistent. */
 
         if (rm->op_code == gpb::M_WRITE || rm->op_code == gpb::M_DELETE) {
             /* We received an M_WRITE or M_DELETE as sent by
