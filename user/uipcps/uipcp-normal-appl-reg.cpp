@@ -736,10 +736,12 @@ CentralizedFaultTolerantDFT::Client::rib_handler(
         return 0;
     }
 
-    /* Lookup rm->invoke_id in the pending map and erase it. */
+    /* Lookup rm->invoke_id in the pending map and erase it. Lookup
+     * may fail if we receive multiple responses (but not for the
+     * first response). */
     auto pi = pending.find(rm->invoke_id);
     if (pi == pending.end()) {
-        UPE(uipcp, "Cannot find pending request with invoke id %d\n",
+        UPW(uipcp, "Cannot find pending request with invoke id %d\n",
             rm->invoke_id);
         return 0;
     }
@@ -748,6 +750,7 @@ CentralizedFaultTolerantDFT::Client::rib_handler(
     if (pi->second.op_code + 1 != rm->op_code) {
         UPE(uipcp, "Opcode mismatch for request with invoke id %d\n",
             rm->invoke_id);
+        pending.erase(pi);
         return 0;
     }
 
