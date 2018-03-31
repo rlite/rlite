@@ -987,11 +987,25 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
 
     if (rm->obj_class == ObjClass) {
         if (!leader()) {
-            /* We are not the leader, we could forward it to the leader node.
-             */
-            UPW(uipcp, "Ignoring request, let the leader answer\n");
-            return 0;
+            /* We are not the leader. */
+            if (!leader_name().empty()) {
+                /* We know that a leader has been elected. We could forward
+                 * the request to the leader, but for now we just ignore and
+                 * rely on the client to multicast. */
+                UPD(uipcp, "Ignoring request, let the leader answer\n");
+                return 0;
+            } else if (rm->op_code != gpb::M_READ) {
+                /* There is no leader and this is not a read request. We
+                 * need to deny the request to preserve consistency. */
+                UPW(uipcp, "Dropping M_WRITE/M_DELETE request because no "
+                           "leader has been elected\n");
+                return 0;
+            }
         }
+
+        /* Either we are the leader (so we can go ahead and serve the request),
+         * or there is no leader and this is a read request that we can serve
+         * because it's ok to be eventually consistent. */
 
         if (rm->op_code == gpb::M_WRITE || rm->op_code == gpb::M_DELETE) {
             /* We received an M_WRITE or M_DELETE as sent by
