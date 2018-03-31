@@ -436,11 +436,11 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
 #endif /* RL_USE_QOS_CUBES */
 
     dt_constants.set_max_pdu_size(65536);
-    dt_constants.set_address_width(4);
-    dt_constants.set_port_id_width(2);
-    dt_constants.set_cep_id_width(2);
-    dt_constants.set_qos_id_width(1);
-    dt_constants.set_seq_num_width(4);
+    dt_constants.set_address_width(sizeof(rl_addr_t));
+    dt_constants.set_port_id_width(sizeof(rl_port_t));
+    dt_constants.set_cep_id_width(sizeof(rl_cepid_t));
+    dt_constants.set_qos_id_width(sizeof(rl_qosid_t));
+    dt_constants.set_seq_num_width(sizeof(rl_seq_t));
     dt_constants.set_length_width(2);
     dt_constants.set_seq_rollover_thresh(1 << 31);
     dt_constants.set_max_pdu_lifetime(4000 /* ms */);
