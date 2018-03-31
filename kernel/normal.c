@@ -666,6 +666,8 @@ rl_normal_flow_writeable(struct flow_entry *flow)
     return !flow_blocked(&flow->cfg, &flow->dtp);
 }
 
+#define RL_DFLT_TTL 64 /* default TTL */
+
 static int
 rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
                     struct rl_buf *rb, bool maysleep)
@@ -740,6 +742,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     pci->pdu_type  = PDU_T_DT;
     pci->pdu_flags = 0;
     pci->pdu_len   = rb->len;
+    pci->pdu_ttl   = RL_DFLT_TTL;
     pci->seqnum    = dtp->next_seq_num_to_use++;
 
     flow->stats.tx_pkt++;
@@ -860,6 +863,7 @@ rl_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
     pci->pdu_type  = PDU_T_MGMT;
     pci->pdu_flags = 0; /* Not valid. */
     pci->pdu_len   = rb->len;
+    pci->pdu_ttl   = RL_DFLT_TTL;
     pci->seqnum    = 0; /* Not valid. */
 
     /* Caller can proceed and send the mgmt PDU. */
@@ -916,6 +920,7 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
         pcic->base.pdu_type          = pdu_type;
         pcic->base.pdu_flags         = 0;
         pcic->base.pdu_len           = rb->len;
+        pcic->base.pdu_ttl           = RL_DFLT_TTL;
         pcic->base.seqnum            = flow->dtp.next_snd_ctl_seq++;
         pcic->last_ctrl_seq_num_rcvd = flow->dtp.last_ctrl_seq_num_rcvd;
         pcic->ack_nack_seq_num       = flow->dtp.last_seq_num_acked =
@@ -1233,7 +1238,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
     int ret = 0;
 
     if (unlikely(rb->len < sizeof(struct rina_pci))) {
-        RPD(2, "Dropping SDU shorter [%u] than PCI\n", (unsigned int)rb->len);
+        RPD(1, "Dropping PDU shorter [%u] than PCI\n", (unsigned int)rb->len);
         rl_buf_free(rb);
         return NULL; /* -EINVAL */
     }
@@ -1301,6 +1306,14 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
     if (pci->dst_addr != ipcp->addr) {
         /* The PDU is not for this IPCP, forward it. Don't propagate the
          * error code of rmt_tx(), since caller does not need it. */
+
+        /* Check TTL. */
+        if (unlikely(pci->pdu_ttl-- == 0)) {
+            RPD(1, "Dropping PDU on zero TTL\n");
+            rl_buf_free(rb);
+            return NULL; /* -EINVAL */
+        }
+
         rmt_tx(ipcp, pci->dst_addr, rb, false);
         return NULL;
     }
