@@ -404,7 +404,8 @@ EnrollmentResources::next_enroll_msg(std::unique_lock<std::mutex> &lk)
 int
 EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
 {
-    uipcp_rib *rib = neigh->rib;
+    uipcp_rib *rib      = neigh->rib;
+    struct uipcp *uipcp = rib->uipcp;
     std::unique_ptr<const CDAPMessage> rm;
 
     {
@@ -423,10 +424,10 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
         m.m_start(uipcp_rib::EnrollmentObjClass, uipcp_rib::EnrollmentObjName);
         ret = nf->send_to_port_id(&m, 0, &enr_info);
         if (ret) {
-            UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
+            UPE(uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             return -1;
         }
-        UPD(rib->uipcp, "I --> S M_START(enrollment)\n");
+        UPD(uipcp, "I --> S M_START(enrollment)\n");
     }
 
     rm = next_enroll_msg(lk);
@@ -440,29 +441,29 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
         size_t objlen;
 
         if (rm->op_code != gpb::M_START_R) {
-            UPE(rib->uipcp, "M_START_R expected\n");
+            UPE(uipcp, "M_START_R expected\n");
             return -1;
         }
 
         if (rm->obj_class != uipcp_rib::EnrollmentObjClass ||
             rm->obj_name != uipcp_rib::EnrollmentObjName) {
-            UPE(rib->uipcp, "%s:%s object expected\n",
+            UPE(uipcp, "%s:%s object expected\n",
                 uipcp_rib::EnrollmentObjName.c_str(),
                 uipcp_rib::EnrollmentObjClass.c_str());
             return -1;
         }
 
-        UPD(rib->uipcp, "I <-- S M_START_R(enrollment)\n");
+        UPD(uipcp, "I <-- S M_START_R(enrollment)\n");
 
         if (rm->result) {
-            UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
+            UPE(uipcp, "Neighbor returned negative response [%d], '%s'\n",
                 rm->result, rm->result_reason.c_str());
             return -1;
         }
 
         rm->get_obj_value(objbuf, objlen);
         if (!objbuf) {
-            UPE(rib->uipcp, "M_START_R does not contain a nested message\n");
+            UPE(uipcp, "M_START_R does not contain a nested message\n");
             return -1;
         }
 
@@ -476,11 +477,22 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
 
         /* We require the slave to specify the EFCP data transfer constants. */
         if (!enr_info.has_dt_constants()) {
-            UPE(rib->uipcp, "M_START_R does not contain EFCP data "
-                            "transfer constants\n");
+            UPE(uipcp, "M_START_R does not contain EFCP data "
+                       "transfer constants\n");
             return -1;
         }
         rib->dt_constants = enr_info.dt_constants();
+        /* Check consistency with what is known to the kernel. */
+        if (uipcp->pcisizes.addr != rib->dt_constants.address_width() ||
+            uipcp->pcisizes.seq != rib->dt_constants.seq_num_width() ||
+            uipcp->pcisizes.seq != rib->dt_constants.ctrl_seq_num_width() ||
+            uipcp->pcisizes.pdulen != rib->dt_constants.length_width() ||
+            uipcp->pcisizes.cepid != rib->dt_constants.cep_id_width() ||
+            uipcp->pcisizes.qosid != rib->dt_constants.qos_id_width()) {
+            UPE(uipcp, "Advertised EFCP data transfer constants do "
+                       "not match the ones known by the kernel\n");
+            return -1;
+        }
     }
 
     for (;;) {
@@ -504,13 +516,13 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
         }
 
         if (rm->op_code != gpb::M_STOP) {
-            UPE(rib->uipcp, "M_STOP expected\n");
+            UPE(uipcp, "M_STOP expected\n");
             return -1;
         }
 
         if (rm->obj_class != uipcp_rib::EnrollmentObjClass ||
             rm->obj_name != uipcp_rib::EnrollmentObjName) {
-            UPE(rib->uipcp, "%s:%s object expected\n",
+            UPE(uipcp, "%s:%s object expected\n",
                 uipcp_rib::EnrollmentObjName.c_str(),
                 uipcp_rib::EnrollmentObjClass.c_str());
             return -1;
@@ -518,11 +530,11 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
 
         rm->get_obj_value(objbuf, objlen);
         if (!objbuf) {
-            UPE(rib->uipcp, "M_STOP does not contain a nested message\n");
+            UPE(uipcp, "M_STOP does not contain a nested message\n");
             return -1;
         }
 
-        UPD(rib->uipcp, "I <-- S M_STOP(enrollment)\n");
+        UPD(uipcp, "I <-- S M_STOP(enrollment)\n");
 
         gpb::EnrollmentInfo enr_info;
 
@@ -539,15 +551,15 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
 
         ret = nf->send_to_port_id(&m, rm->invoke_id);
         if (ret) {
-            UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
+            UPE(uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             return -1;
         }
-        UPD(rib->uipcp, "I --> S M_STOP_R(enrollment)\n");
+        UPD(uipcp, "I --> S M_STOP_R(enrollment)\n");
 
         if (enr_info.start_early()) {
-            UPD(rib->uipcp, "Initiator is allowed to start early\n");
+            UPD(uipcp, "Initiator is allowed to start early\n");
         } else {
-            UPE(rib->uipcp, "Not yet implemented (start_early==false)\n");
+            UPE(uipcp, "Not yet implemented (start_early==false)\n");
         }
 
         break;
