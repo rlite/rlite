@@ -372,6 +372,8 @@ public:
     /* Name of the current leader (if we know it). */
     ReplicaId leader_name() const { return leader_id; }
 
+    bool leader_elected() const { return !leader_id.empty(); }
+
     std::string local_name() const { return local_id; }
     std::string sm_name() const { return name; }
 

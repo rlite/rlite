@@ -393,6 +393,7 @@ RaftSM::back_to_follower(RaftSMOutput *out)
 {
     int ret;
 
+    leader_id.clear();
     votes_collected = 0;
     if ((ret = vote_for_candidate(string()))) {
         return ret;
@@ -938,6 +939,7 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
             return ret;
         }
         votes_collected = 1;
+        leader_id.clear();
         /* Reset the election timer in case we lose the election. */
         out->timer_commands.push_back(RaftTimerCmd(
             this, RaftTimerType::Election, RaftTimerAction::Restart,

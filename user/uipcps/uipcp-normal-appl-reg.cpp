@@ -988,7 +988,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
     if (rm->obj_class == ObjClass) {
         if (!leader()) {
             /* We are not the leader. */
-            if (!leader_name().empty()) {
+            if (leader_elected()) {
                 /* We know that a leader has been elected. We could forward
                  * the request to the leader, but for now we just ignore and
                  * rely on the client to multicast. */
