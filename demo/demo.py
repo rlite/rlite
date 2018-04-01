@@ -923,3 +923,37 @@ for vmname in sorted(demo.vms):
 fout.write(outs)
 fout.close()
 subprocess.call(['chmod', '+x', 'greplog.sh'])
+
+###### Generate grep script for kernel log inspection ######
+fout = open('grepklog.sh', 'w')
+
+outs =  '#!/bin/bash\n'             \
+        '\n'                        \
+        'if [ -z "$1" ]; then\n'\
+        '   echo "Regular expression missing"\n'\
+        '   exit 255\n'\
+        'fi\n'\
+
+for vmname in sorted(demo.vms):
+    vm = demo.vms[vmname]
+    outs += 'echo "Accessing log for node %(vmname)s"\n'\
+        'DONE=255\n'\
+        'while [ $DONE != "0" ]; do\n'\
+        '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost <<ENDSSH\n'\
+                        % {'sshopts': sshopts, 'username': args.user,
+                              'ssh': vm['ssh'],
+                              'dif': dif, 'vmname': vmname}
+
+    outs += 'dmesg | grep "$1"\n'
+
+    outs +=      'true\n'\
+            'ENDSSH\n'\
+        '   DONE=$?\n'\
+        '   if [ $DONE != "0" ]; then\n'\
+        '       sleep 1\n'\
+        '   fi\n'\
+        'done\n\n'
+
+fout.write(outs)
+fout.close()
+subprocess.call(['chmod', '+x', 'grepklog.sh'])
