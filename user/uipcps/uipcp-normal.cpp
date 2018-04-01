@@ -443,7 +443,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     dt_constants.set_seq_num_width(sizeof(rl_seq_t));
     dt_constants.set_length_width(2);
     dt_constants.set_seq_rollover_thresh(1 << 31);
-    dt_constants.set_max_pdu_lifetime(4000 /* ms */);
+    dt_constants.set_max_pdu_lifetime(RL_TTL_DFLT /* hops, should be ms */);
     dt_constants.set_concatenation_enabled(false);
     dt_constants.set_fragmentation_enabled(false);
     dt_constants.set_integrity_enabled(false);
