@@ -68,16 +68,13 @@ operator!=(const gpb::LowerFlow &a, const gpb::LowerFlow &o)
 class RoutingEngine {
 public:
     RL_NODEFAULT_NONCOPIABLE(RoutingEngine);
-    RoutingEngine(uipcp_rib *r) : lfa_enabled(false), rib(r) {}
+    RoutingEngine(uipcp_rib *r, bool lfa) : rib(r), lfa_enabled(lfa) {}
 
     /* Recompute routing and forwarding table and possibly
      * update kernel forwarding data structures. */
     void update_kernel_routing(const NodeId &);
 
     void flow_state_update(struct rl_kmsg_flow_state *upd);
-
-    /* Is Loop Free Alternate algorithm enabled ? */
-    bool lfa_enabled;
 
     /* Dump the routing table. */
     void dump(std::stringstream &ss) const;
@@ -118,7 +115,11 @@ private:
     /* Set of ports that are currently down. */
     std::unordered_set<rl_port_t> ports_down;
 
+    /* Backpointer. */
     uipcp_rib *rib;
+
+    /* Is Loop Free Alternate algorithm enabled ? */
+    bool lfa_enabled;
 };
 
 class FullyReplicatedLFDB : public LFDB {
@@ -131,7 +132,7 @@ public:
     RoutingEngine re;
 
     RL_NODEFAULT_NONCOPIABLE(FullyReplicatedLFDB);
-    FullyReplicatedLFDB(uipcp_rib *_ur) : LFDB(_ur), re(_ur) {}
+    FullyReplicatedLFDB(uipcp_rib *_ur, bool lfa) : LFDB(_ur), re(_ur, lfa) {}
     ~FullyReplicatedLFDB() {}
 
     void dump(std::stringstream &ss) const override;
@@ -904,34 +905,12 @@ RoutingEngine::dump(std::stringstream &ss) const
 void
 uipcp_rib::lfdb_lib_init()
 {
-    auto builder = [](uipcp_rib *rib) {
-        std::string policy_name = rib->policies[LFDB::Prefix];
-        struct FullyReplicatedLFDB *lfdbd;
-
-        if (rib->lfdb == nullptr) {
-            rib->lfdb = make_unique<FullyReplicatedLFDB>(rib);
-        }
-        lfdbd = dynamic_cast<FullyReplicatedLFDB *>(rib->lfdb.get());
-        assert(lfdbd != nullptr);
-
-        /* Temporary solution to support LFA policies. No pointer switching is
-         * carried out. */
-        if (policy_name == "link-state") {
-            if (lfdbd->re.lfa_enabled) {
-                lfdbd->re.lfa_enabled = false;
-                UPD(rib->uipcp, "LFA switched off\n");
-            }
-        } else if (policy_name == "link-state-lfa") {
-            if (!lfdbd->re.lfa_enabled) {
-                lfdbd->re.lfa_enabled = true;
-                UPD(rib->uipcp, "LFA switched on\n");
-            }
-        } else {
-            assert(false);
-        }
-    };
     available_policies[LFDB::Prefix].insert(
-        PolicyBuilder("link-state", builder));
+        PolicyBuilder("link-state", [](uipcp_rib *rib) {
+            rib->lfdb = make_unique<FullyReplicatedLFDB>(rib, false);
+        }));
     available_policies[LFDB::Prefix].insert(
-        PolicyBuilder("link-state-lfa", builder));
+        PolicyBuilder("link-state-lfa", [](uipcp_rib *rib) {
+            rib->lfdb = make_unique<FullyReplicatedLFDB>(rib, true);
+        }));
 }
