@@ -443,7 +443,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     dt_constants.set_seq_num_width(sizeof(rl_seq_t));
     dt_constants.set_length_width(2);
     dt_constants.set_seq_rollover_thresh(1 << 31);
-    dt_constants.set_max_pdu_lifetime(RL_TTL_DFLT /* hops, should be ms */);
+    dt_constants.set_max_pdu_lifetime(4000 /* ms */);
     dt_constants.set_concatenation_enabled(false);
     dt_constants.set_fragmentation_enabled(false);
     dt_constants.set_integrity_enabled(false);
@@ -523,6 +523,8 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
         uipcp_loop_fdh_del(uipcp, mgmtfd);
         throw std::exception();
     }
+
+    update_ttl();
 }
 
 uipcp_rib::~uipcp_rib()
@@ -1504,6 +1506,27 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
     }
 
     return ret;
+}
+
+int
+uipcp_rib::update_ttl()
+{
+    unsigned int ttl = RL_TTL_DFLT;
+    std::stringstream ss;
+
+    if (dt_constants.max_pdu_lifetime() < 10 /* ms */) {
+        ttl = 16;
+    } else if (dt_constants.max_pdu_lifetime() < 1000 /* ms */) {
+        ttl = 64;
+    }
+
+    ss << ttl;
+    if (rl_conf_ipcp_config(uipcp->id, "ttl", ss.str().c_str())) {
+        UPE(uipcp, "Failed to configure TTL %s for IPCP %s\n", ss.str().c_str(),
+            uipcp->name);
+    }
+
+    return 0;
 }
 
 int

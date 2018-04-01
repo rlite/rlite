@@ -493,15 +493,10 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
                        "not match the ones known by the kernel\n");
             return -1;
         }
-        {
-            /* Configure TTL */
-            std::stringstream ss;
-            ss << rib->dt_constants.max_pdu_lifetime();
-            if (rl_conf_ipcp_config(uipcp->id, "ttl", ss.str().c_str())) {
-                UPE(uipcp, "Failed to configure TTL %s for IPCP %s\n",
-                    ss.str().c_str(), uipcp->name);
-            }
-        }
+
+        /* Configure TTL after the update of the EFCP data transfer
+         * constants. */
+        rib->update_ttl();
     }
 
     for (;;) {
