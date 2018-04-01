@@ -641,6 +641,7 @@ struct uipcp_rib {
     rlm_addr_t lookup_node_address(const std::string &node_name) const;
     std::string lookup_neighbor_by_address(rlm_addr_t address);
     void check_for_address_conflicts();
+    int update_ttl();
 
     gpb::NeighborCandidate neighbor_cand_get() const;
     int lookup_neigh_flow_by_port_id(rl_port_t port_id,
