@@ -1007,7 +1007,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
 
     if (rm->obj_class == ObjClass) {
         if (!leader() && rm->op_code != gpb::M_READ) {
-            /* We are not the leader this is not a read request. We
+            /* We are not the leader and this is not a read request. We
              * need to deny the request to preserve consistency. */
             UPD(uipcp, "Ignoring request, let the leader answer\n");
             return 0;

@@ -722,6 +722,7 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
 /* Implementation of the normal IPCP. */
 struct rl_normal {
     struct ipcp_entry *ipcp;
+    uint16_t ttl; /* time to live */
 
     /* Implementation of the PDU Forwarding Table (PDUFT).
      * An hash table, a default entry and a lock. */

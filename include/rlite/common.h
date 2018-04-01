@@ -236,6 +236,7 @@ struct rl_flow_config {
 
 #define RL_MPL_MSECS_DFLT 1000
 #define RL_DATA_RXMS_MAX_DFLT 10
+#define RL_TTL_DFLT 64 /* default TTL */
 
 /* Does a flow specification correspond to best effort QoS? */
 static inline int
