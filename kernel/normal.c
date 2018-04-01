@@ -154,6 +154,7 @@ rl_normal_create(struct ipcp_entry *ipcp)
     hash_init(priv->pdu_ft);
     priv->pduft_dflt = NULL;
     rwlock_init(&priv->pduft_lock);
+    priv->ttl = RL_TTL_DFLT;
 
     PD("New IPC created [%p]\n", priv);
 
@@ -163,7 +164,7 @@ rl_normal_create(struct ipcp_entry *ipcp)
 static void
 rl_normal_destroy(struct ipcp_entry *ipcp)
 {
-    struct rl_normal *priv = ipcp->priv;
+    struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
 
     rl_pduft_flush(ipcp);
     rl_free(priv, RL_MT_SHIM);
@@ -666,16 +667,15 @@ rl_normal_flow_writeable(struct flow_entry *flow)
     return !flow_blocked(&flow->cfg, &flow->dtp);
 }
 
-#define RL_DFLT_TTL 64 /* default TTL */
-
 static int
 rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
                     struct rl_buf *rb, bool maysleep)
 {
-    struct rina_pci *pci;
+    struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
     struct dtp *dtp        = &flow->dtp;
     struct dtcp_config *dc = &flow->cfg.dtcp;
     bool dtcp_present      = DTCP_PRESENT(flow->cfg.dtcp);
+    struct rina_pci *pci;
 
     spin_lock_bh(&dtp->lock);
 
@@ -742,7 +742,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     pci->pdu_type  = PDU_T_DT;
     pci->pdu_flags = 0;
     pci->pdu_len   = rb->len;
-    pci->pdu_ttl   = RL_DFLT_TTL;
+    pci->pdu_ttl   = priv->ttl;
     pci->seqnum    = dtp->next_seq_num_to_use++;
 
     flow->stats.tx_pkt++;
@@ -863,7 +863,7 @@ rl_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
     pci->pdu_type  = PDU_T_MGMT;
     pci->pdu_flags = 0; /* Not valid. */
     pci->pdu_len   = rb->len;
-    pci->pdu_ttl   = RL_DFLT_TTL;
+    pci->pdu_ttl   = priv->ttl;
     pci->seqnum    = 0; /* Not valid. */
 
     /* Caller can proceed and send the mgmt PDU. */
@@ -874,6 +874,7 @@ static int
 rl_normal_config(struct ipcp_entry *ipcp, const char *param_name,
                  const char *param_value, int *notify)
 {
+    struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
     int ret = -ENOSYS; /* don't know how to manage this parameter */
 
     if (strcmp(param_name, "address") == 0) {
@@ -885,6 +886,15 @@ rl_normal_config(struct ipcp_entry *ipcp, const char *param_name,
                (long long unsigned)address);
             *notify    = (ipcp->addr != address);
             ipcp->addr = address;
+        }
+    } else if (strcmp(param_name, "ttl") == 0) {
+        uint16_t ttl;
+
+        ret = kstrtou16(param_value, 10, &ttl);
+        if (ret == 0 && ttl != priv->ttl) {
+            *notify = 0;
+            PI("IPCP %u TTL set to %u\n", ipcp->id, (unsigned)ttl);
+            priv->ttl = ttl;
         }
     }
 
@@ -904,6 +914,7 @@ static struct rl_buf *
 ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
                uint8_t pdu_type)
 {
+    struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
     struct rl_buf *rb =
         rl_buf_alloc(sizeof(struct rina_pci_ctrl), ipcp->txhdroom,
                      ipcp->tailroom, GFP_ATOMIC);
@@ -920,7 +931,7 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
         pcic->base.pdu_type          = pdu_type;
         pcic->base.pdu_flags         = 0;
         pcic->base.pdu_len           = rb->len;
-        pcic->base.pdu_ttl           = RL_DFLT_TTL;
+        pcic->base.pdu_ttl           = priv->ttl;
         pcic->base.seqnum            = flow->dtp.next_snd_ctl_seq++;
         pcic->last_ctrl_seq_num_rcvd = flow->dtp.last_ctrl_seq_num_rcvd;
         pcic->ack_nack_seq_num       = flow->dtp.last_seq_num_acked =
