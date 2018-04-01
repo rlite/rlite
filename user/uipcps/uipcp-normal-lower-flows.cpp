@@ -895,8 +895,12 @@ RoutingEngine::dump(std::stringstream &ss) const
         }
 
         ss << "    Remote: " << node_id_pretty(dst_node) << ", Next hops: ";
-        for (const NodeId &lfa : kvr.second) {
-            ss << lfa;
+        for (auto lfa = kvr.second.begin();;) {
+            ss << *lfa;
+            if (++lfa == kvr.second.end()) {
+                break;
+            }
+            ss << " ";
         }
         ss << endl;
     }
