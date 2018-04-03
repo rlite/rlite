@@ -337,8 +337,10 @@ rl_shim_udp4_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
 }
 
 static int
-udp4_xmit(struct shim_udp4_flow *flow_priv, struct rl_buf *rb, bool maysleep)
+rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
+                       struct rl_buf *rb, bool maysleep)
 {
+    struct shim_udp4_flow *flow_priv = flow->priv;
     struct msghdr msg;
     struct iovec iov;
     int ret;
@@ -382,15 +384,6 @@ rl_shim_udp4_flow_writeable(struct flow_entry *flow)
     struct shim_udp4_flow *flow_priv = flow->priv;
 
     return sock_writeable(flow_priv->sock->sk);
-}
-
-static int
-rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                       struct rl_buf *rb, bool maysleep)
-{
-    struct shim_udp4_flow *flow_priv = flow->priv;
-
-    return udp4_xmit(flow_priv, rb, maysleep);
 }
 
 static int
