@@ -386,8 +386,23 @@ perf_client(struct worker *w)
     struct timespec w1, w2;
     char buf[SDU_SIZE_MAX];
     unsigned long long ns;
+    struct pollfd pfd[2];
     unsigned int i = 0;
+    int timeout    = 0;
     int ret;
+
+    /* We use non-blocking writes. See the explanation in
+     * perf_server(). */
+    ret = fcntl(w->dfd, F_SETFL, O_NONBLOCK);
+    if (ret) {
+        perror("fcntl(F_SETFL)");
+        return -1;
+    }
+
+    pfd[0].fd     = w->dfd;
+    pfd[1].fd     = w->rp->stop_pipe[0];
+    pfd[0].events = POLLOUT;
+    pfd[1].events = POLLIN;
 
     memset(buf, 'x', size);
 
@@ -395,13 +410,37 @@ perf_client(struct worker *w)
 
     for (i = 0; !rp->cli_stop && (!limit || i < limit); i++) {
         ret = write(w->dfd, buf, size);
-        if (ret != size) {
+        if (ret < 0 && errno == EAGAIN) {
+            ret = poll(pfd, 2, RP_DATA_WAIT_MSECS);
             if (ret < 0) {
-                perror("write(buf)");
-            } else {
-                PRINTF("Partial write %d/%d\n", ret, size);
+                perror("poll(flow)");
+                return -1;
+            } else if (ret == 0) {
+                /* Timeout */
+                timeout = 1;
+                PRINTF("Timeout occurred\n");
+                break;
+            }
+            if (pfd[0].revents & POLLOUT) {
+                /* Ready to write. */
+                i--;
+                continue;
+            }
+            /* Nothing to write and stop signal received. */
+            assert(pfd[1].revents & POLLIN);
+            if (w->rp->verbose) {
+                PRINTF("Stopped\n");
             }
             break;
+        } else {
+            if (ret != size) {
+                if (ret < 0) {
+                    perror("write(buf)");
+                } else {
+                    PRINTF("Partial write %d/%d\n", ret, size);
+                }
+                break;
+            }
         }
 
         if (interval && --cdown == 0) {
@@ -425,6 +464,14 @@ perf_client(struct worker *w)
     clock_gettime(CLOCK_MONOTONIC, &t_end);
     ns = 1000000000ULL * (t_end.tv_sec - t_start.tv_sec) +
          (t_end.tv_nsec - t_start.tv_nsec);
+    if (timeout) {
+        /* There was a timeout, adjust the time measurement. */
+        if (ns <= RP_DATA_WAIT_MSECS * 1000000ULL) {
+            ns = 1;
+        } else {
+            ns -= RP_DATA_WAIT_MSECS * 1000000ULL;
+        }
+    }
 
     if (ns) {
         w->result.cnt = i;
@@ -536,8 +583,9 @@ perf_server(struct worker *w)
             }
 
             if (pfd[0].revents & POLLIN) {
-                /* Ready to read. */
-                n = read(w->dfd, buf, sizeof(buf));
+                /* Ready to read. Adjust 'i' and retry. */
+                i--;
+                continue;
             } else {
                 struct rp_config_msg stop;
                 int ret;
