@@ -44,10 +44,6 @@
 
 struct rl_shim_udp4 {
     struct ipcp_entry *ipcp;
-    struct work_struct txw;
-    spinlock_t txq_lock;
-    unsigned int txq_len;
-    struct list_head txq;
 };
 
 struct shim_udp4_flow {
@@ -66,16 +62,6 @@ struct shim_udp4_flow {
     struct mutex rxw_lock;
 };
 
-#define INET4_MAX_TXQ_LEN 64
-
-struct txq_entry {
-    struct rl_buf *rb;
-    struct shim_udp4_flow *flow_priv;
-    struct list_head node;
-};
-
-static void udp4_tx_worker(struct work_struct *w);
-
 static void *
 rl_shim_udp4_create(struct ipcp_entry *ipcp)
 {
@@ -87,11 +73,6 @@ rl_shim_udp4_create(struct ipcp_entry *ipcp)
     }
 
     priv->ipcp = ipcp;
-
-    priv->txq_len = 0;
-    INIT_LIST_HEAD(&priv->txq);
-    INIT_WORK(&priv->txw, udp4_tx_worker);
-    spin_lock_init(&priv->txq_lock);
 
     /* Set max_sdu_size for the IPCP, considering that the SDU is going
      * to be encapsulated in the UDP packet, and the UDP packet is going
@@ -356,7 +337,7 @@ rl_shim_udp4_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
 }
 
 static int
-udp4_xmit(struct shim_udp4_flow *flow_priv, struct rl_buf *rb)
+udp4_xmit(struct shim_udp4_flow *flow_priv, struct rl_buf *rb, bool maysleep)
 {
     struct msghdr msg;
     struct iovec iov;
@@ -369,7 +350,7 @@ udp4_xmit(struct shim_udp4_flow *flow_priv, struct rl_buf *rb)
     msg.msg_namelen    = sizeof(flow_priv->remote_addr);
     msg.msg_control    = NULL;
     msg.msg_controllen = 0;
-    msg.msg_flags      = MSG_DONTWAIT;
+    msg.msg_flags      = maysleep ? 0 : MSG_DONTWAIT;
 
     ret =
         kernel_sendmsg(flow_priv->sock, &msg, (struct kvec *)&iov, 1, rb->len);
@@ -395,38 +376,6 @@ udp4_xmit(struct shim_udp4_flow *flow_priv, struct rl_buf *rb)
     return ret;
 }
 
-static void
-udp4_tx_worker(struct work_struct *w)
-{
-    struct rl_shim_udp4 *priv = container_of(w, struct rl_shim_udp4, txw);
-
-    for (;;) {
-        struct txq_entry *qe = NULL;
-
-        spin_lock_bh(&priv->txq_lock);
-        if (priv->txq_len) {
-            qe = list_first_entry(&priv->txq, struct txq_entry, node);
-            list_del_init(&qe->node);
-            priv->txq_len--;
-        }
-        spin_unlock_bh(&priv->txq_lock);
-
-        if (!qe) {
-            break;
-        }
-
-        if (!sock_writeable(qe->flow_priv->sock->sk) ||
-            udp4_xmit(qe->flow_priv, qe->rb) == -EAGAIN) {
-            /* Cannot backpressure here, we have to drop */
-            RPD(2, "Dropping SDU [len=%d]\n", (int)qe->rb->len);
-            rl_buf_free(qe->rb);
-        }
-
-        flow_put(qe->flow_priv->flow);
-        rl_free(qe, RL_MT_SHIMDATA);
-    }
-}
-
 static bool
 rl_shim_udp4_flow_writeable(struct flow_entry *flow)
 {
@@ -440,48 +389,8 @@ rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
                        struct rl_buf *rb, bool maysleep)
 {
     struct shim_udp4_flow *flow_priv = flow->priv;
-    struct rl_shim_udp4 *shim        = ipcp->priv;
 
-    if (!sock_writeable(flow_priv->sock->sk)) {
-        /* Backpressure: We will be called again. */
-        return -EAGAIN;
-    }
-
-    if (!maysleep) {
-        struct txq_entry *qe =
-            rl_alloc(sizeof(*qe), GFP_ATOMIC, RL_MT_SHIMDATA);
-        bool drop = false;
-
-        if (unlikely(!qe)) {
-            rl_buf_free(rb);
-            PE("Out of memory, dropping packet\n");
-            return -ENOMEM;
-        }
-
-        qe->rb = rb;
-        flow_get_ref(flow);
-        qe->flow_priv = flow_priv;
-        spin_lock_bh(&shim->txq_lock);
-        if (shim->txq_len > INET4_MAX_TXQ_LEN) {
-            drop = true;
-        } else {
-            list_add_tail(&qe->node, &shim->txq);
-            shim->txq_len++;
-        }
-        spin_unlock_bh(&shim->txq_lock);
-
-        if (drop) {
-            NPD(2, "Queue full, dropping PDU [len=%u]\n", rb->len);
-            rl_buf_free(rb);
-            return -ENOSPC;
-        }
-
-        schedule_work(&shim->txw);
-
-        return 0;
-    }
-
-    return udp4_xmit(flow_priv, rb);
+    return udp4_xmit(flow_priv, rb, maysleep);
 }
 
 static int
