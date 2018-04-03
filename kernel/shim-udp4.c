@@ -42,6 +42,7 @@
 #include <linux/udp.h>
 #include <net/sock.h>
 
+/* This struct is unnecessary, but we keep it to ease future extensions. */
 struct rl_shim_udp4 {
     struct ipcp_entry *ipcp;
 };
@@ -75,12 +76,11 @@ rl_shim_udp4_create(struct ipcp_entry *ipcp)
     priv->ipcp = ipcp;
 
     /* Set max_sdu_size for the IPCP, considering that the SDU is going
-     * to be encapsulated in the UDP packet, and the UDP packet is going
-     * to be encapsulated in the IP packet. Assuming the IP packet does
-     * not have options, and is not encapsulated in other tunnels, the
-     * maximum SDU size is limited by the maximum size of an IP packet,
-     * that is (2^16 - 1). */
-    ipcp->max_sdu_size = ((1 << 16) - 1) - 8 /* UDP hdr */ - 20 /* IP hdr */;
+     * to be encapsulated in an UDP packet, and the UDP packet is going
+     * to be encapsulated in an IP packet. We assume the IP packets are
+     * not encapsulated inside other tunnels and that 40 bytes are enough
+     * with IPv4 with options. */
+    ipcp->max_sdu_size = ETH_DATA_LEN - 8 /* UDP hdr */ - 40 /* IPv6 hdr */;
 
     return priv;
 }
