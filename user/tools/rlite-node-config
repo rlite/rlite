@@ -119,7 +119,7 @@ while True:
             continue
 
         splitted = line.split()
-        if splitted[0] == 'ipcp-enroll':
+        if splitted[0] == 'ipcp-enroll' or splitted[0] == 'ipcp-lower-flow-alloc':
             enrolls.append((linecnt, splitted))
         else:
             cmds.append((linecnt, splitted))
