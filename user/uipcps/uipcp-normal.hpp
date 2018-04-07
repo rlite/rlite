@@ -338,22 +338,28 @@ struct LFDB {
     virtual void dump(std::stringstream &ss) const         = 0;
     virtual void dump_routing(std::stringstream &ss) const = 0;
 
-    virtual void update_local(const std::string &neigh_name)      = 0;
-    virtual void update_routing()                                 = 0;
-    virtual int flow_state_update(struct rl_kmsg_flow_state *upd) = 0;
+    virtual void update_local(const std::string &neigh_name) {}
+    virtual void update_routing() {}
+    virtual int flow_state_update(struct rl_kmsg_flow_state *upd) { return 0; }
 
     /* Called to flush all the local entries related to a given neighbor. */
-    virtual void neigh_disconnected(const std::string &neigh_name) = 0;
+    virtual void neigh_disconnected(const std::string &neigh_name) {}
 
     virtual int rib_handler(const CDAPMessage *rm,
                             std::shared_ptr<NeighFlow> const &nf,
                             std::shared_ptr<Neighbor> const &neigh,
-                            rlm_addr_t src_addr) = 0;
+                            rlm_addr_t src_addr)
+    {
+        return 0;
+    }
 
     virtual int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
-                           unsigned int limit) const = 0;
-    virtual int neighs_refresh(size_t limit)         = 0;
-    virtual void age_incr()                          = 0;
+                           unsigned int limit) const
+    {
+        return 0;
+    }
+    virtual int neighs_refresh(size_t limit) { return 0; }
+    virtual void age_incr() {}
 
     static std::string TableName;
     static std::string ObjClass;
