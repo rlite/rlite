@@ -771,7 +771,6 @@ uipcp_rib::update_address(rlm_addr_t new_addr)
         return;
     }
 
-    lfdb->update_routing();
     UPD(uipcp, "Address updated %lu --> %lu\n", (long unsigned)myaddr,
         (long unsigned)new_addr);
     myaddr = new_addr; /* do the update */
