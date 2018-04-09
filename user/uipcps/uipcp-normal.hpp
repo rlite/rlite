@@ -397,13 +397,16 @@ struct AddrAllocator {
 struct PolicyBuilder {
     std::string name;
     std::function<void(uipcp_rib *)> builder = [](uipcp_rib *) {};
+    std::list<std::string> paths;
 
     PolicyBuilder(const std::string &policy_name) : name(policy_name) {}
     PolicyBuilder(const std::string &policy_name,
-                  std::function<void(uipcp_rib *)> fun)
+                  std::function<void(uipcp_rib *)> fun,
+                  std::list<std::string> ps = {})
         : PolicyBuilder(policy_name)
     {
         builder = fun;
+        paths   = ps;
     }
     bool operator<(const PolicyBuilder &o) const { return name < o.name; }
     bool operator==(const PolicyBuilder &o) const { return name == o.name; }
@@ -704,6 +707,7 @@ struct uipcp_rib {
                       rlm_addr_t src_addr);
 
     void rib_handler_register(std::string rib_path, RibHandler h);
+    void rib_handler_unregister(std::string rib_path);
 
     /* RIB handlers for received CDAP messages. */
     int dft_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
@@ -737,10 +741,10 @@ struct uipcp_rib {
                        std::shared_ptr<NeighFlow> const &nf,
                        std::shared_ptr<Neighbor> const &neigh,
                        rlm_addr_t src_addr);
-    int addr_alloc_table_handler(const CDAPMessage *rm,
-                                 std::shared_ptr<NeighFlow> const &nf,
-                                 std::shared_ptr<Neighbor> const &neigh,
-                                 rlm_addr_t src_addr)
+    int addr_alloc_handler(const CDAPMessage *rm,
+                           std::shared_ptr<NeighFlow> const &nf,
+                           std::shared_ptr<Neighbor> const &neigh,
+                           rlm_addr_t src_addr)
     {
         return addra->rib_handler(rm, nf, neigh, src_addr);
     }

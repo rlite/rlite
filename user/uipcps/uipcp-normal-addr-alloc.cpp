@@ -325,8 +325,10 @@ uipcp_rib::addra_lib_init()
         PolicyBuilder("manual", [](uipcp_rib *rib) {
             rib->addra = make_unique<ManualAddrAllocator>(rib);
         }));
-    available_policies[AddrAllocator::Prefix].insert(
-        PolicyBuilder("distributed", [](uipcp_rib *rib) {
+    available_policies[AddrAllocator::Prefix].insert(PolicyBuilder(
+        "distributed",
+        [](uipcp_rib *rib) {
             rib->addra = make_unique<DistributedAddrAllocator>(rib);
-        }));
+        },
+        {AddrAllocator::TableName}));
 }

@@ -493,16 +493,11 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     policy_mod(DFT::Prefix, "fully-replicated");
     policy_mod(Routing::Prefix, "link-state");
 
-    /* Insert the handlers for the RIB objects. */
-    rib_handler_register(DFT::TableName, &uipcp_rib::dft_handler);
+    /* Insert handlers for common RIB objects. */
     rib_handler_register(Neighbor::TableName, &uipcp_rib::neighbors_handler);
-    rib_handler_register(Routing::TableName, &uipcp_rib::lfdb_handler);
-    rib_handler_register(FlowAllocator::TableName, &uipcp_rib::flows_handler);
     rib_handler_register(NeighFlow::KeepaliveObjName,
                          &uipcp_rib::keepalive_handler);
     rib_handler_register(StatusObjName, &uipcp_rib::status_handler);
-    rib_handler_register(AddrAllocator::TableName,
-                         &uipcp_rib::addr_alloc_table_handler);
     rib_handler_register(DFT::Prefix + "/policy", &uipcp_rib::policy_handler);
     rib_handler_register(Routing::Prefix + "/policy",
                          &uipcp_rib::policy_handler);
@@ -607,8 +602,17 @@ uipcp_rib::rib_handler_register(std::string rib_path, RibHandler h)
 
     info.handler = h;
 
+    assert(handlers.count(rib_path) == 0);
     handlers.insert(make_pair(rib_path, info));
 }
+
+void
+uipcp_rib::rib_handler_unregister(std::string rib_path)
+{
+    assert(handlers.count(rib_path) > 0);
+    handlers.erase(rib_path);
+}
+
 #ifdef RL_USE_QOS_CUBES
 static inline string
 u82boolstr(uint8_t v)
@@ -1212,9 +1216,39 @@ uipcp_rib::policy_mod(const std::string &component,
         return 0; /* nothing to do */
     }
 
+    /* Unregister previous RIB paths, if any. */
+    if (!policies[component].empty()) {
+        auto prev_builder =
+            available_policies[component].find(policies[component]);
+
+        assert(prev_builder != available_policies[component].end());
+        for (const std::string &path : prev_builder->paths) {
+            rib_handler_unregister(path);
+        }
+    }
+
+    /* Set the new policy. */
     policies[component] = policy_name;
     UPD(uipcp, "set %s policy to %s\n", component.c_str(), policy_name.c_str());
+    /* Invoke the policy builder. */
     policy_builder->builder(this);
+    /* Register the new RIB paths. */
+    for (const std::string &path : policy_builder->paths) {
+        RibHandler h;
+        if (component == DFT::Prefix) {
+            h = &uipcp_rib::dft_handler;
+        } else if (component == Routing::Prefix) {
+            h = &uipcp_rib::lfdb_handler;
+        } else if (component == FlowAllocator::Prefix) {
+            h = &uipcp_rib::flows_handler;
+        } else if (component == AddrAllocator::Prefix) {
+            h = &uipcp_rib::addr_alloc_handler;
+        } else {
+            assert(false);
+        }
+        rib_handler_register(path, h);
+    }
+    /* Reconfigure the new component, if necessary. */
     if (component == DFT::Prefix) {
         dft->reconfigure();
     }
@@ -2127,11 +2161,11 @@ extern "C" void
 normal_lib_init(void)
 {
     /* We need to register the available policies for all the components. */
-    uipcp_rib::addra_lib_init();    /* address allocation */
-    uipcp_rib::dft_lib_init();      /* DFT policies */
-    uipcp_rib::fa_lib_init();       /* flow allocation */
-    uipcp_rib::routing_lib_init();  /* routing */
-    uipcp_rib::ra_lib_init();       /* enrollment and resource allocator */
+    uipcp_rib::addra_lib_init();   /* address allocation */
+    uipcp_rib::dft_lib_init();     /* DFT policies */
+    uipcp_rib::fa_lib_init();      /* flow allocation */
+    uipcp_rib::routing_lib_init(); /* routing */
+    uipcp_rib::ra_lib_init();      /* enrollment and resource allocator */
 }
 
 struct uipcp_ops normal_ops = {
