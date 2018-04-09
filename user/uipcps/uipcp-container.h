@@ -174,6 +174,10 @@ struct uipcp_ops {
     /* User wants the uipcp to disconnect from the neighbor connected through
      * a given lower DIF. */
     int (*lower_dif_detach)(struct uipcp *uipcp, const char *lower_dif);
+
+    /* User wants to add or remove a static route to/from an IPCP. */
+    int (*route_mod)(struct uipcp *uipcp,
+                     const struct rl_cmsg_ipcp_route_mod *req);
 };
 
 typedef int (*periodic_task_func_t)(struct uipcp *const uipcp);

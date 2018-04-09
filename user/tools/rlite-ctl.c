@@ -850,6 +850,39 @@ ipcp_neigh_disconnect(int argc, char **argv, struct cmd_descriptor *cd)
     return request_response(RLITE_MB(&req), NULL);
 }
 
+static int
+ipcp_route_mod(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    struct rl_cmsg_ipcp_route_mod req;
+    struct ipcp_attrs *attrs;
+    const char *ipcp_name;
+    const char *dest_name;
+    const char *next_hops = NULL;
+
+    assert(argc >= 2);
+    ipcp_name = argv[0];
+    dest_name = argv[1];
+    if (argc > 2) {
+        next_hops = argv[2];
+    }
+
+    req.ipcp_name = strdup(ipcp_name);
+    req.dest_name = strdup(dest_name);
+    req.next_hops = next_hops ? strdup(next_hops) : NULL;
+    attrs         = lookup_ipcp_by_name(req.ipcp_name);
+    if (!attrs) {
+        PE("Could not find IPC process %s\n", ipcp_name);
+        return -1;
+    }
+
+    req.hdr.msg_type = !strcmp(cd->name, "ipcp-route-add")
+                           ? RLITE_U_IPCP_ROUTE_ADD
+                           : RLITE_U_IPCP_ROUTE_DEL;
+    req.hdr.event_id = 0;
+
+    return request_response(RLITE_MB(&req), NULL);
+}
+
 #ifdef RL_MEMTRACK
 static int
 memtrack_dump(int argc, char **argv, struct cmd_descriptor *cd)
@@ -1174,6 +1207,18 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage    = "IPCP_NAME NEIGH_NAME",
         .num_args = 2,
         .func     = ipcp_neigh_disconnect,
+    },
+    {
+        .name     = "ipcp-route-add",
+        .usage    = "IPCP_NAME DEST_NAME NEXT_HOP[,NEXT_HOP][...]",
+        .num_args = 3,
+        .func     = ipcp_route_mod,
+    },
+    {
+        .name     = "ipcp-route-del",
+        .usage    = "IPCP_NAME DEST_NAME",
+        .num_args = 2,
+        .func     = ipcp_route_mod,
     },
     {
         .name     = "ipcps-show",

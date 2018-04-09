@@ -15,6 +15,8 @@ rlite-ctl dif-policy-list dd resalloc | grep -q "\<default\>" || exit 1
 rlite-ctl dif-policy-list dd routing | grep -q "\<link-state\>" || exit 1
 rlite-ctl dif-policy-mod dd routing link-state-lfa || exit 1
 rlite-ctl dif-policy-list dd routing | grep -q "\<link-state-lfa\>" || exit 1
+rlite-ctl dif-policy-mod dd routing static || exit 1
+rlite-ctl dif-policy-list dd routing | grep -q "\<static\>" || exit 1
 
 # Expect failure on the following ones
 rlite-ctl dif-policy-list dd wrong-component && exit 1

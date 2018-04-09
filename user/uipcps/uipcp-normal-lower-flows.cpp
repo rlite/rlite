@@ -101,13 +101,16 @@ private:
         std::unordered_map<NodeId, Info> &info);
     int compute_next_hops(const NodeId &);
 
+public:
     /* Step 3. Forwarding table computation and kernel update. */
     int compute_fwd_table();
 
-    /* The routing table computed by compute_next_hops(). */
+    /* The routing table computed by compute_next_hops(), or statically
+     * updated. */
     std::unordered_map<NodeId, std::list<NodeId>> next_hops;
     NodeId dflt_nhop;
 
+private:
     /* The forwarding table computed by compute_fwd_table().
      * It maps a NodeId --> (dst_addr, local_port). */
     std::unordered_map<rlm_addr_t, std::pair<NodeId, rl_port_t>> next_ports;
@@ -136,7 +139,7 @@ public:
     ~FullyReplicatedLFDB() {}
 
     void dump(std::stringstream &ss) const override;
-    void dump_routing(std::stringstream &ss) const override;
+    void dump_routing(std::stringstream &ss) const override { re.dump(ss); }
 
     const gpb::LowerFlow *find(const NodeId &local_node,
                                const NodeId &remote_node) const
@@ -330,7 +333,7 @@ FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm,
         rib->neighs_sync_obj_excluding(neigh, add_f, ObjClass, TableName,
                                        &prop_lfl);
 
-        /* Update the routing table. */
+        /* Update the kernel routing table. */
         re.update_kernel_routing(rib->myname);
     }
 
@@ -372,12 +375,6 @@ FullyReplicatedLFDB::dump(std::stringstream &ss) const
     }
 
     ss << endl;
-}
-
-void
-FullyReplicatedLFDB::dump_routing(std::stringstream &ss) const
-{
-    re.dump(ss);
 }
 
 int
@@ -906,6 +903,64 @@ RoutingEngine::dump(std::stringstream &ss) const
     }
 }
 
+class StaticRouting : public LFDB {
+    /* Lower Flow Database. */
+    std::unordered_map<NodeId, std::unordered_map<NodeId, gpb::LowerFlow>> db;
+    friend class RoutingEngine;
+
+public:
+    /* Routing engine. */
+    RoutingEngine re;
+
+    RL_NODEFAULT_NONCOPIABLE(StaticRouting);
+    StaticRouting(uipcp_rib *_ur) : LFDB(_ur), re(_ur, true) {}
+    ~StaticRouting() {}
+
+    void dump(std::stringstream &ss) const override { dump_routing(ss); }
+    void dump_routing(std::stringstream &ss) const override { re.dump(ss); }
+    int route_mod(const struct rl_cmsg_ipcp_route_mod *req);
+};
+
+int
+StaticRouting::route_mod(const struct rl_cmsg_ipcp_route_mod *req)
+{
+    std::string dest_ipcp;
+    std::list<NodeId> next_hops;
+
+    if (!req->dest_name || strlen(req->dest_name) == 0) {
+        UPE(rib->uipcp, "No destination IPCP specified\n");
+        return -1;
+    }
+
+    dest_ipcp = req->dest_name;
+
+    if (req->hdr.msg_type == RLITE_U_IPCP_ROUTE_ADD) {
+        if (!req->next_hops || strlen(req->next_hops) == 0) {
+            UPE(rib->uipcp, "No next hop specified\n");
+            return -1;
+        }
+        next_hops = strsplit(NodeId(req->next_hops), ',');
+        {
+            set<NodeId> u(next_hops.begin(), next_hops.end());
+            if (u.size() != next_hops.size()) {
+                UPE(rib->uipcp, "Next hops list contains duplicates\n");
+                return -1;
+            }
+        }
+        re.next_hops[dest_ipcp] = next_hops;
+    } else { /* RLITE_U_IPCP_ROUTE_DEL */
+        if (!re.next_hops.count(dest_ipcp)) {
+            UPE(rib->uipcp, "No route to destination '%s'\n", req->dest_name);
+            return -1;
+        }
+        re.next_hops.erase(dest_ipcp);
+    }
+
+    re.compute_fwd_table();
+
+    return 0;
+}
+
 void
 uipcp_rib::lfdb_lib_init()
 {
@@ -917,4 +972,7 @@ uipcp_rib::lfdb_lib_init()
         PolicyBuilder("link-state-lfa", [](uipcp_rib *rib) {
             rib->lfdb = make_unique<FullyReplicatedLFDB>(rib, true);
         }));
+    available_policies[LFDB::Prefix].insert(PolicyBuilder(
+        "static",
+        [](uipcp_rib *rib) { rib->lfdb = make_unique<StaticRouting>(rib); }));
 }

@@ -360,6 +360,10 @@ struct LFDB {
     }
     virtual int neighs_refresh(size_t limit) { return 0; }
     virtual void age_incr() {}
+    virtual int route_mod(const struct rl_cmsg_ipcp_route_mod *req)
+    {
+        return 0;
+    }
 
     static std::string TableName;
     static std::string ObjClass;
