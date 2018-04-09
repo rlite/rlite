@@ -719,10 +719,10 @@ struct uipcp_rib {
                           std::shared_ptr<NeighFlow> const &nf,
                           std::shared_ptr<Neighbor> const &neigh,
                           rlm_addr_t src_addr);
-    int lfdb_handler(const CDAPMessage *rm,
-                     std::shared_ptr<NeighFlow> const &nf,
-                     std::shared_ptr<Neighbor> const &neigh,
-                     rlm_addr_t src_addr)
+    int routing_handler(const CDAPMessage *rm,
+                        std::shared_ptr<NeighFlow> const &nf,
+                        std::shared_ptr<Neighbor> const &neigh,
+                        rlm_addr_t src_addr)
     {
         return routing->rib_handler(rm, nf, neigh, src_addr);
     };
