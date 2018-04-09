@@ -2111,6 +2111,15 @@ normal_lower_dif_detach(struct uipcp *uipcp, const char *lower_dif)
     return rib->lower_dif_detach(string(lower_dif));
 }
 
+static int
+normal_route_mod(struct uipcp *uipcp, const struct rl_cmsg_ipcp_route_mod *req)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    std::lock_guard<std::mutex> guard(rib->mutex);
+
+    return rib->lfdb->route_mod(req);
+}
+
 extern "C" void
 normal_lib_init(void)
 {
@@ -2146,4 +2155,5 @@ struct uipcp_ops normal_ops = {
     .config               = nullptr,
     .neigh_disconnect     = normal_neigh_disconnect,
     .lower_dif_detach     = normal_lower_dif_detach,
+    .route_mod            = normal_route_mod,
 };

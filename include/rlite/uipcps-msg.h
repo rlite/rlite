@@ -54,6 +54,8 @@ enum {
     RLITE_U_IPCP_NEIGH_DISCONNECT,       /* 20 */
     RLITE_U_IPCP_RIB_PATHS_SHOW_REQ,     /* 21 */
     RLITE_U_IPCP_RIB_PATHS_SHOW_RESP,    /* 22 */
+    RLITE_U_IPCP_ROUTE_ADD,              /* 23 */
+    RLITE_U_IPCP_ROUTE_DEL,              /* 24 */
 
     RLITE_U_MSG_MAX,
 };
@@ -176,6 +178,16 @@ struct rl_cmsg_ipcp_neigh_disconnect {
 
     char *ipcp_name;  /* local IPCP */
     char *neigh_name; /* neigh IPCP to disconnect from */
+} __attribute__((packed));
+
+/* rlite-ctl --> uipcps message to add a manual routing
+ * rule for a local ipcp_process. */
+struct rl_cmsg_ipcp_route_mod {
+    struct rl_msg_hdr hdr;
+
+    char *ipcp_name; /* local IPCP */
+    char *dest_name; /* destination IPCP */
+    char *next_hops; /* next hops */
 } __attribute__((packed));
 
 #endif /* __RLITE_U_MSG_H__ */

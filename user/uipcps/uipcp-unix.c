@@ -365,6 +365,27 @@ rl_u_ipcp_config(struct uipcps *uipcps, int sfd,
 }
 
 static int
+rl_u_ipcp_route_mod(struct uipcps *uipcps, int sfd,
+                    const struct rl_msg_base *b_req)
+{
+    struct rl_cmsg_ipcp_route_mod *req = (struct rl_cmsg_ipcp_route_mod *)b_req;
+    struct rl_msg_base_resp resp;
+    struct uipcp *uipcp;
+
+    resp.result = RLITE_ERR;
+
+    /* Find the userspace part of the requestor IPCP. */
+    uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
+    if (uipcp && uipcp->ops.route_mod) {
+        resp.result = uipcp->ops.route_mod(uipcp, req);
+    }
+
+    uipcp_put(uipcp);
+
+    return rl_u_response(sfd, RLITE_MB(req), &resp);
+}
+
+static int
 rl_u_probe(struct uipcps *uipcps, int sfd, const struct rl_msg_base *b_req)
 {
     struct rl_msg_base_resp resp = {
@@ -494,6 +515,8 @@ static rl_req_handler_t rl_config_handlers[] = {
     [RLITE_U_TERMINATE]                  = rl_u_terminate,
     [RLITE_U_IPCP_NEIGH_DISCONNECT]      = rl_u_ipcp_neigh_disconnect,
     [RLITE_U_IPCP_RIB_PATHS_SHOW_REQ]    = rl_u_ipcp_rib_show,
+    [RLITE_U_IPCP_ROUTE_ADD]             = rl_u_ipcp_route_mod,
+    [RLITE_U_IPCP_ROUTE_DEL]             = rl_u_ipcp_route_mod,
 #ifdef RL_MEMTRACK
     [RLITE_U_MEMTRACK_DUMP] = rl_u_memtrack_dump,
 #endif /* RL_MEMTRACK */

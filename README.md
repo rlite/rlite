@@ -291,7 +291,12 @@ Available commands:
 * `dif-policy-list`: Show current and available policies for a DIF.
 * `dif-policy-param-mod`: Modify a policy parameter for a DIF running in the
                         system.
-* `dif-policy-param-list`: Show DIF parameters together with their current values.
+* `dif-policy-param-list`: Show DIF parameters together with their current
+                           values.
+* `ipcp-route-add`: Add or update a routing rule for a local IPCP; valid for
+                    the static routing policy.
+* `ipcp-route-del`: Remove a routing rule from a local IPCP; valid for the
+                    static routing policy.
 
 To show the available commands and the corresponding usage, run
 
@@ -994,6 +999,7 @@ components of a normal IPCP process:
 | dft                 | centralized-fault-tolerant | DFT stored by a fault-tolerant cluster of replicas |
 | routing             | link-state       | Link state routing algorithm      |
 | routing             | link-state-lfa   | Link state enhanced with Loop Free Alternate |
+| routing             | static           | Statically configured routing rules |
 
 This is an example of how to change the routing policy of the IPCP in a local
 DIF
