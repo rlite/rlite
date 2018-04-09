@@ -361,7 +361,7 @@ EnrollmentResources::enrollment_commit()
 
     /* A new N-1 flow has been allocated. We may need to update or LFDB w.r.t
      * the local entries. */
-    rib->lfdb->update_local(neigh->ipcp_name);
+    rib->routing->update_local(neigh->ipcp_name);
 
     /* Sync with the neighbor. */
     rib->sync_rib(nf);
@@ -780,7 +780,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
 
         {
             /* Send component policies. */
-            list<std::string> components = {DFT::Prefix, LFDB::Prefix,
+            list<std::string> components = {DFT::Prefix, Routing::Prefix,
                                             AddrAllocator::Prefix};
             for (const auto &c : components) {
                 m = CDAPMessage();
@@ -1108,7 +1108,7 @@ uipcp_rib::sync_rib(const std::shared_ptr<NeighFlow> &nf)
     }
 
     /* Synchronize lower flow database. */
-    ret |= lfdb->sync_neigh(nf, limit);
+    ret |= routing->sync_neigh(nf, limit);
 
     /* Synchronize Directory Forwarding Table. */
     ret |= dft->sync_neigh(nf, limit);
@@ -1143,7 +1143,7 @@ uipcp_rib::neighs_refresh()
 
     UPV(uipcp, "Refreshing neighbors RIB\n");
 
-    lfdb->neighs_refresh(limit);
+    routing->neighs_refresh(limit);
     dft->neighs_refresh(limit);
     {
         gpb::NeighborCandidateList ncl;
@@ -1228,7 +1228,7 @@ uipcp_rib::del_neighbor(std::string neigh_name, bool reconnect)
         reconnect);
 
     /* Tell the routing subsystem that this neighbor disconnected. */
-    lfdb->neigh_disconnected(neigh_name);
+    routing->neigh_disconnected(neigh_name);
 
     return 0;
 }
@@ -1343,7 +1343,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm,
 
                 /* Possibly updated neighbor address, we may need to update or
                  * insert a local LFDB entry. */
-                lfdb->update_local(neigh_name);
+                routing->update_local(neigh_name);
             }
 
         } else {
@@ -1370,7 +1370,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm,
         neighs_sync_obj_excluding(neigh, add, Neighbor::ObjClass,
                                   Neighbor::TableName, &prop_ncl);
         /* Update the routing, as node addressing information has changed. */
-        lfdb->update_routing();
+        routing->update_kernel();
     }
 
     return 0;
