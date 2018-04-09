@@ -49,12 +49,13 @@ string address      = "/daf/mgmt/naming/address";
 string whatevercast = "/daf/mgmt/naming/whatevercast";
 #endif
 
-std::string DFT::ObjClass   = "dft_entries";
-std::string DFT::Prefix     = "/mgmt/dft";
-std::string DFT::TableName  = DFT::Prefix + "/table";
-std::string LFDB::ObjClass  = "lfdb_entries";
-std::string LFDB::Prefix    = "/mgmt/routing";
-std::string LFDB::TableName = LFDB::Prefix + "/lfdb"; /* Lower Flow DB */
+std::string DFT::ObjClass     = "dft_entries";
+std::string DFT::Prefix       = "/mgmt/dft";
+std::string DFT::TableName    = DFT::Prefix + "/table";
+std::string Routing::ObjClass = "lfdb_entries";
+std::string Routing::Prefix   = "/mgmt/routing";
+std::string Routing::TableName =
+    Routing::Prefix + "/routing"; /* Lower Flow DB */
 std::string AddrAllocator::ObjClass      = "aa_entries";
 std::string AddrAllocator::Prefix        = "/mgmt/addralloc";
 std::string AddrAllocator::TableName     = AddrAllocator::Prefix + "/table";
@@ -483,18 +484,19 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
         PolicyParam(true);
     params_map[uipcp_rib::RibDaemonPrefix]["refresh-intval"] =
         PolicyParam(kRIBRefreshIntval);
-    params_map[LFDB::Prefix]["age-incr-intval"] = PolicyParam(kAgeIncrIntval);
-    params_map[LFDB::Prefix]["age-max"]         = PolicyParam(kAgeMax);
+    params_map[Routing::Prefix]["age-incr-intval"] =
+        PolicyParam(kAgeIncrIntval);
+    params_map[Routing::Prefix]["age-max"] = PolicyParam(kAgeMax);
 
     policy_mod(FlowAllocator::Prefix, "local");
     policy_mod(AddrAllocator::Prefix, "distributed");
     policy_mod(DFT::Prefix, "fully-replicated");
-    policy_mod(LFDB::Prefix, "link-state");
+    policy_mod(Routing::Prefix, "link-state");
 
     /* Insert the handlers for the RIB objects. */
     rib_handler_register(DFT::TableName, &uipcp_rib::dft_handler);
     rib_handler_register(Neighbor::TableName, &uipcp_rib::neighbors_handler);
-    rib_handler_register(LFDB::TableName, &uipcp_rib::lfdb_handler);
+    rib_handler_register(Routing::TableName, &uipcp_rib::lfdb_handler);
     rib_handler_register(FlowAllocator::TableName, &uipcp_rib::flows_handler);
     rib_handler_register(NeighFlow::KeepaliveObjName,
                          &uipcp_rib::keepalive_handler);
@@ -502,7 +504,8 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     rib_handler_register(AddrAllocator::TableName,
                          &uipcp_rib::addr_alloc_table_handler);
     rib_handler_register(DFT::Prefix + "/policy", &uipcp_rib::policy_handler);
-    rib_handler_register(LFDB::Prefix + "/policy", &uipcp_rib::policy_handler);
+    rib_handler_register(Routing::Prefix + "/policy",
+                         &uipcp_rib::policy_handler);
     rib_handler_register(AddrAllocator::Prefix + "/policy",
                          &uipcp_rib::policy_handler);
     rib_handler_register(DFT::Prefix + "/params",
@@ -583,7 +586,7 @@ uipcp_rib::~uipcp_rib()
     neighbors.clear();
     addra.reset();
     dft.reset();
-    lfdb.reset();
+    routing.reset();
     fa.reset();
 
     for (auto &kv : pending_fa_reqs) {
@@ -735,7 +738,7 @@ uipcp_rib::dump(std::stringstream &ss) const
     ss << endl;
 
     dft->dump(ss);
-    lfdb->dump(ss);
+    routing->dump(ss);
     addra->dump(ss);
     fa->dump(ss);
 
@@ -1941,7 +1944,7 @@ normal_flow_state_update(struct uipcp *uipcp, const struct rl_msg_base *msg)
     struct rl_kmsg_flow_state *upd = (struct rl_kmsg_flow_state *)msg;
     std::lock_guard<std::mutex> guard(rib->mutex);
 
-    return rib->lfdb->flow_state_update(upd);
+    return rib->routing->flow_state_update(upd);
 }
 
 static int
@@ -1998,7 +2001,7 @@ normal_ipcp_routing_show(struct uipcp *uipcp)
     std::lock_guard<std::mutex> guard(rib->mutex);
     stringstream ss;
 
-    rib->lfdb->dump_routing(ss);
+    rib->routing->dump_routing(ss);
 
     return rl_strdup(ss.str().c_str(), RL_MT_UTILS);
 }
@@ -2117,18 +2120,18 @@ normal_route_mod(struct uipcp *uipcp, const struct rl_cmsg_ipcp_route_mod *req)
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(rib->mutex);
 
-    return rib->lfdb->route_mod(req);
+    return rib->routing->route_mod(req);
 }
 
 extern "C" void
 normal_lib_init(void)
 {
     /* We need to register the available policies for all the components. */
-    uipcp_rib::addra_lib_init(); /* address allocation */
-    uipcp_rib::dft_lib_init();   /* DFT policies */
-    uipcp_rib::fa_lib_init();    /* flow allocation */
-    uipcp_rib::lfdb_lib_init();  /* routing */
-    uipcp_rib::ra_lib_init();    /* enrollment and resource allocator */
+    uipcp_rib::addra_lib_init();    /* address allocation */
+    uipcp_rib::dft_lib_init();      /* DFT policies */
+    uipcp_rib::fa_lib_init();       /* flow allocation */
+    uipcp_rib::routing_lib_init();  /* routing */
+    uipcp_rib::ra_lib_init();       /* enrollment and resource allocator */
 }
 
 struct uipcp_ops normal_ops = {

@@ -125,7 +125,7 @@ private:
     bool lfa_enabled;
 };
 
-class FullyReplicatedLFDB : public LFDB {
+class FullyReplicatedLFDB : public Routing {
     /* Lower Flow Database. */
     std::unordered_map<NodeId, std::unordered_map<NodeId, gpb::LowerFlow>> db;
     friend class RoutingEngine;
@@ -135,7 +135,9 @@ public:
     RoutingEngine re;
 
     RL_NODEFAULT_NONCOPIABLE(FullyReplicatedLFDB);
-    FullyReplicatedLFDB(uipcp_rib *_ur, bool lfa) : LFDB(_ur), re(_ur, lfa) {}
+    FullyReplicatedLFDB(uipcp_rib *_ur, bool lfa) : Routing(_ur), re(_ur, lfa)
+    {
+    }
     ~FullyReplicatedLFDB() {}
 
     void dump(std::stringstream &ss) const override;
@@ -152,7 +154,7 @@ public:
     bool add(const gpb::LowerFlow &lf);
     bool del(const NodeId &local_node, const NodeId &remote_node);
     void update_local(const std::string &neigh_name) override;
-    void update_routing() override;
+    void update_kernel() override;
     int flow_state_update(struct rl_kmsg_flow_state *upd) override;
     void neigh_disconnected(const std::string &neigh_name) override;
 
@@ -341,7 +343,7 @@ FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm,
 }
 
 void
-FullyReplicatedLFDB::update_routing()
+FullyReplicatedLFDB::update_kernel()
 {
     /* Update the routing table. */
     re.update_kernel_routing(rib->myname);
@@ -441,11 +443,11 @@ uipcp_rib::age_incr_tmr_restart()
 {
     age_incr_timer = make_unique<TimeoutEvent>(
         std::chrono::seconds(
-            get_param_value<int>(LFDB::Prefix, "age-incr-intval")),
+            get_param_value<int>(Routing::Prefix, "age-incr-intval")),
         uipcp, this, [](struct uipcp *uipcp, void *arg) {
             uipcp_rib *rib = (uipcp_rib *)arg;
             rib->age_incr_timer->fired();
-            rib->lfdb->age_incr();
+            rib->routing->age_incr();
         });
 }
 
@@ -455,8 +457,9 @@ FullyReplicatedLFDB::age_incr()
 {
     std::lock_guard<std::mutex> guard(rib->mutex);
     unsigned int age_inc_intval =
-        rib->get_param_value<int>(LFDB::Prefix, "age-incr-intval");
-    unsigned int age_max = rib->get_param_value<int>(LFDB::Prefix, "age-max");
+        rib->get_param_value<int>(Routing::Prefix, "age-incr-intval");
+    unsigned int age_max =
+        rib->get_param_value<int>(Routing::Prefix, "age-max");
     gpb::LowerFlowList prop_lfl;
 
     for (auto &kvi : db) {
@@ -602,17 +605,17 @@ RoutingEngine::compute_next_hops(const NodeId &local_node)
     /* Clean up state left from the previous run. */
     next_hops.clear();
 
-    FullyReplicatedLFDB *lfdb =
-        dynamic_cast<FullyReplicatedLFDB *>(rib->lfdb.get());
+    FullyReplicatedLFDB *routing =
+        dynamic_cast<FullyReplicatedLFDB *>(rib->routing.get());
 
     /* Build the graph from the Lower Flow Database. */
     graph[local_node] = list<Edge>();
-    for (const auto &kvi : lfdb->db) {
+    for (const auto &kvi : routing->db) {
         for (const auto &kvj : kvi.second) {
             const gpb::LowerFlow *revlf;
 
-            revlf =
-                lfdb->find(kvj.second.local_node(), kvj.second.remote_node());
+            revlf = routing->find(kvj.second.local_node(),
+                                  kvj.second.remote_node());
 
             if (revlf == nullptr || revlf->cost() != kvj.second.cost()) {
                 /* Something is wrong, this could be malicious or erroneous. */
@@ -629,7 +632,7 @@ RoutingEngine::compute_next_hops(const NodeId &local_node)
         }
     }
 
-    PV_S("Graph [%lu nodes]:\n", lfdb->db.size());
+    PV_S("Graph [%lu nodes]:\n", routing->db.size());
     for (const auto &kvg : graph) {
         PV_S("%s: {", kvg.first.c_str());
         for (const Edge &edge : kvg.second) {
@@ -903,17 +906,16 @@ RoutingEngine::dump(std::stringstream &ss) const
     }
 }
 
-class StaticRouting : public LFDB {
+class StaticRouting : public Routing {
     /* Lower Flow Database. */
     std::unordered_map<NodeId, std::unordered_map<NodeId, gpb::LowerFlow>> db;
-    friend class RoutingEngine;
 
 public:
     /* Routing engine. */
     RoutingEngine re;
 
     RL_NODEFAULT_NONCOPIABLE(StaticRouting);
-    StaticRouting(uipcp_rib *_ur) : LFDB(_ur), re(_ur, true) {}
+    StaticRouting(uipcp_rib *_ur) : Routing(_ur), re(_ur, true) {}
     ~StaticRouting() {}
 
     void dump(std::stringstream &ss) const override { dump_routing(ss); }
@@ -962,17 +964,18 @@ StaticRouting::route_mod(const struct rl_cmsg_ipcp_route_mod *req)
 }
 
 void
-uipcp_rib::lfdb_lib_init()
+uipcp_rib::routing_lib_init()
 {
-    available_policies[LFDB::Prefix].insert(
+    available_policies[Routing::Prefix].insert(
         PolicyBuilder("link-state", [](uipcp_rib *rib) {
-            rib->lfdb = make_unique<FullyReplicatedLFDB>(rib, false);
+            rib->routing = make_unique<FullyReplicatedLFDB>(rib, false);
         }));
-    available_policies[LFDB::Prefix].insert(
+    available_policies[Routing::Prefix].insert(
         PolicyBuilder("link-state-lfa", [](uipcp_rib *rib) {
-            rib->lfdb = make_unique<FullyReplicatedLFDB>(rib, true);
+            rib->routing = make_unique<FullyReplicatedLFDB>(rib, true);
         }));
-    available_policies[LFDB::Prefix].insert(PolicyBuilder(
-        "static",
-        [](uipcp_rib *rib) { rib->lfdb = make_unique<StaticRouting>(rib); }));
+    available_policies[Routing::Prefix].insert(
+        PolicyBuilder("static", [](uipcp_rib *rib) {
+            rib->routing = make_unique<StaticRouting>(rib);
+        }));
 }

@@ -327,19 +327,19 @@ struct FlowAllocator {
 
 /* Lower Flows Database and dissemination of routing information,
  * related to (N-1)-flows. */
-struct LFDB {
+struct Routing {
     /* Backpointer to parent data structure. */
     uipcp_rib *rib;
 
-    RL_NODEFAULT_NONCOPIABLE(LFDB);
-    LFDB(uipcp_rib *_ur) : rib(_ur) {}
-    virtual ~LFDB() {}
+    RL_NODEFAULT_NONCOPIABLE(Routing);
+    Routing(uipcp_rib *_ur) : rib(_ur) {}
+    virtual ~Routing() {}
 
     virtual void dump(std::stringstream &ss) const         = 0;
     virtual void dump_routing(std::stringstream &ss) const = 0;
 
     virtual void update_local(const std::string &neigh_name) {}
-    virtual void update_routing() {}
+    virtual void update_kernel() {}
     virtual int flow_state_update(struct rl_kmsg_flow_state *upd) { return 0; }
 
     /* Called to flush all the local entries related to a given neighbor. */
@@ -542,7 +542,7 @@ struct uipcp_rib {
     std::unique_ptr<DFT> dft;
 
     /* Lower Flow Database. */
-    std::unique_ptr<LFDB> lfdb;
+    std::unique_ptr<Routing> routing;
 
     /* Timer ID for LFDB synchronization with neighbors. */
     std::unique_ptr<TimeoutEvent> sync_timer;
@@ -720,7 +720,7 @@ struct uipcp_rib {
                      std::shared_ptr<Neighbor> const &neigh,
                      rlm_addr_t src_addr)
     {
-        return lfdb->rib_handler(rm, nf, neigh, src_addr);
+        return routing->rib_handler(rm, nf, neigh, src_addr);
     };
     int flows_handler(const CDAPMessage *rm,
                       std::shared_ptr<NeighFlow> const &nf,
@@ -794,7 +794,7 @@ struct uipcp_rib {
     static void addra_lib_init();
     static void dft_lib_init();
     static void fa_lib_init();
-    static void lfdb_lib_init();
+    static void routing_lib_init();
     static void ra_lib_init();
 
 private:
