@@ -1238,7 +1238,7 @@ uipcp_rib::policy_mod(const std::string &component,
         if (component == DFT::Prefix) {
             h = &uipcp_rib::dft_handler;
         } else if (component == Routing::Prefix) {
-            h = &uipcp_rib::lfdb_handler;
+            h = &uipcp_rib::routing_handler;
         } else if (component == FlowAllocator::Prefix) {
             h = &uipcp_rib::flows_handler;
         } else if (component == AddrAllocator::Prefix) {
