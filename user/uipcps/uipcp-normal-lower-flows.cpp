@@ -966,14 +966,18 @@ StaticRouting::route_mod(const struct rl_cmsg_ipcp_route_mod *req)
 void
 uipcp_rib::routing_lib_init()
 {
-    available_policies[Routing::Prefix].insert(
-        PolicyBuilder("link-state", [](uipcp_rib *rib) {
+    available_policies[Routing::Prefix].insert(PolicyBuilder(
+        "link-state",
+        [](uipcp_rib *rib) {
             rib->routing = make_unique<FullyReplicatedLFDB>(rib, false);
-        }));
-    available_policies[Routing::Prefix].insert(
-        PolicyBuilder("link-state-lfa", [](uipcp_rib *rib) {
+        },
+        {Routing::TableName}));
+    available_policies[Routing::Prefix].insert(PolicyBuilder(
+        "link-state-lfa",
+        [](uipcp_rib *rib) {
             rib->routing = make_unique<FullyReplicatedLFDB>(rib, true);
-        }));
+        },
+        {Routing::TableName}));
     available_policies[Routing::Prefix].insert(
         PolicyBuilder("static", [](uipcp_rib *rib) {
             rib->routing = make_unique<StaticRouting>(rib);

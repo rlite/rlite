@@ -700,8 +700,8 @@ LocalFlowAllocator::dump_memtrack(std::stringstream &ss) const
 void
 uipcp_rib::fa_lib_init()
 {
-    available_policies[FlowAllocator::Prefix].insert(
-        PolicyBuilder("local", [](uipcp_rib *rib) {
-            rib->fa = make_unique<LocalFlowAllocator>(rib);
-        }));
+    available_policies[FlowAllocator::Prefix].insert(PolicyBuilder(
+        "local",
+        [](uipcp_rib *rib) { rib->fa = make_unique<LocalFlowAllocator>(rib); },
+        {FlowAllocator::TableName}));
 }
