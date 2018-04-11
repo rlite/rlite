@@ -1332,9 +1332,10 @@ usage(void)
         "   -p NUM : client runs NUM parallel instances, using NUM threads\n"
         "   -w : server runs in background\n"
         "   -L NUM : maximum loss probability introduced by the flow "
-        "(NUM/10000)\n"
+        "(NUM/%u)\n"
         "   -E NUM : maximum delay introduced by the flow (microseconds)\n"
-        "   -v : be verbose\n");
+        "   -v : be verbose\n",
+        RINA_FLOW_SPEC_LOSS_MAX);
 }
 
 int
@@ -1474,7 +1475,7 @@ main(int argc, char **argv)
 
         case 'L':
             rp->flowspec.max_loss = atoi(optarg);
-            if (rp->flowspec.max_loss > 10000) {
+            if (rp->flowspec.max_loss > RINA_FLOW_SPEC_LOSS_MAX) {
                 PRINTF("    Invalid 'max loss' %d\n", rp->flowspec.max_loss);
                 return -1;
             }
