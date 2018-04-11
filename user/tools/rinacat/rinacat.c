@@ -764,7 +764,7 @@ CatServer()
         VVERBOSE("    avg_bandwidth (in bits/second): %ld\n",
                  (long)fspec.avg_bandwidth);
         VVERBOSE("    max_delay (in microseconds): %d\n", fspec.max_delay);
-        VVERBOSE("    max_loss (percentage): %d\n", fspec.max_loss);
+        VVERBOSE("    max_loss (percentage): %f\n", fspec.max_loss / 10000.0);
         VVERBOSE("    max_jitter (in microseconds): %d\n", fspec.max_jitter);
         VVERBOSE("    in_order_delivery (boolean): %d\n",
                  (int)fspec.in_order_delivery);
