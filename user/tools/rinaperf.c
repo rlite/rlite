@@ -1331,7 +1331,11 @@ usage(void)
         "server\n"
         "   -p NUM : client runs NUM parallel instances, using NUM threads\n"
         "   -w : server runs in background\n"
-        "   -v : be verbose\n");
+        "   -L NUM : maximum loss probability introduced by the flow "
+        "(NUM/%u)\n"
+        "   -E NUM : maximum delay introduced by the flow (microseconds)\n"
+        "   -v : be verbose\n",
+        RINA_FLOW_SPEC_LOSS_MAX);
 }
 
 int
@@ -1374,7 +1378,8 @@ main(int argc, char **argv)
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_unreliable(&rp->flowspec);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:b:a:z:p:D:wv")) != -1) {
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:b:a:z:p:D:L:E:wv")) !=
+           -1) {
         switch (opt) {
         case 'h':
             usage();
@@ -1466,6 +1471,22 @@ main(int argc, char **argv)
 
         case 'v':
             rp->verbose = 1;
+            break;
+
+        case 'L':
+            rp->flowspec.max_loss = atoi(optarg);
+            if (rp->flowspec.max_loss > RINA_FLOW_SPEC_LOSS_MAX) {
+                PRINTF("    Invalid 'max loss' %d\n", rp->flowspec.max_loss);
+                return -1;
+            }
+            break;
+
+        case 'E':
+            rp->flowspec.max_delay = atoi(optarg);
+            if (rp->flowspec.max_delay > 5000000) {
+                PRINTF("    Invalid 'max delay' %d\n", rp->flowspec.max_delay);
+                return -1;
+            }
             break;
 
         default:
