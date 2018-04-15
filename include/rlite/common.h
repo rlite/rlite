@@ -243,7 +243,8 @@ static inline int
 rina_flow_spec_best_effort(struct rina_flow_spec *spec)
 {
     return spec->max_sdu_gap == ((rlm_seq_t)-1) && !spec->avg_bandwidth &&
-           !spec->max_delay && !spec->max_jitter && !spec->in_order_delivery;
+           spec->max_loss == RINA_FLOW_SPEC_LOSS_MAX && !spec->max_delay &&
+           !spec->max_jitter && !spec->in_order_delivery;
 }
 
 struct rl_flow_stats {
