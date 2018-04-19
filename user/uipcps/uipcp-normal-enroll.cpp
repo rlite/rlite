@@ -1810,8 +1810,8 @@ uipcp_rib::trigger_re_enrollments()
                 /* Prune the flow now, we'll try to enroll later. */
                 UPD(uipcp,
                     "Pruning flow towards %s since inactive "
-                    "for %ld seconds\n",
-                    nc.c_str(), inact.count());
+                    "for %lld seconds\n",
+                    nc.c_str(), static_cast<long long int>(inact.count()));
                 neigh_flow_prune(nf);
             }
 
@@ -1951,8 +1951,8 @@ uipcp_rib::check_for_address_conflicts()
         rlm_addr_t addr = kvn.second.address();
 
         if (m.count(addr)) {
-            UPW(uipcp, "Nodes %s and %s conflicts on the same address %lu\n",
-                m[addr].c_str(), kvn.first.c_str(), addr);
+            UPW(uipcp, "Nodes %s and %s conflicts on the same address %llu\n",
+                m[addr].c_str(), kvn.first.c_str(), (long long unsigned)addr);
             need_to_change = ((myname == m[addr] && myname < kvn.first) ||
                               (myname == kvn.first && myname < m[addr]));
         } else {

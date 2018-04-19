@@ -363,9 +363,10 @@ ping_report(struct rp_result_msg *snd, struct rp_result_msg *rcv)
 {
     PRINTF("%10s %15s %10s %10s %15s\n", "", "Transactions", "Kpps", "Mbps",
            "Latency (ns)");
-    PRINTF("%-10s %15lu %10.3f %10.3f %15lu\n", "Sender", snd->cnt,
+    PRINTF("%-10s %15llu %10.3f %10.3f %15llu\n", "Sender",
+           (long long unsigned)snd->cnt,
            (double)snd->pps / 1000.0, (double)snd->bps / 1000000.0,
-           snd->latency);
+           (long long unsigned)snd->latency);
 #if 0
     PRINTF("%-10s %15lu %10.3f %10.3f %15lu\n",
             "Receiver", rcv->cnt, (double)rcv->pps/1000.0,
@@ -667,9 +668,11 @@ static void
 perf_report(struct rp_result_msg *snd, struct rp_result_msg *rcv)
 {
     PRINTF("%10s %12s %10s %10s\n", "", "Packets", "Kpps", "Mbps");
-    PRINTF("%-10s %12lu %10.3f %10.3f\n", "Sender", snd->cnt,
+    PRINTF("%-10s %12llu %10.3f %10.3f\n", "Sender",
+           (long long unsigned)snd->cnt,
            (double)snd->pps / 1000.0, (double)snd->bps / 1000000.0);
-    PRINTF("%-10s %12lu %10.3f %10.3f\n", "Receiver", rcv->cnt,
+    PRINTF("%-10s %12llu %10.3f %10.3f\n", "Receiver",
+           (long long unsigned)rcv->cnt,
            (double)rcv->pps / 1000.0, (double)rcv->bps / 1000000.0);
 }
 
@@ -848,7 +851,8 @@ client_worker_function(void *opaque)
         char durbuf[64];
 
         if (w->test_config.cnt) {
-            snprintf(countbuf, sizeof(countbuf), "%lu", w->test_config.cnt);
+            snprintf(countbuf, sizeof(countbuf), "%llu",
+                     (long long unsigned)w->test_config.cnt);
         } else {
             strncpy(countbuf, "inf", sizeof(countbuf));
         }
@@ -1057,9 +1061,9 @@ server_worker_function(void *opaque)
         }
 
         if (rp->verbose) {
-            PRINTF("Configuring test type %u, SDU count %lu, SDU size %u, "
+            PRINTF("Configuring test type %u, SDU count %llu, SDU size %u, "
                    "ticket %u\n",
-                   cfg.opcode, cfg.cnt, cfg.size, ticket);
+                   cfg.opcode, (long long unsigned)cfg.cnt, cfg.size, ticket);
         }
 
         /* Wait for the client to allocate a data flow and come back to us. */
