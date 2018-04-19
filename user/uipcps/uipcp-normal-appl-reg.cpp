@@ -41,7 +41,7 @@ time64()
         tv.tv_nsec = 0;
     }
 
-    return (tv.tv_sec << 32) | (tv.tv_nsec & ((1L << 32) - 1L));
+    return ((uint64_t)tv.tv_sec << 32) | (tv.tv_nsec & ((1LL << 32) - 1LL));
 }
 
 class FullyReplicatedDFT : public DFT {
@@ -716,8 +716,8 @@ CentralizedFaultTolerantDFT::Client::appl_register(
 
     mod_pending_timer();
 
-    UPI(parent->rib->uipcp, "Write request '%s <= %lu' issued\n",
-        appl_name.c_str(), parent->rib->myaddr);
+    UPI(parent->rib->uipcp, "Write request '%s <= %llu' issued\n",
+        appl_name.c_str(), (long long unsigned)parent->rib->myaddr);
 
     return 0;
 }
@@ -965,8 +965,9 @@ CentralizedFaultTolerantDFT::Replica::apply(raft::LogIndex index,
         m->invoke_id = mit->second.invoke_id;
         parent->rib->send_to_dst_addr(std::move(m), mit->second.requestor_addr);
         UPD(parent->rib->uipcp,
-            "Pending response for index %u sent to client %lu (invoke_id=%d)\n",
-            index, mit->second.requestor_addr, mit->second.invoke_id);
+            "Pending response for index %u sent to client %llu (invoke_id=%d)\n",
+            index, (long long unsigned)mit->second.requestor_addr,
+            mit->second.invoke_id);
         pending.erase(index);
     }
 

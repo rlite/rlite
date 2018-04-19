@@ -632,7 +632,7 @@ RoutingEngine::compute_next_hops(const NodeId &local_node)
         }
     }
 
-    PV_S("Graph [%lu nodes]:\n", routing->db.size());
+    PV_S("Graph [%lu nodes]:\n", (long unsigned)routing->db.size());
     for (const auto &kvg : graph) {
         PV_S("%s: {", kvg.first.c_str());
         for (const Edge &edge : kvg.second) {

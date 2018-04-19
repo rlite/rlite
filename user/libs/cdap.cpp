@@ -339,7 +339,7 @@ InvokeIdMgr::__discard(unordered_set<Id, IdHasher> &pending)
     time_t now = time(nullptr);
 
     for (auto i = pending.begin(); i != pending.end(); i++) {
-        if (now - i->created > discard_secs) {
+        if (now - i->created > static_cast<time_t>(discard_secs)) {
             torm.push_back(i);
         }
     }
