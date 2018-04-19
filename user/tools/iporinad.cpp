@@ -156,6 +156,10 @@ public:
     /* Enable verbose mode */
     int verbose = 0;
 
+    /* QoS parameters */
+    int max_delay = 0;
+    int max_loss  = RINA_FLOW_SPEC_LOSS_MAX;
+
     void start_workers();
     int setup();
     int main_loop();
@@ -1098,7 +1102,9 @@ IPoRINA::connect_to_remotes()
                     spec.in_order_delivery = 1;
                     spec.msg_boundaries    = 1;
                 }
-                wfd = rina_flow_alloc(
+                spec.max_loss  = (uint16_t)g->max_loss;
+                spec.max_delay = (uint32_t)g->max_delay;
+                wfd            = rina_flow_alloc(
                     kv.second.dif_name.c_str(), myname.c_str(),
                     kv.second.app_name.c_str(), &spec, RINA_F_NOWAIT);
                 if (wfd < 0) {
@@ -1215,6 +1221,32 @@ IPoRINA::connect_to_remotes()
     }
 }
 
+/* Turn this program into a daemon process. */
+static void
+daemonize(void)
+{
+    pid_t pid = fork();
+    pid_t sid;
+
+    if (pid < 0) {
+        perror("fork(daemonize)");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid > 0) {
+        /* This is the parent. We can terminate it. */
+        exit(0);
+    }
+
+    /* Execution continues only in the child's context. */
+    sid = setsid();
+    if (sid < 0) {
+        exit(EXIT_FAILURE);
+    }
+
+    chdir("/");
+}
+
 static void
 usage(void)
 {
@@ -1222,16 +1254,22 @@ usage(void)
          << "   -h : show this help" << endl
          << "   -c CONF_FILE: path to config file "
             "(default /etc/rina/iporinad.conf)"
-         << endl;
+         << "   -L NUM : maximum loss probability introduced by the flow "
+            "(NUM/"
+         << RINA_FLOW_SPEC_LOSS_MAX << ")" << endl
+         << "   -E NUM : maximum delay introduced by the flow (microseconds)"
+         << endl
+         << "   -v : be verbose" << endl;
 }
 
 int
 main(int argc, char **argv)
 {
     const char *confpath = "/etc/rina/iporinad.conf";
+    int background       = 0;
     int opt;
 
-    while ((opt = getopt(argc, argv, "hc:v")) != -1) {
+    while ((opt = getopt(argc, argv, "hc:vL:E:w")) != -1) {
         switch (opt) {
         case 'h':
             usage();
@@ -1243,6 +1281,26 @@ main(int argc, char **argv)
 
         case 'v':
             g->verbose++;
+            break;
+
+        case 'L':
+            g->max_loss = atoi(optarg);
+            if (g->max_loss < 0 || g->max_loss > RINA_FLOW_SPEC_LOSS_MAX) {
+                cout << "    Invalid 'max loss' " << g->max_loss << endl;
+                return -1;
+            }
+            break;
+
+        case 'E':
+            g->max_delay = atoi(optarg);
+            if (g->max_delay < 0 || g->max_delay > 5000000) {
+                cout << "    Invalid 'max delay' " << g->max_delay << endl;
+                return -1;
+            }
+            break;
+
+        case 'w':
+            background = 1;
             break;
 
         default:
@@ -1274,6 +1332,10 @@ main(int argc, char **argv)
     /* Name registration and creation of TUN devices. */
     if (g->setup()) {
         return -1;
+    }
+
+    if (background) {
+        daemonize();
     }
 
     /* Start the threads that will carry out the forwarding work. */
