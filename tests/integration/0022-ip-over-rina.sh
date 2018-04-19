@@ -14,8 +14,8 @@ route       10.9.12.0/24
 route       10.9.13.0/24
 EOF
 
-iporinad -c iporinad1.conf || exit 1 &
-iporinad -c iporinad2.conf || exit 1 &
+iporinad -w -c iporinad1.conf || exit 1
+iporinad -w -c iporinad2.conf || exit 1
 sleep 2
 pkill iporinad || exit 1
 
