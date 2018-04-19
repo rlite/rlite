@@ -1221,6 +1221,32 @@ IPoRINA::connect_to_remotes()
     }
 }
 
+/* Turn this program into a daemon process. */
+static void
+daemonize(void)
+{
+    pid_t pid = fork();
+    pid_t sid;
+
+    if (pid < 0) {
+        perror("fork(daemonize)");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid > 0) {
+        /* This is the parent. We can terminate it. */
+        exit(0);
+    }
+
+    /* Execution continues only in the child's context. */
+    sid = setsid();
+    if (sid < 0) {
+        exit(EXIT_FAILURE);
+    }
+
+    chdir("/");
+}
+
 static void
 usage(void)
 {
@@ -1240,9 +1266,10 @@ int
 main(int argc, char **argv)
 {
     const char *confpath = "/etc/rina/iporinad.conf";
+    int background       = 0;
     int opt;
 
-    while ((opt = getopt(argc, argv, "hc:vL:E:")) != -1) {
+    while ((opt = getopt(argc, argv, "hc:vL:E:w")) != -1) {
         switch (opt) {
         case 'h':
             usage();
@@ -1270,6 +1297,10 @@ main(int argc, char **argv)
                 cout << "    Invalid 'max delay' " << g->max_delay << endl;
                 return -1;
             }
+            break;
+
+        case 'w':
+            background = 1;
             break;
 
         default:
@@ -1301,6 +1332,10 @@ main(int argc, char **argv)
     /* Name registration and creation of TUN devices. */
     if (g->setup()) {
         return -1;
+    }
+
+    if (background) {
+        daemonize();
     }
 
     /* Start the threads that will carry out the forwarding work. */
