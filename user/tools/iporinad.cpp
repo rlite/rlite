@@ -1010,6 +1010,7 @@ IPoRINA::main_loop()
         size_t objlen;
         Hello hello;
         string remote_name;
+        Remote *r = nullptr;
 
         /* CDAP server-side connection setup. */
         rm = conn.accept();
@@ -1037,19 +1038,21 @@ IPoRINA::main_loop()
                 cout << "M_START(data) received from " << remote_name << endl;
             }
 
-            std::lock_guard<std::mutex> lock(remotes[remote_name]->mutex);
+            r = remotes[remote_name].get();
 
-            if (!remotes[remote_name]->flow_alloc_needed[IPOR_DATA]) {
+            std::lock_guard<std::mutex> lock(r->mutex);
+
+            if (!r->flow_alloc_needed[IPOR_DATA]) {
                 /* This is a race condition, we already have a data flow
                  * for this remote. */
                 close(cfd);
                 continue;
             }
-            remotes[remote_name]->rfd                          = cfd;
-            remotes[remote_name]->flow_alloc_needed[IPOR_DATA] = false;
-            remotes[remote_name]->mss_configure();
+            r->rfd                          = cfd;
+            r->flow_alloc_needed[IPOR_DATA] = false;
+            r->mss_configure();
             /* Submit the new fd mapping to a worker thread. */
-            submit(remotes[remote_name].get());
+            submit(r);
             continue;
         }
 
@@ -1064,8 +1067,7 @@ IPoRINA::main_loop()
         if (remotes.count(remote_name) == 0) {
             remotes[remote_name] = make_unique<Remote>();
 
-            Remote *r = remotes[remote_name].get();
-
+            r           = remotes[remote_name].get();
             r->app_name = remote_name;
             r->dif_name = string();
             if (r->tun_alloc()) {
@@ -1074,19 +1076,18 @@ IPoRINA::main_loop()
             }
         }
 
-        remotes[remote_name]->tun_local_addr  = IPAddr(hello.tun_dst_addr);
-        remotes[remote_name]->tun_remote_addr = IPAddr(hello.tun_src_addr);
+        r                  = remotes[remote_name].get();
+        r->tun_local_addr  = IPAddr(hello.tun_dst_addr);
+        r->tun_remote_addr = IPAddr(hello.tun_src_addr);
 
         cout << "Hello received from " << remote_name << ": "
              << hello.num_routes << " routes, tun_subnet " << hello.tun_subnet
-             << ", local IP "
-             << static_cast<string>(remotes[remote_name]->tun_local_addr)
-             << ", remote IP "
-             << static_cast<string>(remotes[remote_name]->tun_remote_addr)
+             << ", local IP " << static_cast<string>(r->tun_local_addr)
+             << ", remote IP " << static_cast<string>(r->tun_remote_addr)
              << endl;
 
         /* Receive routes from peer. */
-        remotes[remote_name]->routes.clear();
+        r->routes.clear();
         for (unsigned int i = 0; i < hello.num_routes; i++) {
             RouteObj robj;
             size_t prevlen;
@@ -1105,16 +1106,16 @@ IPoRINA::main_loop()
             robj = RouteObj(objbuf, objlen);
 
             /* Add the route in the set. */
-            prevlen = remotes[remote_name]->routes.size();
-            remotes[remote_name]->routes.insert(Route(robj.route));
-            if (remotes[remote_name]->routes.size() > prevlen) {
+            prevlen = r->routes.size();
+            r->routes.insert(Route(robj.route));
+            if (r->routes.size() > prevlen) {
                 /* Log only if the route was added to the set. */
                 cout << "Route " << robj.route << " reachable through "
                      << remote_name << endl;
             }
         }
 
-        remotes[remote_name]->ip_configure();
+        r->ip_configure();
 
     abor:
         close(cfd);
