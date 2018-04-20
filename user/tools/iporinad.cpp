@@ -607,7 +607,7 @@ execute_command(stringstream &cmdss)
     /* Allocate a working copy for the arguments. */
     argv = new char *[tokens.size() + 1];
     for (unsigned i = 0; i <= tokens.size(); i++) {
-        argv[i] = NULL;
+        argv[i] = nullptr;
     }
     for (unsigned i = 0; i < tokens.size(); i++) {
         argv[i] = strdup(tokens[i].c_str());
@@ -648,7 +648,7 @@ out:
     for (unsigned i = 0; i < tokens.size(); i++) {
         if (argv[i]) {
             free(argv[i]);
-            argv[i] = NULL;
+            argv[i] = nullptr;
         }
     }
 
@@ -990,7 +990,7 @@ IPoRINA::main_loop()
 
         /* New incoming connection. */
         assert(pfd[0].revents & POLLIN);
-        cfd = rina_flow_accept(rfd, NULL, NULL, 0);
+        cfd = rina_flow_accept(rfd, nullptr, nullptr, 0);
         if (cfd < 0) {
             if (errno == ENOSPC) {
                 continue;
@@ -1028,7 +1028,7 @@ IPoRINA::main_loop()
 
         if (rm->obj_class == "data") {
             /* This is a data flow. */
-            rm = NULL;
+            rm = nullptr;
             if (remotes.count(remote_name) == 0) {
                 cerr << "M_START(data) for unknown remote" << endl;
                 goto abor;
@@ -1205,7 +1205,7 @@ IPoRINA::connect_to_remotes()
 
                 /* CDAP connection setup. */
                 if (conn.connect(myname, kv.second->app_name, gpb::AUTH_NONE,
-                                 NULL)) {
+                                 nullptr)) {
                     cerr << "CDAP connection failed" << endl;
                     goto abor;
                 }
@@ -1214,7 +1214,7 @@ IPoRINA::connect_to_remotes()
                     /* This is a data connection, send an empty CDAP start
                      * message to inform the remote peer. */
                     m.m_start("data", "/data");
-                    if (cdap_obj_send(&conn, &m, 0, NULL) < 0) {
+                    if (cdap_obj_send(&conn, &m, 0, nullptr) < 0) {
                         cerr << "Failed to send M_START(data)" << endl;
                         goto abor;
                     }
