@@ -39,6 +39,7 @@
 #include <algorithm>
 #include <memory>
 #include <thread>
+#include <mutex>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -56,6 +57,7 @@
 #include <rina/cdap.hpp>
 #include "fdfwd.hpp"
 #include "iporina.pb.h"
+#include "rlite/cpputils.hpp"
 
 using namespace std;
 
@@ -167,7 +169,7 @@ class IPoRINA {
 
     /* Daemon configuration. */
     Local local;
-    map<string, Remote> remotes;
+    map<string, std::unique_ptr<Remote>> remotes;
     list<Route> local_routes;
 
     /* Map to keep track of active sessions. Used to react on
@@ -832,7 +834,7 @@ IPoRINA::parse_conf(const char *path)
                      << endl;
                 return -1;
             }
-            remotes[tokens[1]] = Remote(tokens[1], tokens[2], subnet);
+            remotes[tokens[1]] = make_unique<Remote>(tokens[1], tokens[2], subnet);
 
         } else if (tokens[0] == "route") {
             IPAddr subnet;
@@ -870,8 +872,8 @@ IPoRINA::dump_conf()
 
     cout << "Remotes:" << endl;
     for (const auto &kv : remotes) {
-        cout << "   " << kv.second.app_name << " in DIF " << kv.second.dif_name
-             << ", tunnel prefix " << kv.second.tun_subnet.repr << endl;
+        cout << "   " << kv.second->app_name << " in DIF " << kv.second->dif_name
+             << ", tunnel prefix " << kv.second->tun_subnet.repr << endl;
     }
 
     cout << "Advertised routes:" << endl;
@@ -904,7 +906,7 @@ IPoRINA::setup(void)
 
     /* Create a TUN device for each remote. */
     for (auto &kv : remotes) {
-        if (kv.second.tun_alloc()) {
+        if (kv.second->tun_alloc()) {
             return -1;
         }
     }
@@ -964,14 +966,14 @@ IPoRINA::main_loop()
                     cerr << "Failed to match completed session (token=" << token
                          << ")" << endl;
                 } else {
-                    Remote &r = remotes[active_sessions[token]];
+                    Remote *r = remotes[active_sessions[token]].get();
                     cout << "Remote " << active_sessions[token]
                          << " disconnected" << endl;
                     active_sessions.erase(token);
-                    r.ip_cleanup();
+                    r->ip_cleanup();
                     /* Trigger flow reallocation towards the peer. */
-                    r.flow_alloc_needed[IPOR_CTRL] =
-                        r.flow_alloc_needed[IPOR_DATA] = true;
+                    r->flow_alloc_needed[IPOR_CTRL] =
+                        r->flow_alloc_needed[IPOR_DATA] = true;
                 }
             }
             continue;
@@ -1025,11 +1027,11 @@ IPoRINA::main_loop()
             if (verbose) {
                 cout << "M_START(data) received from " << remote_name << endl;
             }
-            remotes[remote_name].rfd                          = cfd;
-            remotes[remote_name].flow_alloc_needed[IPOR_DATA] = false;
-            remotes[remote_name].mss_configure();
+            remotes[remote_name]->rfd                          = cfd;
+            remotes[remote_name]->flow_alloc_needed[IPOR_DATA] = false;
+            remotes[remote_name]->mss_configure();
             /* Submit the new fd mapping to a worker thread. */
-            submit(&remotes[remote_name]);
+            submit(remotes[remote_name].get());
             continue;
         }
 
@@ -1042,31 +1044,31 @@ IPoRINA::main_loop()
         hello = Hello(objbuf, objlen);
 
         if (remotes.count(remote_name) == 0) {
-            remotes[remote_name] = Remote();
+            remotes[remote_name] = make_unique<Remote>();
 
-            Remote &r = remotes[remote_name];
+            Remote *r = remotes[remote_name].get();
 
-            r.app_name = remote_name;
-            r.dif_name = string();
-            if (r.tun_alloc()) {
+            r->app_name = remote_name;
+            r->dif_name = string();
+            if (r->tun_alloc()) {
                 close(cfd);
                 goto abor;
             }
         }
 
-        remotes[remote_name].tun_local_addr  = IPAddr(hello.tun_dst_addr);
-        remotes[remote_name].tun_remote_addr = IPAddr(hello.tun_src_addr);
+        remotes[remote_name]->tun_local_addr  = IPAddr(hello.tun_dst_addr);
+        remotes[remote_name]->tun_remote_addr = IPAddr(hello.tun_src_addr);
 
         cout << "Hello received from " << remote_name << ": "
              << hello.num_routes << " routes, tun_subnet " << hello.tun_subnet
              << ", local IP "
-             << static_cast<string>(remotes[remote_name].tun_local_addr)
+             << static_cast<string>(remotes[remote_name]->tun_local_addr)
              << ", remote IP "
-             << static_cast<string>(remotes[remote_name].tun_remote_addr)
+             << static_cast<string>(remotes[remote_name]->tun_remote_addr)
              << endl;
 
         /* Receive routes from peer. */
-        remotes[remote_name].routes.clear();
+        remotes[remote_name]->routes.clear();
         for (unsigned int i = 0; i < hello.num_routes; i++) {
             RouteObj robj;
             size_t prevlen;
@@ -1085,16 +1087,16 @@ IPoRINA::main_loop()
             robj = RouteObj(objbuf, objlen);
 
             /* Add the route in the set. */
-            prevlen = remotes[remote_name].routes.size();
-            remotes[remote_name].routes.insert(Route(robj.route));
-            if (remotes[remote_name].routes.size() > prevlen) {
+            prevlen = remotes[remote_name]->routes.size();
+            remotes[remote_name]->routes.insert(Route(robj.route));
+            if (remotes[remote_name]->routes.size() > prevlen) {
                 /* Log only if the route was added to the set. */
                 cout << "Route " << robj.route << " reachable through "
                      << remote_name << endl;
             }
         }
 
-        remotes[remote_name].ip_configure();
+        remotes[remote_name]->ip_configure();
 
     abor:
         close(cfd);
@@ -1118,7 +1120,7 @@ IPoRINA::connect_to_remotes()
                 int ret;
                 int wfd;
 
-                if (!kv.second.flow_alloc_needed[i]) {
+                if (!kv.second->flow_alloc_needed[i]) {
                     /* We already connected to this remote. */
                     continue;
                 }
@@ -1134,12 +1136,12 @@ IPoRINA::connect_to_remotes()
                 spec.max_loss  = (uint16_t)g->max_loss;
                 spec.max_delay = (uint32_t)g->max_delay;
                 wfd            = rina_flow_alloc(
-                    kv.second.dif_name.c_str(), myname.c_str(),
-                    kv.second.app_name.c_str(), &spec, RINA_F_NOWAIT);
+                    kv.second->dif_name.c_str(), myname.c_str(),
+                    kv.second->app_name.c_str(), &spec, RINA_F_NOWAIT);
                 if (wfd < 0) {
                     perror("rina_flow_alloc()");
-                    cout << "Failed to connect to remote " << kv.second.app_name
-                         << " through DIF " << kv.second.dif_name << endl;
+                    cout << "Failed to connect to remote " << kv.second->app_name
+                         << " through DIF " << kv.second->dif_name << endl;
                     continue;
                 }
                 pfd.fd     = wfd;
@@ -1150,8 +1152,8 @@ IPoRINA::connect_to_remotes()
                         perror("poll(wfd)");
                     } else if (verbose) {
                         cout << "Failed to connect to remote "
-                             << kv.second.app_name << " through DIF "
-                             << kv.second.dif_name << endl;
+                             << kv.second->app_name << " through DIF "
+                             << kv.second->dif_name << endl;
                     }
                     close(wfd);
                     continue;
@@ -1164,15 +1166,15 @@ IPoRINA::connect_to_remotes()
                             perror("rina_flow_alloc_wait()");
                         }
                         cout << "Failed to connect to remote "
-                             << kv.second.app_name << " through DIF "
-                             << kv.second.dif_name << endl;
+                             << kv.second->app_name << " through DIF "
+                             << kv.second->dif_name << endl;
                     }
                     continue;
                 }
 
                 if (verbose > 1) {
-                    cout << "Flow allocated to remote " << kv.second.app_name
-                         << " through DIF " << kv.second.dif_name << endl;
+                    cout << "Flow allocated to remote " << kv.second->app_name
+                         << " through DIF " << kv.second->dif_name << endl;
                 }
 
                 CDAPConn conn(rfd);
@@ -1181,7 +1183,7 @@ IPoRINA::connect_to_remotes()
                 Hello hello;
 
                 /* CDAP connection setup. */
-                if (conn.connect(myname, kv.second.app_name, gpb::AUTH_NONE,
+                if (conn.connect(myname, kv.second->app_name, gpb::AUTH_NONE,
                                  NULL)) {
                     cerr << "CDAP connection failed" << endl;
                     goto abor;
@@ -1195,30 +1197,30 @@ IPoRINA::connect_to_remotes()
                         cerr << "Failed to send M_START(data)" << endl;
                         goto abor;
                     }
-                    kv.second.rfd = rfd;
-                    kv.second.mss_configure();
+                    kv.second->rfd = rfd;
+                    kv.second->mss_configure();
 
                     /* Submit the new fd mapping to a worker thread. */
-                    submit(&kv.second);
+                    submit(kv.second.get());
 
                 } else {
                     /* This is a control connection. */
 
                     /* Assign tunnel IP addresses if needed. */
-                    if (kv.second.tun_local_addr.empty() ||
-                        kv.second.tun_remote_addr.empty()) {
-                        kv.second.tun_local_addr =
-                            kv.second.tun_subnet.hostaddr(1);
-                        kv.second.tun_remote_addr =
-                            kv.second.tun_subnet.hostaddr(2);
+                    if (kv.second->tun_local_addr.empty() ||
+                        kv.second->tun_remote_addr.empty()) {
+                        kv.second->tun_local_addr =
+                            kv.second->tun_subnet.hostaddr(1);
+                        kv.second->tun_remote_addr =
+                            kv.second->tun_subnet.hostaddr(2);
                     }
 
                     /* Exchange routes. */
                     m.m_start("hello", "/hello");
                     hello.num_routes   = local_routes.size();
-                    hello.tun_subnet   = kv.second.tun_subnet;
-                    hello.tun_src_addr = kv.second.tun_local_addr;
-                    hello.tun_dst_addr = kv.second.tun_remote_addr;
+                    hello.tun_subnet   = kv.second->tun_subnet;
+                    hello.tun_src_addr = kv.second->tun_local_addr;
+                    hello.tun_dst_addr = kv.second->tun_remote_addr;
                     if (cdap_obj_send(&conn, &m, 0, &hello) < 0) {
                         cerr << "Failed to send M_START(hello)" << endl;
                         goto abor;
@@ -1233,10 +1235,10 @@ IPoRINA::connect_to_remotes()
                             goto abor;
                         }
                     }
-                    kv.second.ip_configure();
+                    kv.second->ip_configure();
                 }
 
-                kv.second.flow_alloc_needed[i] = false;
+                kv.second->flow_alloc_needed[i] = false;
             abor:
                 /* Don't close a data file descriptor which is going
                  * to be used. */
