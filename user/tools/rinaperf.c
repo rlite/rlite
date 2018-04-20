@@ -364,9 +364,8 @@ ping_report(struct rp_result_msg *snd, struct rp_result_msg *rcv)
     PRINTF("%10s %15s %10s %10s %15s\n", "", "Transactions", "Kpps", "Mbps",
            "Latency (ns)");
     PRINTF("%-10s %15llu %10.3f %10.3f %15llu\n", "Sender",
-           (long long unsigned)snd->cnt,
-           (double)snd->pps / 1000.0, (double)snd->bps / 1000000.0,
-           (long long unsigned)snd->latency);
+           (long long unsigned)snd->cnt, (double)snd->pps / 1000.0,
+           (double)snd->bps / 1000000.0, (long long unsigned)snd->latency);
 #if 0
     PRINTF("%-10s %15lu %10.3f %10.3f %15lu\n",
             "Receiver", rcv->cnt, (double)rcv->pps/1000.0,
@@ -669,11 +668,11 @@ perf_report(struct rp_result_msg *snd, struct rp_result_msg *rcv)
 {
     PRINTF("%10s %12s %10s %10s\n", "", "Packets", "Kpps", "Mbps");
     PRINTF("%-10s %12llu %10.3f %10.3f\n", "Sender",
-           (long long unsigned)snd->cnt,
-           (double)snd->pps / 1000.0, (double)snd->bps / 1000000.0);
+           (long long unsigned)snd->cnt, (double)snd->pps / 1000.0,
+           (double)snd->bps / 1000000.0);
     PRINTF("%-10s %12llu %10.3f %10.3f\n", "Receiver",
-           (long long unsigned)rcv->cnt,
-           (double)rcv->pps / 1000.0, (double)rcv->bps / 1000000.0);
+           (long long unsigned)rcv->cnt, (double)rcv->pps / 1000.0,
+           (double)rcv->bps / 1000000.0);
 }
 
 struct rp_test_desc {

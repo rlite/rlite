@@ -965,7 +965,8 @@ CentralizedFaultTolerantDFT::Replica::apply(raft::LogIndex index,
         m->invoke_id = mit->second.invoke_id;
         parent->rib->send_to_dst_addr(std::move(m), mit->second.requestor_addr);
         UPD(parent->rib->uipcp,
-            "Pending response for index %u sent to client %llu (invoke_id=%d)\n",
+            "Pending response for index %u sent to client %llu "
+            "(invoke_id=%d)\n",
             index, (long long unsigned)mit->second.requestor_addr,
             mit->second.invoke_id);
         pending.erase(index);
