@@ -141,6 +141,9 @@ struct Remote {
     /* Data file descriptor for the flow that supports the tunnel. */
     int rfd;
 
+    /* Prevent duplicated data flow for this remote. */
+    std::mutex mutex;
+
     Remote() : tun_fd(-1), rfd(-1)
     {
         flow_alloc_needed[IPOR_CTRL] = flow_alloc_needed[IPOR_DATA] = true;
@@ -975,6 +978,8 @@ IPoRINA::main_loop()
                          << " disconnected" << endl;
                     active_sessions.erase(token);
                     r->ip_cleanup();
+
+                    std::lock_guard<std::mutex> lock(r->mutex);
                     /* Trigger flow reallocation towards the peer. */
                     r->flow_alloc_needed[IPOR_CTRL] =
                         r->flow_alloc_needed[IPOR_DATA] = true;
@@ -1030,6 +1035,15 @@ IPoRINA::main_loop()
             }
             if (verbose) {
                 cout << "M_START(data) received from " << remote_name << endl;
+            }
+
+            std::lock_guard<std::mutex> lock(remotes[remote_name]->mutex);
+
+            if (!remotes[remote_name]->flow_alloc_needed[IPOR_DATA]) {
+                /* This is a race condition, we already have a data flow
+                 * for this remote. */
+                close(cfd);
+                continue;
             }
             remotes[remote_name]->rfd                          = cfd;
             remotes[remote_name]->flow_alloc_needed[IPOR_DATA] = false;
@@ -1117,6 +1131,8 @@ IPoRINA::connect_to_remotes()
 
     for (;;) {
         for (auto &kv : remotes) {
+            std::lock_guard<std::mutex> lock(kv.second->mutex);
+
             for (unsigned i = 0; i < IPOR_MAX; i++) {
                 struct rina_flow_spec spec;
                 struct pollfd pfd;
