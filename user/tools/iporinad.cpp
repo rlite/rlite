@@ -152,6 +152,8 @@ struct Remote {
         flow_alloc_needed[IPOR_CTRL] = flow_alloc_needed[IPOR_DATA] = true;
     }
 
+    RL_NONCOPIABLE(Remote);
+
     /* Allocate a tunnel device for this remote. */
     int tun_alloc();
 
