@@ -417,14 +417,13 @@ rl_conf_flows_print(struct list_head *flows)
              "remote addr/port %llu:%u, %s"
              "tx %llu pkt %llu byte %llu err, "
              "rx %llu pkt %llu byte %llu err\n",
-	     rl_flow->ipcp_id, (long long unsigned int)rl_flow->local_addr,
-	     rl_flow->local_port, (long long unsigned int)rl_flow->remote_addr,
-	     rl_flow->remote_port, specinfo, (long long unsigned)stats.tx_pkt,
-	     (long long unsigned)stats.tx_byte,
-	     (long long unsigned)stats.tx_err,
-	     (long long unsigned)stats.rx_pkt,
-	     (long long unsigned)stats.rx_byte,
-	     (long long unsigned)stats.rx_err);
+             rl_flow->ipcp_id, (long long unsigned int)rl_flow->local_addr,
+             rl_flow->local_port, (long long unsigned int)rl_flow->remote_addr,
+             rl_flow->remote_port, specinfo, (long long unsigned)stats.tx_pkt,
+             (long long unsigned)stats.tx_byte,
+             (long long unsigned)stats.tx_err, (long long unsigned)stats.rx_pkt,
+             (long long unsigned)stats.rx_byte,
+             (long long unsigned)stats.rx_err);
     }
 
     return 0;

@@ -836,7 +836,8 @@ IPoRINA::parse_conf(const char *path)
                      << endl;
                 return -1;
             }
-            remotes[tokens[1]] = make_unique<Remote>(tokens[1], tokens[2], subnet);
+            remotes[tokens[1]] =
+                make_unique<Remote>(tokens[1], tokens[2], subnet);
 
         } else if (tokens[0] == "route") {
             IPAddr subnet;
@@ -874,8 +875,9 @@ IPoRINA::dump_conf()
 
     cout << "Remotes:" << endl;
     for (const auto &kv : remotes) {
-        cout << "   " << kv.second->app_name << " in DIF " << kv.second->dif_name
-             << ", tunnel prefix " << kv.second->tun_subnet.repr << endl;
+        cout << "   " << kv.second->app_name << " in DIF "
+             << kv.second->dif_name << ", tunnel prefix "
+             << kv.second->tun_subnet.repr << endl;
     }
 
     cout << "Advertised routes:" << endl;
@@ -1142,8 +1144,9 @@ IPoRINA::connect_to_remotes()
                     kv.second->app_name.c_str(), &spec, RINA_F_NOWAIT);
                 if (wfd < 0) {
                     perror("rina_flow_alloc()");
-                    cout << "Failed to connect to remote " << kv.second->app_name
-                         << " through DIF " << kv.second->dif_name << endl;
+                    cout << "Failed to connect to remote "
+                         << kv.second->app_name << " through DIF "
+                         << kv.second->dif_name << endl;
                     continue;
                 }
                 pfd.fd     = wfd;
