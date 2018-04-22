@@ -1200,7 +1200,7 @@ IPoRINA::connect_to_remotes()
 
                 rfd = rina_flow_alloc_wait(wfd);
                 if (rfd < 0) {
-                    if (errno != EPERM || verbose > 1) {
+                    if (errno != EPERM || verbose > 0) {
                         if (errno != EPERM) {
                             perror("rina_flow_alloc_wait()");
                         }
@@ -1210,7 +1210,7 @@ IPoRINA::connect_to_remotes()
                     continue;
                 }
 
-                if (verbose > 1) {
+                if (verbose > 0) {
                     cout << "Flow allocated to remote " << r->app_name
                          << " through DIF " << r->dif_name << endl;
                 }
