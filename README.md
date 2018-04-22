@@ -1185,6 +1185,18 @@ towards the tun device associated to the peer.
     route       10.9.2.0/24
     route       10.9.3.0/24
 
+In the current iporinad prototype peers do not perform any routing or
+dissemination protocol. As an example, if node A specifies B in its remotes,
+A will send its local routes to B (and B will send its own to A at a later
+time).
+If B has a remote C that A does not have, then the routes received by B
+from A will not be disseminated to C. It follows that the iporinad user
+is normally expected to specify a full mesh in the configuration files
+(e.g., A specifies B and C, B specifies A and C, and C specifies A and B).
+Note that a proper routing protocol is anyway used by the DIF that supports
+the tunnel, so it may be that when A tunnels an IP packet towards C, the
+encapsulated RINA packet is routed to B to reach C.
+
 
 ### 7.3 rinaperf
 The rinaperf program is a simple multi-threaded client/server application that is able to measure
