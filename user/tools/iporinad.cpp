@@ -40,6 +40,7 @@
 #include <memory>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -184,6 +185,9 @@ class IPoRINA {
 
     /* Worker threads that forward traffic. */
     vector<std::unique_ptr<FwdWorker>> workers;
+
+    std::condition_variable connect_work;
+    std::mutex connect_lock;
 
 public:
     IPoRINA();
@@ -966,6 +970,7 @@ IPoRINA::main_loop()
         if (pfd[1].revents & POLLIN) {
             /* Some sessions terminated. */
             FwdToken token;
+            bool notify = false;
 
             while ((token = worker->get_next_closed()) != 0) {
                 if (!active_sessions.count(token) ||
@@ -983,7 +988,13 @@ IPoRINA::main_loop()
                     /* Trigger flow reallocation towards the peer. */
                     r->flow_alloc_needed[IPOR_CTRL] =
                         r->flow_alloc_needed[IPOR_DATA] = true;
+                    notify                              = true;
                 }
+            }
+
+            if (notify) {
+                std::unique_lock<std::mutex> lk(connect_lock);
+                connect_work.notify_one();
             }
             continue;
         }
@@ -1010,7 +1021,8 @@ IPoRINA::main_loop()
         size_t objlen;
         Hello hello;
         string remote_name;
-        Remote *r = nullptr;
+        Remote *r   = nullptr;
+        bool notify = false;
 
         /* CDAP server-side connection setup. */
         rm = conn.accept();
@@ -1074,6 +1086,7 @@ IPoRINA::main_loop()
                 close(cfd);
                 goto abor;
             }
+            notify = true; /* new remote added, we need to connect to it */
         }
 
         r                  = remotes[remote_name].get();
@@ -1116,6 +1129,11 @@ IPoRINA::main_loop()
         }
 
         r->ip_configure();
+
+        if (notify) {
+            std::unique_lock<std::mutex> lk(connect_lock);
+            connect_work.notify_one();
+        }
 
     abor:
         close(cfd);
@@ -1266,7 +1284,9 @@ IPoRINA::connect_to_remotes()
             }
         }
 
-        sleep(3);
+        /* Wait for more connection work. */
+        std::unique_lock<std::mutex> lk(connect_lock);
+        connect_work.wait_for(lk, std::chrono::seconds(3));
     }
 }
 
