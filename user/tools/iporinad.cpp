@@ -1132,7 +1132,8 @@ IPoRINA::connect_to_remotes()
 
     for (;;) {
         for (auto &kv : remotes) {
-            std::lock_guard<std::mutex> lock(kv.second->mutex);
+            Remote *r = kv.second.get();
+            std::lock_guard<std::mutex> lock(r->mutex);
 
             for (unsigned i = 0; i < IPOR_MAX; i++) {
                 struct rina_flow_spec spec;
@@ -1141,7 +1142,7 @@ IPoRINA::connect_to_remotes()
                 int ret;
                 int wfd;
 
-                if (!kv.second->flow_alloc_needed[i]) {
+                if (!r->flow_alloc_needed[i]) {
                     /* We already connected to this remote. */
                     continue;
                 }
@@ -1156,14 +1157,13 @@ IPoRINA::connect_to_remotes()
                 }
                 spec.max_loss  = (uint16_t)g->max_loss;
                 spec.max_delay = (uint32_t)g->max_delay;
-                wfd            = rina_flow_alloc(
-                    kv.second->dif_name.c_str(), myname.c_str(),
-                    kv.second->app_name.c_str(), &spec, RINA_F_NOWAIT);
+                wfd =
+                    rina_flow_alloc(r->dif_name.c_str(), myname.c_str(),
+                                    r->app_name.c_str(), &spec, RINA_F_NOWAIT);
                 if (wfd < 0) {
                     perror("rina_flow_alloc()");
-                    cout << "Failed to connect to remote "
-                         << kv.second->app_name << " through DIF "
-                         << kv.second->dif_name << endl;
+                    cout << "Failed to connect to remote " << r->app_name
+                         << " through DIF " << r->dif_name << endl;
                     continue;
                 }
                 pfd.fd     = wfd;
@@ -1173,9 +1173,8 @@ IPoRINA::connect_to_remotes()
                     if (ret < 0) {
                         perror("poll(wfd)");
                     } else if (verbose) {
-                        cout << "Failed to connect to remote "
-                             << kv.second->app_name << " through DIF "
-                             << kv.second->dif_name << endl;
+                        cout << "Failed to connect to remote " << r->app_name
+                             << " through DIF " << r->dif_name << endl;
                     }
                     close(wfd);
                     continue;
@@ -1187,16 +1186,15 @@ IPoRINA::connect_to_remotes()
                         if (errno != EPERM) {
                             perror("rina_flow_alloc_wait()");
                         }
-                        cout << "Failed to connect to remote "
-                             << kv.second->app_name << " through DIF "
-                             << kv.second->dif_name << endl;
+                        cout << "Failed to connect to remote " << r->app_name
+                             << " through DIF " << r->dif_name << endl;
                     }
                     continue;
                 }
 
                 if (verbose > 1) {
-                    cout << "Flow allocated to remote " << kv.second->app_name
-                         << " through DIF " << kv.second->dif_name << endl;
+                    cout << "Flow allocated to remote " << r->app_name
+                         << " through DIF " << r->dif_name << endl;
                 }
 
                 CDAPConn conn(rfd);
@@ -1205,7 +1203,7 @@ IPoRINA::connect_to_remotes()
                 Hello hello;
 
                 /* CDAP connection setup. */
-                if (conn.connect(myname, kv.second->app_name, gpb::AUTH_NONE,
+                if (conn.connect(myname, r->app_name, gpb::AUTH_NONE,
                                  nullptr)) {
                     cerr << "CDAP connection failed" << endl;
                     goto abor;
@@ -1219,30 +1217,28 @@ IPoRINA::connect_to_remotes()
                         cerr << "Failed to send M_START(data)" << endl;
                         goto abor;
                     }
-                    kv.second->rfd = rfd;
-                    kv.second->mss_configure();
+                    r->rfd = rfd;
+                    r->mss_configure();
 
                     /* Submit the new fd mapping to a worker thread. */
-                    submit(kv.second.get());
+                    submit(r);
 
                 } else {
                     /* This is a control connection. */
 
                     /* Assign tunnel IP addresses if needed. */
-                    if (kv.second->tun_local_addr.empty() ||
-                        kv.second->tun_remote_addr.empty()) {
-                        kv.second->tun_local_addr =
-                            kv.second->tun_subnet.hostaddr(1);
-                        kv.second->tun_remote_addr =
-                            kv.second->tun_subnet.hostaddr(2);
+                    if (r->tun_local_addr.empty() ||
+                        r->tun_remote_addr.empty()) {
+                        r->tun_local_addr  = r->tun_subnet.hostaddr(1);
+                        r->tun_remote_addr = r->tun_subnet.hostaddr(2);
                     }
 
                     /* Exchange routes. */
                     m.m_start("hello", "/hello");
                     hello.num_routes   = local_routes.size();
-                    hello.tun_subnet   = kv.second->tun_subnet;
-                    hello.tun_src_addr = kv.second->tun_local_addr;
-                    hello.tun_dst_addr = kv.second->tun_remote_addr;
+                    hello.tun_subnet   = r->tun_subnet;
+                    hello.tun_src_addr = r->tun_local_addr;
+                    hello.tun_dst_addr = r->tun_remote_addr;
                     if (cdap_obj_send(&conn, &m, 0, &hello) < 0) {
                         cerr << "Failed to send M_START(hello)" << endl;
                         goto abor;
@@ -1257,10 +1253,10 @@ IPoRINA::connect_to_remotes()
                             goto abor;
                         }
                     }
-                    kv.second->ip_configure();
+                    r->ip_configure();
                 }
 
-                kv.second->flow_alloc_needed[i] = false;
+                r->flow_alloc_needed[i] = false;
             abor:
                 /* Don't close a data file descriptor which is going
                  * to be used. */
