@@ -300,9 +300,6 @@ rcv_inact_tmr_cb(
     spin_unlock_bh(&dtp->lock);
 }
 
-#define RL_RMT_F_MAYSLEEP 1
-#define RL_RMT_F_MAYDROP 2
-
 static int rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr,
                   struct rl_buf *rb, unsigned flags);
 
@@ -621,7 +618,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
         current->state = TASK_INTERRUPTIBLE;
 
         /* Try to push the rb down to the lower IPCP. */
-        ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb, maysleep);
+        ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb, flags);
 
         if (ret == -EAGAIN) {
             /* The lower IPCP cannot transmit it for the time being. If we
@@ -720,7 +717,7 @@ rl_normal_flow_writeable(struct flow_entry *flow)
 
 static int
 rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                    struct rl_buf *rb, bool maysleep)
+                    struct rl_buf *rb, unsigned flags)
 {
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
     struct dtp *dtp        = &flow->dtp;
@@ -736,7 +733,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
             ktime_t now;
             unsigned long us;
 
-            if (!maysleep) {
+            if (!(flags & RL_RMT_F_MAYSLEEP)) {
                 spin_unlock_bh(&dtp->lock);
                 return -EAGAIN;
             }
@@ -858,8 +855,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         return 0;
     }
 
-    return rmt_tx(ipcp, flow->remote_addr, rb,
-                  maysleep ? RL_RMT_F_MAYSLEEP : 0);
+    return rmt_tx(ipcp, flow->remote_addr, rb, flags);
 }
 
 /* Get N-1 flow and N-1 IPCP where the mgmt PDU should be

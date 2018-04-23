@@ -431,8 +431,10 @@ struct ipcp_ops {
     int (*flow_deallocated)(struct ipcp_entry *ipcp, struct flow_entry *flow);
     int (*flow_get_stats)(struct flow_entry *flow, struct rl_flow_stats *stats);
 
+#define RL_RMT_F_MAYSLEEP 1
+#define RL_RMT_F_MAYDROP 2
     int (*sdu_write)(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                     struct rl_buf *rb, bool maysleep);
+                     struct rl_buf *rb, unsigned flags);
     struct rl_buf *(*sdu_rx)(struct ipcp_entry *ipcp, struct rl_buf *rb,
                              struct flow_entry *lower_flow);
     int (*config)(struct ipcp_entry *ipcp, const char *param_name,

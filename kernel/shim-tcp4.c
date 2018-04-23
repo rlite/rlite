@@ -421,7 +421,7 @@ rl_shim_tcp4_flow_writeable(struct flow_entry *flow)
 
 static int
 rl_shim_tcp4_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                       struct rl_buf *rb, bool maysleep)
+                       struct rl_buf *rb, unsigned flags)
 {
     struct shim_tcp4_flow *flow_priv = flow->priv;
     struct rl_shim_tcp4 *shim        = ipcp->priv;
@@ -432,7 +432,7 @@ rl_shim_tcp4_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         return -EAGAIN;
     }
 
-    if (!maysleep) {
+    if (!(flags & RL_RMT_F_MAYSLEEP)) {
         struct txq_entry *qe =
             rl_alloc(sizeof(*qe), GFP_ATOMIC, RL_MT_SHIMDATA);
         bool drop = false;

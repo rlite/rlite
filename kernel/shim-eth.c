@@ -780,7 +780,7 @@ rl_shim_eth_flow_writeable(struct flow_entry *flow)
 
 static int
 rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                      struct rl_buf *rb, bool maysleep)
+                      struct rl_buf *rb, unsigned flags)
 {
     struct rl_shim_eth *priv  = ipcp->priv;
     struct net_device *netdev = priv->netdev;
