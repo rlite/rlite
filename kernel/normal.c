@@ -154,7 +154,8 @@ rl_normal_create(struct ipcp_entry *ipcp)
     hash_init(priv->pdu_ft);
     priv->pduft_dflt = NULL;
     rwlock_init(&priv->pduft_lock);
-    priv->ttl = RL_TTL_DFLT;
+    priv->ttl  = RL_TTL_DFLT;
+    priv->csum = false;
 
     PD("New IPC created [%p]\n", priv);
 
@@ -529,6 +530,50 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     return 0;
 }
 
+/* Internet checksum computation is endianness independent, so it can be
+ * peformed in host order. The caller is expected to store the result in
+ * host order. */
+static uint32_t
+inet_csum(const void *data, uint16_t len, uint32_t sum /* host endianness */)
+{
+    const uint8_t *addr = data;
+    uint32_t i;
+#if 0
+    char *sbuf = kmalloc(len * 2 + 10, GFP_ATOMIC);
+    for (i = 0; i < len; i++) {
+        sprintf(sbuf + 2 * i, "%02x", addr[i]);
+    }
+    printk("pkt: %s\n", sbuf);
+    kfree(sbuf);
+#endif
+
+    /* Checksum all the pairs of bytes first... */
+    for (i = 0; i < (len & ~1U); i += 2) {
+        sum += (u_int16_t)(*((u_int16_t *)(addr + i)));
+        if (sum > 0xFFFF)
+            sum -= 0xFFFF;
+    }
+    /*
+     * If there's a single byte left over, checksum it, too.
+     * Network byte order is big-endian, but we need to interpret
+     * it in host order.
+     */
+    if (i < len) {
+        sum += ntohs(addr[i] << 8);
+        if (sum > 0xFFFF)
+            sum -= 0xFFFF;
+    }
+
+    return sum;
+}
+
+static inline uint16_t
+inet_wrapsum(uint32_t sum)
+{
+    sum = ~sum & 0xFFFF;
+    return sum; /* host endianness */
+}
+
 #define RMTQ_MAX_SIZE (1 << 17)
 
 static int
@@ -743,6 +788,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     pci->pdu_flags = 0;
     pci->pdu_len   = rb->len;
     pci->pdu_ttl   = priv->ttl;
+    pci->pdu_csum  = 0;
     pci->seqnum    = dtp->next_seq_num_to_use++;
 
     flow->stats.tx_pkt++;
@@ -751,6 +797,10 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     if (unlikely(dtp->flags & DTP_F_DRF_SET)) {
         dtp->flags &= ~DTP_F_DRF_SET;
         pci->pdu_flags |= PDU_F_DRF;
+    }
+
+    if (priv->csum) {
+        pci->pdu_csum = inet_wrapsum(inet_csum(pci, rb->len, 0));
     }
 
     if (!dtcp_present) {
@@ -864,7 +914,12 @@ rl_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
     pci->pdu_flags = 0; /* Not valid. */
     pci->pdu_len   = rb->len;
     pci->pdu_ttl   = priv->ttl;
+    pci->pdu_csum  = 0;
     pci->seqnum    = 0; /* Not valid. */
+
+    if (priv->csum) {
+        pci->pdu_csum = inet_wrapsum(inet_csum(pci, rb->len, 0));
+    }
 
     /* Caller can proceed and send the mgmt PDU. */
     return 0;
@@ -895,6 +950,14 @@ rl_normal_config(struct ipcp_entry *ipcp, const char *param_name,
             *notify = 0;
             PI("IPCP %u TTL set to %u\n", ipcp->id, (unsigned)ttl);
             priv->ttl = ttl;
+        }
+    } else if (strcmp(param_name, "csum") == 0) {
+        if (strcmp(param_value, "none") == 0 || strcmp(param_value, "") == 0) {
+            priv->csum = false;
+            ret        = 0;
+        } else if (strcmp(param_value, "inet") == 0) {
+            priv->csum = true;
+            ret        = 0;
         }
     }
 
@@ -932,6 +995,7 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
         pcic->base.pdu_flags         = 0;
         pcic->base.pdu_len           = rb->len;
         pcic->base.pdu_ttl           = priv->ttl;
+        pcic->base.pdu_csum          = 0;
         pcic->base.seqnum            = flow->dtp.next_snd_ctl_seq++;
         pcic->last_ctrl_seq_num_rcvd = flow->dtp.last_ctrl_seq_num_rcvd;
         pcic->ack_nack_seq_num       = flow->dtp.last_seq_num_acked =
@@ -940,6 +1004,9 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
         pcic->new_lwe = flow->dtp.last_lwe_sent = flow->dtp.rcv_lwe;
         pcic->my_rwe                            = flow->dtp.snd_rwe;
         pcic->my_lwe                            = flow->dtp.snd_lwe;
+        if (priv->csum) {
+            pcic->base.pdu_csum = inet_wrapsum(inet_csum(pcic, rb->len, 0));
+        }
     }
 
     return rb;
@@ -1236,7 +1303,8 @@ static struct rl_buf *
 rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
                  struct flow_entry *lower_flow)
 {
-    struct rina_pci *pci = RL_BUF_PCI(rb);
+    struct rl_normal *priv = ipcp->priv;
+    struct rina_pci *pci   = RL_BUF_PCI(rb);
     struct flow_entry *flow;
     rl_seq_t seqnum    = pci->seqnum;
     struct rl_buf *crb = NULL;
@@ -1257,6 +1325,13 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
     if (pci->pdu_len < rb->len) {
         /* Make up for tail padding introduced at lower layers. */
         rb->len = pci->pdu_len;
+    }
+
+    if (priv->csum) {
+        if (unlikely(inet_csum(pci, rb->len, 0) != 0xFFFF)) {
+            RPD(1, "Dropping PDU on wrong checksum %x %x\n", pci->pdu_csum,
+                inet_csum(pci, rb->len, 0));
+        }
     }
 
     if (unlikely(
@@ -1323,6 +1398,17 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
             RPD(1, "Dropping PDU on zero TTL\n");
             rl_buf_free(rb);
             return NULL; /* -EINVAL */
+        }
+        /* Update the checksum incrementally. */
+        if (priv->csum) {
+            uint32_t sum = pci->pdu_csum;
+            /* We need to use ntohs() on the increment, as we are doing
+             * swapped order computations on little endian machines. */
+            sum += ntohs(0x0100);
+            if (sum > 0xFFFF) {
+                sum -= 0xFFFF;
+            }
+            pci->pdu_csum = (uint16_t)sum;
         }
 
         rmt_tx(ipcp, pci->dst_addr, rb, false);

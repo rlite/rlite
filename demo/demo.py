@@ -251,6 +251,10 @@ argparser.add_argument('--enrollment-order',
 argparser.add_argument('--dump-initscripts',
                        help = "Dump an initscript for each machine",
                        action = "store_true", default = False);
+argparser.add_argument('--csum',
+                       help = "Use checksums for all the DIFs",
+                       type = str, choices = ['inet', 'none'],
+                       default = 'none')
 args = argparser.parse_args()
 
 
@@ -348,7 +352,8 @@ demo = Demo(flavour_suffix=flavour_suffix,
             register=args.register,
             simulate=args.simulate,
             broadcast_enrollment=args.broadcast_enrollment,
-            enrollment_strategy=args.enrollment_strategy)
+            enrollment_strategy=args.enrollment_strategy,
+            csum = args.csum)
 
 demo.parse_config(args.conf)
 
