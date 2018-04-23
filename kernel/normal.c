@@ -70,7 +70,7 @@ static inline int
 rl_buf_pci_pop(struct rl_buf *rb)
 {
     if (unlikely(rb->len < sizeof(struct rina_pci))) {
-        RPD(2, "No enough data to pop another PCI\n");
+        RPD(1, "No enough data to pop another PCI\n");
         return -1;
     }
 
@@ -89,7 +89,7 @@ rl_buf_pci_push(struct rl_buf *rb)
 {
 #ifndef RL_SKB
     if (unlikely((uint8_t *)(RL_BUF_PCI(rb) - 1) < &rb->raw->buf[0])) {
-        RPD(2, "No space to push another PCI\n");
+        RPD(1, "No space to push another PCI\n");
         return -1;
     }
 
@@ -417,7 +417,7 @@ rtx_tmr_cb(
     rb_list_foreach_safe (crb, tmp, &rrbq) {
         struct rina_pci *pci = RL_BUF_PCI(crb);
 
-        RPD(2, "sending [%lu] from rtxq\n", (long unsigned)pci->seqnum);
+        RPD(1, "sending [%lu] from rtxq\n", (long unsigned)pci->seqnum);
         rb_list_del(crb);
         rmt_tx(flow->txrx.ipcp, pci->dst_addr, crb, false);
     }
@@ -587,7 +587,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
 
     lower_flow = rl_pduft_lookup((struct rl_normal *)ipcp->priv, remote_addr);
     if (unlikely(!lower_flow && remote_addr != ipcp->addr)) {
-        RPD(2, "No route to IPCP %lu, dropping packet\n",
+        RPD(1, "No route to IPCP %lu, dropping packet\n",
             (long unsigned)remote_addr);
         rl_buf_free(rb);
         /* Do not return -EHOSTUNREACH, this would break applications.
@@ -643,7 +643,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                 lower_ipcp->rmtq_size += rl_buf_truesize(rb);
             } else {
                 /* No room in the RMT queue, we are forced to drop. */
-                RPD(2, "rmtq overrun: dropping PDU\n");
+                RPD(1, "rmtq overrun: dropping PDU\n");
                 rl_buf_free(rb);
             }
             spin_unlock_bh(&lower_ipcp->rmtq_lock);
@@ -871,7 +871,7 @@ rl_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
     if (mhdr->type == RLITE_MGMT_HDR_T_OUT_DST_ADDR) {
         *lower_flow = rl_pduft_lookup(priv, mhdr->remote_addr);
         if (unlikely(!(*lower_flow))) {
-            RPD(2, "No route to IPCP %lu, dropping packet\n",
+            RPD(1, "No route to IPCP %lu, dropping packet\n",
                 (long unsigned)mhdr->remote_addr);
 
             return -EHOSTUNREACH;
@@ -881,7 +881,7 @@ rl_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
     } else if (mhdr->type == RLITE_MGMT_HDR_T_OUT_LOCAL_PORT) {
         *lower_flow = flow_get(mhdr->local_port);
         if (!(*lower_flow) || (*lower_flow)->upper.ipcp != ipcp) {
-            RPD(2,
+            RPD(1,
                 "Invalid mgmt header local port %u, "
                 "dropping packet\n",
                 mhdr->local_port);
@@ -1091,7 +1091,7 @@ seqq_push(struct dtp *dtp, struct rl_buf *rb)
     struct rl_buf *cur;
 
     if (unlikely(dtp->seqq_len >= SEQQ_MAX_LEN)) {
-        RPD(2, "seqq overrun: dropping PDU [%lu]\n", (long unsigned)seqnum);
+        RPD(1, "seqq overrun: dropping PDU [%lu]\n", (long unsigned)seqnum);
         rl_buf_free(rb);
         return;
     }
@@ -1106,7 +1106,7 @@ seqq_push(struct dtp *dtp, struct rl_buf *rb)
             /* This is a duplicate amongst the gaps, we can
              * drop it. */
             rl_buf_free(rb);
-            RPD(2, "Duplicate amongst the gaps [%lu] dropped\n",
+            RPD(1, "Duplicate amongst the gaps [%lu] dropped\n",
                 (long unsigned)seqnum);
 
             return;
@@ -1116,7 +1116,7 @@ seqq_push(struct dtp *dtp, struct rl_buf *rb)
     /* Insert the rb right before 'pos'. */
     rb_list_enq(rb, pos);
     dtp->seqq_len++;
-    RPD(2, "[%lu] inserted\n", (long unsigned)seqnum);
+    RPD(1, "[%lu] inserted\n", (long unsigned)seqnum);
 }
 
 static void
@@ -1133,7 +1133,7 @@ seqq_pop_many(struct dtp *dtp, rl_seq_t max_sdu_gap, struct rb_list *qrbs)
             dtp->seqq_len--;
             rb_list_enq(qrb, qrbs);
             dtp->rcv_next_seq_num = pci->seqnum + 1;
-            RPD(2, "[%lu] popped out from seqq\n", (long unsigned)pci->seqnum);
+            RPD(1, "[%lu] popped out from seqq\n", (long unsigned)pci->seqnum);
         }
     }
 }
@@ -1159,7 +1159,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow, struct rl_buf *rb)
     if (unlikely(pcic->base.seqnum > dtp->last_ctrl_seq_num_rcvd + 1)) {
         /* Gap in the control SDU space. */
         /* POL: Lost control PDU. */
-        RPD(2, "Lost control PDUs: [%lu] --> [%lu]\n",
+        RPD(1, "Lost control PDUs: [%lu] --> [%lu]\n",
             (long unsigned)dtp->last_ctrl_seq_num_rcvd,
             (long unsigned)pcic->base.seqnum);
     } else if (unlikely(dtp->last_ctrl_seq_num_rcvd &&
@@ -1168,7 +1168,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow, struct rl_buf *rb)
          * Note that if last_ctrl_seq_num_rcvd is zero we accept
          * pcic->base.seqnum as the first valid control sequence
          * number. This solution is temporary (WFS). */
-        RPD(2, "Duplicated control PDU [%lu], last [%lu]\n",
+        RPD(1, "Duplicated control PDU [%lu], last [%lu]\n",
             (long unsigned)pcic->base.seqnum,
             (long unsigned)dtp->last_ctrl_seq_num_rcvd);
 
@@ -1418,7 +1418,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 
     flow = flow_get_by_cep(pci->dst_cep);
     if (!flow) {
-        RPD(2, "No flow for cep-id %u: dropping PDU\n", pci->dst_cep);
+        RPD(1, "No flow for cep-id %u: dropping PDU\n", pci->dst_cep);
         rl_buf_free(rb);
         return NULL;
     }
@@ -1501,7 +1501,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
     if (unlikely(seqnum < dtp->rcv_next_seq_num)) {
         /* This is a duplicate. Probably we sould not drop it
          * if the flow configuration does not require it. */
-        RPD(2, "Dropping duplicate PDU [seq=%lu]\n", (long unsigned)seqnum);
+        RPD(1, "Dropping duplicate PDU [seq=%lu]\n", (long unsigned)seqnum);
         rl_buf_free(rb);
         flow->stats.rx_err++;
 
@@ -1531,7 +1531,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 
     } else {
         /* Out of order. */
-        RPD(2, "Out of order packet, RLWE_PRIV would jump %lu --> %lu\n",
+        RPD(1, "Out of order packet, RLWE_PRIV would jump %lu --> %lu\n",
             (long unsigned)dtp->rcv_next_seq_num, (unsigned long)seqnum + 1);
     }
 
@@ -1615,7 +1615,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
     }
 
     if (drop) {
-        RPD(2, "dropping PDU [%lu] to meet QoS requirements\n",
+        RPD(1, "dropping PDU [%lu] to meet QoS requirements\n",
             (long unsigned)seqnum);
         rl_buf_free(rb);
         rb  = NULL;

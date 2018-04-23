@@ -637,7 +637,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
      * allocation initiator. */
 
     if (!match) {
-        RPD(2,
+        RPD(1,
             "PDU from unknown source MAC "
             "%02X:%02X:%02X:%02X:%02X:%02X\n",
             hh->h_source[0], hh->h_source[1], hh->h_source[2], hh->h_source[3],
@@ -666,7 +666,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
         }
 
         if (i == ETH_UPPER_NAMES) {
-            RPD(2, "Flow allocation request arrived but no application "
+            RPD(1, "Flow allocation request arrived but no application "
                    "registered\n");
             goto drop;
         }
@@ -684,7 +684,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
         if (entry->rx_tmpq_len > 64) {
             goto drop;
         }
-        RPD(2, "Push PDU into rx_tmpq\n");
+        RPD(1, "Push PDU into rx_tmpq\n");
         rb_list_enq(rb, &entry->rx_tmpq);
         entry->rx_tmpq_len++;
     }
@@ -791,13 +791,13 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     if (unlikely(!entry)) {
         rl_buf_free(rb);
-        RPD(2, "called on deallocated entry\n");
+        RPD(1, "called on deallocated entry\n");
         return -ENXIO;
     }
 
     if (unlikely(rb->len > ETH_DATA_LEN)) {
         rl_buf_free(rb);
-        RPD(2, "Exceeding maximum ethernet payload (%d)\n", ETH_DATA_LEN);
+        RPD(1, "Exceeding maximum ethernet payload (%d)\n", ETH_DATA_LEN);
         return -EMSGSIZE;
     }
 
@@ -860,7 +860,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     /* Send the skb to the device for transmission. */
     ret = dev_queue_xmit(skb);
     if (unlikely(ret != NET_XMIT_SUCCESS)) {
-        RPD(2, "dev_queue_xmit() error %d\n", ret);
+        RPD(1, "dev_queue_xmit() error %d\n", ret);
 
         spin_lock_bh(&priv->tx_lock);
         entry->stats.tx_pkt--;

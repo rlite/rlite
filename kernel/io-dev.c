@@ -82,7 +82,7 @@ tx_completion_func(unsigned long arg)
         ipcp->rmtq_size -= rl_buf_truesize(rb);
         spin_unlock_bh(&ipcp->rmtq_lock);
 
-        RPD(2, "Sending from rmtq\n");
+        RPD(1, "Sending from rmtq\n");
 
         BUG_ON(!RL_BUF_RMT(rb).compl_flow);
         ret = ipcp->ops.sdu_write(ipcp, RL_BUF_RMT(rb).compl_flow, rb, false);
@@ -130,7 +130,7 @@ rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
     spin_lock_bh(&txrx->rx_lock);
     if (unlikely(qlimit && txrx->rx_qsize > RL_RXQ_SIZE_MAX)) {
         /* This is useful when flow control is not used on a flow. */
-        RPD(2,
+        RPD(1,
             "dropping PDU [length %lu] to avoid userspace rx queue "
             "overrun\n",
             (long unsigned)rb->len);
@@ -345,7 +345,7 @@ rl_io_write_iter(struct kiocb *iocb,
             struct flow_entry *lower_flow;
 
             if (!ipcp->ops.mgmt_sdu_build) {
-                RPD(2, "Missing mgmt_sdu_write() operation\n");
+                RPD(1, "Missing mgmt_sdu_write() operation\n");
                 rl_buf_free(rb);
                 ret = -ENXIO;
                 break;
