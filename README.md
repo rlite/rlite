@@ -26,8 +26,9 @@
 	63. shim-tcp4 IPC Process
 	64. shim-loopback IPC Process
 	65. Normal IPC Process
-		651. IPCP flavours to support different data transfer constants
-		652. Available policies and parameters
+		651. IPCP local parameters
+		652. IPCP flavours to support different data transfer constants
+		653. Available policies and parameters
 7. Tools
     71. rina-gw
     72. iporinad
@@ -941,22 +942,20 @@ It supports two configuration parameter:
 
 ### 6.5. Normal IPC Process
 
-A normal IPC Process can be manually configured with an address unique in its
-DIF.
-This step is not necessary, since a simple default policy for distributed
-address allocation is already available.
-To deactivate automatic address allocation, you need to set the **manual**
-policy for the **addralloc** component using **rlite-ctl** program,
-and configure addresses manually like in the following example:
+A normal IPC Process can be configured with local parameters, flavours and
+policies.
+Local parameters only affect the behaviour of a local IPCP.
+Flavours define the data transfer constants that the IPCP is using within
+its DIF, and must agree with the data transfer constants of the other
+(remote) IPCPs in the same DIF.
+Policies define the variable behaviours of each IPCP component, and they
+are normally set consistently (or disseminated through enrollment) across
+all the IPCPs in a DIF.
 
-    $ sudo rlite-ctl dif-policy-mod n.DIF adddress-allocator manual
-    $ sudo rlite-ctl ipcp-config normal1.IPCP address 7382
+#### 6.5.1. IPCP local parameters
 
-where a normal IPCP called normal1.IPCP is given the address 7382 to be used
-in its DIF.
-
-The following table contains the parameters of a normal IPCP that can be
-modified using the `ipcp-config` command:
+The following table contains the local parameters of a normal IPCP, which can
+be modified using the `ipcp-config` command:
 
 | Parameter name  | Description                       |
 | --------------- |-----------------------------------|
@@ -964,7 +963,20 @@ modified using the `ipcp-config` command:
 | ttl             | Initial value for the TTL (Time To Live) field in the PDU header (default 64). |
 | csum            | Checksum to perform on each PDU: possible values are "none" (default, no checksum) or "inet" (Internet checksum). |
 
-#### 6.5.1. IPCP flavours to support different data transfer constants
+As an example, a normal IPC Process can be manually configured with an address unique in its
+DIF. This step is not usually necessary, since a simple default policy for
+distributed address allocation is already available.
+To deactivate automatic address allocation, you need to set the **manual**
+policy for the **addralloc** component using **rlite-ctl** program,
+and configure addresses manually like in the following example:
+
+    $ sudo rlite-ctl dif-policy-mod n.DIF address-allocator manual
+    $ sudo rlite-ctl ipcp-config normal1.IPCP address 7382
+
+where a normal IPCP called `normal1.IPCP` is given the address 7382 to be used
+in its DIF.
+
+#### 6.5.2. IPCP flavours to support different data transfer constants
 
 The data transfer constants of the normal IPCP (e.g. size of EFCP sequence
 numbers, addresses, CEP-ids, ...) are hardcoded in the **normal.ko** kernel
@@ -995,7 +1007,7 @@ of some macros.
 You are free to add/modify flavours depending on your needs, and use
 the different flavours together.
 
-#### 6.5.2. Available policies and parameters
+#### 6.5.3. Available policies and parameters
 The following table reports policies that are available for the internal
 components of a normal IPCP process:
 
