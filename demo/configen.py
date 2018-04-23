@@ -33,6 +33,7 @@ class Configen(Demo):
         self.enrollment_order = 'parallel'
         self.register = False
         self.simulate = False
+        self.csum = ''
 
     def parse_config(self, conf):
         fin = open(conf, 'r')
