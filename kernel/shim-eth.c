@@ -860,13 +860,17 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     /* Send the skb to the device for transmission. */
     ret = dev_queue_xmit(skb);
     if (unlikely(ret != NET_XMIT_SUCCESS)) {
-        RPD(1, "dev_queue_xmit() error %d\n", ret);
+        RPV(1, "dev_queue_xmit() failed [%d]\n", ret);
 
         spin_lock_bh(&priv->tx_lock);
         entry->stats.tx_pkt--;
         entry->stats.tx_byte -= rb->len;
         entry->stats.tx_err++;
+        priv->ntu--;
         spin_unlock_bh(&priv->tx_lock);
+#ifndef RL_SKB
+        return -EAGAIN; /* backpressure */
+#endif
     }
 
 #ifndef RL_SKB

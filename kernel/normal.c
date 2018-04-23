@@ -300,8 +300,11 @@ rcv_inact_tmr_cb(
     spin_unlock_bh(&dtp->lock);
 }
 
+#define RL_RMT_F_MAYSLEEP 1
+#define RL_RMT_F_MAYDROP 2
+
 static int rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr,
-                  struct rl_buf *rb, bool maysleep);
+                  struct rl_buf *rb, unsigned flags);
 
 static struct rl_buf *sdu_rx_sv_update(struct ipcp_entry *ipcp,
                                        struct flow_entry *flow,
@@ -332,7 +335,7 @@ a_tmr_cb(
     spin_unlock_bh(&dtp->lock);
 
     if (crb) {
-        rmt_tx(ipcp, flow->remote_addr, crb, false);
+        rmt_tx(ipcp, flow->remote_addr, crb, RL_RMT_F_MAYDROP);
     }
 }
 
@@ -419,7 +422,7 @@ rtx_tmr_cb(
 
         RPD(1, "sending [%lu] from rtxq\n", (long unsigned)pci->seqnum);
         rb_list_del(crb);
-        rmt_tx(flow->txrx.ipcp, pci->dst_addr, crb, false);
+        rmt_tx(flow->txrx.ipcp, pci->dst_addr, crb, RL_RMT_F_MAYDROP);
     }
 
     spin_lock_bh(&dtp->lock);
@@ -578,11 +581,12 @@ inet_wrapsum(uint32_t sum)
 
 static int
 rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
-       bool maysleep)
+       unsigned flags)
 {
     DECLARE_WAITQUEUE(wait, current);
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
+    bool maysleep = flags & RL_RMT_F_MAYSLEEP;
     int ret;
 
     lower_flow = rl_pduft_lookup((struct rl_normal *)ipcp->priv, remote_addr);
@@ -636,23 +640,25 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                 continue;
             }
 
-            spin_lock_bh(&lower_ipcp->rmtq_lock);
-            if (lower_ipcp->rmtq_size < RMTQ_MAX_SIZE) {
-                RL_BUF_RMT(rb).compl_flow = lower_flow;
-                rb_list_enq(rb, &lower_ipcp->rmtq);
-                lower_ipcp->rmtq_size += rl_buf_truesize(rb);
-            } else {
-                /* No room in the RMT queue, we are forced to drop. */
-                RPD(1, "rmtq overrun: dropping PDU\n");
-                rl_buf_free(rb);
+            if (flags & RL_RMT_F_MAYDROP) {
+                spin_lock_bh(&lower_ipcp->rmtq_lock);
+                if (lower_ipcp->rmtq_size < RMTQ_MAX_SIZE) {
+                    RL_BUF_RMT(rb).compl_flow = lower_flow;
+                    rb_list_enq(rb, &lower_ipcp->rmtq);
+                    lower_ipcp->rmtq_size += rl_buf_truesize(rb);
+                } else {
+                    /* No room in the RMT queue, we are forced to drop. */
+                    RPD(1, "rmtq overrun: dropping PDU\n");
+                    rl_buf_free(rb);
+                }
+                spin_unlock_bh(&lower_ipcp->rmtq_lock);
+                /* The rb was managed someway (queued or dropped),so  we must
+                 * reset the error code. If we propagated the -EAGAIN, and we
+                 * were recursively called by an upper rmt_tx(), also the upper
+                 * rmt_tx() would try to put the same rb in its queue, which
+                 * is a bug that would crash the system. */
+                ret = 0;
             }
-            spin_unlock_bh(&lower_ipcp->rmtq_lock);
-            /* The rb was managed someway (queued or dropped),so  we must
-             * reset the error code. If we propagated the -EAGAIN, and we
-             * were recursively called by an upper rmt_tx(), also the upper
-             * rmt_tx() would try to put the same rb in its queue, which
-             * is a bug that would crash the system. */
-            ret = 0;
         }
 
         break;
@@ -852,7 +858,8 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         return 0;
     }
 
-    return rmt_tx(ipcp, flow->remote_addr, rb, maysleep);
+    return rmt_tx(ipcp, flow->remote_addr, rb,
+                  maysleep ? RL_RMT_F_MAYSLEEP : 0);
 }
 
 /* Get N-1 flow and N-1 IPCP where the mgmt PDU should be
@@ -1290,7 +1297,7 @@ out:
 
         NPD("sending [%lu] from cwq\n", (long unsigned)pci->seqnum);
         rb_list_del(qrb);
-        rmt_tx(ipcp, pci->dst_addr, qrb, false);
+        rmt_tx(ipcp, pci->dst_addr, qrb, RL_RMT_F_MAYDROP);
     }
 
     /* This could be done conditionally. */
@@ -1412,7 +1419,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
             pci->pdu_csum = (uint16_t)sum;
         }
 
-        rmt_tx(ipcp, pci->dst_addr, rb, false);
+        rmt_tx(ipcp, pci->dst_addr, rb, RL_RMT_F_MAYDROP);
         return NULL;
     }
 
@@ -1635,7 +1642,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 
 snd_crb:
     if (crb) {
-        rmt_tx(ipcp, flow->remote_addr, crb, false);
+        rmt_tx(ipcp, flow->remote_addr, crb, RL_RMT_F_MAYDROP);
     }
 
     flow_put(flow);
@@ -1660,7 +1667,9 @@ rl_normal_sdu_rx_consumed(struct flow_entry *flow, rlm_seq_t seqnum)
     spin_unlock_bh(&dtp->lock);
 
     if (crb) {
-        rmt_tx(ipcp, flow->remote_addr, crb, false);
+        /* TODO If this is called in process-context only we
+         * may sleep. */
+        rmt_tx(ipcp, flow->remote_addr, crb, RL_RMT_F_MAYDROP);
     }
 
     return 0;
