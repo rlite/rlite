@@ -1329,8 +1329,9 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 
     if (priv->csum) {
         if (unlikely(inet_csum(pci, rb->len, 0) != 0xFFFF)) {
-            RPD(1, "Dropping PDU on wrong checksum %x %x\n", pci->pdu_csum,
-                inet_csum(pci, rb->len, 0));
+            RPD(1, "Dropping PDU on wrong checksum\n");
+            rl_buf_free(rb);
+            return NULL;
         }
     }
 
