@@ -97,7 +97,7 @@ def graph_node_depth(graph, node, ub):
 class Demo:
     def __init__(self, flavour_suffix, addr_alloc_policy, reliable_flows,
                  reliable_n_flows, keepalive, register, simulate,
-                 broadcast_enrollment, enrollment_strategy):
+                 broadcast_enrollment, enrollment_strategy, csum):
         self.vms = dict()
         self.shims = dict()
         self.links = []
@@ -121,6 +121,7 @@ class Demo:
         self.broadcast_enrollment = broadcast_enrollment
         self.enrollment_strategy = enrollment_strategy
         self.enrollment_order = ''
+        self.csum = csum
 
     # Parse demo.conf
     def parse_config(self, conf):
@@ -504,6 +505,11 @@ class Demo:
                         'id': vm['id'],
                         'flsuf': self.flavour_suffix
                     })
+                if self.csum == "inet":
+                    ctrl_cmds.append('ipcp-config %(dif)s.%(id)s.IPCP csum inet\n' % {
+                                'dif': dif,
+                                'id': vm['id']
+                            })
                 if self.addr_alloc_policy == "manual":
                     ctrl_cmds.append(
                         'ipcp-config %(dif)s.%(id)s.IPCP address %(id)d\n' % {
