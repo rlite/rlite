@@ -85,7 +85,8 @@ tx_completion_func(unsigned long arg)
         RPD(1, "Sending from rmtq\n");
 
         BUG_ON(!RL_BUF_RMT(rb).compl_flow);
-        ret = ipcp->ops.sdu_write(ipcp, RL_BUF_RMT(rb).compl_flow, rb, false);
+        ret = ipcp->ops.sdu_write(ipcp, RL_BUF_RMT(rb).compl_flow, rb,
+                                  RL_RMT_F_MAYDROP);
         if (unlikely(ret == -EAGAIN)) {
 #if 0
             PD("Pushing back to rmtq\n");
@@ -270,8 +271,8 @@ rl_io_write_iter(struct kiocb *iocb,
 #else  /* AIO_RW */
     size_t left = iov_length(from, iov_cnt);
 #endif /* AIO_RW */
-    size_t tot    = 0;
-    bool blocking = !(f->f_flags & O_NONBLOCK);
+    size_t tot     = 0;
+    unsigned flags = (f->f_flags & O_NONBLOCK) ? 0 : RL_RMT_F_MAYSLEEP;
     bool mgmt_sdu;
     bool something_sent = false;
     DECLARE_WAITQUEUE(wait, current);
@@ -367,14 +368,14 @@ rl_io_write_iter(struct kiocb *iocb,
 
         /* Write to the flow, sleeping if needed. This can be a management write
          * (to an N-1 flow) or an application write (to an N-flow). */
-        if (blocking) {
+        if (flags & RL_RMT_F_MAYSLEEP) {
             add_wait_queue(flow->txrx.tx_wqh, &wait);
         }
 
         for (;;) {
             current->state = TASK_INTERRUPTIBLE;
 
-            ret = ipcp->ops.sdu_write(ipcp, flow, rb, blocking);
+            ret = ipcp->ops.sdu_write(ipcp, flow, rb, flags);
 
             if (ret == -EAGAIN) {
                 if (signal_pending(current)) {
@@ -388,7 +389,7 @@ rl_io_write_iter(struct kiocb *iocb,
                     break;
                 }
 
-                if (!blocking) {
+                if (!(flags & RL_RMT_F_MAYSLEEP)) {
                     rl_buf_free(rb);
                     rb = NULL;
                     break;
@@ -402,7 +403,7 @@ rl_io_write_iter(struct kiocb *iocb,
         }
 
         current->state = TASK_RUNNING;
-        if (blocking) {
+        if ((flags & RL_RMT_F_MAYSLEEP)) {
             remove_wait_queue(flow->txrx.tx_wqh, &wait);
         }
 

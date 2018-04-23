@@ -286,7 +286,7 @@ rl_shim_loopback_flow_writeable(struct flow_entry *flow)
 
 static int
 rl_shim_loopback_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *tx_flow,
-                           struct rl_buf *rb, bool maysleep)
+                           struct rl_buf *rb, unsigned flags)
 {
     struct rl_shim_loopback *priv = ipcp->priv;
     struct flow_entry *rx_flow;

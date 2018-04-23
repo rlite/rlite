@@ -227,7 +227,7 @@ rl_shim_hv_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
 static int
 rl_shim_hv_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                     struct rl_buf *rb, bool maysleep)
+                     struct rl_buf *rb, unsigned flags)
 {
     struct rl_shim_hv *priv   = (struct rl_shim_hv *)ipcp->priv;
     struct vmpi_ops *vmpi_ops = &priv->vmpi_ops;

@@ -338,7 +338,7 @@ rl_shim_udp4_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
 static int
 rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                       struct rl_buf *rb, bool maysleep)
+                       struct rl_buf *rb, unsigned flags)
 {
     struct shim_udp4_flow *flow_priv = flow->priv;
     struct msghdr msg;
@@ -352,7 +352,7 @@ rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     msg.msg_namelen    = sizeof(flow_priv->remote_addr);
     msg.msg_control    = NULL;
     msg.msg_controllen = 0;
-    msg.msg_flags      = maysleep ? 0 : MSG_DONTWAIT;
+    msg.msg_flags      = (flags & RL_RMT_F_MAYSLEEP) ? 0 : MSG_DONTWAIT;
 
     ret =
         kernel_sendmsg(flow_priv->sock, &msg, (struct kvec *)&iov, 1, rb->len);
