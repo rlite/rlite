@@ -723,6 +723,7 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
 struct rl_normal {
     struct ipcp_entry *ipcp;
     uint16_t ttl; /* time to live */
+    bool csum;    /* compute/check internet checksum on each PDU */
 
     /* Implementation of the PDU Forwarding Table (PDUFT).
      * An hash table, a default entry and a lock. */
