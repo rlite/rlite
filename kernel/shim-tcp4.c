@@ -400,7 +400,7 @@ tcp4_tx_worker(struct work_struct *w)
 
         if (sk_stream_wspace(qe->flow_priv->sock->sk) < totlen + 2) {
             /* Cannot backpressure here, we have to drop */
-            RPD(2, "Dropping SDU [len=%d]\n", (int)qe->rb->len);
+            RPD(1, "Dropping SDU [len=%d]\n", (int)qe->rb->len);
             rl_buf_free(qe->rb);
         } else {
             tcp4_xmit(qe->flow_priv, qe->rb);

@@ -209,7 +209,7 @@ static inline int
 rl_buf_custom_pop(struct rl_buf *rb, size_t len)
 {
     if (unlikely(rb->len < len)) {
-        RPD(2, "No enough data to pop %d bytes\n", (int)len);
+        RPD(1, "No enough data to pop %d bytes\n", (int)len);
         return -1;
     }
 
@@ -223,7 +223,7 @@ static inline int
 rl_buf_custom_push(struct rl_buf *rb, size_t len)
 {
     if (unlikely((uint8_t *)(rb->pci) - len < &rb->raw->buf[0])) {
-        RPD(2, "No space to push %d bytes\n", (int)len);
+        RPD(1, "No space to push %d bytes\n", (int)len);
         return -1;
     }
 
@@ -296,7 +296,7 @@ static inline int
 rl_buf_custom_pop(struct rl_buf *rb, size_t len)
 {
     if (unlikely(rb->len < len)) {
-        RPD(2, "No enough data to pop %d bytes\n", (int)len);
+        RPD(1, "No enough data to pop %d bytes\n", (int)len);
         return -1;
     }
 
@@ -309,7 +309,7 @@ static inline int
 rl_buf_custom_push(struct rl_buf *rb, size_t len)
 {
     if (unlikely(skb_headroom(rb) < len)) {
-        RPD(2, "No space to push %d bytes\n", (int)len);
+        RPD(1, "No space to push %d bytes\n", (int)len);
         return -1;
     }
 
