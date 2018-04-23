@@ -955,6 +955,14 @@ and configure addresses manually like in the following example:
 where a normal IPCP called normal1.IPCP is given the address 7382 to be used
 in its DIF.
 
+The following table contains the parameters of a normal IPCP that can be
+modified using the `ipcp-config` command:
+
+| Parameter name  | Description                       |
+| --------------- |-----------------------------------|
+| address         | IPCP address in its DIF. It should be changed only with manual address allocation policy. |
+| ttl             | Initial value for the TTL (Time To Live) field in the PDU header (default 64). |
+| csum            | Checksum to perform on each PDU: possible values are "none" (default, no checksum) or "inet" (Internet checksum). |
 
 #### 6.5.1. IPCP flavours to support different data transfer constants
 
