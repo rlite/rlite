@@ -774,7 +774,7 @@ rl_shim_eth_flow_writeable(struct flow_entry *flow)
     bool ret;
 
     spin_lock_bh(&priv->tx_lock);
-    ret = flow_can_write(priv);
+    ret = flow_can_write(priv) && !priv->xmit_busy;
     spin_unlock_bh(&priv->tx_lock);
 
     return ret;
