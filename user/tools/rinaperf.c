@@ -612,9 +612,16 @@ perf_server(struct worker *w)
                  * adjust 'i' and keep going. */
                 limit = stop.cnt;
                 if (i != stop.cnt) {
-                    PRINTF(
-                        "%llu packets still expected, stop delayed\n",
-                        (long long unsigned)stop.cnt - (long long unsigned)i);
+                    if (i < stop.cnt) {
+                        PRINTF("%llu packets still expected, stop delayed\n",
+                               (long long unsigned)stop.cnt -
+                                   (long long unsigned)i);
+                    } else {
+                        PRINTF("WRN: sender count (%llu) lower than our count "
+                               "(%llu)\n",
+                               (long long unsigned)stop.cnt,
+                               (long long unsigned)i);
+                    }
                 }
                 i--;
                 continue;
