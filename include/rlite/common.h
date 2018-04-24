@@ -276,8 +276,8 @@ struct rl_flow_dtp {
     unsigned int max_cwq_len;
     unsigned int rtxq_len;
     unsigned int max_rtxq_len;
-    unsigned rtt; /* estimated round trip time, in jiffies. */
-    unsigned rtt_stddev;
+    unsigned rtt;        /* estimated round trip time, in usecs. */
+    unsigned rtt_stddev; /* stddev in usecs */
 
     /* Receiver state. */
     rlm_seq_t rcv_lwe;

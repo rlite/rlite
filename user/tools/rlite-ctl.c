@@ -619,7 +619,7 @@ flow_dump(int argc, char **argv, struct cmd_descriptor *cd)
            "    last_ctrl_seq_num_rcvd = %lu\n"
            "    cwq_len                = %lu [max=%lu]\n"
            "    rtxq_len               = %lu [max=%lu]\n"
-           "    rtt                    = %lu [stddev=%lu]\n"
+           "    rtt                    = %lums [stddev=%lums]\n"
            "    rcv_lwe                = %lu\n"
            "    rcv_next_seq_num       = %lu\n"
            "    rcv_rwe                = %lu\n"
@@ -634,7 +634,7 @@ flow_dump(int argc, char **argv, struct cmd_descriptor *cd)
            (unsigned long)dtp.last_ctrl_seq_num_rcvd,
            (unsigned long)dtp.cwq_len, (unsigned long)dtp.max_cwq_len,
            (unsigned long)dtp.rtxq_len, (unsigned long)dtp.max_rtxq_len,
-           (unsigned long)dtp.rtt, (unsigned long)dtp.rtt_stddev,
+           (unsigned long)dtp.rtt / 1000, (unsigned long)dtp.rtt_stddev / 1000,
 
            (unsigned long)dtp.rcv_lwe, (unsigned long)dtp.rcv_next_seq_num,
            (unsigned long)dtp.rcv_rwe, (unsigned long)dtp.max_seq_num_rcvd,

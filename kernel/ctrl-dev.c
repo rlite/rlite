@@ -2270,8 +2270,8 @@ rl_flow_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     resp.dtp.max_cwq_len            = dtp->max_cwq_len;
     resp.dtp.rtxq_len               = dtp->rtxq_len;
     resp.dtp.max_rtxq_len           = dtp->max_rtxq_len;
-    resp.dtp.rtt                    = dtp->rtt;
-    resp.dtp.rtt_stddev             = dtp->rtt_stddev;
+    resp.dtp.rtt                    = jiffies_to_msecs(dtp->rtt) * 1000;
+    resp.dtp.rtt_stddev             = jiffies_to_msecs(dtp->rtt_stddev) * 1000;
     resp.dtp.rcv_lwe                = dtp->rcv_lwe;
     resp.dtp.rcv_next_seq_num       = dtp->rcv_next_seq_num;
     resp.dtp.rcv_rwe                = dtp->rcv_rwe;
