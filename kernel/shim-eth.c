@@ -75,6 +75,7 @@ struct rl_shim_eth {
 
     unsigned int ntp;
     unsigned int ntu;
+    unsigned int xmit_busy;
 
 #define ETH_UPPER_NAMES 4
     char *upper_names[ETH_UPPER_NAMES];
@@ -756,8 +757,9 @@ shim_eth_skb_destructor(struct sk_buff *skb)
     bool notify;
 
     spin_lock_bh(&priv->tx_lock);
-    notify = !flow_can_write(priv);
+    notify = !flow_can_write(priv) || priv->xmit_busy;
     priv->ntp++;
+    priv->xmit_busy = 0;
     spin_unlock_bh(&priv->tx_lock);
 
     if (notify) {
@@ -866,7 +868,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         entry->stats.tx_pkt--;
         entry->stats.tx_byte -= rb->len;
         entry->stats.tx_err++;
-        priv->ntu--;
+        priv->xmit_busy = 1;
         spin_unlock_bh(&priv->tx_lock);
 #ifndef RL_SKB
         return -EAGAIN; /* backpressure */
@@ -1102,7 +1104,7 @@ rl_shim_eth_create(struct ipcp_entry *ipcp)
 
     priv->ipcp   = ipcp;
     priv->netdev = NULL;
-    priv->ntu = priv->ntp = 0;
+    priv->ntu = priv->ntp = priv->xmit_busy = 0;
     INIT_LIST_HEAD(&priv->arp_table);
     spin_lock_init(&priv->arpt_lock);
     spin_lock_init(&priv->tx_lock);
