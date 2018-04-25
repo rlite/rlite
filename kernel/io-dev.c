@@ -85,8 +85,7 @@ tx_completion_func(unsigned long arg)
         RPD(1, "Sending from rmtq\n");
 
         BUG_ON(!RL_BUF_RMT(rb).compl_flow);
-        ret = ipcp->ops.sdu_write(ipcp, RL_BUF_RMT(rb).compl_flow, rb,
-                                  RL_RMT_F_MAYDROP);
+        ret = ipcp->ops.sdu_write(ipcp, RL_BUF_RMT(rb).compl_flow, rb, 0);
         if (unlikely(ret == -EAGAIN)) {
 #if 0
             PD("Pushing back to rmtq\n");

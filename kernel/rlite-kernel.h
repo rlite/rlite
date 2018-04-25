@@ -431,8 +431,13 @@ struct ipcp_ops {
     int (*flow_deallocated)(struct ipcp_entry *ipcp, struct flow_entry *flow);
     int (*flow_get_stats)(struct flow_entry *flow, struct rl_flow_stats *stats);
 
+/* The SDU write implementation can sleep (e.g., when it is called from
+ * process context. */
 #define RL_RMT_F_MAYSLEEP 1
-#define RL_RMT_F_MAYDROP 2
+/* The RMT implementation must consume the buffer, even if there is no
+ * alternative to dropping. When this flag is set, RMT cannot return
+ * EAGAIN, which is the backpressure signal for the caller. */
+#define RL_RMT_F_CONSUME 2
     int (*sdu_write)(struct ipcp_entry *ipcp, struct flow_entry *flow,
                      struct rl_buf *rb, unsigned flags);
     struct rl_buf *(*sdu_rx)(struct ipcp_entry *ipcp, struct rl_buf *rb,

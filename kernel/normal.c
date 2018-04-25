@@ -332,7 +332,7 @@ a_tmr_cb(
     spin_unlock_bh(&dtp->lock);
 
     if (crb) {
-        rmt_tx(ipcp, flow->remote_addr, crb, RL_RMT_F_MAYDROP);
+        rmt_tx(ipcp, flow->remote_addr, crb, RL_RMT_F_CONSUME);
     }
 }
 
@@ -419,7 +419,7 @@ rtx_tmr_cb(
 
         RPD(1, "sending [%lu] from rtxq\n", (long unsigned)pci->seqnum);
         rb_list_del(crb);
-        rmt_tx(flow->txrx.ipcp, pci->dst_addr, crb, RL_RMT_F_MAYDROP);
+        rmt_tx(flow->txrx.ipcp, pci->dst_addr, crb, RL_RMT_F_CONSUME);
     }
 
     spin_lock_bh(&dtp->lock);
@@ -618,13 +618,13 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
         current->state = TASK_INTERRUPTIBLE;
 
         /* Try to push the rb down to the lower IPCP. */
-        ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb, flags);
+        ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb,
+                                        flags & (~RL_RMT_F_CONSUME));
 
         if (ret == -EAGAIN) {
             /* The lower IPCP cannot transmit it for the time being. If we
              * can, we sleep waiting for the IPCP to become available
-             * again. Otherwise we try to enqueue the rb in an RMT queue.
-             */
+             * again. */
             if (maysleep) {
                 if (signal_pending(current)) {
                     rl_buf_free(rb);
@@ -637,7 +637,9 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                 continue;
             }
 
-            if (flags & RL_RMT_F_MAYDROP) {
+            if (flags & RL_RMT_F_CONSUME) {
+                /* We must consume this buffer. We either push it to an RMT
+                 * queue or drop it if there is no space. */
                 spin_lock_bh(&lower_ipcp->rmtq_lock);
                 if (lower_ipcp->rmtq_size < RMTQ_MAX_SIZE) {
                     RL_BUF_RMT(rb).compl_flow = lower_flow;
@@ -647,6 +649,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                     /* No room in the RMT queue, we are forced to drop. */
                     RPD(1, "rmtq overrun: dropping PDU\n");
                     rl_buf_free(rb);
+                    rb = NULL;
                 }
                 spin_unlock_bh(&lower_ipcp->rmtq_lock);
                 /* The rb was managed someway (queued or dropped),so  we must
@@ -655,6 +658,9 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                  * rmt_tx() would try to put the same rb in its queue, which
                  * is a bug that would crash the system. */
                 ret = 0;
+            } else {
+                /* We are not forced to consume this buffer, so we can simply
+                 * propagate the backpressure signal without consuming it. */
             }
         }
 
@@ -844,6 +850,17 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
                 return ret;
             }
+
+            /* At this point we have allocated a sequence number for the rb
+             * and pushed it into the RTX queue. We cannot propagate the
+             * backpressure signal (EAGAIN) to userspace. If we did so, the
+             * receiver could receive the same data twice: one copy as a
+             * result of the retransmission, and another copy because the
+             * application would call write() again on the same data. Note
+             * that the receiver cannot distinguish the duplicated data
+             * because the second copy comes with a different sequence
+             * number. */
+            flags |= RL_RMT_F_CONSUME;
         }
 
         mod_timer(&dtp->snd_inact_tmr, jiffies + 3 * dtp->mpl_r_a);
@@ -1293,7 +1310,7 @@ out:
 
         NPD("sending [%lu] from cwq\n", (long unsigned)pci->seqnum);
         rb_list_del(qrb);
-        rmt_tx(ipcp, pci->dst_addr, qrb, RL_RMT_F_MAYDROP);
+        rmt_tx(ipcp, pci->dst_addr, qrb, RL_RMT_F_CONSUME);
     }
 
     /* This could be done conditionally. */
@@ -1415,7 +1432,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
             pci->pdu_csum = (uint16_t)sum;
         }
 
-        rmt_tx(ipcp, pci->dst_addr, rb, RL_RMT_F_MAYDROP);
+        rmt_tx(ipcp, pci->dst_addr, rb, RL_RMT_F_CONSUME);
         return NULL;
     }
 
@@ -1638,7 +1655,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 
 snd_crb:
     if (crb) {
-        rmt_tx(ipcp, flow->remote_addr, crb, RL_RMT_F_MAYDROP);
+        rmt_tx(ipcp, flow->remote_addr, crb, RL_RMT_F_CONSUME);
     }
 
     flow_put(flow);
@@ -1665,7 +1682,7 @@ rl_normal_sdu_rx_consumed(struct flow_entry *flow, rlm_seq_t seqnum)
     if (crb) {
         /* TODO If this is called in process-context only we
          * may sleep. */
-        rmt_tx(ipcp, flow->remote_addr, crb, RL_RMT_F_MAYDROP);
+        rmt_tx(ipcp, flow->remote_addr, crb, RL_RMT_F_CONSUME);
     }
 
     return 0;
