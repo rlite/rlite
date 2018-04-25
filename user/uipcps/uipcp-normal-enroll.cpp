@@ -1534,7 +1534,7 @@ Neighbor::flow_alloc(const char *supp_dif)
 {
     struct rina_flow_spec relspec;
     rl_ipcp_id_t lower_ipcp_id_;
-    bool use_reliable_flow;
+    bool alloc_reliable_flow;
     rl_port_t port_id_;
     int flow_fd_;
     int ret;
@@ -1544,17 +1544,6 @@ Neighbor::flow_alloc(const char *supp_dif)
     if (ret) {
         UPE(rib->uipcp, "Failed to get lower ipcp id in DIF %s\n", supp_dif);
         return -1;
-    }
-
-    reliable_spec(&relspec);
-    use_reliable_flow =
-        (rl_conf_ipcp_qos_supported(lower_ipcp_id_, &relspec) == 0);
-    UPD(rib->uipcp, "N-1 DIF %s has%s reliable flows\n", supp_dif,
-        (use_reliable_flow ? "" : " not"));
-    if (!rib->get_param_value<bool>(uipcp_rib::ResourceAllocPrefix,
-                                    "reliable-flows")) {
-        /* Force unreliable flows even if we have reliable ones. */
-        use_reliable_flow = false;
     }
 
     /* Allocate a kernel-bound N-1 flow for the I/O. If N-1-DIF is not
@@ -1583,7 +1572,18 @@ Neighbor::flow_alloc(const char *supp_dif)
 
     topo_lower_flow_added(rib->uipcp->uipcps, rib->uipcp->id, lower_ipcp_id_);
 
-    if (mgmt_only == nullptr && use_reliable_flow) {
+    reliable_spec(&relspec);
+    alloc_reliable_flow =
+        (rl_conf_ipcp_qos_supported(lower_ipcp_id_, &relspec) == 0);
+    UPD(rib->uipcp, "N-1 DIF %s has%s reliable flows\n", supp_dif,
+        (alloc_reliable_flow ? "" : " no"));
+    if (!rib->get_param_value<bool>(uipcp_rib::ResourceAllocPrefix,
+                                    "reliable-flows")) {
+        /* Force unreliable flows even if we have reliable ones. */
+        alloc_reliable_flow = false;
+    }
+
+    if (mgmt_only == nullptr && alloc_reliable_flow) {
         int mgmt_fd;
 
         /* Try to allocate a management-only reliable flow outside the RIB
