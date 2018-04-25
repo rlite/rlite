@@ -38,6 +38,7 @@
 #include <cerrno>
 #include <pthread.h>
 #include <poll.h>
+#include <fcntl.h>
 
 #include "rlite/conf.h"
 #include "uipcp-normal.hpp"
@@ -138,9 +139,9 @@ int
 uipcp_rib::mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
                                  size_t buflen)
 {
+    struct pollfd pfd;
     char *mgmtbuf;
     int n;
-    int ret = 0;
 
     if (buflen > MGMTBUF_SIZE_MAX) {
         errno = EFBIG;
@@ -157,16 +158,25 @@ uipcp_rib::mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
     memcpy(mgmtbuf + sizeof(*mhdr), buf, buflen);
     buflen += sizeof(*mhdr);
 
-    n = write(mgmtfd, mgmtbuf, buflen);
+    pfd.fd     = mgmtfd;
+    pfd.events = POLLOUT;
+    n          = poll(&pfd, 1, 1000);
     if (n < 0) {
-        ret = n;
+        perror("poll(mgmtfd)");
+    } else if (n == 0) {
+        errno = ETIMEDOUT;
+        n     = -1;
     } else {
-        assert(n == (int)buflen);
+        n = write(mgmtfd, mgmtbuf, buflen);
+        if (n >= 0) {
+            assert(n == (int)buflen);
+            n = 0;
+        }
     }
 
     rl_free(mgmtbuf, RL_MT_MISC);
 
-    return ret;
+    return n;
 }
 
 int
@@ -419,6 +429,13 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     mgmtfd = rl_open_mgmt_port(uipcp->id);
     if (mgmtfd < 0) {
         ret = mgmtfd;
+        throw std::exception();
+    }
+
+    ret = fcntl(mgmtfd, F_SETFL, O_NONBLOCK);
+    if (ret) {
+        UPE(uipcp, "fcntl(mgmtfd, F_SETFL, O_NONBLOCK) failed [%s]\n",
+            strerror(errno));
         throw std::exception();
     }
 
