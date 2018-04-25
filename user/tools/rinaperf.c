@@ -46,6 +46,63 @@
 
 #include <rina/api.h>
 
+/*
+ * rinaperf: a tool to measure bandwidth and latency of RINA networks.
+ *
+ * The rinaperf program uses two separate flows between the client and the
+ * server for each test. The first one is a control flow, and it is used to
+ * negotiate the test configuration with the server, to terminate the test
+ * and to receive results. The second one is the data flow, where the test
+ * data is transported.
+ *
+ * The application protocol on the client side works as follows:
+ *   - The client allocates the control flow and sends a 20 bytes
+ *     configuration message containing the number of SDUs or transactions,
+ *     the SDU size and the test type.
+ *   - The clients waits for a 4 bytes ticket message from the server (on
+ *     the control flow), containing an integer number that identifies the
+ *     test.
+ *   - The client allocates the data flow and sends on this flow a 20 bytes
+ *     configuration message containing the ticket received from the control
+ *     flow, so that the server knows to which control flow this data flow
+ *     needs to be associated.
+ *   - The client runs the client-side test function (e.g., perf, ping or rr)
+ *     sending and/or receiving data to/from the data flow only.
+ *   - When the client-side test function ends, the client sends a 20 bytes
+ *     stop message on the control flow to ask the server-side test function
+ *     to stop (this may be useful to avoid that server times out, so that the
+ *     test session can end immediately).
+ *   - For tests different from "ping", the client waits for a 32 bytes result
+ *     message, contains various statistics as measured by the server-side test
+ *     function (e.g. SDU count, pps, bps, latency, ...).
+ *   - The client closes both control and data flow.
+ *
+ * The application protocol on the server side works as follows:
+ *   - The server accepts the next flow and allocates a worker thread to handle
+ *     the request.
+ *   - The worker waits to receive a 20 bytes configuration message from the
+ *     flow. Looking at the message opcode, the worker decides if this is a
+ *     control flow or a data flow.
+ *   - In case of control flow, the worker allocates a ticket for the client
+ *     and sends it with a 4 bytes message. The worker then waits (on a
+ *     semaphore) to be notified by a future worker that is expected to
+ *     receive the same ticket on a data flow.
+ *   - In case the opcode indicates a data flow, the worker looks up the
+ *     ticket contained in the message in its table. If there is a match, the
+ *     waiting worker (see above) is notified and informed about the data flow
+ *     file descriptor. The current worker can now terminate, as the rest of
+ *     the test will be carried out by the notified worker.
+ *   - Once woken up, the first worker deallocates the ticket and runs the
+ *     server-side test function, using the test configuration contained in the
+ *     20 bytes message (previously read from the control flow).
+ *     The server-side function uses the data flow to send/receive PDUs.
+ *     However, it also monitors the control flow to check if a 20 bytes stop
+ *     message comes; if one is received, the test function can return early.
+ *   - When the server-side test function returns, the worker sends a 32 bytes
+ *     message on the control flow, to inform the client about the test
+ *     results.
+ */
+
 #define SDU_SIZE_MAX 65535
 #define RP_MAX_WORKERS 1023
 
