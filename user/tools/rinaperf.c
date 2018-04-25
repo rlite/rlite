@@ -73,9 +73,9 @@
  *     to stop (this may be useful to avoid that server times out, so that the
  *     test session can end immediately).
  *   - For tests different from "ping", the client waits for a 32 bytes result
- *     message, contains various statistics as measured by the server-side test
- *     function (e.g. SDU count, pps, bps, latency, ...).
- *   - The client closes both control and data flow.
+ *     message, containing various statistics as measured by the server-side
+ *     test function (e.g. SDU count, pps, bps, latency, ...).
+ *   - The client prints the results and closes both control and data flow.
  *
  * The application protocol on the server side works as follows:
  *   - The server accepts the next flow and allocates a worker thread to handle
@@ -87,20 +87,20 @@
  *     and sends it with a 4 bytes message. The worker then waits (on a
  *     semaphore) to be notified by a future worker that is expected to
  *     receive the same ticket on a data flow.
- *   - In case the opcode indicates a data flow, the worker looks up the
- *     ticket contained in the message in its table. If there is a match, the
+ *   - In case the opcode indicates a data flow, the worker looks up in its
+ *     table the ticket specified in the message. If the ticket is valid, the
  *     waiting worker (see above) is notified and informed about the data flow
  *     file descriptor. The current worker can now terminate, as the rest of
  *     the test will be carried out by the notified worker.
  *   - Once woken up, the first worker deallocates the ticket and runs the
  *     server-side test function, using the test configuration contained in the
- *     20 bytes message (previously read from the control flow).
+ *     20 bytes message previously read from the control flow.
  *     The server-side function uses the data flow to send/receive PDUs.
  *     However, it also monitors the control flow to check if a 20 bytes stop
  *     message comes; if one is received, the test function can return early.
  *   - When the server-side test function returns, the worker sends a 32 bytes
  *     message on the control flow, to inform the client about the test
- *     results.
+ *     results. Finally, both control and data flows are closed.
  */
 
 #define SDU_SIZE_MAX 65535
