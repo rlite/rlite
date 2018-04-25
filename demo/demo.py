@@ -729,12 +729,6 @@ for dif in demo.dif_ordering:
         print(info)
 
 
-for shim in demo.netems:
-    if shim not in demo.shims or demo.shims[shim]['type'] != 'eth':
-        print('Warning: line %s specifies netem rules for '\
-              'dif %s, which is not a shim eth' % \
-                (demo.netems[shim]['linecnt'], shim))
-
 fout.write(outs)
 
 fout.close()

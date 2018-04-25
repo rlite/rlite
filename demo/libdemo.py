@@ -305,10 +305,10 @@ class Demo:
             print('Warning: Line %d unrecognized and ignored' % linecnt)
 
         fin.close()
-        self.check_port_unique()
+        self.check_consistency()
 
-    def check_port_unique(self):
-        # check for uniqueness of host ports
+    def check_consistency(self):
+        # check for uniqueness of forwarded host ports
         for vmname in self.hostfwds:
             for fwdr in self.hostfwds[vmname]:
                 p = int(fwdr.split(':')[0])
@@ -317,6 +317,14 @@ class Demo:
                           % p)
                     quit()
                 self.fwd_hports.add(p)
+
+        # Check that netem rules are applied to shim DIFs
+        for shim in self.netems:
+            if shim not in self.shims or self.shims[shim]['type'] != 'eth':
+                print('Error: line %s specifies netem rules for '\
+                      'dif %s, which is not a shim eth' % \
+                        (self.netems[shim]['linecnt'], shim))
+                quit()
 
     # Compute registration/enrollment order for DIFs
     def compute_order(self):
