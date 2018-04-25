@@ -1043,8 +1043,8 @@ of a normal IPCP process:
 | flowalloc           | local             | initial-a          | Initial value for the DTCP A timer (in milliseconds). |
 | flowalloc           | local             | initial-credit     | Initial size of the DTCP flow control window (in PDUs). |
 | flowalloc           | local             | max-cwq-len        | Maximum size of the DTCP closed window queue (in PDUs). |
-| resalloc            | *                 | reliable-flows     | Use reliable N-flows if reliable N-1-flows are not available (boolean). |
-| resalloc            | *                 | reliable-n-flows   | Use dedicated reliable N-1-flows for management traffic rather than reusing kernel-bound unreliable N-1 flows if possible (boolean). |
+| resalloc            | *                 | reliable-flows     | Use dedicated reliable N-1-flows for management traffic rather than reusing kernel-bound unreliable N-1 flows if possible (boolean). |
+| resalloc            | *                 | reliable-n-flows   | Use dedicated reliable N-flows if reliable N-1-flows are not available (boolean). |
 | resalloc            | *                 | broadcast-enroller | Let the IPCP register the name of the DIF (DAF name) in addition to the IPCP name (boolean). |
 | ribd                | *                 | refresh-intval     | Time interval (in seconds) between two consecutive periodic RIB synchronizations. |
 | routing             | *                 | age-incr-intval    | Time interval (in seconds) between two consecutive increments of the age of LFDB entries. |
