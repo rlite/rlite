@@ -632,6 +632,9 @@ for vmname in sorted(demo.vms):
             'rm .initscript\n'
     outs += '$SUDO nohup rlite-node-config -v -d > rlite-node-config.log 2>&1\n'
 
+    # Configure netem rules inside the nodes, including htb rate limiting
+    outs += demo.compute_netem_rules(vm)
+
     # Run applications after rlite-node-config, so that we are sure the IPCPs
     # are there (non-enrollment commands are run before turning into a daemon).
     for cmd in appl_cmds:
@@ -726,25 +729,11 @@ for dif in demo.dif_ordering:
         print(info)
 
 
-# Apply netem rules. For now this step is done after enrollment in order to
-# avoid artificial packet losses during the enrollment phase. This would
-# be a problem since shim DIFs do not provide reliable flows, and so some
-# enrollments could fail. The enrollment procedure is retried for some
-# times by the uipcps daemon (to cope with losses), but with many nodes
-# the likelyhood of some enrollment failing many times is quite high.
-if args.backend == 'tap':
-    for shim in demo.shims:
-        if shim not in demo.netems:
-            continue
-        for vm in demo.netems[shim]:
-            if not netem_validate(demo.netems[shim][vm]['args']):
-                print('Warning: line %(linecnt)s is invalid and '\
-                      'will be ignored' % demo.netems[shim][vm])
-                continue
-            outs += 'sudo tc qdisc add dev %(tap)s root netem '\
-                    '%(args)s\n'\
-                    % {'tap': tap, 'args': demo.netems[shim][vm]['args']}
-
+for shim in demo.netems:
+    if shim not in demo.shims or demo.shims[shim]['type'] != 'eth':
+        print('Warning: line %s specifies netem rules for '\
+              'dif %s, which is not a shim eth' % \
+                (demo.netems[shim]['linecnt'], shim))
 
 fout.write(outs)
 

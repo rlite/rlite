@@ -226,15 +226,23 @@ class Demo:
 
                 continue
 
-            m = re.match(r'\s*netem\s+([\w-]+)\s+([\w-]+)\s+(\w.*)$', line)
+            m = re.match(r'\s*netem\s+([\w-]+)\s+rate\s+([\w-]+)\s+(\w.*)$', line)
             if m:
                 dif = m.group(1)
-                vmname = m.group(2)
+                rate = m.group(2)
                 netem_args = m.group(3)
 
-                if dif not in self.netems:
-                    self.netems[dif] = dict()
-                self.netems[dif][vmname] = {
+                if re.match(r'\d+[kmg]bit', rate) == None:
+                    print('Error: Line %d: invalid rate "%s" (example: 100mbit)' %
+                          (linecnt, rate))
+                    continue
+
+                if dif in self.netems:
+                    print('Error: Line %d: netem for dif %s already specified' %
+                          (linecnt, dif))
+                    continue
+                self.netems[dif] = {
+                    'rate': rate,
                     'args': netem_args,
                     'linecnt': linecnt
                 }
@@ -491,6 +499,22 @@ class Demo:
                                                                 port['idx'])
             del vars_dict
         return (outs, ctrl_cmds)
+
+    def compute_netem_rules(self, vm):
+        outs = ''
+        for port in vm['ports']:
+            shim = port['shim']
+            if shim not in self.netems:
+                continue
+            outs += 'PORT%(idx)s=$(mac2ifname %(mac)s)\n'\
+                'tc qdisc add dev $PORT%(idx)s root handle 1: htb default 1\n'\
+                'tc class add dev $PORT%(idx)s parent 1: classid 1:1 htb rate %(rate)s\n'\
+                'tc qdisc add dev $PORT%(idx)s parent 1:1 netem %(args)s\n' \
+                    % { 'idx': port['idx'],
+                        'mac': port['mac'],
+                        'rate': self.netems[shim]['rate'],
+                        'args': self.netems[shim]['args']}
+        return outs
 
     def compute_normal_ipcps(self, vmname):
         # Create normal IPCPs (it's handy to do it in topological DIF order)
