@@ -394,9 +394,11 @@ rtx_tmr_cb(
 
             crb = rl_buf_clone(rb, GFP_ATOMIC);
             if (unlikely(!crb)) {
-                RPD(1, "OOM\n");
+                RPV(1, "Out of memory\n");
             } else {
                 rb_list_enq(crb, &rrbq);
+                flow->stats.rtx_pkt++;
+                flow->stats.rtx_byte += rb->len;
             }
         }
         if (!next_exp_set ||
@@ -683,7 +685,7 @@ rl_rtxq_push(struct flow_entry *flow, struct rl_buf *rb)
     struct dtp *dtp    = &flow->dtp;
 
     if (unlikely(!crb)) {
-        RPD(1, "OOM\n");
+        RPV(1, "Out of memory\n");
         return -ENOMEM;
     }
 

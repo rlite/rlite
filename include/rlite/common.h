@@ -108,7 +108,7 @@ struct pci_sizes {
 #define RLITE_ERR 1
 
 /* Expected control API version. */
-#define RL_API_VERSION 1
+#define RL_API_VERSION 2
 
 /* All the possible messages begin like this. */
 struct rl_msg_hdr {
@@ -248,13 +248,21 @@ rina_flow_spec_best_effort(struct rina_flow_spec *spec)
 }
 
 struct rl_flow_stats {
+    /* Sender statistics: packets and bytes successfully
+     * processed for transmission, and packets dropped. */
     uint64_t tx_pkt;
     uint64_t tx_byte;
     uint64_t tx_err;
+
+    /* Receiver statistics: packets and bytes successfully
+     * processed for transmission, and packets dropped. */
     uint64_t rx_pkt;
     uint64_t rx_byte;
     uint64_t rx_err;
-    /*uint64_t unused[6];*/
+
+    /* Retransmission statistics. */
+    uint64_t rtx_pkt;
+    uint64_t rtx_byte;
 };
 
 static inline void
@@ -262,6 +270,7 @@ rl_flow_stats_init(struct rl_flow_stats *stats)
 {
     stats->tx_pkt = stats->tx_byte = stats->tx_err = 0;
     stats->rx_pkt = stats->rx_byte = stats->rx_err = 0;
+    stats->rtx_pkt = stats->rtx_byte = 0;
 }
 
 /* DTP state exported to userspace. */
