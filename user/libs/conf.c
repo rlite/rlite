@@ -416,8 +416,8 @@ rl_conf_flows_print(struct list_head *flows)
 
     PI_S("Flows table:\n");
     list_for_each_entry (rl_flow, flows, node) {
-        char bbuf[32];
-        size_t blen = sizeof(bbuf);
+        char bbuf[3][32];
+        size_t blen = 32;
         struct rl_flow_stats stats;
         int ofs = 0;
         int ret;
@@ -447,12 +447,12 @@ rl_conf_flows_print(struct list_head *flows)
              rl_flow->ipcp_id, (long long unsigned int)rl_flow->local_addr,
              rl_flow->local_port, (long long unsigned int)rl_flow->remote_addr,
              rl_flow->remote_port, specinfo, (long long unsigned)stats.rx_pkt,
-             byteprint(bbuf, blen, stats.rx_byte),
+             byteprint(bbuf[0], blen, stats.rx_byte),
              (long long unsigned)stats.rx_err, (long long unsigned)stats.tx_pkt,
-             byteprint(bbuf, blen, stats.tx_byte),
+             byteprint(bbuf[1], blen, stats.tx_byte),
              (long long unsigned)stats.tx_err,
              (long long unsigned)stats.rtx_pkt,
-             byteprint(bbuf, blen, stats.rtx_byte));
+             byteprint(bbuf[2], blen, stats.rtx_byte));
     }
 
     return 0;
