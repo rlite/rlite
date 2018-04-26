@@ -1104,14 +1104,16 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
 /* Takes the ownership of the rb. */
 static void
-seqq_push(struct dtp *dtp, struct rl_buf *rb)
+seqq_push(struct flow_entry *flow, struct rl_buf *rb)
 {
     rl_seq_t seqnum     = RL_BUF_PCI(rb)->seqnum;
+    struct dtp *dtp     = &flow->dtp;
     struct rb_list *pos = &dtp->seqq;
     struct rl_buf *cur;
 
     if (unlikely(dtp->seqq_len >= SEQQ_MAX_LEN)) {
         RPD(1, "seqq overrun: dropping PDU [%lu]\n", (long unsigned)seqnum);
+        flow->stats.rx_err++;
         rl_buf_free(rb);
         return;
     }
@@ -1125,6 +1127,7 @@ seqq_push(struct dtp *dtp, struct rl_buf *rb)
         } else if (seqnum == pci->seqnum) {
             /* This is a duplicate amongst the gaps, we can
              * drop it. */
+            flow->stats.rx_err++;
             rl_buf_free(rb);
             RPD(1, "Duplicate amongst the gaps [%lu] dropped\n",
                 (long unsigned)seqnum);
@@ -1136,6 +1139,8 @@ seqq_push(struct dtp *dtp, struct rl_buf *rb)
     /* Insert the rb right before 'pos'. */
     rb_list_enq(rb, pos);
     dtp->seqq_len++;
+    flow->stats.rx_pkt++;
+    flow->stats.rx_byte += rb->len;
     RPD(1, "[%lu] inserted\n", (long unsigned)seqnum);
 }
 
@@ -1645,9 +1650,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
     } else {
         /* What is not dropped nor delivered goes in the sequencing queue.
          * Don't ack here, we have to wait for the gap to be filled. */
-        flow->stats.rx_pkt++;
-        flow->stats.rx_byte += rb->len;
-        seqq_push(dtp, rb);
+        seqq_push(flow, rb);
         rb = NULL;
     }
 
