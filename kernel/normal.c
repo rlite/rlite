@@ -1174,6 +1174,9 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow, struct rl_buf *rb)
     if (unlikely((pcic->base.pdu_type & PDU_T_CTRL) != PDU_T_CTRL)) {
         PE("Unknown PDU type %X\n", pcic->base.pdu_type);
         rl_buf_free(rb);
+        spin_lock_bh(&dtp->lock);
+        flow->stats.rx_err++;
+        spin_unlock_bh(&dtp->lock);
         return 0;
     }
 
