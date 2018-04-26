@@ -364,7 +364,7 @@ fi
 
 rm -f config.log
 
-REVISION=$(git rev-parse HEAD)
+REVISION=$(git rev-parse --verify HEAD)
 if [ "$?" != "0" ]; then
     REVISION="(unknown)"
     REVISION_DATE="$REVISION"
@@ -458,6 +458,13 @@ EOF
 
     echo '#endif' >> $KCF
 fi
+
+VERF=include/rlite/version.h
+echo "#ifndef __RLITE_VERSION_H__" > $VERF
+echo "#define __RLITE_VERSION_H__" >> $VERF
+echo "#define RL_REVISION_ID \"$REVISION\"" >> $VERF
+echo "#define RL_REVISION_DATE \"$REVISION_DATE\"" >> $VERF
+echo "#endif" >> $VERF
 
 chmod +x prepare.sh
 chmod +x unprepare.sh
