@@ -383,6 +383,31 @@ rl_conf_flow_get_stats(rl_port_t port_id, struct rl_flow_stats *stats)
     return rl_conf_flow_get_info(port_id, stats, NULL);
 }
 
+static char *
+byteprint(char *buf, size_t len, uint64_t bytes)
+{
+    const char *unit = "B";
+
+    if (bytes > 1024) {
+        unit = "KB";
+        bytes /= 1024;
+    }
+
+    if (bytes > 1024) {
+        unit = "MB";
+        bytes /= 1024;
+    }
+
+    if (bytes > 1024) {
+        unit = "GB";
+        bytes /= 1024;
+    }
+
+    snprintf(buf, len, "%llu%s", (long long unsigned)bytes, unit);
+
+    return buf;
+}
+
 int
 rl_conf_flows_print(struct list_head *flows)
 {
@@ -391,9 +416,11 @@ rl_conf_flows_print(struct list_head *flows)
 
     PI_S("Flows table:\n");
     list_for_each_entry (rl_flow, flows, node) {
+        char bbuf[32];
+        size_t blen = sizeof(bbuf);
         struct rl_flow_stats stats;
-        int ret;
         int ofs = 0;
+        int ret;
 
         ret = rl_conf_flow_get_stats(rl_flow->local_port, &stats);
         if (ret) {
@@ -413,19 +440,19 @@ rl_conf_flows_print(struct list_head *flows)
             ofs += snprintf(specinfo + ofs, sizeof(specinfo) - ofs, ", ");
         }
 
-        PI_S(
-            "  ipcp %u, local addr/port %llu:%u, "
-            "remote addr/port %llu:%u, %s"
-            "rx %llu pkt %lluB %llu drop, "
-            "tx %llu pkt %lluB %llu drop, "
-            "rtx %llu pkt %lluB\n",
-            rl_flow->ipcp_id, (long long unsigned int)rl_flow->local_addr,
-            rl_flow->local_port, (long long unsigned int)rl_flow->remote_addr,
-            rl_flow->remote_port, specinfo, (long long unsigned)stats.rx_pkt,
-            (long long unsigned)stats.rx_byte, (long long unsigned)stats.rx_err,
-            (long long unsigned)stats.tx_pkt, (long long unsigned)stats.tx_byte,
-            (long long unsigned)stats.tx_err, (long long unsigned)stats.rtx_pkt,
-            (long long unsigned)stats.rtx_byte);
+        PI_S("  ipcp %u, addr:port %llu:%u<-->%llu:%u, %s"
+             "rx %llu pkt %s %llu drop, "
+             "tx %llu pkt %s %llu drop, "
+             "rtx %llu pkt %s\n",
+             rl_flow->ipcp_id, (long long unsigned int)rl_flow->local_addr,
+             rl_flow->local_port, (long long unsigned int)rl_flow->remote_addr,
+             rl_flow->remote_port, specinfo, (long long unsigned)stats.rx_pkt,
+             byteprint(bbuf, blen, stats.rx_byte),
+             (long long unsigned)stats.rx_err, (long long unsigned)stats.tx_pkt,
+             byteprint(bbuf, blen, stats.tx_byte),
+             (long long unsigned)stats.tx_err,
+             (long long unsigned)stats.rtx_pkt,
+             byteprint(bbuf, blen, stats.rtx_byte));
     }
 
     return 0;
