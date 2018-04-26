@@ -270,7 +270,7 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
 
     entry = rl_alloc(sizeof(*entry), gfp | __GFP_ZERO, RL_MT_UPQ);
     if (!entry) {
-        PE("Out of memory\n");
+        RPV(1, "Out of memory\n");
         return -ENOMEM;
     }
 
@@ -279,7 +279,7 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
     serbuf = rl_alloc(serlen, gfp | __GFP_ZERO, RL_MT_UPQ);
     if (!serbuf) {
         rl_free(entry, RL_MT_UPQ);
-        PE("Out of memory\n");
+        RPV(1, "Out of memory\n");
         return -ENOMEM;
     }
     serlen =
@@ -1649,7 +1649,7 @@ ipcp_update_all(rl_ipcp_id_t ipcp_id, int update_type)
     }
 
     if (ipcp_update_fill(ipcp, &upd, update_type)) {
-        PE("Out of memory\n");
+        RPV(1, "Out of memory\n");
         ret = -ENOMEM;
         goto out;
     }
@@ -1785,7 +1785,7 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
 
             fqe = rl_alloc(sizeof(*fqe), GFP_ATOMIC, RL_MT_FFETCH);
             if (!fqe) {
-                PE("Out of memory\n");
+                RPV(1, "Out of memory\n");
                 break;
             }
 
@@ -1806,7 +1806,7 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
 
         fqe = rl_alloc(sizeof(*fqe), GFP_ATOMIC, RL_MT_FFETCH);
         if (!fqe) {
-            PE("Out of memory\n");
+            RPV(1, "Out of memory\n");
         } else {
             memset(fqe, 0, sizeof(*fqe));
             list_add_tail(&fqe->node, &rc->flows_fetch_q);
@@ -1869,7 +1869,7 @@ rl_reg_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
             list_for_each_entry (appl, &ipcp->registered_appls, node) {
                 fqe = rl_alloc(sizeof(*fqe), GFP_ATOMIC, RL_MT_FFETCH);
                 if (!fqe) {
-                    PE("Out of memory\n");
+                    RPV(1, "Out of memory\n");
                     break;
                 }
 
@@ -1888,7 +1888,7 @@ rl_reg_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
 
         fqe = rl_alloc(sizeof(*fqe), GFP_ATOMIC, RL_MT_FFETCH);
         if (!fqe) {
-            PE("Out of memory\n");
+            RPV(1, "Out of memory\n");
         } else {
             memset(fqe, 0, sizeof(*fqe));
             list_add_tail(&fqe->node, &rc->regs_fetch_q);
@@ -3094,7 +3094,7 @@ initial_ipcp_update(struct rl_ctrl *rc)
     PUNLOCK();
 
     if (ret) {
-        PE("Out of memory\n");
+        RPV(1, "Out of memory\n");
     }
 
     return ret;

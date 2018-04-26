@@ -40,14 +40,14 @@ rl_buf_alloc(size_t size, size_t hdroom, size_t tailroom, gfp_t gfp)
 
     rb = rl_alloc(sizeof(*rb), gfp, RL_MT_BUFHDR);
     if (unlikely(!rb)) {
-        PE("Out of memory\n");
+        RPV(1, "Out of memory\n");
         return NULL;
     }
 
     kbuf = rl_alloc(sizeof(*rb->raw) + real_size, gfp, RL_MT_BUFDATA);
     if (unlikely(!kbuf)) {
         rl_free(rb, RL_MT_BUFHDR);
-        PE("Out of memory\n");
+        RPV(1, "Out of memory\n");
         return NULL;
     }
 
@@ -62,7 +62,7 @@ rl_buf_alloc(size_t size, size_t hdroom, size_t tailroom, gfp_t gfp)
     rb = alloc_skb(hdroom + size + tailroom, gfp);
 
     if (unlikely(!rb)) {
-        PE("Out of memory\n");
+        RPV(1, "Out of memory\n");
         return NULL;
     }
 

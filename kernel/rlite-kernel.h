@@ -64,14 +64,6 @@ extern int verbosity;
 #define DOPRINT(KLEV, LEV, FMT, ...)                                           \
     printk(KLEV "[" LEV "]%s: " FMT, __func__, ##__VA_ARGS__)
 
-#ifdef RL_PV_ENABLE
-#define PV(FMT, ...)                                                           \
-    if (verbosity >= RL_VERB_VERY)                                             \
-    DOPRINT(KERN_DEBUG, "DBG", FMT, ##__VA_ARGS__)
-#else /* ! RL_PV_ENABLE */
-#define PV(FMT, ...)
-#endif /* ! RL_PV_ENABLE */
-
 #define PD(FMT, ...)                                                           \
     if (verbosity >= RL_VERB_DBG)                                              \
     DOPRINT(KERN_DEBUG, "DBG", FMT, ##__VA_ARGS__)
@@ -97,6 +89,10 @@ extern int verbosity;
             PD(FMT, ##__VA_ARGS__);                                            \
     } while (0)
 
+#ifdef RL_PV_ENABLE
+#define PV(FMT, ...)                                                           \
+    if (verbosity >= RL_VERB_VERY)                                             \
+    DOPRINT(KERN_DEBUG, "DBG", FMT, ##__VA_ARGS__)
 #define RPV(LPS, FMT, ...)                                                     \
     do {                                                                       \
         static int t0, __cnt;                                                  \
@@ -107,6 +103,10 @@ extern int verbosity;
         if (__cnt++ < LPS)                                                     \
             PV(FMT, ##__VA_ARGS__);                                            \
     } while (0)
+#else /* ! RL_PV_ENABLE */
+#define PV(FMT, ...)
+#define RPV(LPS, FMT, ...)
+#endif /* ! RL_PV_ENABLE */
 
 /*
  * Bit definitions for the PCI header.

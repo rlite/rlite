@@ -166,7 +166,7 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
                           priv->flow->txrx.ipcp->tailroom, GFP_ATOMIC);
         if (unlikely(!rb)) {
             flow->stats.rx_err++;
-            PE("Out of memory\n");
+            RPV(1, "Out of memory\n");
             break;
         }
         rl_buf_append(rb, ret);
@@ -254,7 +254,7 @@ rl_shim_udp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     priv = rl_alloc(sizeof(*priv), GFP_ATOMIC, RL_MT_SHIMDATA);
     if (!priv) {
-        PE("Out of memory\n");
+        RPV(1, "Out of memory\n");
         return -1;
     }
 

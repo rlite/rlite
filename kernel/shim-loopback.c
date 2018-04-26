@@ -191,7 +191,7 @@ rl_shim_loopback_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     faw = rl_alloc(sizeof(*faw), GFP_KERNEL | __GFP_ZERO, RL_MT_SHIMDATA);
     if (!faw) {
-        PE("Out of memory\n");
+        RPV(1, "Out of memory\n");
         return -ENOMEM;
     }
 
@@ -239,7 +239,7 @@ rl_shim_loopback_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     farw = rl_alloc(sizeof(*farw), GFP_KERNEL | __GFP_ZERO, RL_MT_SHIMDATA);
     if (!farw) {
-        PE("Out of memory\n");
+        RPV(1, "Out of memory\n");
         return -ENOMEM;
     }
 

@@ -56,7 +56,7 @@ shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp, struct rl_msg_base *msg)
     serlen = rl_msg_serlen(rl_shim_hv_numtables, RLITE_SHIM_HV_MSG_MAX, msg);
     rb     = rl_buf_alloc(serlen, ipcp->txhdroom, ipcp->tailroom, GFP_ATOMIC);
     if (!rb) {
-        PE("Out of memory\n");
+        RPV(1, "Out of memory\n");
         return -ENOMEM;
     }
     rl_buf_append(rb, serlen);
