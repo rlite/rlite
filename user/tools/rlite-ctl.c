@@ -42,6 +42,7 @@
 #include "rlite/uipcps-msg.h"
 #include "rlite/conf.h"
 #include "rlite/uipcps-helpers.h"
+#include "rlite/version.h"
 
 /* IPCP attributes. */
 struct ipcp_attrs {
@@ -1371,6 +1372,13 @@ process_args(int argc, char **argv)
      * This must work even if rlite modules are not loaded. */
     if (!strcmp(cmd, "-h") || !strcmp(cmd, "--help")) {
         usage(-1);
+        return 0;
+    }
+
+    if (!strcmp(cmd, "--version") || !strcmp(cmd, "-V")) {
+        printf("rlite-ctl versioning info\n");
+        printf("    build id  : %s\n", RL_REVISION_ID);
+        printf("    build date: %s\n", RL_REVISION_DATE);
         return 0;
     }
 
