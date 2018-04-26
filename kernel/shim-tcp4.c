@@ -179,7 +179,7 @@ tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
                     priv->flow->txrx.ipcp->tailroom, GFP_ATOMIC);
                 if (unlikely(!priv->cur_rx_rb)) {
                     flow->stats.rx_err++;
-                    PE("Out of memory\n");
+                    RPV(1, "Out of memory\n");
                     break;
                 }
                 rl_buf_append(priv->cur_rx_rb, priv->cur_rx_rblen);
@@ -247,7 +247,7 @@ rl_shim_tcp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     priv = rl_alloc(sizeof(*priv), GFP_ATOMIC, RL_MT_SHIMDATA);
     if (!priv) {
-        PE("Out of memory\n");
+        RPV(1, "Out of memory\n");
         return -1;
     }
 
@@ -439,7 +439,7 @@ rl_shim_tcp4_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
         if (unlikely(!qe)) {
             rl_buf_free(rb);
-            PE("Out of memory, dropping packet\n");
+            RPV(1, "Out of memory, dropping packet\n");
             return -ENOMEM;
         }
 

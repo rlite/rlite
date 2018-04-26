@@ -238,7 +238,7 @@ rl_io_open(struct inode *inode, struct file *f)
         rl_alloc(sizeof(*rio), GFP_KERNEL | __GFP_ZERO, RL_MT_IODEV);
 
     if (!rio) {
-        PE("Out of memory\n");
+        RPV(1, "Out of memory\n");
         return -ENOMEM;
     }
 
@@ -647,7 +647,7 @@ rl_io_ioctl_mgmt(struct rl_io *rio, struct rl_ioctl_info *info)
         rl_alloc(sizeof(*(rio->txrx)), GFP_KERNEL | __GFP_ZERO, RL_MT_MISC);
     if (!rio->txrx) {
         ipcp_put(ipcp);
-        PE("Out of memory\n");
+        RPV(1, "Out of memory\n");
         return -ENOMEM;
     }
 

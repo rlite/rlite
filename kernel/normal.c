@@ -99,7 +99,7 @@ rl_buf_pci_push(struct rl_buf *rb)
     if (unlikely(skb_headroom(rb) < sizeof(struct rina_pci))) {
         if (pskb_expand_head(rb, /*nhead=*/sizeof(struct rina_pci), /*ntail=*/0,
                              GFP_ATOMIC)) {
-            PE("Out of memory\n");
+            RPV(1, "Out of memory\n");
             return -1;
         }
     }
@@ -1394,7 +1394,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
                 rl_buf_alloc(rb->len, sizeof(*mhdr), 0, GFP_ATOMIC);
 
             if (!nrb) {
-                PE("Out of memory\n");
+                RPV(1, "Out of memory\n");
                 rl_buf_free(rb);
                 return NULL; /* -ENOMEM */
             }

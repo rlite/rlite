@@ -111,7 +111,7 @@ rl_shim_eth_register(struct ipcp_entry *ipcp, char *appl, int reg)
 
         priv->upper_names[i] = rl_strdup(appl, GFP_KERNEL, RL_MT_SHIMDATA);
         if (!priv->upper_names[i]) {
-            PE("Out of memory\n");
+            RPV(1, "Out of memory\n");
             return -ENOMEM;
         }
 
@@ -388,7 +388,7 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
     return 0;
 
 nomem:
-    PE("Out of memory\n");
+    RPV(1, "Out of memory\n");
 
     if (entry) {
         list_del_init(&entry->node);
@@ -595,7 +595,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
 #ifndef RL_SKB
     rb = rl_buf_alloc(skb->len, ipcp->rxhdroom, ipcp->tailroom, GFP_ATOMIC);
     if (unlikely(!rb)) {
-        PD("Out of memory\n");
+        RPV(1, "Out of memory\n");
         return;
     }
     skb_copy_bits(skb, 0, RL_BUF_DATA(rb), skb->len);
