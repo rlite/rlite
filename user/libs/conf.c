@@ -413,17 +413,19 @@ rl_conf_flows_print(struct list_head *flows)
             ofs += snprintf(specinfo + ofs, sizeof(specinfo) - ofs, ", ");
         }
 
-        PI_S("  ipcp %u, local addr/port %llu:%u, "
-             "remote addr/port %llu:%u, %s"
-             "tx %llu pkt %llu byte %llu err, "
-             "rx %llu pkt %llu byte %llu err\n",
-             rl_flow->ipcp_id, (long long unsigned int)rl_flow->local_addr,
-             rl_flow->local_port, (long long unsigned int)rl_flow->remote_addr,
-             rl_flow->remote_port, specinfo, (long long unsigned)stats.tx_pkt,
-             (long long unsigned)stats.tx_byte,
-             (long long unsigned)stats.tx_err, (long long unsigned)stats.rx_pkt,
-             (long long unsigned)stats.rx_byte,
-             (long long unsigned)stats.rx_err);
+        PI_S(
+            "  ipcp %u, local addr/port %llu:%u, "
+            "remote addr/port %llu:%u, %s"
+            "rx %llu pkt %lluB %llu drop, "
+            "tx %llu pkt %lluB %llu drop, "
+            "rtx %llu pkt %lluB\n",
+            rl_flow->ipcp_id, (long long unsigned int)rl_flow->local_addr,
+            rl_flow->local_port, (long long unsigned int)rl_flow->remote_addr,
+            rl_flow->remote_port, specinfo, (long long unsigned)stats.rx_pkt,
+            (long long unsigned)stats.rx_byte, (long long unsigned)stats.rx_err,
+            (long long unsigned)stats.tx_pkt, (long long unsigned)stats.tx_byte,
+            (long long unsigned)stats.tx_err, (long long unsigned)stats.rtx_pkt,
+            (long long unsigned)stats.rtx_byte);
     }
 
     return 0;
