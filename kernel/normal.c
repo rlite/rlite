@@ -294,6 +294,7 @@ rcv_inact_tmr_cb(
     rb_list_foreach_safe (rb, tmp, &dtp->seqq) {
         rb_list_del(rb);
         rl_buf_free(rb);
+        flow->stats.rx_err++;
         dtp->seqq_len--;
     }
 
@@ -1346,15 +1347,15 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
     bool qlimit;
     int ret = 0;
 
+    if (pci->pdu_len < rb->len) {
+        /* Make up for tail padding introduced at lower layers. */
+        rb->len = pci->pdu_len;
+    }
+
     if (unlikely(rb->len < sizeof(struct rina_pci))) {
         RPD(1, "Dropping PDU shorter [%u] than PCI\n", (unsigned int)rb->len);
         rl_buf_free(rb);
         return NULL; /* -EINVAL */
-    }
-
-    if (pci->pdu_len < rb->len) {
-        /* Make up for tail padding introduced at lower layers. */
-        rb->len = pci->pdu_len;
     }
 
     if (priv->csum) {
@@ -1518,10 +1519,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 
         RL_BUF_RX(rb).cons_seqnum = seqnum;
         ret                       = rl_buf_pci_pop(rb);
-        if (unlikely(ret)) {
-            rl_buf_free(rb);
-            goto snd_crb;
-        }
+        BUG_ON(ret);
 
         ret = rl_sdu_rx_flow(ipcp, flow, rb, qlimit);
 
@@ -1622,22 +1620,20 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 
         RL_BUF_RX(rb).cons_seqnum = seqnum;
         ret                       = rl_buf_pci_pop(rb);
-        if (unlikely(ret)) {
-            rl_buf_free(rb);
-            goto snd_crb;
-        }
+        BUG_ON(ret);
+
         ret = rl_sdu_rx_flow(ipcp, flow, rb, qlimit);
 
         /* Also deliver PDUs just extracted from the seqq. Note
          * that we must use the safe version of list scanning, since
          * rl_sdu_rx_flow() will modify qrb->node. */
         rb_list_foreach_safe (qrb, tmp, &qrbs) {
+            int popr;
+
             rb_list_del(qrb);
             RL_BUF_RX(qrb).cons_seqnum = seqnum;
-            if (unlikely(rl_buf_pci_pop(qrb))) {
-                rl_buf_free(qrb);
-                continue;
-            }
+            popr                       = rl_buf_pci_pop(qrb);
+            BUG_ON(popr);
             ret |= rl_sdu_rx_flow(ipcp, flow, qrb, qlimit);
         }
 
