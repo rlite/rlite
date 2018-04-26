@@ -793,12 +793,14 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     if (unlikely(!entry)) {
         rl_buf_free(rb);
+        entry->stats.tx_err++;
         RPD(1, "called on deallocated entry\n");
         return -ENXIO;
     }
 
     if (unlikely(rb->len > ETH_DATA_LEN)) {
         rl_buf_free(rb);
+        entry->stats.tx_err++;
         RPD(1, "Exceeding maximum ethernet payload (%d)\n", ETH_DATA_LEN);
         return -EMSGSIZE;
     }
@@ -827,7 +829,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     skb   = alloc_skb(hhlen + rb->len + netdev->needed_tailroom, GFP_KERNEL);
     if (!skb) {
         rl_buf_free(rb);
-        PD("Out of memory\n");
+        entry->stats.tx_err++;
         return -ENOMEM;
     }
 
