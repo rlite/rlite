@@ -364,12 +364,17 @@ fi
 
 rm -f config.log
 
-REVISION=$(git rev-parse --verify HEAD)
-if [ "$?" != "0" ]; then
-    REVISION="(unknown)"
-    REVISION_DATE="$REVISION"
+if [[ -d .git ]]; then
+    REVISION=$(git rev-parse --verify HEAD)
+    if [ "$?" != "0" ]; then
+        REVISION="(unknown)"
+        REVISION_DATE="$REVISION"
+    else
+        REVISION_DATE=$(git show -s --format=%cd $REVISION)
+    fi
 else
-    REVISION_DATE=$(git show -s --format=%cd $REVISION)
+    REVISION="(unknown)"
+    REVISION_DATE="$(date)"
 fi
 
 cat >> config.log <<EOF
