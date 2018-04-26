@@ -49,6 +49,7 @@
 #include "rlite/list.h"
 #include "rlite/conf.h"
 #include "rlite/uipcps-helpers.h"
+#include "rlite/version.h"
 #include "uipcp-container.h"
 
 static void
@@ -952,6 +953,7 @@ usage(void)
            "   -v VERB_LEVEL : set verbosity LEVEL: QUIET, WARN, INFO, "
            "DBG (default), VERY\n"
            "   -d : start as a daemon process\n"
+           "   -V : show versioning info and exit\n"
            "   -T PERIOD: for periodic tasks (in seconds)\n"
            "   -H HANDOVER_MANAGER: (none, signal-strength)\n");
 }
@@ -969,7 +971,7 @@ main(int argc, char **argv)
     int pidfd             = -1;
     int ret, opt;
 
-    while ((opt = getopt(argc, argv, "hv:dT:H:")) != -1) {
+    while ((opt = getopt(argc, argv, "hv:dT:H:V")) != -1) {
         switch (opt) {
         case 'h':
             usage();
@@ -993,6 +995,13 @@ main(int argc, char **argv)
                 usage();
                 return -1;
             }
+            break;
+
+        case 'V':
+            printf("rlite-uipcps versioning info\n");
+            printf("    build id  : %s\n", RL_REVISION_ID);
+            printf("    build date: %s\n", RL_REVISION_DATE);
+            return 0;
             break;
 
         default:
