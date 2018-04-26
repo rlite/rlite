@@ -515,9 +515,9 @@ class Demo:
             if shim not in self.netems:
                 continue
             outs += 'PORT%(idx)s=$(mac2ifname %(mac)s)\n'\
-                'tc qdisc add dev $PORT%(idx)s root handle 1: htb default 1\n'\
-                'tc class add dev $PORT%(idx)s parent 1: classid 1:1 htb rate %(rate)s\n'\
-                'tc qdisc add dev $PORT%(idx)s parent 1:1 netem %(args)s\n' \
+                '$SUDO tc qdisc add dev $PORT%(idx)s root handle 1: htb default 1\n'\
+                '$SUDO tc class add dev $PORT%(idx)s parent 1: classid 1:1 htb rate %(rate)s\n'\
+                '$SUDO tc qdisc add dev $PORT%(idx)s parent 1:1 netem %(args)s\n' \
                     % { 'idx': port['idx'],
                         'mac': port['mac'],
                         'rate': self.netems[shim]['rate'],
