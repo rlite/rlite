@@ -21,6 +21,7 @@
 #include <linux/types.h>
 #include "rlite/kernel-msg.h"
 #include "rlite/utils.h"
+#include "rlite/version.h"
 #include "rlite-kernel.h"
 
 #include <linux/module.h>
@@ -3282,11 +3283,15 @@ rlite_init(void)
         return ret;
     }
 
+    PD("using "
 #ifndef RL_SKB
-    PD("using custom packet buffers\n");
+       "custom"
 #else
-    PD("using native packet buffers\n");
+       "native"
 #endif
+       " packet buffers\n");
+    PD("revision id  : %s\n", RL_REVISION_ID);
+    PD("revision date: %s\n", RL_REVISION_DATE);
 
     return 0;
 }
