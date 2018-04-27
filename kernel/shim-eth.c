@@ -867,8 +867,10 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         RPV(1, "dev_queue_xmit() failed [%d]\n", ret);
 
         spin_lock_bh(&priv->tx_lock);
+#ifndef RL_SKB
         entry->stats.tx_pkt--;
         entry->stats.tx_byte -= rb->len;
+#endif
         entry->stats.tx_err++;
         priv->xmit_busy = 1;
         spin_unlock_bh(&priv->tx_lock);
