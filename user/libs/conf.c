@@ -441,9 +441,9 @@ rl_conf_flows_print(struct list_head *flows)
         }
 
         PI_S("  ipcp %u, addr:port %llu:%u<-->%llu:%u, %s"
-             "rx %llu pkt %s %llu drop, "
-             "tx %llu pkt %s %llu drop, "
-             "rtx %llu pkt %s\n",
+             "rx(pkt:%llu, %s, drop:%llu), "
+             "tx(pkt:%llu, %s, drop:%llu), "
+             "rtx(pkt:%llu, %s)\n",
              rl_flow->ipcp_id, (long long unsigned int)rl_flow->local_addr,
              rl_flow->local_port, (long long unsigned int)rl_flow->remote_addr,
              rl_flow->remote_port, specinfo, (long long unsigned)stats.rx_pkt,
