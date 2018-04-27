@@ -66,22 +66,16 @@ struct rina_pci_ctrl {
     rl_seq_t my_rwe;  /* sent but unused */
 } __attribute__((__packed__));
 
-static inline int
+static inline void
 rl_buf_pci_pop(struct rl_buf *rb)
 {
-    if (unlikely(rb->len < sizeof(struct rina_pci))) {
-        RPD(1, "No enough data to pop another PCI\n");
-        return -1;
-    }
-
+    BUG_ON(rb->len < sizeof(struct rina_pci));
 #ifndef RL_SKB
     rb->pci++;
     rb->len -= sizeof(struct rina_pci);
 #else  /* RL_SKB */
     skb_pull(rb, sizeof(struct rina_pci));
 #endif /* RL_SKB */
-
-    return 0;
 }
 
 static inline int
@@ -1387,8 +1381,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
             return NULL; /* -EINVAL */
         }
         RL_BUF_RX(rb).cons_seqnum = pci->seqnum;
-        ret                       = rl_buf_pci_pop(rb);
-        BUG_ON(ret); /* We already check bounds above. */
+        rl_buf_pci_pop(rb);
 
         /* Push a management header using the room made available
          * by rl_buf_pci_pop(), if possible. */
@@ -1518,8 +1511,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         spin_unlock_bh(&dtp->lock);
 
         RL_BUF_RX(rb).cons_seqnum = seqnum;
-        ret                       = rl_buf_pci_pop(rb);
-        BUG_ON(ret);
+        rl_buf_pci_pop(rb);
 
         ret = rl_sdu_rx_flow(ipcp, flow, rb, qlimit);
 
@@ -1619,8 +1611,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         spin_unlock_bh(&dtp->lock);
 
         RL_BUF_RX(rb).cons_seqnum = seqnum;
-        ret                       = rl_buf_pci_pop(rb);
-        BUG_ON(ret);
+        rl_buf_pci_pop(rb);
 
         ret = rl_sdu_rx_flow(ipcp, flow, rb, qlimit);
 
@@ -1628,12 +1619,9 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
          * that we must use the safe version of list scanning, since
          * rl_sdu_rx_flow() will modify qrb->node. */
         rb_list_foreach_safe (qrb, tmp, &qrbs) {
-            int popr;
-
             rb_list_del(qrb);
             RL_BUF_RX(qrb).cons_seqnum = seqnum;
-            popr                       = rl_buf_pci_pop(qrb);
-            BUG_ON(popr);
+            rl_buf_pci_pop(qrb);
             ret |= rl_sdu_rx_flow(ipcp, flow, qrb, qlimit);
         }
 
