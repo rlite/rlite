@@ -728,6 +728,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct dtcp_config *dc = &flow->cfg.dtcp;
     bool dtcp_present      = DTCP_PRESENT(flow->cfg.dtcp);
     struct rina_pci *pci;
+    int ret;
 
     spin_lock_bh(&dtp->lock);
 
@@ -866,7 +867,17 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     spin_unlock_bh(&dtp->lock);
 
-    return rmt_tx(ipcp, flow->remote_addr, rb, flags);
+    ret = rmt_tx(ipcp, flow->remote_addr, rb, flags);
+
+    if (unlikely(ret == -EAGAIN)) {
+        /* Adjust the counter. */
+        spin_lock_bh(&dtp->lock);
+        flow->stats.tx_pkt--;
+        flow->stats.tx_byte -= rb->len;
+        spin_unlock_bh(&dtp->lock);
+    }
+
+    return ret;
 }
 
 /* Get N-1 flow and N-1 IPCP where the mgmt PDU should be
