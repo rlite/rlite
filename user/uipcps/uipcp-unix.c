@@ -999,8 +999,8 @@ main(int argc, char **argv)
 
         case 'V':
             printf("rlite-uipcps versioning info\n");
-            printf("    build id  : %s\n", RL_REVISION_ID);
-            printf("    build date: %s\n", RL_REVISION_DATE);
+            printf("    revision id  : %s\n", RL_REVISION_ID);
+            printf("    revision date: %s\n", RL_REVISION_DATE);
             return 0;
             break;
 
