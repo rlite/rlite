@@ -245,6 +245,7 @@ snd_inact_tmr_cb(
     rb_list_foreach_safe (rb, tmp, &dtp->cwq) {
         rb_list_del(rb);
         rl_buf_free(rb);
+        flow->stats.tx_err++;
         dtp->cwq_len--;
     }
 
@@ -797,9 +798,6 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     pci->pdu_csum  = 0;
     pci->seqnum    = dtp->next_seq_num_to_use++;
 
-    flow->stats.tx_pkt++;
-    flow->stats.tx_byte += rb->len;
-
     if (unlikely(dtp->flags & DTP_F_DRF_SET)) {
         dtp->flags &= ~DTP_F_DRF_SET;
         pci->pdu_flags |= PDU_F_DRF;
@@ -823,24 +821,24 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
                  * that dtp->cwq_len < dtp->max_cwq_len. */
                 rb_list_enq(rb, &dtp->cwq);
                 dtp->cwq_len++;
+                spin_unlock_bh(&dtp->lock);
                 NPD("push [%lu] into cwq\n", (long unsigned)pci->seqnum);
                 rb = NULL; /* Ownership passed. */
-            } else {
-                /* PDU in the sender window. */
-                /* POL: TxControl. */
-                dtp->snd_lwe           = dtp->next_seq_num_to_use;
-                dtp->last_seq_num_sent = pci->seqnum;
-                NPD("sending [%lu] through sender window\n",
-                    (long unsigned)pci->seqnum);
+
+                return 0;
             }
+            /* PDU in the sender window. */
+            /* POL: TxControl. */
+            dtp->snd_lwe           = dtp->next_seq_num_to_use;
+            dtp->last_seq_num_sent = pci->seqnum;
+            NPD("sending [%lu] through sender window\n",
+                (long unsigned)pci->seqnum);
         }
 
         if (rb && (flow->cfg.dtcp.flags & DTCP_CFG_RTX_CTRL)) {
             int ret = rl_rtxq_push(flow, rb);
 
             if (unlikely(ret)) {
-                flow->stats.tx_pkt--;
-                flow->stats.tx_byte -= rb->len;
                 flow->stats.tx_err++;
                 spin_unlock_bh(&dtp->lock);
                 rl_buf_free(rb);
@@ -852,10 +850,10 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
              * and pushed it into the RTX queue. We cannot propagate the
              * backpressure signal (EAGAIN) to userspace. If we did so, the
              * receiver could receive the same data twice: one copy as a
-             * result of the retransmission, and another copy because the
+             * result of a retransmission, and another copy because the
              * application would call write() again on the same data. Note
-             * that the receiver cannot distinguish the duplicated data
-             * because the second copy comes with a different sequence
+             * that the receiver could not distinguish the duplicated data
+             * because the second copy would come with a different sequence
              * number. */
             flags |= RL_RMT_F_CONSUME;
         }
@@ -863,11 +861,10 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         mod_timer(&dtp->snd_inact_tmr, jiffies + 3 * dtp->mpl_r_a);
     }
 
-    spin_unlock_bh(&dtp->lock);
+    flow->stats.tx_pkt++;
+    flow->stats.tx_byte += rb->len;
 
-    if (unlikely(rb == NULL)) {
-        return 0;
-    }
+    spin_unlock_bh(&dtp->lock);
 
     return rmt_tx(ipcp, flow->remote_addr, rb, flags);
 }
@@ -1233,6 +1230,9 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow, struct rl_buf *rb)
                 if (flow->cfg.dtcp.flags & DTCP_CFG_RTX_CTRL) {
                     rl_rtxq_push(flow, qrb);
                 }
+
+                flow->stats.tx_pkt++;
+                flow->stats.tx_byte += rb->len;
             }
         }
     }

@@ -248,19 +248,19 @@ rina_flow_spec_best_effort(struct rina_flow_spec *spec)
 }
 
 struct rl_flow_stats {
-    /* Sender statistics: packets and bytes successfully
+    /* EFCP sender statistics: packets and bytes successfully
      * processed for transmission, and packets dropped. */
     uint64_t tx_pkt;
     uint64_t tx_byte;
     uint64_t tx_err;
 
-    /* Receiver statistics: packets and bytes successfully
+    /* EFCP receiver statistics: packets and bytes successfully
      * processed for transmission, and packets dropped. */
     uint64_t rx_pkt;
     uint64_t rx_byte;
     uint64_t rx_err;
 
-    /* Retransmission statistics. */
+    /* EFCP retransmission statistics. */
     uint64_t rtx_pkt;
     uint64_t rtx_byte;
 };
