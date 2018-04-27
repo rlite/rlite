@@ -1243,7 +1243,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow, struct rl_buf *rb)
                 }
 
                 flow->stats.tx_pkt++;
-                flow->stats.tx_byte += rb->len;
+                flow->stats.tx_byte += qrb->len;
             }
         }
     }
