@@ -167,6 +167,10 @@ rl_normal_destroy(struct ipcp_entry *ipcp)
     PD("IPC [%p] destroyed\n", priv);
 }
 
+/* Maximum and minimum values for the congestion control window. */
+#define RL_CGWIN_MIN 4
+#define RL_CGWIN_MAX (1U << 16)
+
 /* To be called under DTP lock */
 static void
 dtp_snd_reset(struct flow_entry *flow)
@@ -182,6 +186,7 @@ dtp_snd_reset(struct flow_entry *flow)
     dtp->last_ctrl_seq_num_rcvd = 0;
     if (dc->fc.fc_type == RLITE_FC_T_WIN) {
         dtp->snd_rwe += dc->fc.cfg.w.initial_credit;
+        dtp->cgwin = RL_CGWIN_MIN;
     }
 }
 
@@ -401,6 +406,14 @@ rtx_tmr_cb(
             time_before(RL_BUF_RTX(rb).rtx_jiffies, next_exp)) {
             next_exp     = RL_BUF_RTX(rb).rtx_jiffies;
             next_exp_set = true;
+        }
+    }
+
+    if (!rb_list_empty(&rrbq)) {
+        /* Halve the congestion window on retransmission. */
+        dtp->cgwin >>= 1;
+        if (unlikely(dtp->cgwin < RL_CGWIN_MIN)) {
+            dtp->cgwin = RL_CGWIN_MIN;
         }
     }
 
@@ -1310,6 +1323,17 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow, struct rl_buf *rb)
             if (rb_list_empty(&dtp->rtxq)) {
                 /* Everything has been acked, we can stop the rtx timer. */
                 del_timer(&dtp->rtx_tmr);
+            }
+
+            /* Update the congestion control window size (up to a maximum).
+             * In case we never experienced retransmissions we double the
+             * size, otherwise we increment it linearly. */
+            if (dtp->cgwin < RL_CGWIN_MAX) {
+                if (flow->stats.rtx_pkt) {
+                    dtp->cgwin++;
+                } else {
+                    dtp->cgwin <<= 1;
+                }
             }
 
             break;

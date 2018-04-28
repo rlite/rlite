@@ -287,6 +287,7 @@ struct rl_flow_dtp {
     unsigned int max_rtxq_len;
     unsigned rtt;        /* estimated round trip time, in usecs. */
     unsigned rtt_stddev; /* stddev in usecs */
+    unsigned cgwin;      /* congestion window size, in PDUs */
 
     /* Receiver state. */
     rlm_seq_t rcv_lwe;
