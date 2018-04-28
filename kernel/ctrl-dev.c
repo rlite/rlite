@@ -2149,6 +2149,29 @@ rl_ipcp_uipcp_wait(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 }
 
 static int
+rl_rmt_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
+{
+    struct rl_kmsg_ipcp_rmt_stats_req *req =
+        (struct rl_kmsg_ipcp_rmt_stats_req *)bmsg;
+    struct rl_kmsg_ipcp_rmt_stats_resp resp;
+    struct ipcp_entry *ipcp;
+    int ret = -EINVAL; /* Report failure by default. */
+
+    ipcp = ipcp_get(req->ipcp_id);
+    if (ipcp) {
+        memset(&resp, 0, sizeof(resp));
+        resp.hdr.msg_type = RLITE_KER_IPCP_RMT_STATS_RESP;
+        resp.hdr.event_id = req->hdr.event_id;
+        memcpy(&resp.stats, &ipcp->rmt_stats, sizeof(ipcp->rmt_stats));
+        ret = rl_upqueue_append(rc, (const struct rl_msg_base *)&resp, false);
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));
+    }
+    ipcp_put(ipcp);
+
+    return ret;
+}
+
+static int
 rl_uipcp_fa_req_arrived(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_uipcp_fa_req_arrived *req =
@@ -2901,6 +2924,7 @@ static rl_msg_handler_t rl_ctrl_handlers[] = {
     [RLITE_KER_IPCP_QOS_SUPPORTED]    = rl_ipcp_qos_supported,
     [RLITE_KER_APPL_MOVE]             = rl_appl_move,
     [RLITE_KER_REG_FETCH]             = rl_reg_fetch,
+    [RLITE_KER_IPCP_RMT_STATS_REQ]    = rl_rmt_get_stats,
 #ifdef RL_MEMTRACK
     [RLITE_KER_MEMTRACK_DUMP] = rl_memtrack_dump,
 #endif /* RL_MEMTRACK */

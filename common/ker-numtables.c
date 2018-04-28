@@ -163,6 +163,14 @@ struct rl_msg_layout rl_ker_numtables[] = {
         {
             .copylen = sizeof(struct rl_kmsg_flow_state),
         },
+    [RLITE_KER_IPCP_RMT_STATS_REQ] =
+        {
+            .copylen = sizeof(struct rl_kmsg_ipcp_rmt_stats_req),
+        },
+    [RLITE_KER_IPCP_RMT_STATS_RESP] =
+        {
+            .copylen = sizeof(struct rl_kmsg_ipcp_rmt_stats_resp),
+        },
     [RLITE_KER_MSG_MAX] =
         {
             .copylen = 0,
