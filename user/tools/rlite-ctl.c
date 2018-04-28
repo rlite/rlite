@@ -253,6 +253,31 @@ request_response(struct rl_msg_base *req, response_handler_t handler)
     return ret;
 }
 
+static char *
+byteprint(char *buf, size_t len, uint64_t bytes)
+{
+    const char *unit = "B";
+
+    if (bytes > 1024) {
+        unit = "KB";
+        bytes /= 1024;
+    }
+
+    if (bytes > 1024) {
+        unit = "MB";
+        bytes /= 1024;
+    }
+
+    if (bytes > 1024) {
+        unit = "GB";
+        bytes /= 1024;
+    }
+
+    snprintf(buf, len, "%llu%s", (long long unsigned)bytes, unit);
+
+    return buf;
+}
+
 static int
 ipcp_create(int argc, char **argv, struct cmd_descriptor *cd)
 {
@@ -570,16 +595,26 @@ ipcps_show(int argc, char **argv, struct cmd_descriptor *cd)
 static int
 ipcp_stats(int argc, char **argv, struct cmd_descriptor *cd)
 {
+    struct ipcp_attrs *attrs;
     struct rl_rmt_stats rmt;
     unsigned long ipcp_id;
+    char sbuf[32];
     int ret;
 
-    assert(argc >= 1);
-    errno   = 0;
-    ipcp_id = strtoul(argv[0], NULL, 10);
-    if (errno) {
-        PE("Invalid ipcp id %s\n", argv[0]);
-        return -1;
+    if (argc >= 1) {
+        errno   = 0;
+        ipcp_id = strtoul(argv[0], NULL, 10);
+        if (errno) {
+            PE("Invalid ipcp id %s\n", argv[0]);
+            return -1;
+        }
+    } else {
+        attrs = select_ipcp();
+        if (!attrs) {
+            PE("Could not find any IPCP\n");
+            return -1;
+        }
+        ipcp_id = attrs->id;
     }
 
     ret = rl_conf_rmt_get_stats(ipcp_id, &rmt);
@@ -588,23 +623,23 @@ ipcp_stats(int argc, char **argv, struct cmd_descriptor *cd)
         return ret;
     }
 
-    printf("Statistcs for IPCP %lu:\n"
-           "    fwd_pkt        = %llu\n"
-           "    fwd_byte       = %llu\n"
-           "    queued_pkt     = %llu\n"
-           "    queue_drop     = %llu\n"
-           "    noroute_drop   = %llu\n"
-           "    csum_drop      = %llu\n"
-           "    ttl_drop       = %llu\n"
-           "    noflow_drop    = %llu\n"
-           "    other_drop     = %llu\n",
-           (unsigned long)ipcp_id, (unsigned long long)rmt.fwd_pkt,
-           (unsigned long long)rmt.fwd_byte, (unsigned long long)rmt.queued_pkt,
-           (unsigned long long)rmt.queue_drop,
-           (unsigned long long)rmt.noroute_drop,
-           (unsigned long long)rmt.csum_drop, (unsigned long long)rmt.ttl_drop,
-           (unsigned long long)rmt.noflow_drop,
-           (unsigned long long)rmt.other_drop);
+    byteprint(sbuf, sizeof(sbuf), rmt.fwd_byte);
+    printf(
+        "Statistcs for IPCP %lu:\n"
+        "    fwd_pkt        = %llu\n"
+        "    fwd_byte       = %s\n"
+        "    queued_pkt     = %llu\n"
+        "    queue_drop     = %llu\n"
+        "    noroute_drop   = %llu\n"
+        "    csum_drop      = %llu\n"
+        "    ttl_drop       = %llu\n"
+        "    noflow_drop    = %llu\n"
+        "    other_drop     = %llu\n",
+        (unsigned long)ipcp_id, (unsigned long long)rmt.fwd_pkt, sbuf,
+        (unsigned long long)rmt.queued_pkt, (unsigned long long)rmt.queue_drop,
+        (unsigned long long)rmt.noroute_drop, (unsigned long long)rmt.csum_drop,
+        (unsigned long long)rmt.ttl_drop, (unsigned long long)rmt.noflow_drop,
+        (unsigned long long)rmt.other_drop);
 
     return 0;
 }
@@ -1284,8 +1319,8 @@ static struct cmd_descriptor cmd_descriptors[] = {
     },
     {
         .name     = "ipcp-stats",
-        .usage    = "IPCP_NAME",
-        .num_args = 1,
+        .usage    = "[IPCP_NAME]",
+        .num_args = 0,
         .func     = ipcp_stats,
     },
     {
