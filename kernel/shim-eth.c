@@ -73,8 +73,6 @@ struct rl_shim_eth {
     struct ipcp_entry *ipcp;
     struct net_device *netdev;
 
-    unsigned int ntp;
-    unsigned int ntu;
     unsigned int xmit_busy;
 
 #define ETH_UPPER_NAMES 4
@@ -745,8 +743,6 @@ shim_eth_rx_handler(struct sk_buff **skbp)
     return RX_HANDLER_CONSUMED;
 }
 
-#define flow_can_write(_p) ((_p)->ntu != (_p)->ntp)
-
 static void
 shim_eth_skb_destructor(struct sk_buff *skb)
 {
@@ -757,8 +753,7 @@ shim_eth_skb_destructor(struct sk_buff *skb)
     bool notify;
 
     spin_lock_bh(&priv->tx_lock);
-    notify = !flow_can_write(priv) || priv->xmit_busy;
-    priv->ntp++;
+    notify          = priv->xmit_busy;
     priv->xmit_busy = 0;
     spin_unlock_bh(&priv->tx_lock);
 
@@ -774,7 +769,7 @@ rl_shim_eth_flow_writeable(struct flow_entry *flow)
     bool ret;
 
     spin_lock_bh(&priv->tx_lock);
-    ret = flow_can_write(priv) && !priv->xmit_busy;
+    ret = !priv->xmit_busy;
     spin_unlock_bh(&priv->tx_lock);
 
     return ret;
@@ -788,6 +783,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct net_device *netdev = priv->netdev;
     struct sk_buff *skb       = NULL;
     struct arpt_entry *entry  = flow->priv;
+    size_t len                = rb->len;
     int hhlen;
     int ret;
 
@@ -798,35 +794,16 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         return -ENXIO;
     }
 
-    if (unlikely(rb->len > ETH_DATA_LEN)) {
+    if (unlikely(len > ETH_DATA_LEN)) {
         rl_buf_free(rb);
         entry->stats.tx_err++;
         RPD(1, "Exceeding maximum ethernet payload (%d)\n", ETH_DATA_LEN);
         return -EMSGSIZE;
     }
 
-    spin_lock_bh(&priv->tx_lock);
-
-    if (unlikely(!flow_can_write(priv))) {
-        /* Double-check not necessary here, we are using locks,
-         * not memory barriers. */
-        spin_unlock_bh(&priv->tx_lock);
-
-        /* Backpressure: We will be called again. */
-        return -EAGAIN;
-    }
-
-    priv->ntu++;
-
-    /* Also per-flow TX statistics are protected by the tx_lock. */
-    entry->stats.tx_pkt++;
-    entry->stats.tx_byte += rb->len;
-
-    spin_unlock_bh(&priv->tx_lock);
-
 #ifndef RL_SKB
     hhlen = LL_RESERVED_SPACE(netdev); /* Hardware header length. */
-    skb   = alloc_skb(hhlen + rb->len + netdev->needed_tailroom, GFP_KERNEL);
+    skb   = alloc_skb(hhlen + len + netdev->needed_tailroom, GFP_KERNEL);
     if (!skb) {
         rl_buf_free(rb);
         entry->stats.tx_err++;
@@ -858,7 +835,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
 #ifndef RL_SKB
     /* Copy data into the skb. */
-    memcpy(skb_put(skb, rb->len), RL_BUF_DATA(rb), rb->len);
+    memcpy(skb_put(skb, len), RL_BUF_DATA(rb), len);
 #endif /* !RL_SKB */
 
     /* Send the skb to the device for transmission. */
@@ -867,10 +844,6 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         RPV(1, "dev_queue_xmit() failed [%d]\n", ret);
 
         spin_lock_bh(&priv->tx_lock);
-#ifndef RL_SKB
-        entry->stats.tx_pkt--;
-        entry->stats.tx_byte -= rb->len;
-#endif
         entry->stats.tx_err++;
         priv->xmit_busy = 1;
         spin_unlock_bh(&priv->tx_lock);
@@ -878,6 +851,11 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         return -EAGAIN; /* backpressure */
 #endif
     }
+
+    spin_lock_bh(&priv->tx_lock);
+    entry->stats.tx_pkt++;
+    entry->stats.tx_byte += len;
+    spin_unlock_bh(&priv->tx_lock);
 
 #ifndef RL_SKB
     rl_buf_free(rb);
@@ -930,17 +908,7 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
             return ret;
         }
 
-        spin_lock_bh(&priv->tx_lock);
-
         priv->netdev = netdev;
-        priv->ntu    = 0;
-        if (netdev->tx_queue_len) {
-            priv->ntp = priv->ntu + netdev->tx_queue_len;
-        } else {
-            priv->ntp = -2;
-        }
-
-        spin_unlock_bh(&priv->tx_lock);
 
         /* Set IPCP max_sdu_size using the device MTU. However, MTU can be
          * changed; we should intercept those changes, reflect the change
@@ -1106,9 +1074,9 @@ rl_shim_eth_create(struct ipcp_entry *ipcp)
         return NULL;
     }
 
-    priv->ipcp   = ipcp;
-    priv->netdev = NULL;
-    priv->ntu = priv->ntp = priv->xmit_busy = 0;
+    priv->ipcp      = ipcp;
+    priv->netdev    = NULL;
+    priv->xmit_busy = 0;
     INIT_LIST_HEAD(&priv->arp_table);
     spin_lock_init(&priv->arpt_lock);
     spin_lock_init(&priv->tx_lock);
