@@ -482,6 +482,18 @@ struct dif {
     struct list_head node;
 };
 
+struct rl_rmt_stats {
+    uint64_t fwd_pkt;
+    uint64_t fwd_byte;
+    uint64_t queued_pkt;
+    uint64_t queue_drop;
+    uint64_t noroute_drop;
+    uint64_t csum_drop;
+    uint64_t ttl_drop;
+    uint64_t noflow_drop;
+    uint64_t other_drop;
+};
+
 struct ipcp_entry {
     rl_ipcp_id_t id; /* Key */
     char *name;
@@ -508,10 +520,11 @@ struct ipcp_entry {
     struct rl_ctrl *uipcp;
     struct txrx *mgmt_txrx;
 
-    /* TX completion structures. */
+    /* RMT structures (TX completion included). */
     struct rb_list rmtq;
     unsigned int rmtq_size;
     spinlock_t rmtq_lock;
+    struct rl_rmt_stats rmt_stats;
     struct tasklet_struct tx_completion;
     wait_queue_head_t tx_wqh;
 
