@@ -272,6 +272,8 @@ The **rlite-ctl** command line tool is used for the administration of the
 the Linux TCP/IP stack.
 
 Available commands:
+* `reset`: Destroy all the IPCPs of the system.
+* `terminate`: Stop the **rlite-uipcps** daemon.
 * `ipcp-create`: Create a new IPCP in the system.
 * `ipcp-destroy`: Destroy an existing IPCP.
 * `ipcp-config`: Configure an IPCP.
@@ -280,24 +282,29 @@ Available commands:
 * `ipcp-enroller-enable`: Enable an IPCP to act as enroller for its DIF.
                         This is needed for the first IPCP of a DIF, that
                         does not enroll to another IPCP.
+* `ipcp-enroller-disable`: Disable an IPCP to act as enroller for its DIF.
 * `ipcp-enroll`: Enroll an N-IPCP into an N-DIF.
-* `ipcp-reset`: Destroy all the IPCPs of the system.
+* `ipcp-lower-flow-alloc`: Setup an N-1-flow with a DIF member, without
+                           enrolling.
+* `ipcp-neigh-disconnect`: Deallocate an N-1-flow towards a neighbor.
+* `ipcp-route-add`: Add or update a routing rule for a local IPCP; valid for
+                    the static routing policy.
+* `ipcp-route-del`: Remove a routing rule from a local IPCP; valid for the
+                    static routing policy.
 * `ipcps-show`: Show the list of IPCPs that are currently running in the system.
 * `dif-rib-show`: Show the RIB of a DIF running in the system.
-* `flows-show`: Show the allocated N-flows that have a local N-IPCP as one of the
-              endpoints.
-* `flows-dump`: Show the detailed DTP/DTCP state of a given flow.
-* `regs-show`: Show all the (N+1)names registered to any of the local N-IPCPs.
+* `dif-routing-show`: Show the routing table for an IPCP running in the system.
+* `dif-rib-paths-show`: Show the RIB paths exposed by a local IPCP.
 * `dif-policy-mod`: Modify a policy for a DIF running in the system.
 * `dif-policy-list`: Show current and available policies for a DIF.
 * `dif-policy-param-mod`: Modify a policy parameter for a DIF running in the
                         system.
 * `dif-policy-param-list`: Show DIF parameters together with their current
                            values.
-* `ipcp-route-add`: Add or update a routing rule for a local IPCP; valid for
-                    the static routing policy.
-* `ipcp-route-del`: Remove a routing rule from a local IPCP; valid for the
-                    static routing policy.
+* `flows-show`: Show the allocated N-flows that have a local N-IPCP as one of the
+              endpoints.
+* `flows-dump`: Show the detailed DTP/DTCP state of a given flow.
+* `regs-show`: Show all the (N+1)names registered to any of the local N-IPCPs.
 
 To show the available commands and the corresponding usage, run
 
