@@ -723,7 +723,8 @@ flow_blocked(struct rl_flow_config *cfg, struct dtp *dtp)
             dtp->next_seq_num_to_use > dtp->snd_rwe &&
             dtp->cwq_len >= dtp->max_cwq_len) ||
            ((cfg->dtcp.flags & DTCP_CFG_RTX_CTRL) &&
-            dtp->rtxq_len >= dtp->max_rtxq_len);
+            ((dtp->next_seq_num_to_use - dtp->snd_lwe) > dtp->cgwin ||
+             dtp->rtxq_len >= dtp->max_rtxq_len));
 }
 
 static bool
