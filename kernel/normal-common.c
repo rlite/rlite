@@ -107,6 +107,7 @@ dtp_dump(struct dtp *dtp)
            "    max_rtxq_len=%lu\n"
            "    rtt=%lu\n"
            "    rtt_stddev=%lu\n"
+           "    cgwin=%lu\n"
            "    rcv_lwe=%lu\n"
            "    rcv_next_seq_num=%lu\n"
            "    rcv_rwe=%lu\n"
@@ -123,8 +124,9 @@ dtp_dump(struct dtp *dtp)
            (long unsigned)dtp->cwq_len, (long unsigned)dtp->max_cwq_len,
            (long unsigned)dtp->rtxq_len, (long unsigned)dtp->max_rtxq_len,
            (long unsigned)dtp->rtt, (long unsigned)dtp->rtt_stddev,
-           (long unsigned)dtp->rcv_lwe, (long unsigned)dtp->rcv_next_seq_num,
-           (long unsigned)dtp->rcv_rwe, (long unsigned)dtp->max_seq_num_rcvd,
+           (long unsigned)dtp->cgwin, (long unsigned)dtp->rcv_lwe,
+           (long unsigned)dtp->rcv_next_seq_num, (long unsigned)dtp->rcv_rwe,
+           (long unsigned)dtp->max_seq_num_rcvd,
            (long unsigned)dtp->last_lwe_sent,
            (long unsigned)dtp->last_seq_num_acked,
            (long unsigned)dtp->next_snd_ctl_seq, (long unsigned)dtp->seqq_len);

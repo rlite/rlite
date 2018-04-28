@@ -568,6 +568,7 @@ struct dtp {
     struct rl_buf *rtx_tmr_next; /* the packet is going to expire next */
     unsigned rtt;                /* estimated round trip time, in jiffies. */
     unsigned rtt_stddev;
+    unsigned cgwin; /* number of PDUs in the congestion window */
     struct tkbk tkbk;
 
     /* Receiver state. */
