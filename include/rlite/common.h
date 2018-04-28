@@ -260,6 +260,10 @@ struct rl_flow_stats {
     uint64_t rx_byte;
     uint64_t rx_err;
 
+    /* Userspace RX queue statistics. */
+    uint64_t rx_overrun_pkt;
+    uint64_t rx_overrun_byte;
+
     /* EFCP retransmission statistics. */
     uint64_t rtx_pkt;
     uint64_t rtx_byte;
@@ -271,6 +275,7 @@ rl_flow_stats_init(struct rl_flow_stats *stats)
     stats->tx_pkt = stats->tx_byte = stats->tx_err = 0;
     stats->rx_pkt = stats->rx_byte = stats->rx_err = 0;
     stats->rtx_pkt = stats->rtx_byte = 0;
+    stats->rx_overrun_pkt = stats->rx_overrun_byte = 0;
 }
 
 struct rl_rmt_stats {

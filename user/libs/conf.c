@@ -487,13 +487,14 @@ rl_conf_flows_print(struct list_head *flows)
         }
 
         PI_S("  ipcp %u, addr:port %llu:%u<-->%llu:%u, %s"
-             "rx(pkt:%llu, %s, drop:%llu), "
+             "rx(pkt:%llu, %s, drop:%llu+%llu), "
              "tx(pkt:%llu, %s, drop:%llu), "
              "rtx(pkt:%llu, %s)\n",
              rl_flow->ipcp_id, (long long unsigned int)rl_flow->local_addr,
              rl_flow->local_port, (long long unsigned int)rl_flow->remote_addr,
              rl_flow->remote_port, specinfo, (long long unsigned)stats.rx_pkt,
              byteprint(bbuf[0], blen, stats.rx_byte),
+             (long long unsigned)stats.rx_overrun_pkt,
              (long long unsigned)stats.rx_err, (long long unsigned)stats.tx_pkt,
              byteprint(bbuf[1], blen, stats.tx_byte),
              (long long unsigned)stats.tx_err,

@@ -134,6 +134,8 @@ rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
             "dropping PDU [length %lu] to avoid userspace rx queue "
             "overrun\n",
             (long unsigned)rb->len);
+        flow->stats.rx_overrun_pkt++;
+        flow->stats.rx_overrun_byte += rb->len;
         rl_buf_free(rb);
     } else {
         rb_list_enq(rb, &txrx->rx_q);
