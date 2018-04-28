@@ -568,6 +568,48 @@ ipcps_show(int argc, char **argv, struct cmd_descriptor *cd)
 }
 
 static int
+ipcp_stats(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    struct rl_rmt_stats rmt;
+    unsigned long ipcp_id;
+    int ret;
+
+    assert(argc >= 1);
+    errno   = 0;
+    ipcp_id = strtoul(argv[0], NULL, 10);
+    if (errno) {
+        PE("Invalid ipcp id %s\n", argv[0]);
+        return -1;
+    }
+
+    ret = rl_conf_rmt_get_stats(ipcp_id, &rmt);
+    if (ret) {
+        PE("Could not find ipcp with id %lu\n", ipcp_id);
+        return ret;
+    }
+
+    printf("Statistcs for IPCP %lu:\n"
+           "    fwd_pkt        = %llu\n"
+           "    fwd_byte       = %llu\n"
+           "    queued_pkt     = %llu\n"
+           "    queue_drop     = %llu\n"
+           "    noroute_drop   = %llu\n"
+           "    csum_drop      = %llu\n"
+           "    ttl_drop       = %llu\n"
+           "    noflow_drop    = %llu\n"
+           "    other_drop     = %llu\n",
+           (unsigned long)ipcp_id, (unsigned long long)rmt.fwd_pkt,
+           (unsigned long long)rmt.fwd_byte, (unsigned long long)rmt.queued_pkt,
+           (unsigned long long)rmt.queue_drop,
+           (unsigned long long)rmt.noroute_drop,
+           (unsigned long long)rmt.csum_drop, (unsigned long long)rmt.ttl_drop,
+           (unsigned long long)rmt.noflow_drop,
+           (unsigned long long)rmt.other_drop);
+
+    return 0;
+}
+
+static int
 flows_show(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct list_head flows;
@@ -1239,6 +1281,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage    = "",
         .num_args = 0,
         .func     = ipcps_show,
+    },
+    {
+        .name     = "ipcp-stats",
+        .usage    = "IPCP_NAME",
+        .num_args = 1,
+        .func     = ipcp_stats,
     },
     {
         .name     = "dif-rib-show",

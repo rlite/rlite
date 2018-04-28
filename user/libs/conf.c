@@ -217,6 +217,52 @@ rl_conf_ipcp_config(rl_ipcp_id_t ipcp_id, const char *param_name,
 
 /* Support for fetching flow information in kernel space. */
 
+int
+rl_conf_rmt_get_stats(rl_ipcp_id_t ipcp_id, struct rl_rmt_stats *stats)
+{
+    struct rl_kmsg_ipcp_rmt_stats_req msg;
+    struct rl_kmsg_ipcp_rmt_stats_resp *resp;
+    int ret;
+    int fd;
+
+    if (stats == NULL) {
+        return -1;
+    }
+
+    fd = rina_open();
+    if (fd < 0) {
+        return fd;
+    }
+
+    memset(&msg, 0, sizeof(msg));
+    msg.hdr.msg_type = RLITE_KER_IPCP_RMT_STATS_REQ;
+    msg.hdr.event_id = 1;
+    msg.ipcp_id      = ipcp_id;
+
+    ret = rl_write_msg(fd, RLITE_MB(&msg), 1);
+    if (ret < 0) {
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
+        goto out;
+    }
+
+    resp = (struct rl_kmsg_ipcp_rmt_stats_resp *)wait_for_next_msg(fd, 3000);
+    if (!resp) {
+        ret = -1;
+        goto out;
+    }
+    assert(resp->hdr.event_id == msg.hdr.event_id);
+
+    *stats = resp->stats;
+
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
+    rl_free(resp, RL_MT_MSG);
+out:
+    close(fd);
+
+    return ret;
+}
+
 static int
 flow_fetch_append(struct list_head *flows,
                   const struct rl_kmsg_flow_fetch_resp *resp)

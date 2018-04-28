@@ -61,6 +61,8 @@ enum {
     RLITE_KER_REG_FETCH,             /* 29 */
     RLITE_KER_REG_FETCH_RESP,        /* 30 */
     RLITE_KER_FLOW_STATE,            /* 31 */
+    RLITE_KER_IPCP_RMT_STATS_REQ,    /* 32 */
+    RLITE_KER_IPCP_RMT_STATS_RESP,   /* 33 */
 
     RLITE_KER_MSG_MAX,
 };
@@ -367,7 +369,7 @@ struct rl_kmsg_flow_stats_req {
 } __attribute__((packed));
 
 /* application <-- kernel message to report statistics
- * about a give flow. */
+ * about a given flow. */
 struct rl_kmsg_flow_stats_resp {
     struct rl_msg_hdr hdr;
 
@@ -382,6 +384,22 @@ struct rl_kmsg_ipcp_qos_supported {
 
     rl_ipcp_id_t ipcp_id;
     struct rina_flow_spec flowspec;
+} __attribute__((packed));
+
+/* application --> kernel message to ask for
+ * statistics of a given IPCP RMT. */
+struct rl_kmsg_ipcp_rmt_stats_req {
+    struct rl_msg_hdr hdr;
+
+    rl_ipcp_id_t ipcp_id;
+} __attribute__((packed));
+
+/* application <-- kernel message to report statistics
+ * about a given IPCP RMT. */
+struct rl_kmsg_ipcp_rmt_stats_resp {
+    struct rl_msg_hdr hdr;
+
+    struct rl_rmt_stats stats;
 } __attribute__((packed));
 
 #endif /* __RLITE_KER_H__ */

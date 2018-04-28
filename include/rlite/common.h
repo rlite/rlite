@@ -273,6 +273,18 @@ rl_flow_stats_init(struct rl_flow_stats *stats)
     stats->rtx_pkt = stats->rtx_byte = 0;
 }
 
+struct rl_rmt_stats {
+    uint64_t fwd_pkt;
+    uint64_t fwd_byte;
+    uint64_t queued_pkt;
+    uint64_t queue_drop;
+    uint64_t noroute_drop;
+    uint64_t csum_drop;
+    uint64_t ttl_drop;
+    uint64_t noflow_drop;
+    uint64_t other_drop;
+};
+
 /* DTP state exported to userspace. */
 struct rl_flow_dtp {
     /* Sender state. */
