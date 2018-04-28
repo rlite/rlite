@@ -61,9 +61,9 @@ struct rina_pci_ctrl {
     rl_seq_t last_ctrl_seq_num_rcvd;
     rl_seq_t ack_nack_seq_num;
     rl_seq_t new_rwe;
-    rl_seq_t new_lwe; /* sent but unused */
-    rl_seq_t my_lwe;  /* sent but unused */
-    rl_seq_t my_rwe;  /* sent but unused */
+    rl_seq_t new_lwe;
+    rl_seq_t my_lwe; /* sent but unused */
+    rl_seq_t my_rwe; /* sent but unused */
 } __attribute__((__packed__));
 
 static inline void
@@ -810,7 +810,6 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     if (!dtcp_present) {
         /* DTCP not present */
-        dtp->snd_lwe           = dtp->next_seq_num_to_use; /* WFS */
         dtp->last_seq_num_sent = pci->seqnum;
 
     } else {
@@ -830,7 +829,6 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
             }
             /* PDU in the sender window. */
             /* POL: TxControl. */
-            dtp->snd_lwe           = dtp->next_seq_num_to_use;
             dtp->last_seq_num_sent = pci->seqnum;
             NPD("sending [%lu] through sender window\n",
                 (long unsigned)pci->seqnum);
@@ -1213,30 +1211,40 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow, struct rl_buf *rb)
     if (pcic->base.pdu_type & PDU_T_FC_BIT) {
         struct rl_buf *tmp;
 
-        if (unlikely(pcic->new_rwe < dtp->snd_rwe)) {
+        if (unlikely(pcic->new_rwe < dtp->snd_rwe ||
+                     pcic->new_lwe < dtp->snd_lwe)) {
             /* This should not happen, the other end is
              * broken. */
-            PD("Broken peer, new_rwe would go backward [%lu] "
-               "--> [%lu]\n",
-               (long unsigned)dtp->snd_rwe, (long unsigned)pcic->new_rwe);
+            PD("peer moves window backward [%llu:%llu] "
+               "--> [%llu:%llu]\n",
+               (long long unsigned)dtp->snd_lwe,
+               (long long unsigned)dtp->snd_rwe,
+               (long long unsigned)pcic->new_lwe,
+               (long long unsigned)pcic->new_rwe);
 
         } else {
-            NPD("snd_rwe [%lu] --> [%lu]\n", (long unsigned)dtp->snd_rwe,
-                (long unsigned)pcic->new_rwe);
+            NPD("[snd_lwe:snd_rwe]: [%llu:%llu] --> [%llu:%llu]\n",
+                (long long unsigned)dtp->snd_lwe,
+                (long long unsigned)dtp->snd_rwe,
+                (long long unsigned)pcic->new_lwe,
+                (long long unsigned)pcic->new_rwe);
 
-            /* Update snd_rwe. */
+            /* Update snd_rwe and snd_lwe. */
             dtp->snd_rwe = pcic->new_rwe;
+            dtp->snd_lwe = pcic->new_lwe;
 
             /* The update may have unblocked PDU in the cwq,
              * let's pop them out. */
             rb_list_foreach_safe (qrb, tmp, &dtp->cwq) {
-                if (dtp->snd_lwe >= dtp->snd_rwe) {
+                if (dtp->last_seq_num_sent >= dtp->snd_rwe) {
+                    /* We could use qrb seqnum instead of
+                     * last_seq_num_sent. */
                     break;
                 }
                 rb_list_del(qrb);
                 dtp->cwq_len--;
                 rb_list_enq(qrb, &qrbs);
-                dtp->last_seq_num_sent = dtp->snd_lwe++;
+                dtp->last_seq_num_sent++;
 
                 if (flow->cfg.dtcp.flags & DTCP_CFG_RTX_CTRL) {
                     rl_rtxq_push(flow, qrb);
