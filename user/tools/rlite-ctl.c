@@ -1139,6 +1139,24 @@ ipcps_load()
 
 static struct cmd_descriptor cmd_descriptors[] = {
     {
+        .name     = "probe",
+        .usage    = "",
+        .num_args = 0,
+        .func     = probe,
+    },
+    {
+        .name     = "reset",
+        .usage    = "",
+        .num_args = 0,
+        .func     = reset,
+    },
+    {
+        .name     = "terminate",
+        .usage    = "",
+        .num_args = 0,
+        .func     = terminate,
+    },
+    {
         .name     = "ipcp-create",
         .usage    = "IPCP_NAME DIF_TYPE DIF_NAME",
         .num_args = 3,
@@ -1149,12 +1167,6 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage    = "IPCP_NAME",
         .num_args = 1,
         .func     = ipcp_destroy,
-    },
-    {
-        .name     = "reset",
-        .usage    = "",
-        .num_args = 0,
-        .func     = reset,
     },
     {
         .name     = "ipcp-config",
@@ -1247,24 +1259,6 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .func     = ipcp_rib_show,
     },
     {
-        .name     = "flows-show",
-        .usage    = "[DIF_NAME]",
-        .num_args = 0,
-        .func     = flows_show,
-    },
-    {
-        .name     = "flow-dump",
-        .usage    = "PORT_ID",
-        .num_args = 1,
-        .func     = flow_dump,
-    },
-    {
-        .name     = "regs-show",
-        .usage    = "[DIF_NAME]",
-        .num_args = 0,
-        .func     = regs_show,
-    },
-    {
         .name     = "dif-policy-mod",
         .usage    = "DIF_NAME COMPONENT_NAME POLICY_NAME",
         .num_args = 3,
@@ -1289,16 +1283,22 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .func     = ipcp_policy_param_list,
     },
     {
-        .name     = "terminate",
-        .usage    = "",
+        .name     = "flows-show",
+        .usage    = "[DIF_NAME]",
         .num_args = 0,
-        .func     = terminate,
+        .func     = flows_show,
     },
     {
-        .name     = "probe",
-        .usage    = "",
+        .name     = "flow-dump",
+        .usage    = "PORT_ID",
+        .num_args = 1,
+        .func     = flow_dump,
+    },
+    {
+        .name     = "regs-show",
+        .usage    = "[DIF_NAME]",
         .num_args = 0,
-        .func     = probe,
+        .func     = regs_show,
     },
 #if 0
     {
