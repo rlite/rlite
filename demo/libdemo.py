@@ -381,11 +381,11 @@ class Demo:
         for dif in self.dif_ordering:
             if dif not in self.dif_policies:
                 self.dif_policies[dif] = []
-                if self.addr_alloc_policy == "manual":
+                if self.addr_alloc_policy == "static":
                     self.dif_policies[dif].append({
                         'path': 'addralloc',
                         'nodes': [],
-                        'ps': 'manual',
+                        'ps': 'static',
                         'parms': []
                     })
 
@@ -542,7 +542,7 @@ class Demo:
                                 'dif': dif,
                                 'id': vm['id']
                             })
-                if self.addr_alloc_policy == "manual":
+                if self.addr_alloc_policy == "static":
                     ctrl_cmds.append(
                         'ipcp-config %(dif)s.%(id)s.IPCP address %(id)d\n' % {
                             'dif': dif,

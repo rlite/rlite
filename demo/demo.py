@@ -216,7 +216,7 @@ argparser.add_argument('-R', '--reliable-flows', action='store_true',
                               "for management traffic rather than reusing "
                               "kernel-bound unreliable N-1 flows")
 argparser.add_argument('-A', '--addr-alloc-policy', type=str,
-                        choices = ["distributed", "manual"], default = "distributed",
+                        choices = ["distributed", "static"], default = "distributed",
                        help = "Address allocation policy to be used for all DIFs")
 argparser.add_argument('-r', '--register', action='store_true',
                        help = "Register rina-echo-async apps instances on each node")

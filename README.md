@@ -967,18 +967,18 @@ be modified using the `ipcp-config` command:
 
 | Parameter name  | Description                       |
 | --------------- |-----------------------------------|
-| address         | IPCP address in its DIF. It should be changed only with manual address allocation policy. |
+| address         | IPCP address in its DIF. It should be changed only with static address allocation policy. |
 | ttl             | Initial value for the TTL (Time To Live) field in the PDU header (default 64). |
 | csum            | Checksum to perform on each PDU: possible values are "none" (default, no checksum) or "inet" (Internet checksum). |
 
 As an example, a normal IPC Process can be manually configured with an address unique in its
 DIF. This step is not usually necessary, since a simple default policy for
 distributed address allocation is already available.
-To deactivate automatic address allocation, you need to set the **manual**
+To deactivate automatic address allocation, you need to set the **static**
 policy for the **addralloc** component using **rlite-ctl** program,
 and configure addresses manually like in the following example:
 
-    $ sudo rlite-ctl dif-policy-mod n.DIF address-allocator manual
+    $ sudo rlite-ctl dif-policy-mod n.DIF address-allocator static
     $ sudo rlite-ctl ipcp-config normal1.IPCP address 7382
 
 where a normal IPCP called `normal1.IPCP` is given the address 7382 to be used
@@ -1021,7 +1021,7 @@ components of a normal IPCP process:
 
 | Component           | Policy name      | Description                       |
 | ------------------- | -----------------|-----------------------------------|
-| addralloc           | manual           | Manual address allocation         |
+| addralloc           | static           | Static address allocation         |
 | addralloc           | distributed      | Automated address allocation      |
 | dft                 | fully-replicated | Every node has a full copy of the DFT |
 | dft                 | centralized-fault-tolerant | DFT stored by a fault-tolerant cluster of replicas |

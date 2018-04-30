@@ -307,10 +307,10 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
     return 0;
 }
 
-class ManualAddrAllocator : public DistributedAddrAllocator {
+class StaticAddrAllocator : public DistributedAddrAllocator {
 public:
-    RL_NODEFAULT_NONCOPIABLE(ManualAddrAllocator);
-    ManualAddrAllocator(uipcp_rib *_ur) : DistributedAddrAllocator(_ur) {}
+    RL_NODEFAULT_NONCOPIABLE(StaticAddrAllocator);
+    StaticAddrAllocator(uipcp_rib *_ur) : DistributedAddrAllocator(_ur) {}
     int allocate(rlm_addr_t *addr) override
     {
         *addr = RL_ADDR_NULL;
@@ -322,8 +322,8 @@ void
 uipcp_rib::addra_lib_init()
 {
     available_policies[AddrAllocator::Prefix].insert(
-        PolicyBuilder("manual", [](uipcp_rib *rib) {
-            rib->addra = make_unique<ManualAddrAllocator>(rib);
+        PolicyBuilder("static", [](uipcp_rib *rib) {
+            rib->addra = make_unique<StaticAddrAllocator>(rib);
         }));
     available_policies[AddrAllocator::Prefix].insert(PolicyBuilder(
         "distributed",

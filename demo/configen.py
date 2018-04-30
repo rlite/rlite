@@ -293,7 +293,7 @@ argparser.add_argument(
     '-A',
     '--addr-alloc-policy',
     type=str,
-    choices=["distributed", "manual"],
+    choices=["distributed", "static"],
     default="distributed",
     help="Address allocation policy to be used for all DIFs")
 argparser.add_argument(
