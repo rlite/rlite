@@ -7,8 +7,8 @@ rlite-ctl ipcp-enroller-enable x || exit 1
 rlite-ctl dif-policy-list dd || exit 1
 # Set and get per-component policies, checking for consistent results
 rlite-ctl dif-policy-list dd addralloc | grep -q "\<distributed\>" || exit 1
-rlite-ctl dif-policy-mod dd addralloc manual || exit 1
-rlite-ctl dif-policy-list dd addralloc | grep -q "\<manual\>" || exit 1
+rlite-ctl dif-policy-mod dd addralloc static || exit 1
+rlite-ctl dif-policy-list dd addralloc | grep -q "\<static\>" || exit 1
 rlite-ctl dif-policy-list dd enrollment | grep -q "\<default\>"|| exit 1
 rlite-ctl dif-policy-list dd flowalloc | grep -q "\<local\>"|| exit 1
 rlite-ctl dif-policy-list dd resalloc | grep -q "\<default\>" || exit 1

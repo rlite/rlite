@@ -180,7 +180,7 @@ struct rl_cmsg_ipcp_neigh_disconnect {
     char *neigh_name; /* neigh IPCP to disconnect from */
 } __attribute__((packed));
 
-/* rlite-ctl --> uipcps message to add a manual routing
+/* rlite-ctl --> uipcps message to add a static routing
  * rule for a local ipcp_process. */
 struct rl_cmsg_ipcp_route_mod {
     struct rl_msg_hdr hdr;
