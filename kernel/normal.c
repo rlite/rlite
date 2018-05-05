@@ -206,6 +206,7 @@ dtp_rcv_reset(struct flow_entry *flow)
 #endif
     if (dc->fc.fc_type == RLITE_FC_T_WIN) {
         dtp->rcv_rwe += dc->fc.cfg.w.initial_credit;
+        dtp->peer_win = dtp->rcv_rwe - dtp->rcv_lwe;
     }
     dtp->last_lwe_sent      = 0;
     dtp->last_seq_num_acked = 0;
@@ -1065,6 +1066,12 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
     unsigned int a               = dc->initial_a;
     bool ack                     = ack_immediate || !a;
     uint8_t pdu_type             = 0;
+
+    /* peer_win <== peer_win * (112/128) + sample * (16/128)*/
+    flow->dtp.peer_win =
+        (flow->dtp.peer_win * 112 +
+         ((flow->dtp.max_seq_num_rcvd - flow->dtp.last_lwe_sent) << 4)) >>
+        7;
 
     /* We send a flow control ack if we have more than an half window of PDUs
      * that have been correctly consumed by the flow user but yet not published

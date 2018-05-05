@@ -115,6 +115,7 @@ dtp_dump(struct dtp *dtp)
            "    last_lwe_sent=%lu\n"
            "    last_seq_num_acked=%lu\n"
            "    next_snd_ctl_seq=%lu\n"
+           "    peer_win=%lu\n"
            "    seqq_len=%lu\n",
            (long unsigned)flow->local_port, dtp->flags,
            (long unsigned)dtp->snd_lwe, (long unsigned)dtp->snd_rwe,
@@ -129,7 +130,8 @@ dtp_dump(struct dtp *dtp)
            (long unsigned)dtp->max_seq_num_rcvd,
            (long unsigned)dtp->last_lwe_sent,
            (long unsigned)dtp->last_seq_num_acked,
-           (long unsigned)dtp->next_snd_ctl_seq, (long unsigned)dtp->seqq_len);
+           (long unsigned)dtp->next_snd_ctl_seq, (long unsigned)dtp->peer_win,
+           (long unsigned)dtp->seqq_len);
 }
 EXPORT_SYMBOL(dtp_dump);
 

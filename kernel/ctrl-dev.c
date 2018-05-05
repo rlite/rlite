@@ -2305,6 +2305,7 @@ rl_flow_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     resp.dtp.last_seq_num_acked     = dtp->last_seq_num_acked;
     resp.dtp.next_snd_ctl_seq       = dtp->next_snd_ctl_seq;
     resp.dtp.seqq_len               = dtp->seqq_len;
+    resp.dtp.peer_win               = dtp->peer_win;
 
     flow_put(flow);
 

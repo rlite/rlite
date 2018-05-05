@@ -315,6 +315,7 @@ struct rl_flow_dtp {
     rlm_seq_t last_seq_num_acked;
     rlm_seq_t next_snd_ctl_seq;
     unsigned int seqq_len;
+    unsigned peer_win;
 };
 
 #define RL_SHIM_UDP_PORT 0x0d1f
