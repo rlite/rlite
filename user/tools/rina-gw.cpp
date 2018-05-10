@@ -270,7 +270,7 @@ parse_conf(const char *confname)
                            lines_cnt, tokens[0].c_str());
                     continue;
                 }
-            } catch (std::bad_alloc) {
+            } catch (std::bad_alloc &e) {
                 printf("Out of memory while processing configuration file\n");
             }
         }

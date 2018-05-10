@@ -689,7 +689,7 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage &gm)
             obj_value.u.buf.owned = true;
             obj_value.ty          = ObjValType::BYTES;
 
-        } catch (std::bad_alloc) {
+        } catch (std::bad_alloc &e) {
             PE("BYTES object allocation failed\n");
             obj_value.ty = ObjValType::NONE;
         }

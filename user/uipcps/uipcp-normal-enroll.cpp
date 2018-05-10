@@ -97,7 +97,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
 
         try {
             ret = conn->msg_ser(m, invoke_id, &serbuf, &serlen);
-        } catch (std::bad_alloc) {
+        } catch (std::bad_alloc &e) {
             ret = -1;
         }
 

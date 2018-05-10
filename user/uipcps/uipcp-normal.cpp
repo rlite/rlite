@@ -331,7 +331,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
             ret = cdap_dispatch(m.get(), nf, neigh, RL_ADDR_NULL);
         }
 
-    } catch (std::bad_alloc) {
+    } catch (std::bad_alloc &e) {
         UPE(uipcp, "Out of memory\n");
     }
 
@@ -1010,7 +1010,7 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
 
     try {
         ret = msg_ser_stateless(&am, &serbuf, &serlen);
-    } catch (std::bad_alloc) {
+    } catch (std::bad_alloc &e) {
         ret = -1;
     }
 
@@ -1901,10 +1901,10 @@ normal_init(struct uipcp *uipcp)
 {
     try {
         uipcp->priv = rl_new(uipcp_rib(uipcp), RL_MT_SHIM);
-    } catch (std::bad_alloc) {
+    } catch (std::bad_alloc &e) {
         UPE(uipcp, "Out of memory\n");
         return -1;
-    } catch (std::exception) {
+    } catch (std::exception &e) {
         UPE(uipcp, "RIB initialization failed\n");
         return -1;
     }
