@@ -233,6 +233,8 @@ configure options:
     --without-shim-tcp4         Disable shim-tcp4
     --with-skbuffs              Use Linux native skbuffs for PDU data/metadata (better performance)
     --without-skbuffs           Use custom packet representation for PDU data/metadata
+    --with-swig                 Use swig to generate python bindings
+    --without-swig              Don't use swig to generate python bindings
     --verbose-kernel            Compile (conditional) verbose kernel logs (may slow down a bit)
     --debug                     Compile in debug mode
     --no-kernel                 Don't build kernel code
@@ -246,6 +248,7 @@ EOF
 WITH_SHIM_TCP4="y"
 WITH_SHIM_UDP4="y"
 WITH_SKBUFFS="n"
+WITH_SWIG="ON"
 VERB_KERN_LOGS="n"
 INSTALL_PREFIX="/"
 LIBMODPREFIX=""
@@ -321,6 +324,14 @@ do
 
         "--without-skbuffs")
         WITH_SKBUFFS="n"
+        ;;
+
+        "--with-swig")
+        WITH_SWIG="ON"
+        ;;
+
+        "--without-swig")
+        WITH_SWIG="OFF"
         ;;
 
         "--verbose-kernel")
@@ -409,7 +420,7 @@ if [ ${BUILD_USER} == "y" ]; then
 
     (
     cd build
-    cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug -DDEBUG=${DEBUG}
+    cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug -DDEBUG=${DEBUG} -DWITH_SWIG=${WITH_SWIG}
     ) | tee -a config.log
 fi
 

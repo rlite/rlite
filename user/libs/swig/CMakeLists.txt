@@ -1,3 +1,5 @@
+option(WITH_SWIG "Use swig to build python bindings" ON)
+
 find_package(SWIG)
 find_package(PythonLibs)
 
@@ -5,7 +7,7 @@ if (NOT SWIG_FOUND)
     message("SWIG not found: Python bindings will not be built")
 elseif(NOT PYTHONLIBS_FOUND)
     message("Python not found: Python bindings will not be built")
-else()
+elseif (WITH_SWIG)
     include(${SWIG_USE_FILE})
     include_directories(${PYTHON_INCLUDE_PATH})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR})
