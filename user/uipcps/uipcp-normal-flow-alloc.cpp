@@ -423,49 +423,46 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
     return 0;
 }
 
-/* (3) Slave FA <-- Slave application : FA_RESP */
+/* (4) Initiator FA <-- Slave FA : M_CREATE_R */
 int
-LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
+LocalFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
 {
-    std::unique_ptr<CDAPMessage> m;
-    string reason;
-    int ret;
+    const char *objbuf;
+    size_t objlen;
 
-    /* Lookup the corresponding FlowRequest. */
+    rm->get_obj_value(objbuf, objlen);
+    if (!objbuf) {
+        UPE(rib->uipcp, "M_CREATE_R does not contain a nested message\n");
+        return 0;
+    }
 
-    auto f = flow_reqs_in.find(resp->kevent_id);
+    auto f = flow_reqs_out.find(rm->invoke_id);
 
-    if (f == flow_reqs_in.end()) {
+    if (f == flow_reqs_out.end()) {
         UPE(rib->uipcp,
-            "Spurious flow allocation response, no request for kevent_id %u\n",
-            resp->kevent_id);
-        return -1;
+            "M_CREATE_R does not match any pending request (invoke_id=%d)\n",
+            rm->invoke_id);
+        return 0;
     }
 
-    std::unique_ptr<FlowRequest> &freq = f->second;
+    FlowRequest remote_freq;
+    FlowRequest *freq = f->second.get();
 
-    /* Update the freq object with the port-id and cep-id allocated by
-     * the kernel. */
-    freq->set_dst_port(resp->port_id);
-    freq->mutable_connections(0)->set_dst_cep(resp->cep_id);
+    flow_reqs[freq->src_port()] = std::move(f->second);
+    flow_reqs_out.erase(rm->invoke_id);
 
-    if (resp->response) {
-        reason = "Application refused the accept the flow request";
-    }
+    remote_freq.ParseFromArray(objbuf, objlen);
+    /* Update the local freq object with the remote one. */
+    freq->set_dst_port(remote_freq.dst_port());
+    freq->mutable_connections(0)->set_dst_cep(
+        remote_freq.connections(0).dst_cep());
 
-    m = utils::make_unique<CDAPMessage>();
-    m->m_create_r(FlowObjClass, TableName, 0, resp->response ? -1 : 0, reason);
-    m->invoke_id = freq->invoke_id;
+    rib->stats.fa_response_received++;
 
-    ret = rib->send_to_dst_addr(std::move(m), freq->src_addr(), freq.get());
-    if (!resp->response) {
-        /* Move the freq object from the temporary map to the right one. */
-        flow_reqs[resp->port_id] = std::move(freq);
-    }
-    flow_reqs_in.erase(f); /* first std::move(), then erase. */
-    rib->stats.fa_response_issued++;
-
-    return ret;
+    return uipcp_issue_fa_resp_arrived(
+        rib->uipcp, freq->src_port(), freq->dst_port(),
+        freq->connections(0).dst_cep(), freq->dst_addr(), rm->result ? 1 : 0,
+        &freq->flowcfg);
 }
 
 /* (2) Slave FA <-- Initiator FA : M_CREATE */
@@ -519,46 +516,49 @@ LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm)
     return 0;
 }
 
-/* (4) Initiator FA <-- Slave FA : M_CREATE_R */
+/* (3) Slave FA <-- Slave application : FA_RESP */
 int
-LocalFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
+LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
 {
-    const char *objbuf;
-    size_t objlen;
+    std::unique_ptr<CDAPMessage> m;
+    string reason;
+    int ret;
 
-    rm->get_obj_value(objbuf, objlen);
-    if (!objbuf) {
-        UPE(rib->uipcp, "M_CREATE_R does not contain a nested message\n");
-        return 0;
-    }
+    /* Lookup the corresponding FlowRequest. */
 
-    auto f = flow_reqs_out.find(rm->invoke_id);
+    auto f = flow_reqs_in.find(resp->kevent_id);
 
-    if (f == flow_reqs_out.end()) {
+    if (f == flow_reqs_in.end()) {
         UPE(rib->uipcp,
-            "M_CREATE_R does not match any pending request (invoke_id=%d)\n",
-            rm->invoke_id);
-        return 0;
+            "Spurious flow allocation response, no request for kevent_id %u\n",
+            resp->kevent_id);
+        return -1;
     }
 
-    FlowRequest remote_freq;
-    FlowRequest *freq = f->second.get();
+    std::unique_ptr<FlowRequest> &freq = f->second;
 
-    flow_reqs[freq->src_port()] = std::move(f->second);
-    flow_reqs_out.erase(rm->invoke_id);
+    /* Update the freq object with the port-id and cep-id allocated by
+     * the kernel. */
+    freq->set_dst_port(resp->port_id);
+    freq->mutable_connections(0)->set_dst_cep(resp->cep_id);
 
-    remote_freq.ParseFromArray(objbuf, objlen);
-    /* Update the local freq object with the remote one. */
-    freq->set_dst_port(remote_freq.dst_port());
-    freq->mutable_connections(0)->set_dst_cep(
-        remote_freq.connections(0).dst_cep());
+    if (resp->response) {
+        reason = "Application refused the accept the flow request";
+    }
 
-    rib->stats.fa_response_received++;
+    m = utils::make_unique<CDAPMessage>();
+    m->m_create_r(FlowObjClass, TableName, 0, resp->response ? -1 : 0, reason);
+    m->invoke_id = freq->invoke_id;
 
-    return uipcp_issue_fa_resp_arrived(
-        rib->uipcp, freq->src_port(), freq->dst_port(),
-        freq->connections(0).dst_cep(), freq->dst_addr(), rm->result ? 1 : 0,
-        &freq->flowcfg);
+    ret = rib->send_to_dst_addr(std::move(m), freq->src_addr(), freq.get());
+    if (!resp->response) {
+        /* Move the freq object from the temporary map to the right one. */
+        flow_reqs[resp->port_id] = std::move(freq);
+    }
+    flow_reqs_in.erase(f); /* first std::move(), then erase. */
+    rib->stats.fa_response_issued++;
+
+    return ret;
 }
 
 int
