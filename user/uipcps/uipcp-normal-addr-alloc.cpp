@@ -611,20 +611,20 @@ CentralizedFaultTolerantAddrAllocator::Replica::process_rib_msg(
         return 0;
     }
 
+    /* Recover the name of the IPCP for which we want to allocate or
+     * lookup the address. */
+    string ipcp_name = rm->obj_name.substr(rm->obj_name.rfind("/") + 1);
+    const auto mit   = table.find(ipcp_name);
+
     /* Either we are the leader (so we can go ahead and serve the request),
-     * or this is a read request that we can serve because it's ok to be
-     * eventually consistent. */
-    if (!leader() && rm->op_code != gpb::M_READ) {
+     * or this is a request that does not require consensus (so we can serve it
+     * because it's ok to be eventually consistent). */
+    if (!(leader() || mit != table.end())) {
         /* We are not the leader and this is not a read request. We
          * need to deny the request to preserve consistency. */
         UPD(uipcp, "Ignoring request, let the leader answer\n");
         return 0;
     }
-
-    /* Recover the name of the IPCP for which we want to allocate or
-     * lookup the address. */
-    string ipcp_name = rm->obj_name.substr(rm->obj_name.rfind("/") + 1);
-    const auto mit   = table.find(ipcp_name);
 
     if (rm->op_code == gpb::M_CREATE) {
         /* We received an M_CREATE sent by Client::allocate() and we are the
