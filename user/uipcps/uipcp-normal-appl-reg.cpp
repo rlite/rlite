@@ -731,7 +731,9 @@ UipcpRib::dft_lib_init()
         [](UipcpRib *rib) {
             rib->dft = make_unique<CentralizedFaultTolerantDFT>(rib);
         },
-        {DFT::TableName}, {{"replicas", PolicyParam(string())}}));
+        {DFT::TableName},
+        {{"replicas", PolicyParam(string())},
+         {"cli-timeout", PolicyParam(Secs(int(CeftClient::kTimeoutSecs)))}}));
 }
 
 } // namespace Uipcps

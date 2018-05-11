@@ -537,8 +537,10 @@ CentralizedFaultTolerantAddrAllocator::Client::allocate(
     rib->unlock();
 
     std::unique_lock<std::mutex> lk(synchro->mutex);
-    // TODO use timeout parameter
-    if (synchro->allocated.wait_for(lk, Secs(4)) == std::cv_status::timeout) {
+    auto timeout =
+        rib->get_param_value<Msecs>(AddrAllocator::Prefix, "cli-timeout");
+
+    if (synchro->allocated.wait_for(lk, timeout) == std::cv_status::timeout) {
         UPE(rib->uipcp, "Address allocation for IPCP '%s' timed out\n",
             ipcp_name.c_str());
         return -1;
@@ -722,7 +724,9 @@ UipcpRib::addra_lib_init()
             rib->addra =
                 make_unique<CentralizedFaultTolerantAddrAllocator>(rib);
         },
-        {AddrAllocator::TableName}, {{"replicas", PolicyParam(string())}}));
+        {AddrAllocator::TableName},
+        {{"replicas", PolicyParam(string())},
+         {"cli-timeout", PolicyParam(Secs(int(CeftClient::kTimeoutSecs)))}}));
 }
 
 } // namespace Uipcps

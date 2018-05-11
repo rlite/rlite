@@ -119,7 +119,7 @@ protected:
         PendingReq() = default;
         PendingReq(gpb::OpCode op_code) : op_code(op_code)
         {
-            t = std::chrono::system_clock::now() + Secs(3);
+            t = std::chrono::system_clock::now() + Secs(int(kTimeoutSecs));
         }
         virtual ~PendingReq() {}
         virtual std::unique_ptr<PendingReq> clone() const = 0;
@@ -155,6 +155,9 @@ public:
     {
         leader_id = reader_id = name;
     }
+
+    /* Timeout in seconds for client requests to the replicas. */
+    static constexpr int kTimeoutSecs = 5;
 };
 
 } // namespace Uipcps
