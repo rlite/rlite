@@ -468,6 +468,7 @@ wifi_init(const char *inf)
     /* Create a control connection with the child and get the handle. */
     ctrl_conn = wpa_ctrl_open(ctrl_path);
     if (!ctrl_conn) {
+        rl_free(ctrl_path, RL_MT_SHIM);
         perror("Failed to connect to the wpa_supplicant control interface");
         return NULL;
     }

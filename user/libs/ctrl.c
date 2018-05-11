@@ -198,7 +198,14 @@ rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
     req->reg          = reg;
     req->appl_name    = appl_name ? rl_strdup(appl_name, RL_MT_UTILS) : NULL;
 
-    if (dif_name && !req->dif_name) {
+    if ((dif_name && !req->dif_name) || (appl_name && !req->appl_name)) {
+        if (req->dif_name) {
+            rl_free(req->dif_name, RL_MT_UTILS);
+        }
+        if (req->appl_name) {
+            rl_free(req->appl_name, RL_MT_UTILS);
+        }
+        memset(req, 0, sizeof(*req));
         return -1; /* Out of memory. */
     }
 
@@ -214,14 +221,17 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req, uint32_t event_id,
     if (dif_name && strcmp(dif_name, "") == 0) {
         dif_name = NULL;
     }
+    if (local_appl && strcmp(local_appl, "") == 0) {
+        local_appl = NULL;
+    }
+    if (remote_appl && strcmp(remote_appl, "") == 0) {
+        remote_appl = NULL;
+    }
 
     memset(req, 0, sizeof(*req));
-    req->hdr.msg_type = RLITE_KER_FA_REQ;
-    req->hdr.event_id = event_id;
-    req->dif_name     = dif_name ? rl_strdup(dif_name, RL_MT_UTILS) : NULL;
-    if (dif_name && !req->dif_name) {
-        return -1; /* Out of memory. */
-    }
+    req->hdr.msg_type  = RLITE_KER_FA_REQ;
+    req->hdr.event_id  = event_id;
+    req->dif_name      = dif_name ? rl_strdup(dif_name, RL_MT_UTILS) : NULL;
     req->upper_ipcp_id = upper_ipcp_id;
     if (flowspec) {
         memcpy(&req->flowspec, flowspec, sizeof(*flowspec));
@@ -231,6 +241,21 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req, uint32_t event_id,
     req->local_appl  = local_appl ? rl_strdup(local_appl, RL_MT_UTILS) : NULL;
     req->remote_appl = remote_appl ? rl_strdup(remote_appl, RL_MT_UTILS) : NULL;
     req->cookie      = (uint32_t)getpid() >> 1;
+
+    if ((dif_name && !req->dif_name) || (local_appl && !req->local_appl) ||
+        (remote_appl && !req->remote_appl)) {
+        if (req->dif_name) {
+            rl_free(req->dif_name, RL_MT_UTILS);
+        }
+        if (req->local_appl) {
+            rl_free(req->local_appl, RL_MT_UTILS);
+        }
+        if (req->remote_appl) {
+            rl_free(req->remote_appl, RL_MT_UTILS);
+        }
+        memset(req, 0, sizeof(*req));
+        return -1; /* Out of memory. */
+    }
 
     return 0;
 }
@@ -441,6 +466,7 @@ __rina_flow_alloc(const char *dif_name, const char *local_appl,
 
     wfd = rina_open();
     if (wfd < 0) {
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
         return wfd;
     }
 

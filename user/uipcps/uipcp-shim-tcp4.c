@@ -423,6 +423,9 @@ accept_conn(struct uipcp *uipcp, int lfd, void *opaque)
     ep = rl_alloc(sizeof(*ep), RL_MT_SHIMDATA);
     if (!ep) {
         UPE(uipcp, "Out of memory\n");
+        if (local_appl) {
+            rl_free(local_appl, RL_MT_SHIMDATA);
+        }
         return;
     }
     memset(ep, 0, sizeof(*ep));
@@ -435,8 +438,9 @@ accept_conn(struct uipcp *uipcp, int lfd, void *opaque)
      * TCP client. */
     if (sock_addr_to_appl_name(shim, &ep->addr, &remote_appl)) {
         UPE(uipcp, "Failed to get appl_name from remote address\n");
-        if (local_appl)
+        if (local_appl) {
             rl_free(local_appl, RL_MT_SHIMDATA);
+        }
         rl_free(ep, RL_MT_SHIMDATA);
         return;
     }

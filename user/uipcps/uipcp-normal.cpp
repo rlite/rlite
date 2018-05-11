@@ -434,7 +434,6 @@ UipcpRib::UipcpRib(struct uipcp *_u)
 
     mgmtfd = rl_open_mgmt_port(uipcp->id);
     if (mgmtfd < 0) {
-        ret = mgmtfd;
         throw std::exception();
     }
 

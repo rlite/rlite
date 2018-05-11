@@ -94,9 +94,11 @@ ipcp_by_dif(const char *dif_name)
 {
     struct ipcp_attrs *attrs;
 
-    list_for_each_entry (attrs, &ipcps, node) {
-        if (strcmp(attrs->dif_name, dif_name) == 0) {
-            return attrs;
+    if (dif_name) {
+        list_for_each_entry (attrs, &ipcps, node) {
+            if (strcmp(attrs->dif_name, dif_name) == 0) {
+                return attrs;
+            }
         }
     }
 
@@ -187,9 +189,11 @@ read_response(int sfd, response_handler_t handler, unsigned to_msecs)
         pfd[0].events = POLLIN;
         ret           = poll(pfd, 1, to_msecs);
         if (ret < 0) {
+            free(serbuf);
             PE("poll() error [%s]\n", strerror(errno));
             return ret;
         } else if (ret == 0) {
+            free(serbuf);
             PE("request timed out\n");
             return -1;
         }
@@ -197,9 +201,11 @@ read_response(int sfd, response_handler_t handler, unsigned to_msecs)
         n = read(sfd, serbuf + read_ofs, serbuf_size - read_ofs);
         if (n < 0) {
             PE("read() error [%s]\n", strerror(errno));
+            free(serbuf);
             return n;
         } else if (n == 0) {
             PE("uipcps daemon unexpectedly closed the connection\n");
+            free(serbuf);
             return -1;
         }
 
@@ -740,7 +746,7 @@ flows_show(int argc, char **argv, struct cmd_descriptor *cd)
                 ofs += snprintf(specinfo + ofs, sizeof(specinfo) - ofs, " rtx");
             }
             if (ofs) {
-                ofs += snprintf(specinfo + ofs, sizeof(specinfo) - ofs, ", ");
+                snprintf(specinfo + ofs, sizeof(specinfo) - ofs, ", ");
             }
 
             PI_S("  ipcp %u, addr:port %llu:%u<-->%llu:%u, %s"

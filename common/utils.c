@@ -567,25 +567,33 @@ __rina_name_to_string(const struct rina_name *name, int maysleep)
         return NULL;
     }
 
-    memcpy(cur, name->apn, apn_len);
+    if (name->apn) {
+        memcpy(cur, name->apn, apn_len);
+    }
     cur += apn_len;
 
     *cur = '|';
     cur++;
 
-    memcpy(cur, name->api, api_len);
+    if (name->api) {
+        memcpy(cur, name->api, api_len);
+    }
     cur += api_len;
 
     *cur = '|';
     cur++;
 
-    memcpy(cur, name->aen, aen_len);
+    if (name->aen) {
+        memcpy(cur, name->aen, aen_len);
+    }
     cur += aen_len;
 
     *cur = '|';
     cur++;
 
-    memcpy(cur, name->aei, aei_len);
+    if (name->aei) {
+        memcpy(cur, name->aei, aei_len);
+    }
     cur += aei_len;
 
     *cur = '\0';

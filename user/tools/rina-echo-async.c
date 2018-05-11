@@ -119,7 +119,8 @@ client(struct echo_async *rea)
         fsms[i].last_activity = time(NULL);
         if (fsms[i].fd < 0) {
             perror("rina_flow_alloc()");
-            return fsms[i].fd;
+            ret = fsms[i].fd;
+            goto out;
         }
     }
 
@@ -156,7 +157,7 @@ client(struct echo_async *rea)
         ret = select(maxfd + 1, &rdfs, &wrfs, NULL, &to);
         if (ret < 0) {
             perror("select()\n");
-            return ret;
+            goto out;
         } else if (ret == 0) {
             /* Timeout */
         }
@@ -171,7 +172,8 @@ client(struct echo_async *rea)
                     if (fsms[i].fd < 0) {
                         PRINTF("rina_flow_alloc_wait(): flow %d denied\n", i);
                         shutdown_flow(fsms + i);
-                        return -1;
+                        ret = fsms[i].fd;
+                        goto out;
                     } else {
                         fsms[i].state = SELFD_S_WRITE;
                         PRINTF("Flow %d allocated\n", i);
@@ -212,12 +214,17 @@ client(struct echo_async *rea)
             if (time(NULL) - fsms[i].last_activity >= TIMEOUT_SECS) {
                 PRINTF("Flow %d timed out\n", i);
                 shutdown_flow(fsms + i);
-                return -1;
+                ret = -1;
+                goto out;
             }
         }
     }
 
-    return 0;
+    ret = 0;
+out:
+    free(fsms);
+
+    return ret;
 }
 
 /* Turn this program into a daemon process. */
