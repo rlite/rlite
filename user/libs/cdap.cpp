@@ -380,10 +380,9 @@ InvokeIdMgr::get_invoke_id()
 {
     discard();
 
-    while (invoke_id_next == 0 ||
-           pending_invoke_ids.count(Id(invoke_id_next))) {
+    do {
         invoke_id_next++;
-    }
+    } while (pending_invoke_ids.count(Id(invoke_id_next)));
 
     pending_invoke_ids.insert(
         Id(invoke_id_next, std::chrono::system_clock::now()));
