@@ -24,6 +24,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <queue>
 
 #include "BaseRIB.pb.h"
 #include "uipcp-normal-lfdb.hpp"
@@ -80,47 +81,42 @@ LFDB::compute_shortest_paths(
     const std::unordered_map<NodeId, std::list<Edge>> &graph,
     std::unordered_map<NodeId, DijkstraInfo> &info)
 {
+    std::priority_queue<PQInfo> frontier;
+
+    frontier.push(PQInfo(source_node, 0));
+
     /* Initialize the per-node info map. */
     for (const auto &kvg : graph) {
         struct DijkstraInfo inf;
 
-        inf.dist    = UINT_MAX;
-        inf.visited = false;
-
-        info[kvg.first] = inf;
+        inf.dist        = UINT_MAX;
+        inf.visited     = false;
+        info[kvg.first] = std::move(inf);
     }
-    info[source_node].dist = 0;
 
-    for (;;) {
-        NodeId min_node;
-        unsigned int min_dist = UINT_MAX;
-
+    while (!frontier.empty()) {
         /* Select the closest node from the ones in the frontier. */
-        for (auto &kvi : info) {
-            if (!kvi.second.visited && kvi.second.dist < min_dist) {
-                min_node = kvi.first;
-                min_dist = kvi.second.dist;
-            }
-        }
+        PQInfo closer = frontier.top();
+        frontier.pop();
 
-        if (min_dist == UINT_MAX) {
+        if (closer.dist == UINT_MAX) {
             break;
         }
 
-        assert(!min_node.empty());
+        DijkstraInfo &info_min = info[closer.node];
+        info_min.dist          = closer.dist;
+        info_min.visited       = true;
 
         if (verbose) {
-            std::cout << "Selecting node " << min_node << std::endl;
+            std::cout << "Selecting node " << closer.node << std::endl;
         }
 
-        if (!graph.count(min_node)) {
+        // TODO use find()
+        if (!graph.count(closer.node)) {
             continue; /* nothing to do */
         }
 
-        const std::list<Edge> &edges = graph.at(min_node);
-        DijkstraInfo &info_min       = info[min_node];
-
-        info_min.visited = true;
+        const std::list<Edge> &edges = graph.at(closer.node);
 
         for (const Edge &edge : edges) {
             DijkstraInfo &info_to = info[edge.to];
@@ -128,7 +124,8 @@ LFDB::compute_shortest_paths(
             if (info_to.dist > info_min.dist + edge.cost) {
                 info_to.dist = info_min.dist + edge.cost;
                 info_to.nhop =
-                    (min_node == source_node) ? edge.to : info_min.nhop;
+                    (closer.node == source_node) ? edge.to : info_min.nhop;
+                frontier.push(PQInfo(edge.to, info_to.dist));
             }
         }
     }
