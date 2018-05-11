@@ -855,6 +855,13 @@ rl_sched_replace(struct rl_normal *priv, const char *sched_name)
     struct rl_sched *sched   = NULL;
     struct rl_sched *old;
 
+    if (rl_ipcp_has_flows(priv->ipcp, /*report_all=*/false)) {
+        /* Do not allow scheduler changes if this IPCP is being
+         * use by some flow. There is a race condition that
+         * needs to be addressed, though. */
+        return -EBUSY;
+    }
+
     if (sched_name != NULL) {
         struct rl_sched_ops *cur;
 
@@ -1195,6 +1202,11 @@ rl_normal_config(struct ipcp_entry *ipcp, const char *param_name,
         } else {
             ret = -EINVAL;
         }
+    } else if (strcmp(param_name, "sched") == 0) {
+        if (!strcmp(param_value, "none")) {
+            param_value = NULL;
+        }
+        ret = rl_sched_replace(priv, param_value);
     }
 
     return ret;
@@ -1986,11 +1998,6 @@ rl_normal_create(struct ipcp_entry *ipcp)
     priv->csum = false;
 
     INIT_WORK(&priv->sched_deq_work, sched_deq_worker);
-    if (false) {
-        if (rl_sched_replace(priv, "fifo")) {
-            PE("Failed to replace PDU scheduler with fifo\n");
-        }
-    }
 
     PD("New IPC created [%p]\n", priv);
 
