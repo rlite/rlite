@@ -9,9 +9,20 @@ difs_list() {
 _rlite_ctl() {
     local cur=${COMP_WORDS[COMP_CWORD]}
     local prev=${COMP_WORDS[COMP_CWORD-1]}
+    local pprev=${COMP_WORDS[COMP_CWORD-2]}
+
+    case "$pprev" in
+        ipcp-sched-config )
+            SCHEDS="pfifo wrr"
+            COMPREPLY=( $(compgen -W "$SCHEDS" -- $cur) )
+        ;;
+        quantum )
+            COMPREPLY=( $(compgen -W "weights" -- $cur) )
+        ;;
+    esac
 
     case "$prev" in
-        rlite-ctl)
+        rlite-ctl )
             CMDS=$(rlite-ctl -h | tail -n +2 | grep -o "^    [^ ]\+")
             COMPREPLY=( $(compgen -W "$CMDS" -- $cur) )
         ;;
@@ -22,6 +33,12 @@ _rlite_ctl() {
         ipcp-* | uipcp* )
             IPCPS=$(ipcps_list)
             COMPREPLY=( $(compgen -W "$IPCPS" -- $cur) )
+        ;;
+        wrr )
+            COMPREPLY=( $(compgen -W "quantum" -- $cur) )
+        ;;
+        pfifo )
+            COMPREPLY=( $(compgen -W "levels" -- $cur) )
         ;;
     esac
 }
