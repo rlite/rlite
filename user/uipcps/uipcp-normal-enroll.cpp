@@ -1181,7 +1181,7 @@ uipcp_rib::keepalive_timeout(const std::shared_ptr<NeighFlow> &nf)
         /* We assume the neighbor is not alive on this flow, so
          * we prune the flow. */
         UPI(uipcp,
-            "Neighbor %s is not alive on N-1 flow %u "
+            "Neighbor %s is not alive on N-1 port_id %u "
             "and therefore will be pruned\n",
             neigh_name.c_str(), nf->port_id);
 

@@ -268,7 +268,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
         m.reset();
 
         if (!nf) {
-            UPE(uipcp, "Received message from unknown port id %u\n", port_id);
+            UPE(uipcp, "Received message from unknown port_id %u\n", port_id);
             return -1;
         }
 
@@ -1410,7 +1410,7 @@ uipcp_rib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
         return 0;
     }
 
-    UPD(uipcp, "N-flow allocated [neigh = %s, supp_dif = %s, port_id = %u]\n",
+    UPD(uipcp, "N-flow allocated [neigh=%s, supp_dif=%s, port_id=%u]\n",
         req->remote_appl, req->dif_name, req->port_id);
 
     nf           = std::make_shared<NeighFlow>(this, neigh->ipcp_name,
