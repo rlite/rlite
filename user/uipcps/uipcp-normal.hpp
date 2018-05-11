@@ -268,8 +268,39 @@ struct Neighbor {
 #define RL_LOCK_ASSERT(_lock, _locked)
 #endif
 
+/* Base class for all the component of a normal IPCP. */
+struct Component {
+    /* Dump the current state of the component. */
+    virtual void dump(std::stringstream &ss) const = 0;
+
+    /* Handle an incoming CDAP message coming from a neighbor or
+     * another (farther) RIB member. */
+    virtual int rib_handler(const CDAPMessage *rm,
+                            std::shared_ptr<NeighFlow> const &nf,
+                            std::shared_ptr<Neighbor> const &neigh,
+                            rlm_addr_t src_addr)
+    {
+        return 0;
+    };
+
+    /* Called on component parameter changes to reconfigure the component
+     * itself. */
+    virtual int reconfigure() { return 0; }
+
+    /* In case the component synchronizes RIB objects with its neighbors,
+     * two methods can be implemented. The first one is used send the local
+     * objects to a single neighbor, while the other is used to send the
+     * local objects to all the neighbors. */
+    virtual int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
+                           unsigned int limit) const
+    {
+        return 0;
+    }
+    virtual int neighs_refresh(size_t limit) { return 0; }
+};
+
 /* Naming service, to translate names to addresses. */
-struct DFT {
+struct DFT : public Component {
     /* Backpointer to parent data structure. */
     UipcpRib *rib;
 
@@ -277,21 +308,9 @@ struct DFT {
     DFT(UipcpRib *_ur) : rib(_ur) {}
     virtual ~DFT() {}
 
-    virtual int reconfigure() { return 0; }
-    virtual void dump(std::stringstream &ss) const                        = 0;
     virtual int lookup_req(const std::string &appl_name, std::string *dst_node,
                            const std::string &preferred, uint32_t cookie) = 0;
     virtual int appl_register(const struct rl_kmsg_appl_register *req)    = 0;
-    virtual int rib_handler(const CDAPMessage *rm,
-                            std::shared_ptr<NeighFlow> const &nf,
-                            std::shared_ptr<Neighbor> const &neigh,
-                            rlm_addr_t src_addr)                          = 0;
-    virtual int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
-                           unsigned int limit) const
-    {
-        return 0;
-    }
-    virtual int neighs_refresh(size_t limit) { return 0; }
 
     static std::string TableName;
     static std::string ObjClass;
@@ -299,7 +318,7 @@ struct DFT {
 };
 
 /* Allocation and deallocation of N-flows used applications. */
-struct FlowAllocator {
+struct FlowAllocator : public Component {
     /* Backpointer to parent data structure. */
     UipcpRib *rib;
 
@@ -310,7 +329,6 @@ struct FlowAllocator {
     FlowAllocator(UipcpRib *_ur) : rib(_ur), kevent_id_cnt(1) {}
     virtual ~FlowAllocator() {}
 
-    virtual void dump(std::stringstream &ss) const          = 0;
     virtual void dump_memtrack(std::stringstream &ss) const = 0;
 
     virtual int fa_req(struct rl_kmsg_fa_req *req,
@@ -323,9 +341,10 @@ struct FlowAllocator {
     virtual int flows_handler_create_r(const CDAPMessage *rm) = 0;
     virtual int flows_handler_delete(const CDAPMessage *rm)   = 0;
 
-    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-                    std::shared_ptr<Neighbor> const &neigh,
-                    rlm_addr_t src_addr);
+    virtual int rib_handler(const CDAPMessage *rm,
+                            std::shared_ptr<NeighFlow> const &nf,
+                            std::shared_ptr<Neighbor> const &neigh,
+                            rlm_addr_t src_addr) override;
 
     static std::string TableName;
     static std::string ObjClass;
@@ -335,7 +354,7 @@ struct FlowAllocator {
 
 /* Lower Flows Database and dissemination of routing information,
  * related to (N-1)-flows. */
-struct Routing {
+struct Routing : public Component {
     /* Backpointer to parent data structure. */
     UipcpRib *rib;
 
@@ -343,7 +362,6 @@ struct Routing {
     Routing(UipcpRib *_ur) : rib(_ur) {}
     virtual ~Routing() {}
 
-    virtual void dump(std::stringstream &ss) const         = 0;
     virtual void dump_routing(std::stringstream &ss) const = 0;
 
     virtual void update_local(const std::string &neigh_name) {}
@@ -353,20 +371,6 @@ struct Routing {
     /* Called to flush all the local entries related to a given neighbor. */
     virtual void neigh_disconnected(const std::string &neigh_name) {}
 
-    virtual int rib_handler(const CDAPMessage *rm,
-                            std::shared_ptr<NeighFlow> const &nf,
-                            std::shared_ptr<Neighbor> const &neigh,
-                            rlm_addr_t src_addr)
-    {
-        return 0;
-    }
-
-    virtual int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
-                           unsigned int limit) const
-    {
-        return 0;
-    }
-    virtual int neighs_refresh(size_t limit) { return 0; }
     virtual void age_incr() {}
     virtual int route_mod(const struct rl_cmsg_ipcp_route_mod *req)
     {
@@ -379,7 +383,7 @@ struct Routing {
 };
 
 /* Address allocation for the members of the N-DIF. */
-struct AddrAllocator {
+struct AddrAllocator : public Component {
     /* Backpointer to parent data structure. */
     UipcpRib *rib;
 
@@ -387,8 +391,6 @@ struct AddrAllocator {
     AddrAllocator(UipcpRib *_ur) : rib(_ur) {}
     virtual ~AddrAllocator() {}
 
-    virtual int reconfigure() { return 0; }
-    virtual void dump(std::stringstream &ss) const = 0;
     /* Allocate an address. Note that this method is synchronous, and so it
      * should not be called by the uipcp event loop. It is designed to be called
      * by the enroller thread or other auxiliary threads.
@@ -396,15 +398,6 @@ struct AddrAllocator {
      * success, the 'addr' output argument is filled with the allocated address.
      */
     virtual int allocate(const std::string &ipcp_name, rlm_addr_t *addr) = 0;
-    virtual int rib_handler(const CDAPMessage *rm,
-                            std::shared_ptr<NeighFlow> const &nf,
-                            std::shared_ptr<Neighbor> const &neigh,
-                            rlm_addr_t src_addr)                         = 0;
-    virtual int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
-                           unsigned int limit) const
-    {
-        return 0;
-    }
 
     static std::string TableName;
     static std::string ObjClass;
