@@ -35,11 +35,24 @@ struct rl_msg_layout {
     unsigned int names;
     unsigned int strings;
     unsigned int buffers;
+    unsigned int arrays;
 };
 
 struct rl_msg_buf_field {
     void *buf;
     uint32_t len;
+};
+
+struct rl_msg_array_field {
+    uint32_t elem_size;
+    uint32_t num_elements;
+    union {
+        void *raw;
+        uint8_t *bytes;
+        uint16_t *words;
+        uint32_t *dwords;
+        uint64_t *qwords;
+    } slots;
 };
 
 int rina_sername_valid(const char *str);

@@ -181,6 +181,49 @@ deserialize_buffer(const void **pptr, struct rl_msg_buf_field *bf, int *sleft)
     return 0;
 }
 
+static void
+serialize_array(void **pptr, const struct rl_msg_array_field *af)
+{
+    size_t array_size = af->elem_size * af->num_elements;
+
+    serialize_obj(*pptr, uint32_t, af->elem_size);
+    serialize_obj(*pptr, uint32_t, af->num_elements);
+    memcpy(*pptr, af->slots.raw, array_size);
+    *pptr += array_size;
+}
+
+static int
+deserialize_array(const void **pptr, struct rl_msg_array_field *af, int *sleft)
+{
+    size_t array_size;
+
+    if (*sleft < 2 * sizeof(uint32_t)) {
+        return -1;
+    }
+    deserialize_obj(*pptr, uint32_t, &af->elem_size);
+    deserialize_obj(*pptr, uint32_t, &af->num_elements);
+    *sleft -= 2 * sizeof(uint32_t);
+    array_size = af->elem_size * af->num_elements;
+
+    if (array_size) {
+        if (*sleft < array_size) {
+            return -1;
+        }
+        af->slots.raw = COMMON_ALLOC(array_size, 1);
+        if (!af->slots.raw) {
+            return -1;
+        }
+
+        memcpy(af->slots.raw, *pptr, array_size);
+        *pptr += array_size;
+        *sleft -= array_size;
+    } else {
+        af->slots.raw = NULL;
+    }
+
+    return 0;
+}
+
 /* Serialize a RINA name. */
 void
 serialize_rina_name(void **pptr, const struct rina_name *name)
@@ -267,6 +310,7 @@ serialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
     struct rina_name *name;
     string_t *str;
     const struct rl_msg_buf_field *bf;
+    const struct rl_msg_array_field *af;
     int i;
 
     if (msg->hdr.msg_type >= num_entries) {
@@ -296,6 +340,11 @@ serialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
         serialize_buffer(&serptr, bf);
     }
 
+    af = (const struct rl_msg_array_field *)bf;
+    for (i = 0; i < numtables[msg->hdr.msg_type].arrays; i++, af++) {
+        serialize_array(&serptr, af);
+    }
+
     serlen = serptr - serbuf;
 
     return serlen;
@@ -312,6 +361,7 @@ deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
     struct rina_name *name;
     string_t *str;
     struct rl_msg_buf_field *bf;
+    struct rl_msg_array_field *af;
     unsigned int copylen;
     const void *desptr;
     int sleft = serbuf_len;
@@ -383,6 +433,19 @@ deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
             return ret;
         }
         dleft -= sizeof(struct rl_msg_buf_field);
+    }
+
+    af = (struct rl_msg_array_field *)bf;
+    for (i = 0; i < numtables[bmsg->hdr.msg_type].arrays; i++, af++) {
+        if (dleft < sizeof(struct rl_msg_array_field)) {
+            PE("Message buffer too short\n");
+            return -1;
+        }
+        ret = deserialize_array(&desptr, af, &sleft);
+        if (ret) {
+            return ret;
+        }
+        dleft -= sizeof(struct rl_msg_array_field);
     }
 
     if ((desptr - serbuf) != serbuf_len || sleft) {
