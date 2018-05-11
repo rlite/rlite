@@ -483,7 +483,7 @@ CentralizedFaultTolerantDFT::reconfigure()
         return 0;
     }
     UPD(rib->uipcp, "replicas = %s\n", replicas.c_str());
-    peers = utils::strsplit(replicas, ',');
+    peers = utils::strsplit<std::list>(replicas, ',');
 
     /* Create the client anyway. */
     client = utils::make_unique<Client>(this, peers);

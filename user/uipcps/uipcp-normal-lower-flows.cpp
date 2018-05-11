@@ -737,7 +737,7 @@ StaticRouting::route_mod(const struct rl_cmsg_ipcp_route_mod *req)
             UPE(rib->uipcp, "No next hop specified\n");
             return -1;
         }
-        next_hops = utils::strsplit(NodeId(req->next_hops), ',');
+        next_hops = utils::strsplit<std::list>(NodeId(req->next_hops), ',');
         {
             set<NodeId> u(next_hops.begin(), next_hops.end());
             if (u.size() != next_hops.size()) {

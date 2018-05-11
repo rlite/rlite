@@ -9,11 +9,12 @@
 
 namespace utils {
 
-static inline std::list<std::string>
+template <template <typename, typename> class Container>
+Container<std::string, std::allocator<std::string>>
 strsplit(const std::string &s, char delim)
 {
     std::stringstream ss(s);
-    std::list<std::string> ret;
+    Container<std::string, std::allocator<std::string>> ret;
     std::string item;
 
     while (std::getline(ss, item, delim)) {
