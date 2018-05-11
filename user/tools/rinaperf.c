@@ -163,9 +163,9 @@ struct worker {
     unsigned int real_duration_ms; /* measured by the client */
 
     /* A window of RTT samples to compute ping statistics. */
-#define WINSIZE 2048
-    unsigned int win_idx;
-    uint32_t win[WINSIZE];
+#define WINSIZE 4096
+    unsigned int rtt_win_idx;
+    uint32_t rtt_win[WINSIZE];
 };
 
 struct rinaperf {
@@ -216,7 +216,7 @@ worker_init(struct worker *w, struct rinaperf *rp)
 {
     w->rp  = rp;
     w->cfd = w->dfd = -1;
-    w->win_idx      = 0;
+    w->rtt_win_idx  = 0;
 }
 
 static void
@@ -332,8 +332,8 @@ ping_client(struct worker *w)
                         PRINTF("[%lu.%06lu] ", (unsigned long)recv_time.tv_sec,
                                (unsigned long)recv_time.tv_usec);
                     }
-                    w->win[w->win_idx] = ns;
-                    w->win_idx         = (w->win_idx + 1) % WINSIZE;
+                    w->rtt_win[w->rtt_win_idx] = ns;
+                    w->rtt_win_idx             = (w->rtt_win_idx + 1) % WINSIZE;
                     PRINTF("%d bytes from server: rtt = %.3f ms\n", ret,
                            ((float)ns) / 1000000.0);
                 } else {
@@ -453,7 +453,7 @@ static void
 ping_report(struct worker *w, struct rp_result_msg *snd,
             struct rp_result_msg *rcv)
 {
-    unsigned num_samples = (snd->cnt > WINSIZE) ? WINSIZE : w->win_idx;
+    unsigned num_samples = (snd->cnt > WINSIZE) ? WINSIZE : w->rtt_win_idx;
     double stddev;
     double avg;
     double sum;
@@ -467,7 +467,7 @@ ping_report(struct worker *w, struct rp_result_msg *snd,
 
     /* Compute and report RTT statistics. */
     for (sum = 0.0, i = 0; i < num_samples; i++) {
-        double sample = w->win[i];
+        double sample = w->rtt_win[i];
         sum += sample;
         if (sample < min) {
             min = sample;
@@ -478,7 +478,7 @@ ping_report(struct worker *w, struct rp_result_msg *snd,
     }
     avg = sum / num_samples;
     for (sum = 0.0, i = 0; i < num_samples; i++) {
-        double sample = w->win[i];
+        double sample = w->rtt_win[i];
         sum += (sample - avg) * (sample - avg);
     }
     stddev = sqrt(sum / num_samples);
