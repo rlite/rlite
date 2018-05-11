@@ -1331,9 +1331,12 @@ flows_removew_func(struct work_struct *w)
     }
     FUNLOCK(dm);
 
-    /* Destroy the entries without holding the lock. */
+    /* Destroy the entries without holding the lock (but still grab
+     * the lock to modify flow->node_rm). */
     list_for_each_entry_safe (flow, tmp, &removeq, node_rm) {
+        FLOCK(dm);
         list_del_init(&flow->node_rm);
+        FUNLOCK(dm);
         flow_del(flow);
     }
 }
