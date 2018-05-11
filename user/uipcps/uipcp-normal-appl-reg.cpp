@@ -693,10 +693,10 @@ protected:
     };
     std::unordered_map</*invoke_id*/ int, std::unique_ptr<PendingReq>> pending;
 
-    int read_from_replicas(std::unique_ptr<CDAPMessage> m,
-                           std::unique_ptr<PendingReq> pr);
+    enum class OpSemantics { Get, Put };
+
     int send_to_replicas(std::unique_ptr<CDAPMessage> m,
-                         std::unique_ptr<PendingReq> pr);
+                         std::unique_ptr<PendingReq> pr, OpSemantics sem);
     void mod_pending_timer();
 
 public:
@@ -772,6 +772,42 @@ CeftClient::mod_pending_timer()
                 cli->process_timeout();
             });
     }
+}
+
+// TODO remove replica from PendingReq() constructor.
+int
+CeftClient::send_to_replicas(std::unique_ptr<CDAPMessage> m,
+                             std::unique_ptr<PendingReq> pr, OpSemantics sem)
+{
+    const raft::ReplicaId &selected_id =
+        (sem == OpSemantics::Get) ? reader_id : leader_id;
+
+    /* If we have a selected for this operation (leader or selected reader), we
+     * send it to that replica only; otherwise we send it to all the replicas.
+     */
+    for (const auto &r : replicas) {
+        if (selected_id.empty() || r == selected_id) {
+            auto mc  = make_unique<CDAPMessage>(*m);
+            auto prc = pr->clone();
+            int invoke_id;
+            int ret;
+
+            /* Set the 'pending' map before sending, in case we are sending to
+             * ourselves (and so we wouldn't find the entry in the map).*/
+            mc->invoke_id = invoke_id = rib->invoke_id_mgr.get_invoke_id();
+            prc->replica              = r;
+            pending[invoke_id]        = std::move(prc);
+            ret = rib->send_to_dst_node(std::move(mc), r, nullptr, nullptr);
+            if (ret) {
+                pending.erase(invoke_id);
+                return ret;
+            }
+        }
+    }
+
+    mod_pending_timer();
+
+    return 0;
 }
 
 class CentralizedFaultTolerantDFT : public DFT {
@@ -940,67 +976,6 @@ CentralizedFaultTolerantDFT::reconfigure()
     return 0;
 }
 
-// TODO merge read_from and send_to, and move them up
-int
-CeftClient::read_from_replicas(std::unique_ptr<CDAPMessage> m,
-                               std::unique_ptr<PendingReq> pr)
-{
-    /* If we have a selected reader, we send it to the reader only; otherwise
-     * we send it to all the replicas. */
-    for (const auto &r : replicas) {
-        if (reader_id.empty() || r == reader_id) {
-            auto mc  = make_unique<CDAPMessage>(*m);
-            auto prc = pr->clone();
-            int invoke_id;
-            int ret;
-
-            mc->invoke_id = invoke_id = rib->invoke_id_mgr.get_invoke_id();
-            prc->replica              = r;
-            pending[invoke_id]        = std::move(prc);
-            ret = rib->send_to_dst_node(std::move(mc), r, nullptr, nullptr);
-            if (ret) {
-                pending.erase(invoke_id);
-                return ret;
-            }
-        }
-    }
-
-    mod_pending_timer();
-
-    return 0;
-}
-
-int
-CeftClient::send_to_replicas(std::unique_ptr<CDAPMessage> m,
-                             std::unique_ptr<PendingReq> pr)
-{
-    /* If we know who is the leader, we send it to the leader only; otherwise
-     * we send it to all the replicas. */
-    for (const auto &r : replicas) {
-        if (leader_id.empty() || r == leader_id) {
-            auto mc  = make_unique<CDAPMessage>(*m);
-            auto prc = pr->clone();
-            int invoke_id;
-            int ret;
-
-            /* Set the 'pending' map before sending, in case we are sending to
-             * ourselves (and so we wouldn't find the entry in the map).*/
-            mc->invoke_id = invoke_id = rib->invoke_id_mgr.get_invoke_id();
-            prc->replica              = r;
-            pending[invoke_id]        = std::move(prc);
-            ret = rib->send_to_dst_node(std::move(mc), r, nullptr, nullptr);
-            if (ret) {
-                pending.erase(invoke_id);
-                return ret;
-            }
-        }
-    }
-
-    mod_pending_timer();
-
-    return 0;
-}
-
 int
 CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
                                                 std::string *dst_node,
@@ -1013,7 +988,7 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
     m->m_read(ObjClass, TableName + "/" + appl_name);
 
     auto pr = make_unique<PendingReq>(string(), m->op_code, appl_name, 0);
-    int ret = read_from_replicas(std::move(m), std::move(pr));
+    int ret = send_to_replicas(std::move(m), std::move(pr), OpSemantics::Get);
     if (ret) {
         return ret;
     }
@@ -1054,7 +1029,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
         return ret;
     }
 
-    ret = send_to_replicas(std::move(m), std::move(pr));
+    ret = send_to_replicas(std::move(m), std::move(pr), OpSemantics::Put);
     if (ret) {
         return ret;
     }
