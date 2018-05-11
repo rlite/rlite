@@ -1348,8 +1348,8 @@ UipcpRib::neighbors_handler(const CDAPMessage *rm,
                 UPD(uipcp, "Candidate neighbor %s %s\n", neigh_name.c_str(),
                     (mit != neighbors_seen.end() ? "updated" : "added"));
 
-                /* Possibly updated neighbor address, we may need to update or
-                 * insert a local LFDB entry. */
+                /* Possibly updated neighbor address, we may need to update
+                 * our routing table. */
                 routing->update_local(neigh_name);
             }
 
