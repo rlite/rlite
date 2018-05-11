@@ -85,7 +85,7 @@ public:
     int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
                     std::shared_ptr<Neighbor> const &neigh,
                     rlm_addr_t src_addr);
-    virtual int apply(const char *const serbuf) = 0;
+    virtual int apply(const char *const serbuf, CDAPMessage *const rm) = 0;
     using CommandToSubmit =
         std::pair<std::unique_ptr<char[]>, std::unique_ptr<CDAPMessage>>;
     virtual int replica_process_rib_msg(

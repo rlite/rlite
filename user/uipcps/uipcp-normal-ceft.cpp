@@ -159,15 +159,23 @@ CeftReplica::process_timeout()
 int
 CeftReplica::apply(raft::LogIndex index, const char *const serbuf)
 {
-    /* Invoke the actual implementation. */
-    apply(serbuf);
+    std::unique_ptr<CDAPMessage> rm;
 
-    /* Send a response to the client. */
+    /* Check if this is associated to a client request. This happens if we
+     * were the leader for this log entry. */
     auto mit = pending.find(index);
     if (mit != pending.end()) {
-        int invoke_id = mit->second->m->invoke_id;
-        rib->send_to_dst_addr(std::move(mit->second->m),
-                              mit->second->requestor_addr);
+        rm = std::move(mit->second->m);
+    }
+
+    /* Invoke the actual state machine update. This may modify the response (if
+     * any) with the result of the update. */
+    apply(serbuf, rm.get());
+
+    if (mit != pending.end()) {
+        /* Send the response to the client and flush the pending response. */
+        int invoke_id = rm->invoke_id;
+        rib->send_to_dst_addr(std::move(rm), mit->second->requestor_addr);
         UPD(rib->uipcp,
             "Pending response for index %u sent to client %llu "
             "(invoke_id=%d)\n",

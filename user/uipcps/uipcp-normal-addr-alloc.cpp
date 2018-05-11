@@ -373,7 +373,7 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
                 table[peer] = next_unused_address++;
             }
         };
-        int apply(const char *const serbuf) override;
+        int apply(const char *const serbuf, CDAPMessage *const rm) override;
         virtual int replica_process_rib_msg(
             const CDAPMessage *rm, rlm_addr_t src_addr,
             std::vector<CommandToSubmit> *commands) override;
@@ -629,7 +629,8 @@ CentralizedFaultTolerantAddrAllocator::Replica::dump(
 /* Apply a command to the replicated state machine. We just need to update our
  * map. */
 int
-CentralizedFaultTolerantAddrAllocator::Replica::apply(const char *const serbuf)
+CentralizedFaultTolerantAddrAllocator::Replica::apply(const char *const serbuf,
+                                                      CDAPMessage *const rm)
 {
     auto c = reinterpret_cast<const Command *const>(serbuf);
 

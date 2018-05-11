@@ -372,7 +372,7 @@ class CentralizedFaultTolerantDFT : public DFT {
                               std::string("-") + dft->rib->myname,
                           sizeof(Command), DFT::TableName),
               impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
-        int apply(const char *const serbuf) override;
+        int apply(const char *const serbuf, CDAPMessage *const rm) override;
         int replica_process_rib_msg(
             const CDAPMessage *rm, rlm_addr_t src_addr,
             std::vector<CommandToSubmit> *commands) override;
@@ -632,7 +632,8 @@ CentralizedFaultTolerantDFT::Client::client_process_rib_msg(
 /* Apply a command to the replicated state machine. We just pass the command
  * to the same multimap implementation used by the fully replicated DFT. */
 int
-CentralizedFaultTolerantDFT::Replica::apply(const char *const serbuf)
+CentralizedFaultTolerantDFT::Replica::apply(const char *const serbuf,
+                                            CDAPMessage *const rm)
 {
     auto c = reinterpret_cast<const Command *const>(serbuf);
     gpb::DFTEntry e;

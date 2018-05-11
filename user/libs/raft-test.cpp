@@ -541,6 +541,7 @@ run_simulation(const list<TestEvent> &external_events)
  * of the replicas is eventually available (although there can be periods with
  * no majority, or even zero active replicas).
  */
+// TODO add test where election timer expires at the same time for more replicas
 int
 main(int argc, char **argv)
 {
