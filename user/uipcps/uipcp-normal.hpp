@@ -50,6 +50,8 @@
 #include "uipcp-container.h"
 #include "BaseRIB.pb.h"
 
+namespace Uipcps {
+
 #ifdef RL_MEMTRACK
 #define rl_new(_exp, _ty)                                                      \
     ({                                                                         \
@@ -840,5 +842,7 @@ int uipcp_do_register(struct uipcp *uipcp, const char *dif_name,
 void normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque);
 
 #define UIPCP_RIB(_u) (static_cast<uipcp_rib *>((_u)->priv))
+
+} // namespace Uipcps
 
 #endif /* __UIPCP_RIB_H__ */

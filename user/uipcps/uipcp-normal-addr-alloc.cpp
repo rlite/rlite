@@ -6,6 +6,8 @@
 
 using namespace std;
 
+namespace Uipcps {
+
 class DistributedAddrAllocator : public AddrAllocator {
     /* Table used to carry on distributed address allocation.
      * It maps (address allocated) --> (requestor name). */
@@ -333,3 +335,5 @@ uipcp_rib::addra_lib_init()
         },
         {AddrAllocator::TableName}));
 }
+
+} // namespace Uipcps

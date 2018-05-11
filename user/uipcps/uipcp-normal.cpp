@@ -46,6 +46,8 @@
 
 using namespace std;
 
+namespace Uipcps {
+
 #if 0
 string address      = "/daf/mgmt/naming/address";
 string whatevercast = "/daf/mgmt/naming/whatevercast";
@@ -892,7 +894,7 @@ uipcp_rib::register_to_lower_one(const char *lower_dif, bool reg)
     int ret;
 
     /* Perform the registration of the IPCP name. */
-    if ((ret = uipcp_do_register(uipcp, lower_dif, uipcp->name, reg))) {
+    if ((ret = ::uipcp_do_register(uipcp, lower_dif, uipcp->name, reg))) {
         UPE(uipcp, "%segistration of IPCP name %s %s DIF %s failed\n",
             reg ? "R" : "Unr", uipcp->name, reg ? "into" : "from", lower_dif);
         return ret;
@@ -907,7 +909,8 @@ uipcp_rib::register_to_lower_one(const char *lower_dif, bool reg)
          * this IPCP is part of. If this fails broadcast enrollment won't work.
          * However it is not an hard failure, as unicast enrollment is still
          * possible. */
-        if ((ret = uipcp_do_register(uipcp, lower_dif, uipcp->dif_name, reg))) {
+        if ((ret =
+                 ::uipcp_do_register(uipcp, lower_dif, uipcp->dif_name, reg))) {
             UPW(uipcp, "%segistration of DAF name %s %s DIF %s failed\n",
                 reg ? "R" : "Unr", uipcp->dif_name, reg ? "into" : "from",
                 lower_dif);
@@ -1541,7 +1544,8 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
 
     if (self_reg_pending) {
         /* Perform (un)registration out of the lock. */
-        ret = uipcp_do_register(uipcp, uipcp->dif_name, uipcp->name, self_reg);
+        ret =
+            ::uipcp_do_register(uipcp, uipcp->dif_name, uipcp->name, self_reg);
 
         if (ret) {
             UPE(uipcp, "self-(un)registration failed\n");
@@ -2240,6 +2244,10 @@ normal_lib_init(void)
     uipcp_rib::routing_lib_init(); /* routing */
     uipcp_rib::ra_lib_init();      /* enrollment and resource allocator */
 }
+
+} // namespace Uipcps
+
+using namespace Uipcps;
 
 struct uipcp_ops normal_ops = {
     .init                 = normal_init,

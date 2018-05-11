@@ -32,6 +32,8 @@
 
 using namespace std;
 
+namespace Uipcps {
+
 NeighFlow::NeighFlow(uipcp_rib *parent, const string &ipcp_name,
                      const string &supdif, rl_port_t pid, int ffd,
                      rl_ipcp_id_t lid)
@@ -1979,3 +1981,5 @@ uipcp_rib::ra_lib_init()
     available_policies[uipcp_rib::ResourceAllocPrefix].insert(
         PolicyBuilder("default"));
 }
+
+} // namespace Uipcps

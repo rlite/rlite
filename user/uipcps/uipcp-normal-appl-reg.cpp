@@ -30,6 +30,8 @@
 
 using namespace std;
 
+namespace Uipcps {
+
 static uint64_t
 time64()
 {
@@ -1149,3 +1151,5 @@ uipcp_rib::dft_lib_init()
         },
         {DFT::TableName}));
 }
+
+} // namespace Uipcps

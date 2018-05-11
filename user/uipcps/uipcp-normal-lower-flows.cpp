@@ -31,6 +31,8 @@
 
 using namespace std;
 
+namespace Uipcps {
+
 using NodeId = std::string;
 
 /* Helper for pretty printing of default route. */
@@ -987,3 +989,5 @@ uipcp_rib::routing_lib_init()
             rib->routing = make_unique<StaticRouting>(rib);
         }));
 }
+
+} // namespace Uipcps

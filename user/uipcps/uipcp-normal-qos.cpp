@@ -28,6 +28,8 @@
 
 using namespace std;
 
+namespace Uipcps {
+
 #ifdef RL_USE_QOS_CUBES
 
 /* Helper function that emulates Python's str.strip(). */
@@ -240,4 +242,7 @@ uipcp_rib::load_qos_cubes(const char *filename)
 
     return 0;
 }
+
 #endif /* RL_USE_QOS_CUBES */
+
+} // namespace Uipcps

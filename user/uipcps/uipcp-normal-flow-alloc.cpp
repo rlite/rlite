@@ -27,6 +27,8 @@
 
 using namespace std;
 
+namespace Uipcps {
+
 struct FlowRequest : public gpb::FlowRequest {
     FlowRequest() = default;
     RL_NONCOPIABLE(FlowRequest);
@@ -707,3 +709,5 @@ uipcp_rib::fa_lib_init()
         [](uipcp_rib *rib) { rib->fa = make_unique<LocalFlowAllocator>(rib); },
         {FlowAllocator::TableName}));
 }
+
+} // namespace Uipcps
