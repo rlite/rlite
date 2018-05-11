@@ -38,6 +38,8 @@
 #include <linux/bitmap.h>
 #include <linux/hashtable.h>
 #include <linux/spinlock.h>
+#include <linux/nsproxy.h>
+#include <net/net_namespace.h>
 #include <asm/compat.h>
 
 int verbosity = RL_VERB_DBG;
@@ -175,41 +177,17 @@ struct rl_dm {
     struct list_head flows_removeq;
     struct list_head flows_putq;
     struct work_struct flows_removew;
+
+    /* Reference to the parent network namespace, and node for the
+     * netns hash table. */
+    struct net *net;
+    unsigned int refcnt;
+    struct hlist_node node;
 };
 
-/* Instance of rl_dm for the default network namespace. */
-static struct rl_dm rl_dm;
-
-/* We want to know if a rl_dm instance is empty so that we can remove
- * it and release its network namespace (if it is not the default one). */
-static bool
-rl_dm_empty(struct rl_dm *dm)
-{
-    return hash_empty(dm->ipcp_table) && hash_empty(dm->flow_table) &&
-           hash_empty(dm->flow_table_by_cep) && list_empty(&dm->difs) &&
-           list_empty(&dm->ctrl_devs) && list_empty(&dm->appl_removeq) &&
-           !work_pending(&dm->appl_removew) &&
-           !timer_pending(&dm->flows_putq_tmr) &&
-           list_empty(&dm->flows_removeq) && list_empty(&dm->flows_putq) &&
-           !work_pending(&dm->flows_removew);
-}
-
-static struct rl_dm *
-rl_dm_get(void)
-{
-    return &rl_dm;
-}
-
-static struct rl_dm *
-rl_dm_getref(struct rl_dm *dm)
-{
-    return dm;
-}
-
-static void
-rl_dm_put(struct rl_dm *dm)
-{
-}
+static struct rl_dm *rl_dm_get(void);
+static void rl_dm_put(struct rl_dm *dm);
+static struct rl_dm *rl_dm_getref(struct rl_dm *dm);
 
 #define FLOCK(dm) write_lock_bh(&dm->flows_lock)
 #define FUNLOCK(dm) write_unlock_bh(&dm->flows_lock)
@@ -979,7 +957,7 @@ flow_get(struct rl_dm *dm, rl_port_t port_id)
     struct flow_entry *flow;
 
     FRLOCK(dm);
-    flow = flow_lookup(&rl_dm, port_id);
+    flow = flow_lookup(dm, port_id);
     if (flow) {
         atomic_inc(&flow->refcnt);
         PV("FLOWREFCNT %u ++: %u\n", flow->local_port,
@@ -3365,6 +3343,10 @@ rl_ctrl_open(struct inode *inode, struct file *f)
     }
 
     rc->dm = rl_dm_get();
+    if (!rc->dm) {
+        rl_free(rc, RL_MT_CTLDEV);
+        return -ENOMEM;
+    }
 
     f->private_data = rc;
     rc->file        = f;
@@ -3382,8 +3364,6 @@ rl_ctrl_open(struct inode *inode, struct file *f)
     list_add_tail(&rc->node, &rc->dm->ctrl_devs);
     mutex_unlock(&rc->dm->general_lock);
 
-    rl_dm_put(rc->dm);
-
     return 0;
 }
 
@@ -3391,7 +3371,7 @@ static int
 rl_ctrl_release(struct inode *inode, struct file *f)
 {
     struct rl_ctrl *rc = (struct rl_ctrl *)f->private_data;
-    struct rl_dm *dm   = rl_dm_get();
+    struct rl_dm *dm   = rc->dm;
 
     mutex_lock(&dm->general_lock);
     list_del_init(&rc->node);
@@ -3500,6 +3480,136 @@ static struct miscdevice rl_ctrl_misc = {
 
 extern struct miscdevice rl_io_misc;
 
+/* We want to know if a rl_dm instance is empty so that we can remove
+ * it and release its network namespace (if it is not the default one). */
+static bool
+rl_dm_empty(struct rl_dm *dm)
+{
+    return hash_empty(dm->ipcp_table) && hash_empty(dm->flow_table) &&
+           hash_empty(dm->flow_table_by_cep) && list_empty(&dm->difs) &&
+           list_empty(&dm->ctrl_devs) && list_empty(&dm->appl_removeq) &&
+           !work_pending(&dm->appl_removew) &&
+           !timer_pending(&dm->flows_putq_tmr) &&
+           list_empty(&dm->flows_removeq) && list_empty(&dm->flows_putq) &&
+           !work_pending(&dm->flows_removew);
+}
+
+/* To be called under rl_global.lock. */
+static struct rl_dm *
+rl_dm_lookup(struct net *net)
+{
+    struct rl_dm *dm;
+    struct hlist_head *head;
+
+    head = &rl_global.netns_table[hash_min((uintptr_t)net,
+                                           HASH_BITS(rl_global.netns_table))];
+    hlist_for_each_entry (dm, head, node) {
+        if (dm->net == net) {
+            return dm;
+        }
+    };
+
+    return NULL;
+}
+
+static struct rl_dm *
+rl_dm_get(void)
+{
+    struct net *net = current->nsproxy ? current->nsproxy->net_ns : &init_net;
+    struct rl_dm *dm;
+
+    mutex_lock(&rl_global.lock);
+    dm = rl_dm_lookup(net);
+    if (dm != NULL) {
+        /* A data model for the current namespace was already created. Increment
+         * its reference counter and return it. */
+        dm->refcnt++;
+        mutex_unlock(&rl_global.lock);
+
+        return dm;
+    }
+
+    /* Data model not found for the current namespace. Let's create one and
+     * return it. */
+    dm = rl_alloc(sizeof(*dm), GFP_KERNEL, RL_MT_MISC);
+    if (dm == NULL) {
+        return NULL;
+    }
+
+    bitmap_zero(dm->ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
+    hash_init(dm->ipcp_table);
+    bitmap_zero(dm->port_id_bitmap, PORT_ID_BITMAP_SIZE);
+    hash_init(dm->flow_table);
+    bitmap_zero(dm->cep_id_bitmap, CEP_ID_BITMAP_SIZE);
+    hash_init(dm->flow_table_by_cep);
+    mutex_init(&dm->general_lock);
+    rwlock_init(&dm->flows_lock);
+    spin_lock_init(&dm->ipcps_lock);
+    spin_lock_init(&dm->difs_lock);
+    spin_lock_init(&dm->appl_removeq_lock);
+    INIT_LIST_HEAD(&dm->difs);
+    INIT_LIST_HEAD(&dm->ctrl_devs);
+    INIT_LIST_HEAD(&dm->appl_removeq);
+    INIT_LIST_HEAD(&dm->flows_removeq);
+    INIT_LIST_HEAD(&dm->flows_putq);
+    INIT_WORK(&dm->appl_removew, appl_removew_func);
+    INIT_WORK(&dm->flows_removew, flows_removew_func);
+#ifdef RL_HAVE_TIMER_SETUP
+    timer_setup(&dm->flows_putq_tmr, flows_putq_drain, 0);
+#else  /* !RL_HAVE_TIMER_SETUP */
+    setup_timer(&dm->flows_putq_tmr, flows_putq_drain, (unsigned long)dm);
+#endif /* !RL_HAVE_TIMER_SETUP */
+    dm->net    = net;
+    dm->refcnt = 1; /* Cogito, ergo sum. */
+    hash_add(rl_global.netns_table, &dm->node, (uintptr_t)net);
+    /* Grab a reference to the parent network namespace. */
+    get_net(net);
+    mutex_unlock(&rl_global.lock);
+
+    PD("Data model created for namespace %p\n", net);
+
+    return dm;
+}
+
+static struct rl_dm *
+rl_dm_getref(struct rl_dm *dm)
+{
+    mutex_lock(&rl_global.lock);
+    dm->refcnt++;
+    mutex_unlock(&rl_global.lock);
+
+    return dm;
+}
+
+static void
+rl_dm_put(struct rl_dm *dm)
+{
+    if (dm == NULL) {
+        return;
+    }
+
+    mutex_lock(&rl_global.lock);
+    BUG_ON(dm->refcnt == 0);
+    dm->refcnt--;
+    if (dm->refcnt > 0) {
+        mutex_unlock(&rl_global.lock);
+        return; /* still in use */
+    }
+
+    /* This data model is not used anymore. We can get rid of it. */
+    hash_del(&dm->node);
+    mutex_unlock(&rl_global.lock);
+
+    del_timer(&dm->flows_putq_tmr);
+    cancel_work_sync(&dm->flows_removew);
+    cancel_work_sync(&dm->appl_removew);
+    BUG_ON(!rl_dm_empty(dm));
+    put_net(dm->net);
+    PD("Data model for namespace %p destroyed\n", dm->net);
+    dm->net = NULL;
+    rl_free(dm, RL_MT_MISC);
+}
+
 static int __init
 rlite_init(void)
 {
@@ -3508,30 +3618,6 @@ rlite_init(void)
     mutex_init(&rl_global.lock);
     INIT_LIST_HEAD(&rl_global.ipcp_factories);
     hash_init(rl_global.netns_table);
-
-    bitmap_zero(rl_dm.ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
-    hash_init(rl_dm.ipcp_table);
-    bitmap_zero(rl_dm.port_id_bitmap, PORT_ID_BITMAP_SIZE);
-    hash_init(rl_dm.flow_table);
-    bitmap_zero(rl_dm.cep_id_bitmap, CEP_ID_BITMAP_SIZE);
-    hash_init(rl_dm.flow_table_by_cep);
-    mutex_init(&rl_dm.general_lock);
-    rwlock_init(&rl_dm.flows_lock);
-    spin_lock_init(&rl_dm.ipcps_lock);
-    spin_lock_init(&rl_dm.difs_lock);
-    spin_lock_init(&rl_dm.appl_removeq_lock);
-    INIT_LIST_HEAD(&rl_dm.difs);
-    INIT_LIST_HEAD(&rl_dm.ctrl_devs);
-    INIT_LIST_HEAD(&rl_dm.appl_removeq);
-    INIT_LIST_HEAD(&rl_dm.flows_removeq);
-    INIT_LIST_HEAD(&rl_dm.flows_putq);
-    INIT_WORK(&rl_dm.appl_removew, appl_removew_func);
-    INIT_WORK(&rl_dm.flows_removew, flows_removew_func);
-#ifdef RL_HAVE_TIMER_SETUP
-    timer_setup(&rl_dm.flows_putq_tmr, flows_putq_drain, 0);
-#else  /* !RL_HAVE_TIMER_SETUP */
-    setup_timer(&rl_dm.flows_putq_tmr, flows_putq_drain, (unsigned long)&rl_dm);
-#endif /* !RL_HAVE_TIMER_SETUP */
 
     ret = misc_register(&rl_ctrl_misc);
     if (ret) {
@@ -3556,17 +3642,12 @@ rlite_init(void)
     PD("revision id  : %s\n", RL_REVISION_ID);
     PD("revision date: %s\n", RL_REVISION_DATE);
 
-    PD("global dm empty: %d\n", rl_dm_empty(&rl_dm));
-
     return 0;
 }
 
 static void __exit
 rlite_fini(void)
 {
-    del_timer(&rl_dm.flows_putq_tmr);
-    cancel_work_sync(&rl_dm.flows_removew);
-    cancel_work_sync(&rl_dm.appl_removew);
     misc_deregister(&rl_io_misc);
     misc_deregister(&rl_ctrl_misc);
 }
