@@ -608,7 +608,11 @@ EnrollmentResources::enrollee_thread()
     {
         /* (2) I <-- S: M_CONNECT_R */
 
-        assert(rm->op_code == gpb::M_CONNECT_R); /* Rely on CDAP fsm. */
+        if (rm->op_code != gpb::M_CONNECT_R) {
+            UPE(rib->uipcp, "Unexpected opcode %s\n",
+                CDAPMessage::opcode_repr(rm->op_code).c_str());
+            goto err;
+        }
 
         if (rm->result) {
             UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
@@ -892,7 +896,12 @@ EnrollmentResources::enroller_thread()
         int ret;
 
         /* We are the enrollment slave, let's send an M_CONNECT_R message. */
-        assert(rm->op_code == gpb::M_CONNECT); /* Rely on CDAP fsm. */
+        if (rm->op_code != gpb::M_CONNECT) {
+            UPE(rib->uipcp, "Unexpected opcode %s\n",
+                CDAPMessage::opcode_repr(rm->op_code).c_str());
+            goto err;
+        }
+
         ret = m.m_connect_r(rm.get(), 0, string());
         if (ret) {
             UPE(rib->uipcp, "M_CONNECT_R creation failed\n");
