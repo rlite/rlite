@@ -132,9 +132,10 @@ public:
     void dump(std::stringstream &ss) const override;
     void dump_memtrack(std::stringstream &ss) const override;
 
-    std::unordered_map<std::string, std::unique_ptr<FlowRequest>> flow_reqs;
-    std::unordered_map<unsigned int, std::unique_ptr<FlowRequest>>
-        flow_reqs_tmp;
+    std::unordered_map<rl_port_t, std::unique_ptr<FlowRequest>> flow_reqs;
+    std::unordered_map<unsigned int, std::unique_ptr<FlowRequest>> flow_reqs_in;
+    std::unordered_map</*invoke_id=*/int, std::unique_ptr<FlowRequest>>
+        flow_reqs_out;
 
     int fa_req(struct rl_kmsg_fa_req *req,
                const std::string &remote_node) override;
@@ -405,19 +406,17 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
     freq->set_create_flow_retries(0);
     freq->set_hop_cnt(0);
 
-    obj_name << TableName << "/" << freq->src_addr() << "-" << req->local_port;
-
     m = utils::make_unique<CDAPMessage>();
-    m->m_create(FlowObjClass, obj_name.str());
+    m->m_create(FlowObjClass, TableName);
 
-    freq->invoke_id = 0; /* invoke_id is actually set in send_to_dst_addr() */
-    freq->flags     = RL_FLOWREQ_INITIATOR | RL_FLOWREQ_SEND_DEL;
+    m->invoke_id = freq->invoke_id = rib->invoke_id_mgr.get_invoke_id();
+    freq->flags                    = RL_FLOWREQ_INITIATOR | RL_FLOWREQ_SEND_DEL;
 
     ret = rib->send_to_dst_addr(std::move(m), freq->dst_addr(), freq.get());
     if (ret) {
         return ret;
     }
-    flow_reqs[obj_name.str() + string("L")] = std::move(freq);
+    flow_reqs_out[freq->invoke_id] = std::move(freq);
     rib->stats.fa_request_issued++;
 
     return 0;
@@ -428,15 +427,14 @@ int
 LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
 {
     std::unique_ptr<CDAPMessage> m;
-    stringstream obj_name;
     string reason;
     int ret;
 
     /* Lookup the corresponding FlowRequest. */
 
-    auto f = flow_reqs_tmp.find(resp->kevent_id);
+    auto f = flow_reqs_in.find(resp->kevent_id);
 
-    if (f == flow_reqs_tmp.end()) {
+    if (f == flow_reqs_in.end()) {
         UPE(rib->uipcp,
             "Spurious flow allocation response, no request for kevent_id %u\n",
             resp->kevent_id);
@@ -450,23 +448,20 @@ LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
     freq->set_dst_port(resp->port_id);
     freq->mutable_connections(0)->set_dst_cep(resp->cep_id);
 
-    obj_name << TableName << "/" << freq->src_addr() << "-" << freq->src_port();
-
     if (resp->response) {
         reason = "Application refused the accept the flow request";
     }
 
     m = utils::make_unique<CDAPMessage>();
-    m->m_create_r(FlowObjClass, obj_name.str(), 0, resp->response ? -1 : 0,
-                  reason);
+    m->m_create_r(FlowObjClass, TableName, 0, resp->response ? -1 : 0, reason);
     m->invoke_id = freq->invoke_id;
 
     ret = rib->send_to_dst_addr(std::move(m), freq->src_addr(), freq.get());
     if (!resp->response) {
         /* Move the freq object from the temporary map to the right one. */
-        flow_reqs[obj_name.str() + string("R")] = std::move(freq);
+        flow_reqs[resp->port_id] = std::move(freq);
     }
-    flow_reqs_tmp.erase(f); /* first std::move(), then erase. */
+    flow_reqs_in.erase(f); /* first std::move(), then erase. */
     rib->stats.fa_response_issued++;
 
     return ret;
@@ -517,7 +512,7 @@ LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm)
     uipcp_issue_fa_req_arrived(
         rib->uipcp, freq->uid, freq->src_port(), freq->connections(0).src_cep(),
         freq->src_addr(), local_appl.c_str(), remote_appl.c_str(), &flowcfg);
-    flow_reqs_tmp[freq->uid] = std::move(freq);
+    flow_reqs_in[freq->uid] = std::move(freq);
     rib->stats.fa_request_received++;
 
     return 0;
@@ -536,17 +531,20 @@ LocalFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
         return 0;
     }
 
-    auto f = flow_reqs.find(rm->obj_name + string("L"));
+    auto f = flow_reqs_out.find(rm->invoke_id);
 
-    if (f == flow_reqs.end()) {
+    if (f == flow_reqs_out.end()) {
         UPE(rib->uipcp,
-            "M_CREATE_R for '%s' does not match any pending request\n",
-            rm->obj_name.c_str());
+            "M_CREATE_R does not match any pending request (invoke_id=%d)\n",
+            rm->invoke_id);
         return 0;
     }
 
-    std::unique_ptr<FlowRequest> &freq = f->second;
     FlowRequest remote_freq;
+    FlowRequest *freq = f->second.get();
+
+    flow_reqs[freq->src_port()] = std::move(f->second);
+    flow_reqs_out.erase(rm->invoke_id);
 
     remote_freq.ParseFromArray(objbuf, objlen);
     /* Update the local freq object with the remote one. */
@@ -565,44 +563,29 @@ LocalFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
 int
 LocalFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 {
-    stringstream obj_name_ext;
-    string obj_name;
-    rlm_addr_t remote_addr;
     std::unique_ptr<CDAPMessage> m;
+    rlm_addr_t remote_addr;
+    std::stringstream remote_obj_name;
     bool send_del;
 
-    /* Lookup the corresponding FlowRequest, depending on whether we were
-     * the initiator or not. */
-    if (req->initiator) {
-        obj_name_ext << TableName << "/" << rib->myaddr << "-"
-                     << req->local_port_id;
-        obj_name = obj_name_ext.str();
-        obj_name_ext << "L";
-    } else {
-        obj_name_ext << TableName << "/" << req->remote_addr << "-"
-                     << req->remote_port_id;
-        obj_name = obj_name_ext.str();
-        obj_name_ext << "R";
-    }
-
-    auto f = flow_reqs.find(obj_name_ext.str());
+    /* Lookup the corresponding FlowRequest by port_id. */
+    auto f = flow_reqs.find(req->local_port_id);
     if (f == flow_reqs.end()) {
         UPE(rib->uipcp,
-            "Spurious flow deallocated notification, no object with name %s\n",
-            obj_name_ext.str().c_str());
+            "Spurious flow deallocated notification, no object with port_id "
+            "%u\n",
+            req->local_port_id);
         return -1;
     }
 
-    std::unique_ptr<FlowRequest> &freq = f->second;
+    std::unique_ptr<FlowRequest> freq = std::move(f->second);
 
-    /* We were the initiator. */
-    assert(!!(freq->flags & RL_FLOWREQ_INITIATOR) == !!req->initiator);
-    remote_addr = req->initiator ? freq->dst_addr() : freq->src_addr();
-    send_del    = (freq->flags & RL_FLOWREQ_SEND_DEL);
     flow_reqs.erase(f);
+    assert(!!(freq->flags & RL_FLOWREQ_INITIATOR) == !!req->initiator);
+    send_del = (freq->flags & RL_FLOWREQ_SEND_DEL);
 
-    UPD(rib->uipcp, "Removed flow request %s [port %u]\n",
-        obj_name_ext.str().c_str(), req->local_port_id);
+    UPD(rib->uipcp, "Removed flow request with port_id %u\n",
+        req->local_port_id);
 
     if (!send_del) {
         return 0;
@@ -610,8 +593,16 @@ LocalFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 
     /* We should wait 2 MPL here before notifying the peer. */
     m = utils::make_unique<CDAPMessage>();
-    m->m_delete(FlowObjClass, obj_name);
+    remote_obj_name << TableName << "/";
+    if (req->initiator) {
+        remote_obj_name << freq->dst_port();
+    } else {
+        remote_obj_name << freq->src_port();
+    }
+    remote_addr = req->initiator ? freq->dst_addr() : freq->src_addr();
+    m->m_delete(FlowObjClass, remote_obj_name.str());
 
+    // TODO send send_to_dst_node()
     return rib->send_to_dst_addr(std::move(m), remote_addr);
 }
 
@@ -621,39 +612,20 @@ LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm)
     rl_port_t local_port;
     stringstream decode;
     string objname;
-    unsigned addr, port;
-    char separator;
 
     decode << rm->obj_name.substr(TableName.size() + 1);
-    decode >> addr >> separator >> port;
-    /* TODO the following is wrong when flows are local to the node, as
-     * local and remote address are the same. */
-    if (addr == rib->myaddr) {
-        /* We were the initiator. */
-        objname = rm->obj_name + string("L");
-    } else {
-        /* We were the target. */
-        objname = rm->obj_name + string("R");
-    }
-    auto f = flow_reqs.find(objname);
+    decode >> local_port;
 
+    /* Lookup the corresponding FlowRequest by port_id. */
+    auto f = flow_reqs.find(local_port);
     if (f == flow_reqs.end()) {
-        UPV(rib->uipcp, "Flow '%s' already deleted locally\n", objname.c_str());
-        return 0;
+        UPV(rib->uipcp, "No flow port_id %u (may be already deleted locally)\n",
+            local_port);
+        return -1;
     }
 
     std::unique_ptr<FlowRequest> &freq = f->second;
-
-    if (addr == rib->myaddr) {
-        /* We were the initiator. */
-        assert(freq->flags & RL_FLOWREQ_INITIATOR);
-    } else {
-        /* We were the target. */
-        assert(!(freq->flags & RL_FLOWREQ_INITIATOR));
-    }
-
-    local_port = (freq->flags & RL_FLOWREQ_INITIATOR) ? freq->src_port()
-                                                      : freq->dst_port();
+    // TODO make sure freq matches rm
 
     /* We received a delete request from the peer, so we won't need to send
      * him a delete request. */
@@ -720,7 +692,7 @@ void
 LocalFlowAllocator::dump_memtrack(std::stringstream &ss) const
 {
     ss << endl << "Temporary tables:" << endl;
-    ss << "    " << flow_reqs_tmp.size()
+    ss << "    " << flow_reqs_in.size() << " + " << flow_reqs_out.size()
        << " elements in the "
           "temporary flow request table"
        << endl;
