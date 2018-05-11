@@ -155,9 +155,9 @@ main(int argc, char **argv)
           /*reachability_tests=*/{{1, 1}, {2, 2}, {3, 1}}}};
 
     {
-        /* Generate a grid-shaped network of size NxN. */
+        /* Generate a grid-shaped network of size 'sqn' x 'sqn'. */
         TestLFDB::LinksList links;
-        ReachabilityTests tests;
+        ReachabilityTests reachability_tests;
         int sqn = static_cast<int>(std::sqrt(n));
 
         if (sqn < 2) {
@@ -173,8 +173,21 @@ main(int argc, char **argv)
             }
         }
 
-        tests.push_back({1, 1});
-        test_vectors.push_back(make_pair(std::move(links), tests));
+        /* Get from node 0 (top left) to top right in sqn-1 steps. */
+        reachability_tests.push_back({coord(0, sqn - 1), sqn - 1});
+
+        /* Get from node 0 (top left) to bottom left in sqn-1 steps. */
+        reachability_tests.push_back({coord(sqn - 1, 0), sqn - 1});
+
+        /* Get from node 0 (top left) to bottom right. */
+        reachability_tests.push_back({coord(sqn - 1, sqn - 1), 2 * (sqn - 1)});
+
+        /* Get from node 0 (top left) to one very close to the the
+         * bottom left node. */
+        reachability_tests.push_back({coord(sqn - 2, 1), sqn - 1});
+
+        test_vectors.push_back(
+            make_pair(std::move(links), std::move(reachability_tests)));
     }
 
     int counter = 1;
