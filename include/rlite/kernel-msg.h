@@ -76,14 +76,14 @@ extern struct rl_msg_layout rl_ker_numtables[RLITE_KER_MSG_MAX + 1];
 /* All the messages MUST follow a common format and attribute ordering:
  *   - the first field must be 'rl_msg_t msg_type'
  *   - the second field must be 'uint32_t event_id'
- *   - then come (if any) all the fields that are not 'struct rina_name' nor
- *     strings ('char *'), in whatever order
+ *   - then come (if any) all the fields that store fixed size attributes, in
+ *     whatever order
  *   - then come (if any) all the fields that are 'struct rina_name', in
  *     whatever order
  *   - then come (if any) all the fields that are strings ('char *'), in
  *     whatever order
- *   - then come (if any) all the files that are buffer (struct rl_buf_field),
- *     in whatever order
+ *   - then come (if any) all the fields that are buffers
+ *     ('struct rl_buf_field'), in whatever order
  */
 
 /* application --> kernel message to create a new IPC process. */
