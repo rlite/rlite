@@ -46,6 +46,7 @@ pkill rina-echo-async
 rmmod rlite > /dev/null 2>&1
 
 testcnt="0"
+SECONDS=0
 for t in tests/integration/*.sh ; do
     testcnt=$((testcnt + 1))
     if [ "$TESTSEL" -ne "0" ] && [ "$TESTSEL" -ne "$testcnt" ]; then
@@ -72,3 +73,4 @@ for t in tests/integration/*.sh ; do
     fi
     echo -e "${GREEN}>>> TEST #${testcnt} PASSED${NOC}"
 done
+echo -e "${ORANGE}>>> Completed in ${SECONDS} seconds ${NOC}"
