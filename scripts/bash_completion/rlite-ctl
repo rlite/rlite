@@ -1,0 +1,21 @@
+_rlite_ctl()
+{
+    local cur=${COMP_WORDS[COMP_CWORD]}
+    local prev=${COMP_WORDS[COMP_CWORD-1]}
+
+    case "$prev" in
+        "rlite-ctl")
+            CMDS="probe reset terminate ipcp-create ipcp-destroy ipcp-config"
+            CMDS="${CMDS} ipcp-config-get ipcp-register ipcp-unregister"
+            CMDS="${CMDS} ipcp-enroller-enable ipcp-enroller-disable"
+            CMDS="${CMDS} ipcp-enroll ipcp-enroll-retry ipcp-lower-flow-alloc"
+            CMDS="${CMDS} ipcp-neigh-disconnect ipcp-route-add ipcp-route-del"
+            CMDS="${CMDS} ipcps-show ipcp-stats uipcp-stats-show dif-rib-show"
+            CMDS="${CMDS} dif-routing-show dif-rib-paths-show dif-policy-mod"
+            CMDS="${CMDS} dif-policy-list dif-policy-param-mod dif-policy-param-list"
+            CMDS="${CMDS} flows-show flow-dump regs-show"
+            COMPREPLY=( $(compgen -W "$CMDS" -- $cur) )
+        ;;
+    esac
+}
+complete -F _rlite_ctl rlite-ctl
