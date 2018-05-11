@@ -618,7 +618,10 @@ CentralizedFaultTolerantAddrAllocator::Replica::apply(const char *const serbuf)
     assert(c->opcode == Command::OpcodeSet || c->opcode == Command::OpcodeDel);
     if (c->opcode == Command::OpcodeSet) {
         table[c->ipcp_name] = c->address;
-        next_unused_address++;
+        /* Make sure next_unused_address is consistent with the table. This
+         * is necessary because we could become leader anytime. Note that we
+         * should handle 64-bit wraparound here. */
+        next_unused_address = std::max(next_unused_address, c->address + 1);
     } else {
         table.erase(c->ipcp_name);
     }
@@ -670,13 +673,14 @@ CentralizedFaultTolerantAddrAllocator::Replica::replica_process_rib_msg(
             rib->send_to_dst_addr(std::move(m), src_addr);
         } else {
             /* Let's allocate an address and submit the request to the Raft
-             * state machine. */
+             * state machine. Note that this code is only executed by the
+             * leader. */
             auto cbuf  = std::unique_ptr<char[]>(new char[sizeof(Command)]);
             Command *c = reinterpret_cast<Command *>(cbuf.get());
 
             /* Fill in the command struct (already serialized). */
             strncpy(c->ipcp_name, ipcp_name.c_str(), sizeof(c->ipcp_name));
-            c->address = next_unused_address;
+            c->address = next_unused_address++;
             c->opcode  = Command::OpcodeSet;
 
             m->set_obj_value((static_cast<int64_t>(c->address)));
