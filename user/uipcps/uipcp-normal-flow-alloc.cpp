@@ -584,7 +584,7 @@ LocalFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     assert(!!(freq->flags & RL_FLOWREQ_INITIATOR) == !!req->initiator);
     send_del = (freq->flags & RL_FLOWREQ_SEND_DEL);
 
-    UPD(rib->uipcp, "Removed flow request with port_id %u\n",
+    UPV(rib->uipcp, "Removed flow request with port_id %u\n",
         req->local_port_id);
 
     if (!send_del) {

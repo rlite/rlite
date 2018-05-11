@@ -258,7 +258,8 @@ uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port,
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
         if (errno == ENXIO) {
-            UPD(uipcp, "Flow already deleted [port %u]\n", local_port);
+            UPV(uipcp, "Flow with port_id %u already deleted\n", local_port);
+            ret = 0;
         } else {
             UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
         }
