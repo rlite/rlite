@@ -477,10 +477,11 @@ run_simulation(const list<TestEvent> &external_events)
         /* In case this should be the last iteration, check if any
          * retransmissions are needed, and schedule them. */
         if (retransmit_check && should_stop(t_last_ievent + grace_period)) {
+            const TestReplica *const leader = get_leader();
             set<uint32_t> missing_commands;
 
-            for (const auto &kv : replicas) {
-                missing_commands = kv.second->get_missing_commands(
+            if (leader) {
+                missing_commands = leader->get_missing_commands(
                     std::move(missing_commands), input_counter);
             }
             for (const auto cmd : missing_commands) {
