@@ -553,8 +553,12 @@ class Demo:
                             'id': vm['id']
                         })
                 elif self.addr_alloc_policy == "distributed":
-                    nack_wait_secs = 5 if self.enrollment_order == 'parallel' and len(
-                        self.vms) > 30 else 1
+                    if self.enrollment_order != 'parallel' or len(self.vms) < 30:
+                        nack_wait_secs = 1
+                    elif len(self.vms) >= 100:
+                        nack_wait_secs = 10
+                    else:
+                        nack_wait_secs = 5
                     ctrl_cmds.append(
                         'dif-policy-param-mod %(dif)s.DIF addralloc nack-wait-secs %(nws)d\n'
                         % {
