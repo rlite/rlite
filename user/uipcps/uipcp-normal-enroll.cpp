@@ -759,8 +759,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
 
         /* Return address. */
         enr_info.ParseFromArray(objbuf, objlen);
-        if (rib->addra->allocate(neigh->ipcp_name, &addr) ||
-            addr == RL_ADDR_NULL) {
+        if (rib->addra->allocate(neigh->ipcp_name, &addr)) {
             UPE(rib->uipcp, "Address allocation failed\n");
             return -1;
         }
