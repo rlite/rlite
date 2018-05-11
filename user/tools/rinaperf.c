@@ -183,7 +183,7 @@ struct rinaperf {
     int cli_stop;           /* another way to stop client threads */
     int cli_flow_allocated; /* client flows allocated ? */
     int background;         /* server runs as a daemon process */
-    int cdf_points;         /* number of CDF percentiles to report */
+    int cdf;                /* report CDF percentiles */
 
     /* Synchronization between client threads and main thread. */
     sem_t cli_barrier;
@@ -497,7 +497,7 @@ ping_report(struct worker *w, struct rp_result_msg *snd,
     max /= 1000000.0;
     stddev /= 1000000.0;
 
-    if (w->rp->cdf_points <= 0) {
+    if (!w->rp->cdf) {
         printf("--- %s ping statistics ---\n", w->rp->srv_appl_name);
         printf("%lu packets transmitted, %lu received, 0%% packet loss, "
                "time %lums\n",
@@ -514,6 +514,10 @@ ping_report(struct worker *w, struct rp_result_msg *snd,
         for (i = 1; i < 100; i++) {
             int pos = (i * RTT_WINSIZE) / 100;
             printf("p%d=%.3f us\n", i, (double)w->rtt_win[pos] / 1000.0);
+        }
+        for (i = 991; i < 1000; i++) {
+            printf("p%.1f=%.3f us\n", (float)i / 10.0,
+                   (double)w->rtt_win[i * RTT_WINSIZE / 1000] / 1000.0);
         }
         printf("p100=%.3f us\n", (double)w->rtt_win[RTT_WINSIZE - 1] / 1000.0);
     }
@@ -1535,12 +1539,12 @@ main(int argc, char **argv)
     sem_init(&rp->cli_barrier, 0, 0);
     pthread_mutex_init(&rp->ticket_lock, NULL);
     rp->background = 0;
-    rp->cdf_points = 0; /* Don't report CDF percentiles. */
+    rp->cdf        = 0; /* Don't report CDF percentiles. */
 
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_unreliable(&rp->flowspec);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:b:a:z:p:D:L:E:TwvC:")) !=
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:b:a:z:p:D:L:E:TwvC")) !=
            -1) {
         switch (opt) {
         case 'h':
@@ -1656,11 +1660,7 @@ main(int argc, char **argv)
             break;
 
         case 'C':
-            rp->cdf_points = atoi(optarg);
-            if (rp->cdf_points > 100) {
-                PRINTF("    Invalid number of CDF points '%s'\n", optarg);
-                return -1;
-            }
+            rp->cdf = 1;
             break;
 
         default:
