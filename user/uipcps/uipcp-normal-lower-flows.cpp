@@ -426,7 +426,7 @@ FullyReplicatedLFDB::neighs_refresh(size_t limit)
     assert(it != db.end());
 
     auto age_thresh = rib->get_param_value<Msecs>(Routing::Prefix, "age-max");
-    age_thresh      = age_thresh * 90 / 100;
+    age_thresh      = age_thresh * 30 / 100;
 
     for (auto jt = it->second.begin(); jt != it->second.end();) {
         gpb::LowerFlowList lfl;
@@ -435,9 +435,9 @@ FullyReplicatedLFDB::neighs_refresh(size_t limit)
                jt != it->second.end()) {
             auto age = Secs(jt->second.age());
 
-            /* Refresh the entry by incrementing its sequence number if
-             * we are getting close to the maximum age. */
-            if (age > age_thresh) {
+            /* Renew the entry by incrementing its sequence number if
+             * we reached ~1/3 of the maximum age. */
+            if (age >= age_thresh) {
                 jt->second.set_seqnum(jt->second.seqnum() + 1);
                 jt->second.set_age(0);
             }

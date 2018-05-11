@@ -577,7 +577,7 @@ struct uipcp_rib {
     static constexpr int kAgeIncrIntvalSecs = 10;
 
     /* Max age (in seconds) for an LFDB entry not to be discarded. */
-    static constexpr int kAgeMaxSecs = 300;
+    static constexpr int kAgeMaxSecs = 900;
 
     /* Time interval (in seconds) between two consecutive periodic
      * RIB synchronizations. */
