@@ -1350,7 +1350,7 @@ UipcpRib::neighbors_handler(const CDAPMessage *rm,
 
                 /* Possibly updated neighbor address, we may need to update
                  * our routing table. */
-                routing->update_local(neigh_name);
+                routing->neighbor_updated(neigh_name);
             }
 
         } else {

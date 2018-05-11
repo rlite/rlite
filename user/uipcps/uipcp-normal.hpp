@@ -367,6 +367,7 @@ struct Routing : public Component {
     virtual void update_local(const std::string &neigh_name) {}
     virtual void update_kernel(bool force = true) {}
     virtual int flow_state_update(struct rl_kmsg_flow_state *upd) { return 0; }
+    virtual void neighbor_updated(const std::string &neigh_name) {}
 
     /* Called to flush all the local entries related to a given neighbor. */
     virtual void neigh_disconnected(const std::string &neigh_name) {}

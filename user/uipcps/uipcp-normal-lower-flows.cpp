@@ -802,11 +802,10 @@ RoutingEngine::compute_fwd_table()
             }
 
             if (!neigh->second->has_flows()) {
-                /* There is a time window where this can happen. It happens
-                 * because of the update_local() call in the
-                 * neighbors_handler().
-                 * TODO Remove that call and fix the integration tests. */
-                UPW(uipcp, "No flow for next hop %s\n",
+                /* This should not happen, because it would mean that we
+                 * declared to have a local LFDB entry without a corresponding
+                 * local flow. */
+                UPE(uipcp, "No flow for next hop %s\n",
                     neigh->second->ipcp_name.c_str());
                 continue;
             }
