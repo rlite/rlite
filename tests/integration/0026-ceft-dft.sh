@@ -76,4 +76,9 @@ ip netns exec s2 rinaperf -lw -z rpinst1 || abort
 ip netns exec c rinaperf -lw -z rpinst2 || abort
 ip netns exec c rinaperf -z rpinst1 -p 1 -c 7 -i 10 || abort
 ip netns exec s1 rinaperf -z rpinst2 -p 1 -c 3 -i 10 || abort
+pkill rinaperf
+# Give some time to commit the unregistrations to the cluster. This
+# is not necessary for the test to be successful, but it is useful
+# anyway to improve test coverage.
+sleep 1
 cleanup
