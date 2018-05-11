@@ -475,7 +475,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
                     kAddrAllocDistrNackWaitSecsMax);
     params_map[DFT::Prefix]["replicas"] = PolicyParam(string());
     params_map[uipcp_rib::EnrollmentPrefix]["timeout"] =
-        PolicyParam(kEnrollTimeoutMsecs);
+        PolicyParam(std::chrono::milliseconds(int(kEnrollTimeoutMsecs)));
     params_map[uipcp_rib::EnrollmentPrefix]["keepalive"] =
         PolicyParam(kKeepaliveTimeout);
     params_map[uipcp_rib::EnrollmentPrefix]["keepalive-thresh"] =
@@ -1319,14 +1319,16 @@ uipcp_rib::policy_param_mod(const std::string &component,
 
     /* Fix-ups. */
     {
-        int eto = get_param_value<int>(uipcp_rib::EnrollmentPrefix, "timeout");
+        auto eto = get_param_value<std::chrono::milliseconds>(
+            uipcp_rib::EnrollmentPrefix, "timeout");
         int ato =
             get_param_value<int>(AddrAllocator::Prefix, "nack-wait-secs") *
             1000;
         int minval = ato * 150 / 100;
 
-        if (eto < minval) {
-            params_map[EnrollmentPrefix]["timeout"].value.i = minval;
+        if (eto.count() < minval) {
+            params_map[EnrollmentPrefix]["timeout"].durval =
+                std::chrono::milliseconds(minval);
             UPD(uipcp, "%s.timeout fixed up to %d\n", EnrollmentPrefix.c_str(),
                 minval);
         }

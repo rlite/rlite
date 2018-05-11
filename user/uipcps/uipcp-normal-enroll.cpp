@@ -383,11 +383,11 @@ EnrollmentResources::next_enroll_msg(std::unique_lock<std::mutex> &lk)
     std::unique_ptr<const CDAPMessage> msg;
 
     while (msgs.empty()) {
-        int to = neigh->rib->get_param_value<int>(uipcp_rib::EnrollmentPrefix,
-                                                  "timeout");
+        auto to = neigh->rib->get_param_value<std::chrono::milliseconds>(
+            uipcp_rib::EnrollmentPrefix, "timeout");
         std::cv_status cvst;
 
-        cvst = msgs_avail.wait_for(lk, std::chrono::milliseconds(to));
+        cvst = msgs_avail.wait_for(lk, to);
         if (cvst == std::cv_status::timeout) {
             UPW(neigh->rib->uipcp, "Timed out\n");
             return nullptr;

@@ -21,8 +21,8 @@ rlite-ctl dif-policy-param-mod dd addralloc nack-wait-secs 2 || exit 1
 rlite-ctl dif-policy-param-list dd addralloc nack-wait-secs | grep "\<2\>" || exit 1
 rlite-ctl dif-policy-param-mod dd dft replicas r1,r2,r3,r4,r5 || exit 1
 rlite-ctl dif-policy-param-list dd dft replicas | grep "r1,r2,r3,r4,r5" || exit 1
-rlite-ctl dif-policy-param-mod dd enrollment timeout 300 || exit 1
-rlite-ctl dif-policy-param-list dd enrollment timeout | grep 300 || exit 1
+rlite-ctl dif-policy-param-mod dd enrollment timeout 3000ms || exit 1
+rlite-ctl dif-policy-param-list dd enrollment timeout | grep 3000ms || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment keepalive 478 || exit 1
 rlite-ctl dif-policy-param-list dd enrollment keepalive | grep 478 || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment keepalive-thresh 21 || exit 1
@@ -55,6 +55,6 @@ rlite-ctl dif-policy-param-list dd routing age-incr-intval | grep 107 || exit 1
 rlite-ctl dif-policy-param-list dd routing age-max | grep 771 || exit 1
 
 # Expect failure on the following ones
-rlite-ctl dif-policy-param-list dd wrong-component timeout 300 && exit 1
-rlite-ctl dif-policy-param-list dd enrollment wrong-parameter 300 && exit 1
+rlite-ctl dif-policy-param-list dd wrong-component timeout 4004ms && exit 1
+rlite-ctl dif-policy-param-list dd enrollment wrong-parameter 4003 && exit 1
 exit 0

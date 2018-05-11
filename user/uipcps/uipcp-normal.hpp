@@ -819,6 +819,10 @@ template <>
 int uipcp_rib::get_param_value<int>(const std::string &component,
                                     const std::string &param_name);
 
+template <>
+std::chrono::milliseconds uipcp_rib::get_param_value<std::chrono::milliseconds>(
+    const std::string &component, const std::string &param_name);
+
 gpb::APName *apname2gpb(const std::string &name);
 std::string apname2string(const gpb::APName &gname);
 
