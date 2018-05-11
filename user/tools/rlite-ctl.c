@@ -627,7 +627,7 @@ ipcp_stats(int argc, char **argv, struct cmd_descriptor *cd)
     struct ipcp_attrs *attrs;
     struct rl_ipcp_stats stats;
     unsigned long ipcp_id;
-    char sbuf[32];
+    char sbuf[4][32];
     int ret;
 
     if (argc >= 1) {
@@ -652,18 +652,33 @@ ipcp_stats(int argc, char **argv, struct cmd_descriptor *cd)
         return ret;
     }
 
-    byteprint(sbuf, sizeof(sbuf), stats.rmt.fwd_byte);
+    byteprint(sbuf[0], sizeof(sbuf[0]), stats.tx_byte);
+    byteprint(sbuf[1], sizeof(sbuf[1]), stats.rx_byte);
+    byteprint(sbuf[2], sizeof(sbuf[2]), stats.rtx_byte);
+    byteprint(sbuf[3], sizeof(sbuf[3]), stats.rmt.fwd_byte);
     printf("Statistcs for IPCP %lu:\n"
-           "    fwd_pkt        = %llu\n"
-           "    fwd_byte       = %s\n"
-           "    queued_pkt     = %llu\n"
-           "    queue_drop     = %llu\n"
-           "    noroute_drop   = %llu\n"
-           "    csum_drop      = %llu\n"
-           "    ttl_drop       = %llu\n"
-           "    noflow_drop    = %llu\n"
-           "    other_drop     = %llu\n",
-           (unsigned long)ipcp_id, (unsigned long long)stats.rmt.fwd_pkt, sbuf,
+           "    tx_pkt        = %llu\n"
+           "    tx_byte        = %s\n"
+           "    tx_err        = %llu\n"
+           "    rx_pkt        = %llu\n"
+           "    rx_byte        = %s\n"
+           "    rx_err        = %llu\n"
+           "    rtx_pkt        = %llu\n"
+           "    rtx_byte        = %s\n"
+           "    rmt.fwd_pkt        = %llu\n"
+           "    rmt.fwd_byte       = %s\n"
+           "    rmt.queued_pkt     = %llu\n"
+           "    rmt.queue_drop     = %llu\n"
+           "    rmt.noroute_drop   = %llu\n"
+           "    rmt.csum_drop      = %llu\n"
+           "    rmt.ttl_drop       = %llu\n"
+           "    rmt.noflow_drop    = %llu\n"
+           "    rmt.other_drop     = %llu\n",
+           (unsigned long)ipcp_id, (unsigned long long)stats.tx_pkt, sbuf[0],
+           (unsigned long long)stats.tx_err, (unsigned long long)stats.rx_pkt,
+           sbuf[1], (unsigned long long)stats.rx_err,
+           (unsigned long long)stats.rtx_pkt, sbuf[2],
+           (unsigned long long)stats.rmt.fwd_pkt, sbuf[3],
            (unsigned long long)stats.rmt.queued_pkt,
            (unsigned long long)stats.rmt.queue_drop,
            (unsigned long long)stats.rmt.noroute_drop,
