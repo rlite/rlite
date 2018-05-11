@@ -157,7 +157,8 @@ CeftReplica::process_timeout()
 /* Apply a command to the replicated state machine. We just pass the command
  * to the same multimap implementation used by the fully replicated DFT. */
 int
-CeftReplica::apply(raft::LogIndex index, const char *const serbuf)
+CeftReplica::apply(raft::LogIndex index, raft::Term term,
+                   const char *const serbuf)
 {
     std::unique_ptr<CDAPMessage> rm;
 

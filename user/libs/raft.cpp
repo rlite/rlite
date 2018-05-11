@@ -571,8 +571,12 @@ RaftSM::apply_committed_entries()
 
     for (; last_applied < commit_index; last_applied++) {
         LogIndex next = last_applied + 1;
+        Term term;
         int ret;
 
+        if (log_entry_get_term(next, &term) != 0) {
+            return -1;
+        }
         if (!serbuf) {
             serbuf = std::unique_ptr<char[]>(new char[log_command_size]);
         }
@@ -581,7 +585,7 @@ RaftSM::apply_committed_entries()
                  serbuf.get(), log_command_size))) {
             return ret;
         }
-        apply(next, serbuf.get());
+        apply(next, term, serbuf.get());
         if (verbosity >= kVerboseInfo) {
             IOS_INF() << "Entry " << next << " applied" << endl;
         }

@@ -68,7 +68,8 @@ public:
     ~TestReplica() { shutdown(); }
 
     /* Apply (commit) a command to the replicated state machine. */
-    virtual int apply(LogIndex index, const char *const serbuf) override
+    virtual int apply(LogIndex index, Term term,
+                      const char *const serbuf) override
     {
         uint32_t cmd = *(reinterpret_cast<const uint32_t *>(serbuf));
         committed_commands.push_back(cmd);

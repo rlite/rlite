@@ -83,7 +83,8 @@ public:
     int init(const std::list<raft::ReplicaId> &peers);
     int process_sm_output(raft::RaftSMOutput out);
     int process_timeout();
-    int apply(raft::LogIndex index, const char *const serbuf) override final;
+    int apply(raft::LogIndex index, raft::Term term,
+              const char *const serbuf) override final;
     int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
                     std::shared_ptr<Neighbor> const &neigh,
                     rlm_addr_t src_addr);

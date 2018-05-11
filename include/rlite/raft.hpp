@@ -379,7 +379,7 @@ public:
 
     /* Called by the Raft state machine when a log entry needs to
      * be applied to the replicated state machine. */
-    virtual int apply(LogIndex index, const char *const serbuf) = 0;
+    virtual int apply(LogIndex index, Term term, const char *const serbuf) = 0;
     virtual ~RaftSM();
 
     /* True if this Raft SM is the current leader. */
