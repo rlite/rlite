@@ -632,10 +632,9 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     if (likely(entry && entry->flow)) {
         struct flow_entry *flow = entry->flow;
 
+        read_unlock_bh(&priv->arpt_lock);
         stats->rx_pkt++;
         stats->rx_byte += len;
-        read_unlock_bh(&priv->arpt_lock);
-
         rl_sdu_rx_flow(ipcp, flow, rb, true);
 
         return;
@@ -699,16 +698,15 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
         rb_list_enq(rb, &entry->rx_tmpq);
         entry->rx_tmpq_len++;
     }
+    write_unlock_bh(&priv->arpt_lock);
 
     stats->rx_pkt++;
     stats->rx_byte += len;
-
-    write_unlock_bh(&priv->arpt_lock);
     return;
 
 drop:
-    stats->rx_err++;
     write_unlock_bh(&priv->arpt_lock);
+    stats->rx_err++;
     rl_buf_free(rb);
 }
 
