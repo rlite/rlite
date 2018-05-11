@@ -552,11 +552,13 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req, struct ipcp_entry **pentry)
         init_waitqueue_head(&entry->uipcp_wqh);
         mutex_init(&entry->lock);
         hash_add(rl_dm.ipcp_table, &entry->node, entry->id);
+#ifdef RL_RMT_QUEUES
         rb_list_init(&entry->rmtq);
         entry->rmtq_size = 0;
         spin_lock_init(&entry->rmtq_lock);
         tasklet_init(&entry->tx_completion, tx_completion_func,
                      (unsigned long)entry);
+#endif /* RL_RMT_QUEUES */
         init_waitqueue_head(&entry->tx_wqh);
         *pentry = entry;
     } else {
@@ -1447,8 +1449,6 @@ ipcp_probe_references(struct ipcp_entry *ipcp)
 int
 __ipcp_put(struct ipcp_entry *entry)
 {
-    struct rl_buf *rb, *tmp;
-
     if (!entry) {
         return 0;
     }
@@ -1477,12 +1477,16 @@ __ipcp_put(struct ipcp_entry *entry)
         entry->ops.destroy(entry);
     }
 
-    tasklet_kill(&entry->tx_completion);
-
-    rb_list_foreach_safe (rb, tmp, &entry->rmtq) {
-        rb_list_del(rb);
-        rl_buf_free(rb);
+#ifdef RL_RMT_QUEUES
+    {
+        struct rl_buf *rb, *tmp;
+        tasklet_kill(&entry->tx_completion);
+        rb_list_foreach_safe (rb, tmp, &entry->rmtq) {
+            rb_list_del(rb);
+            rl_buf_free(rb);
+        }
     }
+#endif /* RL_RMT_QUEUES */
 
     /* If the module was refcounted for this IPC process instance,
      * remove the reference. Note that this operation **must** happen

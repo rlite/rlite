@@ -56,6 +56,12 @@
 #include <linux/socket.h> /* memcpy_{to,from}iovecend */
 #endif
 
+/* Enable if you wish to enable RMT queues. This is currently disabled because
+ * it is not SMP scalable, and its advantages are still not clear.
+ * We may reintroduce RMT queues once we add support for RMT scheduling; in
+ * that case an SMP-scalable RMT implementation is needed. */
+// #define RL_RMT_QUEUES
+
 /*
  * Logging support.
  */
@@ -512,10 +518,12 @@ struct ipcp_entry {
     /* RMT structures, including TX completion.
      * These are actually used by the upper IPCP to send PDUs to its N-1
      * flows provided by this IPCP.*/
+#ifdef RL_RMT_QUEUES
     struct rb_list rmtq;
     unsigned int rmtq_size;
     spinlock_t rmtq_lock;
     struct tasklet_struct tx_completion;
+#endif /* RL_RMT_QUEUES */
     wait_queue_head_t tx_wqh;
 
     /* Per-cpu lossy statistics, to avoid cacheline ping-pongs between more

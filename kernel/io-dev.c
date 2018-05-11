@@ -62,6 +62,7 @@ hms_time(void)
 }
 #endif
 
+#ifdef RL_RMT_QUEUES
 void
 tx_completion_func(unsigned long arg)
 {
@@ -100,6 +101,7 @@ tx_completion_func(unsigned long arg)
         }
     }
 }
+#endif /* RL_RMT_QUEUES */
 
 /* Userspace queue threshold in bytes. */
 #define RL_RXQ_SIZE_MAX (1 << 20)
@@ -189,12 +191,14 @@ EXPORT_SYMBOL(rl_sdu_rx_shortcut);
 static void
 rl_write_restart_wqh(struct ipcp_entry *ipcp, wait_queue_head_t *wqh)
 {
+#ifdef RL_RMT_QUEUES
     spin_lock_bh(&ipcp->rmtq_lock);
     if (ipcp->rmtq_size > 0) {
         /* Schedule a tasklet to complete the tx work. */
         tasklet_schedule(&ipcp->tx_completion);
     }
     spin_unlock_bh(&ipcp->rmtq_lock);
+#endif /* RL_RMT_QUEUES */
 
     /* Wake up waiting process contexts. */
     wake_up_interruptible_poll(wqh, POLLOUT | POLLWRBAND | POLLWRNORM);
@@ -803,7 +807,7 @@ static const struct file_operations rl_io_fops = {
     .read_iter  = rl_io_read_iter,
 #else  /* AIO_RW */
     .aio_write = rl_io_write_iter,
-    .aio_read = rl_io_read_iter,
+    .aio_read  = rl_io_read_iter,
 #endif /* AIO_RW */
     .poll           = rl_io_poll,
     .unlocked_ioctl = rl_io_ioctl,

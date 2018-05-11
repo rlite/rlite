@@ -655,6 +655,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
             }
 
             if (flags & RL_RMT_F_CONSUME) {
+#ifdef RL_RMT_QUEUES
                 /* We must consume this buffer. We either push it to an RMT
                  * queue or drop it if there is no space. */
                 spin_lock_bh(&lower_ipcp->rmtq_lock);
@@ -666,12 +667,15 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                 } else {
                     /* No room in the RMT queue, we are forced to drop. */
                     RPD(1, "rmtq overrun: dropping PDU\n");
+#endif /* RL_RMT_QUEUES */
                     stats->rmt.queue_drop++;
                     rl_buf_free(rb);
                     rb = NULL;
+#ifdef RL_RMT_QUEUES
                 }
                 spin_unlock_bh(&lower_ipcp->rmtq_lock);
-                /* The rb was managed someway (queued or dropped),so  we must
+#endif /* !RL_RMT_QUEUES */
+                /* The rb was managed somehow (queued or dropped),so  we must
                  * reset the error code. If we propagated the -EAGAIN, and we
                  * were recursively called by an upper rmt_tx(), also the upper
                  * rmt_tx() would try to put the same rb in its queue, which
