@@ -697,16 +697,16 @@ FullyReplicatedLFDB::age_incr_tmr_restart()
         rib->get_param_value<Msecs>(Routing::Prefix, "age-incr-intval"),
         rib->uipcp, this, [](struct uipcp *uipcp, void *arg) {
             FullyReplicatedLFDB *r = (FullyReplicatedLFDB *)arg;
+            std::lock_guard<std::mutex> guard(r->rib->mutex);
             r->age_incr_timer->fired();
             r->age_incr();
         });
 }
 
-/* Called from timer context, we need to take the RIB lock. */
+/* Called from timer context, under RIB lock. */
 void
 FullyReplicatedLFDB::age_incr()
 {
-    std::lock_guard<std::mutex> guard(rib->mutex);
     auto age_inc_intval =
         rib->get_param_value<Msecs>(Routing::Prefix, "age-incr-intval");
     auto age_max = rib->get_param_value<Msecs>(Routing::Prefix, "age-max");
