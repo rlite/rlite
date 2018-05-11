@@ -1226,6 +1226,9 @@ rl_normal_config_get(struct ipcp_entry *ipcp, const char *param_name, char *buf,
     } else if (strcmp(param_name, "csum") == 0) {
         const char *value = priv->csum ? "inet" : "none";
         snprintf(buf, buflen, "%s", value);
+    } else if (strcmp(param_name, "sched") == 0) {
+        const char *value = priv->sched ? priv->sched->ops.name : "none";
+        snprintf(buf, buflen, "%s", value);
     } else {
         ret = -ENOSYS; /* don't know how to manage this parameter */
     }
