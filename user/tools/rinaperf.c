@@ -321,10 +321,8 @@ ping_client(struct worker *w)
                     if (w->rp->timestamp) {
                         struct timeval recv_time;
                         gettimeofday(&recv_time, NULL);
-                        PRINTF("[%lu.%06lu] ",
-                           (unsigned long)recv_time.tv_sec,
-                           (unsigned long)recv_time.tv_usec
-                        );
+                        PRINTF("[%lu.%06lu] ", (unsigned long)recv_time.tv_sec,
+                               (unsigned long)recv_time.tv_usec);
                     }
                     PRINTF("%d bytes from server: rtt = %.3f ms\n", ret,
                            ((float)ns) / 1000000.0);
