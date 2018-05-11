@@ -1087,7 +1087,7 @@ flows_putq_drain(
 #ifdef RL_HAVE_TIMER_SETUP
     struct timer_list *tmr
 #else
-    unsigned long unused
+    unsigned long arg
 #endif
 )
 {
