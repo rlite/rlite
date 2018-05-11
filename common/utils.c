@@ -144,7 +144,7 @@ deserialize_string(const void **pptr, char **s, int *sleft)
 
 /* Serialize a buffer. */
 static void
-serialize_buffer(void **pptr, const struct rl_buf_field *bf)
+serialize_buffer(void **pptr, const struct rl_msg_buf_field *bf)
 {
     serialize_obj(*pptr, uint32_t, bf->len);
 
@@ -154,7 +154,7 @@ serialize_buffer(void **pptr, const struct rl_buf_field *bf)
 
 /* Deserialize a buffer. */
 static int
-deserialize_buffer(const void **pptr, struct rl_buf_field *bf, int *sleft)
+deserialize_buffer(const void **pptr, struct rl_msg_buf_field *bf, int *sleft)
 {
     if (*sleft < sizeof(uint32_t)) {
         return -1;
@@ -226,7 +226,7 @@ rl_msg_serlen(struct rl_msg_layout *numtables, size_t num_entries,
     unsigned int ret;
     struct rina_name *name;
     string_t *str;
-    const struct rl_buf_field *bf;
+    const struct rl_msg_buf_field *bf;
     int i;
 
     if (msg->hdr.msg_type >= num_entries) {
@@ -247,7 +247,7 @@ rl_msg_serlen(struct rl_msg_layout *numtables, size_t num_entries,
         ret += sizeof(uint16_t) + string_prlen(*str);
     }
 
-    bf = (const struct rl_buf_field *)str;
+    bf = (const struct rl_msg_buf_field *)str;
     for (i = 0; i < numtables[msg->hdr.msg_type].buffers; i++, bf++) {
         ret += sizeof(bf->len) + bf->len;
     }
@@ -266,7 +266,7 @@ serialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
     unsigned int copylen;
     struct rina_name *name;
     string_t *str;
-    const struct rl_buf_field *bf;
+    const struct rl_msg_buf_field *bf;
     int i;
 
     if (msg->hdr.msg_type >= num_entries) {
@@ -291,7 +291,7 @@ serialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
         serialize_string(&serptr, *str);
     }
 
-    bf = (const struct rl_buf_field *)str;
+    bf = (const struct rl_msg_buf_field *)str;
     for (i = 0; i < numtables[msg->hdr.msg_type].buffers; i++, bf++) {
         serialize_buffer(&serptr, bf);
     }
@@ -311,7 +311,7 @@ deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
     struct rl_msg_base *bmsg = RLITE_MB(serbuf);
     struct rina_name *name;
     string_t *str;
-    struct rl_buf_field *bf;
+    struct rl_msg_buf_field *bf;
     unsigned int copylen;
     const void *desptr;
     int sleft = serbuf_len;
@@ -372,9 +372,9 @@ deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
         dleft -= sizeof(string_t);
     }
 
-    bf = (struct rl_buf_field *)str;
+    bf = (struct rl_msg_buf_field *)str;
     for (i = 0; i < numtables[bmsg->hdr.msg_type].buffers; i++, bf++) {
-        if (dleft < sizeof(struct rl_buf_field)) {
+        if (dleft < sizeof(struct rl_msg_buf_field)) {
             PE("Message buffer too short\n");
             return -1;
         }
@@ -382,7 +382,7 @@ deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
         if (ret) {
             return ret;
         }
-        dleft -= sizeof(struct rl_buf_field);
+        dleft -= sizeof(struct rl_msg_buf_field);
     }
 
     if ((desptr - serbuf) != serbuf_len || sleft) {

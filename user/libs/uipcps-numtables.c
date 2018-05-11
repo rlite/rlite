@@ -49,7 +49,7 @@ struct rl_msg_layout rl_uipcps_numtables[] = {
     [RLITE_U_IPCP_RIB_SHOW_RESP] =
         {
             .copylen = sizeof(struct rl_cmsg_ipcp_rib_show_resp) -
-                       1 * sizeof(struct rl_buf_field),
+                       1 * sizeof(struct rl_msg_buf_field),
             .buffers = 1,
         },
     [RLITE_U_IPCP_LOWER_FLOW_ALLOC] =
@@ -78,7 +78,7 @@ struct rl_msg_layout rl_uipcps_numtables[] = {
     [RLITE_U_IPCP_ROUTING_SHOW_RESP] =
         {
             .copylen = sizeof(struct rl_cmsg_ipcp_routing_show_resp) -
-                       1 * sizeof(struct rl_buf_field),
+                       1 * sizeof(struct rl_msg_buf_field),
             .buffers = 1,
         },
     [RLITE_U_IPCP_POLICY_PARAM_MOD] =
@@ -105,7 +105,7 @@ struct rl_msg_layout rl_uipcps_numtables[] = {
     [RLITE_U_IPCP_POLICY_LIST_RESP] =
         {
             .copylen = sizeof(struct rl_cmsg_ipcp_policy_list_resp) -
-                       1 * sizeof(struct rl_buf_field),
+                       1 * sizeof(struct rl_msg_buf_field),
             .buffers = 1,
         },
     [RLITE_U_IPCP_POLICY_PARAM_LIST_REQ] =
@@ -117,7 +117,7 @@ struct rl_msg_layout rl_uipcps_numtables[] = {
     [RLITE_U_IPCP_POLICY_PARAM_LIST_RESP] =
         {
             .copylen = sizeof(struct rl_cmsg_ipcp_policy_param_list_resp) -
-                       1 * sizeof(struct rl_buf_field),
+                       1 * sizeof(struct rl_msg_buf_field),
             .buffers = 1,
         },
     [RLITE_U_TERMINATE] =
@@ -139,7 +139,7 @@ struct rl_msg_layout rl_uipcps_numtables[] = {
     [RLITE_U_IPCP_RIB_PATHS_SHOW_RESP] =
         {
             .copylen = sizeof(struct rl_cmsg_ipcp_rib_show_resp) -
-                       1 * sizeof(struct rl_buf_field),
+                       1 * sizeof(struct rl_msg_buf_field),
             .buffers = 1,
         },
     [RLITE_U_IPCP_ROUTE_ADD] =
@@ -163,7 +163,7 @@ struct rl_msg_layout rl_uipcps_numtables[] = {
     [RLITE_U_IPCP_STATS_SHOW_RESP] =
         {
             .copylen = sizeof(struct rl_cmsg_ipcp_stats_resp) -
-                       1 * sizeof(struct rl_buf_field),
+                       1 * sizeof(struct rl_msg_buf_field),
             .buffers = 1,
         },
     [RLITE_U_MEMTRACK_DUMP] =

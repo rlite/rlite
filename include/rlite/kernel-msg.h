@@ -83,7 +83,7 @@ extern struct rl_msg_layout rl_ker_numtables[RLITE_KER_MSG_MAX + 1];
  *   - then come (if any) all the fields that are strings ('char *'), in
  *     whatever order
  *   - then come (if any) all the fields that are buffers
- *     ('struct rl_buf_field'), in whatever order
+ *     ('struct rl_msg_buf_field'), in whatever order
  */
 
 /* application --> kernel message to create a new IPC process. */

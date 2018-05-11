@@ -105,7 +105,7 @@ struct rl_cmsg_ipcp_rib_show_resp {
 
     uint8_t result;
     uint8_t pad1[7];
-    struct rl_buf_field dump;
+    struct rl_msg_buf_field dump;
 };
 
 /* rlite-ctl --> uipcps message to change a DIF policy */

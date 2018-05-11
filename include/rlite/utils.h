@@ -37,7 +37,7 @@ struct rl_msg_layout {
     unsigned int buffers;
 };
 
-struct rl_buf_field {
+struct rl_msg_buf_field {
     void *buf;
     uint32_t len;
 };
