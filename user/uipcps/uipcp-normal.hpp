@@ -308,6 +308,7 @@ struct Component {
         return 0;
     }
     virtual int neighs_refresh(size_t limit) { return 0; }
+    virtual ~Component() {}
 };
 
 /* Naming service, to translate names to addresses. */
