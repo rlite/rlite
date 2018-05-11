@@ -578,7 +578,7 @@ class Demo:
                             'dif': dif
                         })
                 ctrl_cmds.append(
-                    'dif-policy-param-mod %(dif)s.DIF enrollment keepalive %(keepalive)s\n'
+                    'dif-policy-param-mod %(dif)s.DIF enrollment keepalive %(keepalive)ss\n'
                     % {
                         'dif': dif,
                         'keepalive': self.keepalive
