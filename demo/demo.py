@@ -255,11 +255,15 @@ argparser.add_argument('--csum',
                        help = "Use checksums for all the DIFs",
                        type = str, choices = ['inet', 'none'],
                        default = 'none')
+argparser.add_argument('-C', '--namespaces', action='store_true',
+                       help = "Implement each node as a network namespace rather than "\
+                              "a Virtual Machine")
 args = argparser.parse_args()
 
 
 # Check we have what we need
-which('qemu-system-x86_64')
+if not args.namespaces:
+    which('qemu-system-x86_64')
 
 subprocess.call(['chmod', '0400', 'buildroot/buildroot_rsa'])
 
@@ -267,16 +271,17 @@ subprocess.call(['chmod', '0400', 'buildroot/buildroot_rsa'])
 sshopts = '-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
 if not args.image:
     sshopts += '-o IdentityFile=buildroot/buildroot_rsa '
-sudo = 'sudo' if args.image != '' else ''
+sudo = 'sudo' if args.image != '' or args.namespaces else ''
 vmimgpath = 'buildroot/rootfs.cpio'
 
 flavour_suffix = ''
 if args.flavour != '':
     flavour_suffix = '-' + args.flavour
 
-imgprefix = "rlite.%s" % ('debug' if args.debug else 'prod',)
-download_if_needed(vmimgpath, 'https://bitbucket.org/vmaffione/rina-images/downloads/%s.rootfs.cpio' % imgprefix)
-download_if_needed('buildroot/bzImage', 'https://bitbucket.org/vmaffione/rina-images/downloads/%s.bzImage' % imgprefix)
+if not args.namespaces:
+    imgprefix = "rlite.%s" % ('debug' if args.debug else 'prod',)
+    download_if_needed(vmimgpath, 'https://bitbucket.org/vmaffione/rina-images/downloads/%s.rootfs.cpio' % imgprefix)
+    download_if_needed('buildroot/bzImage', 'https://bitbucket.org/vmaffione/rina-images/downloads/%s.bzImage' % imgprefix)
 
 # Possibly autogenerate ring topology
 if args.ring != None and args.ring > 0:
@@ -357,10 +362,14 @@ demo = Demo(flavour_suffix=flavour_suffix,
 
 demo.parse_config(args.conf)
 
-boot_batch_size = max(1, multiprocessing.cpu_count() / 2)
-if len(demo.vms) > boot_batch_size:
-    print("You want to run a lot of nodes, so it's better if I give "
-          "each node some time to boot (since the boot is CPU-intensive)")
+if args.namespaces:
+    boot_batch_size = 100000  # infinite batch size
+    args.backend = 'veth'
+else:
+    boot_batch_size = max(1, multiprocessing.cpu_count() / 2)
+    if len(demo.vms) > boot_batch_size:
+        print("You want to run a lot of nodes, so it's better if I give "
+              "each node some time to boot (since the boot is CPU-intensive)")
 
 VMTHRESH = 10
 if not args.backend:
@@ -390,7 +399,7 @@ if args.backend == 'tap':
                 'sudo ip link set %(br)s up\n'      \
                 ') &\n' % {'br': shim}
     outs += 'wait\n'
-elif args.backend == 'udp':
+elif args.backend in ['udp', 'veth']:
     for shim in sorted(demo.shims):
         if len(demo.shims[shim]['vms']) != 2:
             print('Error: UDP backend only supports peer-to-peer links')
@@ -399,45 +408,60 @@ elif args.backend == 'udp':
 udp_idx = args.base_port
 udp_map = dict()
 
-for l in sorted(demo.links):
-    shim, vm = l
-    idx = len(demo.vms[vm]['ports']) + 1
-    tap = '%s.%02x' % (vm, idx)
+if args.namespaces:
+    for shname in sorted(demo.shims):
+        shim = demo.shims[shname]
+        assert(len(shim['vms']) == 2)
+        vm0 = shim['vms'][0]
+        vm1 = shim['vms'][1]
+        veth0 = '%s.%s' % (shim['name'], vm0)
+        veth1 = '%s.%s' % (shim['name'], vm1)
+        outs += 'sudo ip link add %s type veth peer name %s\n'\
+            % (veth0, veth1)
+        idx0 = len(demo.vms[vm0]['ports']) + 1
+        idx1 = len(demo.vms[vm1]['ports']) + 1
+        demo.vms[vm0]['ports'].append({'veth': veth0, 'shim': shname, 'idx': idx0})
+        demo.vms[vm1]['ports'].append({'veth': veth1, 'shim': shname, 'idx': idx1})
+else:
+    for l in sorted(demo.links):
+        shim, vm = l
+        idx = len(demo.vms[vm]['ports']) + 1
+        tap = '%s.%02x' % (vm, idx)
 
-    # Assign UDP ports
-    if shim not in udp_map:
-        udp_map[shim] = dict()
-    for shvm in demo.shims[shim]['vms']:
-        if shvm not in udp_map[shim]:
-            udp_map[shim][shvm] = udp_idx
-            udp_idx += 1
-        if shvm == vm:
-            udp_local_port = udp_map[shim][shvm]
-        else:
-            udp_remote_port = udp_map[shim][shvm]
+        # Assign UDP ports
+        if shim not in udp_map:
+            udp_map[shim] = dict()
+        for shvm in demo.shims[shim]['vms']:
+            if shvm not in udp_map[shim]:
+                udp_map[shim][shvm] = udp_idx
+                udp_idx += 1
+            if shvm == vm:
+                udp_local_port = udp_map[shim][shvm]
+            else:
+                udp_remote_port = udp_map[shim][shvm]
 
-    if args.backend == 'tap':
-        outs += '(\n'                                           \
-                'sudo ip tuntap add mode tap name %(tap)s\n'    \
-                'sudo ip link set %(tap)s up\n'                 \
-                'sudo brctl addif %(br)s %(tap)s\n'             \
-                    % {'tap': tap, 'br': shim}
+        if args.backend == 'tap':
+            outs += '(\n'                                           \
+                    'sudo ip tuntap add mode tap name %(tap)s\n'    \
+                    'sudo ip link set %(tap)s up\n'                 \
+                    'sudo brctl addif %(br)s %(tap)s\n'             \
+                        % {'tap': tap, 'br': shim}
 
-        if demo.shims[shim]['type'] == 'eth' and demo.shims[shim]['speed'] > 0:
-            speed = '%d%sbit' % (demo.shims[shim]['speed'], demo.shims[shim]['speed_unit'])
+            if demo.shims[shim]['type'] == 'eth' and demo.shims[shim]['speed'] > 0:
+                speed = '%d%sbit' % (demo.shims[shim]['speed'], demo.shims[shim]['speed_unit'])
 
-            # Rate limit the traffic transmitted on the TAP interface
-            outs += 'sudo tc qdisc add dev %(tap)s handle 1: root '     \
-                                    'htb default 11\n'                  \
-                    'sudo tc class add dev %(tap)s parent 1: classid '  \
-                                    '1:1 htb rate 10gbit\n'             \
-                    'sudo tc class add dev %(tap)s parent 1:1 classid ' \
-                                    '1:11 htb rate %(speed)s\n'         \
-                    % {'tap': tap, 'speed': speed}
+                # Rate limit the traffic transmitted on the TAP interface
+                outs += 'sudo tc qdisc add dev %(tap)s handle 1: root '     \
+                                        'htb default 11\n'                  \
+                        'sudo tc class add dev %(tap)s parent 1: classid '  \
+                                        '1:1 htb rate 10gbit\n'             \
+                        'sudo tc class add dev %(tap)s parent 1:1 classid ' \
+                                        '1:11 htb rate %(speed)s\n'         \
+                        % {'tap': tap, 'speed': speed}
 
-        outs += ') & \n'
+            outs += ') & \n'
 
-    demo.vms[vm]['ports'].append({'tap': tap, 'shim': shim, 'idx': idx,
+        demo.vms[vm]['ports'].append({'tap': tap, 'shim': shim, 'idx': idx,
                              'ip': demo.dns_mappings[shim][vm]['ip'] if shim in
                              demo.dns_mappings else None,
                              'udpl': udp_local_port, 'udpr': udp_remote_port,
@@ -446,76 +470,103 @@ for l in sorted(demo.links):
 if args.backend == 'tap':
     outs += 'wait\n'
 
-budget = boot_batch_size
 
+verbmap = {'QUIET': 1, 'WARN': 2, 'INFO': 3, 'DBG': 4, 'VERY': 5}
+
+if args.namespaces:
+    # Load the modules only once
+    outs += ''\
+        'sudo modprobe rlite verbosity=%(verbidx)s\n'\
+        'sudo modprobe rlite-shim-eth\n'\
+        'sudo modprobe rlite-shim-udp4\n'\
+        'sudo modprobe rlite-normal%(flsuf)s\n'\
+        'sudo chmod a+rwx /dev/rlite\n'\
+        'sudo chmod a+rwx /dev/rlite-io\n'\
+        'sudo mkdir -p /run/rlite\n'\
+        'sudo chmod -R a+rw /run/rlite\n'\
+        'sudo dmesg -n8\n'\
+            % {'verb': args.verbosity,
+               'verbidx': verbmap[args.verbosity],
+               'flsuf': flavour_suffix}
+
+
+budget = boot_batch_size
 for vmname in sorted(demo.vms):
     vm = demo.vms[vmname]
-
     vmid = vm['id']
 
-    fwdp = args.base_port + vmid
-    fwdc = fwdp + 10000
-    mac = vm_get_mac(vmid, 99)
-
-    vm['ssh'] = fwdp
-
-    vars_dict = {'fwdp': fwdp, 'id': vmid, 'mac': mac,
-                 'vmimgpath': vmimgpath, 'fwdc': fwdc,
-                 'memory': args.memory, 'frontend': args.frontend,
-                 'vmname': vmname, 'numcpus': args.num_cpus}
-
-    hostfwdstr = 'hostfwd=tcp::%(fwdp)s-:22' % vars_dict
-    if vmname in demo.hostfwds:
-        for fwdr in demo.hostfwds[vmname]:
-            hport, gport = fwdr.split(':')
-            hostfwdstr += ',hostfwd=tcp::%s-:%s' % (hport, gport)
-
-    vars_dict['hostfwdstr'] = hostfwdstr
-
-    # '-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '
-    outs += 'qemu-system-x86_64 '
-    if args.image != '':  # standard buildroot image
-        outs += args.image + ' -snapshot '
+    if args.namespaces:
+        vm['nsname'] = 'ns%s' % vmname
+        outs += 'sudo ip netns add %(nsname)s\n'\
+                'sudo ip netns exec %(nsname)s ip link set lo up\n'\
+                    % {'nsname': vm['nsname']}
+        for port in vm['ports']:
+            outs += 'sudo ip link set %s netns %s\n'\
+                % (port['veth'], vm['nsname'])
     else:
-        outs += '-kernel buildroot/bzImage '                    \
-                '-append "console=ttyS0" '                      \
-                '-initrd %(vmimgpath)s ' % vars_dict
-    outs += '-vga std '                                         \
-            '-display none '                                    \
-            '--enable-kvm '                                     \
-            '-smp %(numcpus)s '                                 \
-            '-m %(memory)sM '                                   \
-            '-device %(frontend)s,mac=%(mac)s,netdev=mgmt '     \
-            '-netdev user,id=mgmt,%(hostfwdstr)s '              \
-            '-pidfile rina-%(id)s.pid '                         \
-            '-serial file:%(vmname)s.log '                      \
-            % vars_dict
+        fwdp = args.base_port + vmid
+        fwdc = fwdp + 10000
+        mac = vm_get_mac(vmid, 99)
 
-    del vars_dict
+        vm['ssh'] = fwdp
 
-    for port in vm['ports']:
-        tap = port['tap']
-        mac = vm_get_mac(vmid, port['idx'])
-        port['mac'] = mac
+        vars_dict = {'fwdp': fwdp, 'id': vmid, 'mac': mac,
+                     'vmimgpath': vmimgpath, 'fwdc': fwdc,
+                     'memory': args.memory, 'frontend': args.frontend,
+                     'vmname': vmname, 'numcpus': args.num_cpus}
 
-        vars_dict = {'mac': mac, 'idx': port['idx'], 'frontend': args.frontend}
+        hostfwdstr = 'hostfwd=tcp::%(fwdp)s-:22' % vars_dict
+        if vmname in demo.hostfwds:
+            for fwdr in demo.hostfwds[vmname]:
+                hport, gport = fwdr.split(':')
+                hostfwdstr += ',hostfwd=tcp::%s-:%s' % (hport, gport)
 
-        outs += '-device %(frontend)s,mac=%(mac)s,netdev=data%(idx)s ' % vars_dict
-        if args.backend == 'tap':
-            vars_dict['tap'] = tap
-            vars_dict['vhost'] = ',vhost=on' if args.vhost else ''
-            outs += '-netdev tap,ifname=%(tap)s,id=data%(idx)s,script=no,'  \
-                    'downscript=no%(vhost)s ' % vars_dict
-        elif args.backend == 'udp':
-            vars_dict['udpl'] = port['udpl']
-            vars_dict['udpr'] = port['udpr']
-            outs += '-netdev socket,localaddr=127.0.0.1:%(udpl)s,'\
-                    'udp=127.0.0.1:%(udpr)d,id=data%(idx)s ' % vars_dict
+        vars_dict['hostfwdstr'] = hostfwdstr
+
+        # '-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '
+        outs += 'qemu-system-x86_64 '
+        if args.image != '':  # standard buildroot image
+            outs += args.image + ' -snapshot '
         else:
-            assert(False)
+            outs += '-kernel buildroot/bzImage '                    \
+                    '-append "console=ttyS0" '                      \
+                    '-initrd %(vmimgpath)s ' % vars_dict
+        outs += '-vga std '                                         \
+                '-display none '                                    \
+                '--enable-kvm '                                     \
+                '-smp %(numcpus)s '                                 \
+                '-m %(memory)sM '                                   \
+                '-device %(frontend)s,mac=%(mac)s,netdev=mgmt '     \
+                '-netdev user,id=mgmt,%(hostfwdstr)s '              \
+                '-pidfile rina-%(id)s.pid '                         \
+                '-serial file:%(vmname)s.log '                      \
+                % vars_dict
+
         del vars_dict
 
-    outs += '&\n'
+        for port in vm['ports']:
+            tap = port['tap']
+            mac = vm_get_mac(vmid, port['idx'])
+            port['mac'] = mac
+
+            vars_dict = {'mac': mac, 'idx': port['idx'], 'frontend': args.frontend}
+
+            outs += '-device %(frontend)s,mac=%(mac)s,netdev=data%(idx)s ' % vars_dict
+            if args.backend == 'tap':
+                vars_dict['tap'] = tap
+                vars_dict['vhost'] = ',vhost=on' if args.vhost else ''
+                outs += '-netdev tap,ifname=%(tap)s,id=data%(idx)s,script=no,'  \
+                        'downscript=no%(vhost)s ' % vars_dict
+            elif args.backend == 'udp':
+                vars_dict['udpl'] = port['udpl']
+                vars_dict['udpr'] = port['udpr']
+                outs += '-netdev socket,localaddr=127.0.0.1:%(udpl)s,'\
+                        'udp=127.0.0.1:%(udpr)d,id=data%(idx)s ' % vars_dict
+            else:
+                assert(False)
+            del vars_dict
+
+        outs += '&\n'
 
     budget -= 1
     if budget <= 0:
@@ -549,21 +600,24 @@ for vmname in sorted(demo.vms):
             vm_conf_count = 0
             outs += 'SUBSHELLS=""\n'
 
-    outs += '(\n'\
-            'DONE=255\n'\
-            'while [ $DONE != "0" ]; do\n'\
-            '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
-                    'set -x\n'\
-                    'SUDO=%(sudo)s\n'\
-                    '$SUDO hostname %(name)s\n'\
-                    '\n'\
-            '\n' % {'name': vm['name'], 'ssh': vm['ssh'], 'username': args.user,
-                    'sshopts': sshopts, 'sudo': sudo}
+    outs += '(\n'
+    if args.namespaces:
+        scriptname = '.%s.initscript' % vmname
+        outs += 'cat > %s << \'EOI\'\n' % scriptname
+        outs += '#!/bin/bash\n'
+    else:
+        outs += 'DONE=255\n'\
+                'while [ $DONE != "0" ]; do\n'\
+                '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
+                % {'ssh': vm['ssh'], 'username': args.user, 'sshopts': sshopts}
 
-    verbmap = {'QUIET': 1, 'WARN': 2, 'INFO': 3, 'DBG': 4, 'VERY': 5}
+    outs +=         'set -x\n'\
+                    'SUDO=%(sudo)s\n' % {'sudo': sudo}
+    if not args.namespaces:
+        outs +=     '$SUDO hostname %(name)s\n' % {'name': vm['name']}
 
-    # Load kernel modules
-    outs +=         '$SUDO modprobe rlite verbosity=%(verbidx)s\n'\
+        # Load kernel modules
+        outs +=     '$SUDO modprobe rlite verbosity=%(verbidx)s\n'\
                     '$SUDO modprobe rlite-shim-eth\n'\
                     '$SUDO modprobe rlite-shim-udp4\n'\
                     '$SUDO modprobe rlite-normal%(flsuf)s\n'\
@@ -572,18 +626,19 @@ for vmname in sorted(demo.vms):
                     '$SUDO mkdir -p /run/rlite\n'\
                     '$SUDO chmod -R a+rw /run/rlite\n'\
                     '$SUDO dmesg -n8\n'\
-                    '\n'\
-                    '$SUDO %(valgrind)s rlite-uipcps -d -v %(verb)s '\
-                                        '> uipcp.log 2>&1\n'\
+                        % {'verbidx': verbmap[args.verbosity],
+                           'flsuf': flavour_suffix}
+
+    outs +=         '$SUDO %(valgrind)s rlite-uipcps -d -v %(verb)s '\
+                            '> uipcp.%(vmname)s.log 2>&1\n'\
                         % {'verb': args.verbosity,
-                           'verbidx': verbmap[args.verbosity],
-                           'flsuf': flavour_suffix,
+                           'vmname': vmname,
                            'valgrind': 'valgrind' if args.valgrind else ''}
 
     ctrl_cmds = []
 
     # Create and configure shim IPCPs
-    pouts, pctrl_cmds = demo.compute_shim_ipcps(vm)
+    pouts, pctrl_cmds = demo.compute_shim_ipcps(vm, not args.namespaces)
     outs += pouts
     ctrl_cmds += pctrl_cmds
 
@@ -614,7 +669,8 @@ for vmname in sorted(demo.vms):
         initscript.close()
 
     # Generate /etc/rina/initscript
-    outs += 'cat > .initscript <<EOF\n'
+    node_config_file = 'node-config.%s.initscript' % vmname
+    outs += 'cat > %s <<EOF\n' % node_config_file
     for cmd in ctrl_cmds:
         outs += cmd
     outs += 'EOF\n'
@@ -622,15 +678,14 @@ for vmname in sorted(demo.vms):
     if args.enrollment_order == 'parallel':
         # Add enrollments to the initscript only when parallel enrollment
         # is used.
-        outs += 'cat >> .initscript <<EOF\n'
+        outs += 'cat >> %s <<EOF\n' % node_config_file
         for cmd in enroll_cmds:
             outs += cmd
         outs += 'EOF\n'
 
     # Run rlite-node-config
-    outs += '$SUDO cp .initscript /etc/rina/initscript\n'\
-            'rm .initscript\n'
-    outs += '$SUDO nohup rlite-node-config -v -d > rlite-node-config.log 2>&1\n'
+    outs += '$SUDO nohup rlite-node-config -v -d -s %s > rlite-node-config.%s.log 2>&1\n'\
+            % (node_config_file, vmname)
 
     # Configure netem rules inside the nodes, including htb rate limiting
     outs += demo.compute_netem_rules(vm)
@@ -649,7 +704,14 @@ for vmname in sorted(demo.vms):
                      'randmax': args.rand_max,
                      'randintv': args.rand_interval }
 
-    outs +=         '\n'\
+    if args.namespaces:
+        outs += 'EOI\n'\
+                'chmod +x %(script)s\n'\
+                'sudo ip netns exec %(nsname)s bash %(script)s\n'\
+                '#rm %(script)s\n'\
+                    % {'script': scriptname, 'nsname': vm['nsname']}
+    else:
+        outs +=     ''\
                     'sleep 1\n'\
                     'true\n'\
                 'ENDSSH\n'\
@@ -657,9 +719,10 @@ for vmname in sorted(demo.vms):
             '   if [ $DONE != "0" ]; then\n'\
             '       sleep 1\n'\
             '   fi\n'\
-            'done\n'\
-            ') &\n'
-    outs += 'SUBSHELLS="$SUBSHELLS $!"\n\n'
+            'done\n'
+
+    outs += ') &\n'\
+            'SUBSHELLS="$SUBSHELLS $!"\n\n'
     vm_conf_count += 1
 
 if vm_conf_count > 0:
@@ -681,18 +744,24 @@ if args.enrollment_order == 'sequential':
             else:
                 oper = 'enroll-retry'
 
-            vars_dict = {'ssh': vm['ssh'], 'id': vm['id'],
+            vars_dict = {'id': vm['id'],
                          'pvid': demo.vms[enrollment['enroller']]['id'],
-                         'username': args.user,
                          'vmname': vm['name'],
                          'dif': dif, 'ldif': enrollment['lower_dif'],
-                         'sshopts': sshopts, 'sudo': sudo,
+                          'sudo': sudo,
                          'oper': oper}
 
-            outs += 'DONE=255\n'\
+            if args.namespaces:
+                scriptname = '.%s.enrollscript' % vm['name']
+                outs += 'cat > %s << \'EOI\'\n' % scriptname
+                outs += '#!/bin/bash\n'
+            else:
+                outs += 'DONE=255\n'\
                     'while [ $DONE != "0" ]; do\n'\
                     '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
-                    'set -x\n'\
+                    % {'ssh': vm['ssh'], 'username': args.user, 'sshopts': sshopts}
+
+            outs += 'set -x\n'\
                     'SUDO=%(sudo)s\n'\
                     '$SUDO rlite-ctl ipcp-%(oper)s %(dif)s.%(id)s.IPCP %(dif)s.DIF '\
                             '%(ldif)s.DIF ' % vars_dict
@@ -700,14 +769,22 @@ if args.enrollment_order == 'sequential':
                 outs += '%(dif)s.%(pvid)s.IPCP\n' % vars_dict
             else:
                 outs += '\n'
-            outs += 'sleep 1\n'\
-                    'true\n'\
-                    'ENDSSH\n'\
-                    '   DONE=$?\n'\
-                    '   if [ $DONE != "0" ]; then\n'\
-                    '       sleep 1\n'\
-                    '   fi\n'\
-                    'done\n\n' % vars_dict
+
+            if args.namespaces:
+                outs += 'EOI\n'\
+                        'chmod +x %(script)s\n'\
+                        'sudo ip netns exec %(nsname)s bash %(script)s\n'\
+                        '#rm %(script)s\n'\
+                            % {'script': scriptname, 'nsname': vm['nsname']}
+            else:
+                outs += 'sleep 1\n'\
+                        'true\n'\
+                        'ENDSSH\n'\
+                        '   DONE=$?\n'\
+                        '   if [ $DONE != "0" ]; then\n'\
+                        '       sleep 1\n'\
+                        '   fi\n'\
+                        'done\n\n' % vars_dict
 
 # Just for debugging
 for dif in demo.dif_ordering:
@@ -756,13 +833,29 @@ outs =  '#!/bin/bash\n'             \
         '   rm $PIDFILE\n'                                      \
         '}\n\n'
 
-for vmname in sorted(demo.vms):
-    vm = demo.vms[vmname]
-    outs += '( kill_qemu rina-%(id)s.pid ) &\n' % {'id': vm['id']}
+if not args.namespaces:
+    for vmname in sorted(demo.vms):
+        vm = demo.vms[vmname]
+        outs += '( kill_qemu rina-%(id)s.pid ) &\n' % {'id': vm['id']}
 
-outs += 'wait\n'
+    outs += 'wait\n'
 
-if args.backend == 'tap':
+if args.namespaces:
+    # Remove all the namespaces (this also deletes the veths)
+    for vmname in sorted(demo.vms):
+        vm = demo.vms[vmname]
+        outs += 'sudo ip netns exec %(nsname)s rlite-ctl reset\n'\
+                'sudo ip netns del %(nsname)s\n' % {'nsname': vm['nsname']}
+
+    # Kill the daemons and unload the modules
+    outs += 'sudo pkill rlite-node-config\n'\
+            'sudo pkill rlite-uipcps\n'\
+            'sudo rmmod rlite-normal%(flsuf)s\n'\
+            'sudo rmmod rlite-shim-eth\n'\
+            'sudo rmmod rlite-shim-udp4\n'\
+            'sudo rmmod rlite\n' % {'flsuf': flavour_suffix}
+
+elif args.backend == 'tap':
     for vmname in sorted(demo.vms):
         vm = demo.vms[vmname]
         for port in vm['ports']:
@@ -777,7 +870,6 @@ if args.backend == 'tap':
                         % {'tap': tap, 'br': shim}
     outs += 'wait\n'
 
-if args.backend == 'tap':
     for shim in sorted(demo.shims):
         outs += '(\n'                                   \
                 'sudo ip link set %(br)s down\n'        \
@@ -851,12 +943,14 @@ if args.register:
         # Select a pivot node
         pivot = sorted(demo.difs[dif])[0]
         outs += 'echo "Use \"%(pivot)s\" as a pivot for DIF %(dif)s"\n'\
+                    % {'pivot': pivot, 'dif': dif}
+        if not args.namespaces:
+            outs += ''\
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
             '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
                     '#set -x\n' % {'sshopts': sshopts, 'username': args.user,
-                                  'ssh': demo.vms[pivot]['ssh'], 'pivot': pivot,
-                                  'dif': dif}
+                                  'ssh': demo.vms[pivot]['ssh']}
 
         for vmname in sorted(demo.difs[dif]):
             outs += 'echo "%(pivot)s --> %(vmname)s"\n'\
@@ -865,7 +959,8 @@ if args.register:
                         'in DIF %(dif)s"\n'\
                         % {'vmname': vmname, 'dif': dif, 'pivot': pivot}
 
-        outs +=      'true\n'\
+        if not args.namespaces:
+            outs += 'true\n'\
                 'ENDSSH\n'\
             '   DONE=$?\n'\
             '   if [ $DONE != "0" ]; then\n'\
@@ -888,25 +983,26 @@ outs =  '#!/bin/bash\n'             \
         '   exit 255\n'\
         'fi\n'\
 
-for vmname in sorted(demo.vms):
-    vm = demo.vms[vmname]
-    outs += 'echo "Accessing log for node %(vmname)s"\n'\
-        'DONE=255\n'\
-        'while [ $DONE != "0" ]; do\n'\
-        '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost <<ENDSSH\n'\
-                        % {'sshopts': sshopts, 'username': args.user,
-                              'ssh': vm['ssh'],
-                              'dif': dif, 'vmname': vmname}
+if not args.namespaces:
+    for vmname in sorted(demo.vms):
+        vm = demo.vms[vmname]
+        outs += 'echo "Accessing log for node %(vmname)s"\n'\
+            'DONE=255\n'\
+            'while [ $DONE != "0" ]; do\n'\
+            '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost <<ENDSSH\n'\
+                            % {'sshopts': sshopts, 'username': args.user,
+                                  'ssh': vm['ssh'],
+                                  'dif': dif, 'vmname': vmname}
 
-    outs += 'grep "$1" uipcp.log\n'
+        outs += 'grep "$1" uipcp.*.log\n'
 
-    outs +=      'true\n'\
-            'ENDSSH\n'\
-        '   DONE=$?\n'\
-        '   if [ $DONE != "0" ]; then\n'\
-        '       sleep 1\n'\
-        '   fi\n'\
-        'done\n\n'
+        outs +=      'true\n'\
+                'ENDSSH\n'\
+            '   DONE=$?\n'\
+            '   if [ $DONE != "0" ]; then\n'\
+            '       sleep 1\n'\
+            '   fi\n'\
+            'done\n\n'
 
 fout.write(outs)
 fout.close()
@@ -922,25 +1018,28 @@ outs =  '#!/bin/bash\n'             \
         '   exit 255\n'\
         'fi\n'\
 
-for vmname in sorted(demo.vms):
-    vm = demo.vms[vmname]
-    outs += 'echo "Accessing log for node %(vmname)s"\n'\
-        'DONE=255\n'\
-        'while [ $DONE != "0" ]; do\n'\
-        '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost <<ENDSSH\n'\
-                        % {'sshopts': sshopts, 'username': args.user,
-                              'ssh': vm['ssh'],
-                              'dif': dif, 'vmname': vmname}
+if args.namespaces:
+        'dmesg | grep "$1"\n'
+else:
+    for vmname in sorted(demo.vms):
+        vm = demo.vms[vmname]
+        outs += 'echo "Accessing log for node %(vmname)s"\n'\
+            'DONE=255\n'\
+            'while [ $DONE != "0" ]; do\n'\
+            '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost <<ENDSSH\n'\
+                            % {'sshopts': sshopts, 'username': args.user,
+                                  'ssh': vm['ssh'],
+                                  'dif': dif, 'vmname': vmname}
 
-    outs += 'dmesg | grep "$1"\n'
+        outs += 'dmesg | grep "$1"\n'
 
-    outs +=      'true\n'\
-            'ENDSSH\n'\
-        '   DONE=$?\n'\
-        '   if [ $DONE != "0" ]; then\n'\
-        '       sleep 1\n'\
-        '   fi\n'\
-        'done\n\n'
+        outs +=      'true\n'\
+                'ENDSSH\n'\
+            '   DONE=$?\n'\
+            '   if [ $DONE != "0" ]; then\n'\
+            '       sleep 1\n'\
+            '   fi\n'\
+            'done\n\n'
 
 fout.write(outs)
 fout.close()

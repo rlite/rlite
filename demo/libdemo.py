@@ -480,21 +480,25 @@ class Demo:
             vm['id'] = vmid
             vmid += 1
 
-    def compute_shim_ipcps(self, vm):
+    def compute_shim_ipcps(self, vm, mac2ifname = True):
         outs = ''
         ctrl_cmds = []
         # Create and configure shim IPCPs
         for port in vm['ports']:
             shim = self.shims[port['shim']]
             vars_dict = {
-                'mac': port['mac'],
                 'idx': port['idx'],
                 'shim': port['shim'],
                 'id': vm['id'],
                 'shimtype': shim['type']
             }
-            outs += 'PORT%(idx)s=$(mac2ifname %(mac)s)\n'\
-                    '$SUDO ip link set $PORT%(idx)s up\n' % vars_dict
+            if mac2ifname:
+                vars_dict['mac'] = port['mac']
+                outs += 'PORT%(idx)s=$(mac2ifname %(mac)s)\n' % vars_dict
+            else:
+                vars_dict['ifname'] = port['veth']
+                outs += 'PORT%(idx)s=%(ifname)s\n' % vars_dict
+            outs += '$SUDO ip link set $PORT%(idx)s up\n' % vars_dict
             ctrl_cmds.append(
                 'ipcp-create %(shim)s.%(id)s.IPCP shim-%(shimtype)s %(shim)s.DIF\n'
                 % vars_dict)

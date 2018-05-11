@@ -13,10 +13,6 @@ Open tasks, in decreasing order of priority:
      just periodically exchange hashes (and do the full update only when
      needed)
 
-* add kernel support for network namespaces
-    * it is enough to assign namespaces at IPCP creation time
-    * the assigned namespace is the one of the current process
-
 * implement support for tailroom (needed by shim-eth)
 
 * extend demonstrator to support multiple physical machines
@@ -27,5 +23,3 @@ Open tasks, in decreasing order of priority:
 
 * implement utility to graphically show dif-rib-show, using graphviz
   (DIF map with active links)
-
-* remove DIF argument from ipcp-enroll command
