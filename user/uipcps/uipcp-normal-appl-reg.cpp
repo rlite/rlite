@@ -395,6 +395,7 @@ public:
     {
     }
 
+    int init(const std::list<raft::ReplicaId> &peers);
     int process_sm_output(raft::RaftSMOutput out);
     int process_timeout();
     int apply(raft::LogIndex index, const char *const serbuf) override final;
@@ -412,6 +413,21 @@ std::string CeftReplica::ReqVoteRespObjClass       = "raft_rv_r";
 std::string CeftReplica::AppendEntriesObjClass     = "raft_ae";
 std::string CeftReplica::AppendEntriesRespObjClass = "raft_ae_r";
 
+int
+CeftReplica::init(const std::list<raft::ReplicaId> &peers)
+{
+    set_election_timeout(Msecs(1000), Msecs(2000));
+    set_heartbeat_timeout(Msecs(100));
+    set_verbosity(raft::RaftSM::kVerboseInfo);
+
+    raft::RaftSMOutput out;
+    if (RaftSM::init(peers, &out)) {
+        UPE(rib->uipcp, "Failed to init Raft state machine for DFT\n");
+        return -1;
+    }
+    UPI(rib->uipcp, "Raft replica initialized\n");
+    return process_sm_output(std::move(out));
+}
 int
 CeftReplica::process_sm_output(raft::RaftSMOutput out)
 {
@@ -828,17 +844,7 @@ CentralizedFaultTolerantDFT::reconfigure()
             raft = make_unique<Replica>(this);
             peers.erase(it); /* remove myself */
 
-            raft->set_election_timeout(Msecs(1000), Msecs(2000));
-            raft->set_heartbeat_timeout(Msecs(100));
-            raft->set_verbosity(raft::RaftSM::kVerboseInfo);
-
-            raft::RaftSMOutput out;
-            if (raft->init(peers, &out)) {
-                UPE(rib->uipcp, "Failed to init Raft state machine for DFT\n");
-                return -1;
-            }
-            UPI(rib->uipcp, "Raft replica initialized\n");
-            return raft->process_sm_output(std::move(out));
+            return raft->init(peers);
         }
     }
 
