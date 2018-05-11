@@ -237,6 +237,7 @@ configure options:
     --no-swig                   Don't use swig to generate python bindings
     --verbose-kernel            Compile (conditional) verbose kernel logs (may slow down a bit)
     --debug                     Compile in debug mode
+    --opt                       Compile with optimizations enabled (-O2)
     --no-kernel                 Don't build kernel code
     --no-user                   Don't build userspace code
     --sanitize-includes         Use IWYU if available
@@ -261,6 +262,7 @@ BUILD_USER="y"
 CLANG_PREFIX=""
 IWYU="n"
 USE_CLANG="n"
+OPTIMIZE="n"
 
 # Option parsing
 while [[ $# > 0 ]]
@@ -355,6 +357,10 @@ do
         DEBUG="y"
         ;;
 
+        "--opt")
+        OPTIMIZE="y"
+        ;;
+
         "--sanitize-includes")
         IWYU="y"
         ;;
@@ -446,7 +452,7 @@ if [ ${BUILD_USER} == "y" ]; then
 
     (
     cd build
-    ${CLANG_PREFIX} cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug -DDEBUG=${DEBUG} -DWITH_SWIG=${WITH_SWIG} ${CMAKE_EXTRA}
+    ${CLANG_PREFIX} cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug -DDEBUG=${DEBUG} -DOPTIMIZE=${OPTIMIZE} -DWITH_SWIG=${WITH_SWIG} ${CMAKE_EXTRA}
     ) | tee -a config.log
 fi
 
