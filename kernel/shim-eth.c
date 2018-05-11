@@ -597,6 +597,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     struct ethhdr *hh = eth_hdr(skb);
     struct arpt_entry *entry;
     struct rl_ipcp_stats *stats = this_cpu_ptr(ipcp->stats);
+    unsigned len;
 
     NPD("SHIM ETH PDU from %02X:%02X:%02X:%02X:%02X:%02X [%d]\n",
         hh->h_source[0], hh->h_source[1], hh->h_source[2], hh->h_source[3],
@@ -614,10 +615,11 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     rb                       = skb;
 #endif
 
+    len = rb->len;
     /* Try to shortcut the packet to the upper IPCP. */
     if ((rb = rl_sdu_rx_shortcut(ipcp, rb)) == NULL) {
         stats->rx_pkt++;
-        stats->rx_byte += rb->len;
+        stats->rx_byte += len;
         return;
     }
 
@@ -631,7 +633,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
         struct flow_entry *flow = entry->flow;
 
         stats->rx_pkt++;
-        stats->rx_byte += rb->len;
+        stats->rx_byte += len;
         read_unlock_bh(&priv->arpt_lock);
 
         rl_sdu_rx_flow(ipcp, flow, rb, true);
@@ -699,7 +701,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     }
 
     stats->rx_pkt++;
-    stats->rx_byte += rb->len;
+    stats->rx_byte += len;
 
     write_unlock_bh(&priv->arpt_lock);
     return;
