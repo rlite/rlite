@@ -619,8 +619,9 @@ struct dtp {
 struct flow_entry {
     rl_port_t local_port; /* flow table key */
     rl_port_t remote_port;
-    uint16_t local_cep;
-    uint16_t remote_cep;
+    rlm_cepid_t local_cep;
+    rlm_cepid_t remote_cep;
+    rlm_qosid_t qos_id;
     rlm_addr_t remote_addr;
     char *local_appl;
     char *remote_appl;

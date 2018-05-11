@@ -52,7 +52,7 @@ struct rina_pci {
     rl_cepid_t dst_cep;
     rl_cepid_t src_cep;
     rl_pdulen_t pdu_len;
-    rl_qosid_t qosid;
+    rl_qosid_t qos_id;
 } __attribute__((__packed__));
 
 /* PCI header to be used for control PDUs. */
@@ -108,7 +108,7 @@ rina_pci_dump(struct rina_pci *pci)
 {
     PD("PCI: dst=%lx,src=%lx,qos=%u,dcep=%u,scep=%u,type=%x,flags=%x,"
        "seq=%lu\n",
-       (long unsigned)pci->dst_addr, (long unsigned)pci->src_addr, pci->qosid,
+       (long unsigned)pci->dst_addr, (long unsigned)pci->src_addr, pci->qos_id,
        pci->dst_cep, pci->src_cep, pci->pdu_type, pci->pdu_flags,
        (long unsigned)pci->seqnum);
 }
@@ -818,7 +818,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     pci            = RL_BUF_PCI(rb);
     pci->dst_addr  = flow->remote_addr;
     pci->src_addr  = ipcp->addr;
-    pci->qosid     = 0;
+    pci->qos_id    = flow->qos_id;
     pci->dst_cep   = flow->remote_cep;
     pci->src_cep   = flow->local_cep;
     pci->pdu_type  = PDU_T_DT;
@@ -952,7 +952,7 @@ rl_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
     pci            = RL_BUF_PCI(rb);
     pci->dst_addr  = dst_addr;
     pci->src_addr  = ipcp->addr;
-    pci->qosid     = 0; /* Not valid. */
+    pci->qos_id    = 0; /* Not valid. */
     pci->dst_cep   = 0; /* Not valid. */
     pci->src_cep   = 0; /* Not valid. */
     pci->pdu_type  = PDU_T_MGMT;
@@ -1042,7 +1042,7 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
         pcic                         = (struct rina_pci_ctrl *)RL_BUF_DATA(rb);
         pcic->base.dst_addr          = flow->remote_addr;
         pcic->base.src_addr          = ipcp->addr;
-        pcic->base.qosid             = 0;
+        pcic->base.qos_id            = flow->qos_id;
         pcic->base.dst_cep           = flow->remote_cep;
         pcic->base.src_cep           = flow->local_cep;
         pcic->base.pdu_type          = pdu_type;

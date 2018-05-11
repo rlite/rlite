@@ -1393,6 +1393,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper, uint32_t event_id,
         entry->remote_port = RL_PORT_ID_NONE; /* Not valid. */
         entry->remote_cep  = RL_PORT_ID_NONE; /* Not valid. */
         entry->remote_addr = RL_ADDR_NULL;    /* Not valid. */
+        entry->qos_id      = 0;               /* default */
         entry->upper       = upper;
         if (upper.rc) {
             get_file(upper.rc->file);
