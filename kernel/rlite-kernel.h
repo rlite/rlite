@@ -498,6 +498,8 @@ struct ipcp_entry {
     struct dif *dif;
     struct pci_sizes pcisizes;
     rlm_addr_t addr;
+    /* How many milliseconds we should postpone the flow teardown. */
+    uint32_t flow_del_wait_ms;
 
 #define RL_K_IPCP_USE_CEP_IDS (1 << 0)
 #define RL_K_IPCP_ZOMBIE (1 << 1)

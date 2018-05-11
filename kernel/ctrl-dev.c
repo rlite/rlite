@@ -591,15 +591,16 @@ ipcp_add_entry(struct rl_dm *dm, struct rl_kmsg_ipcp_create *req,
     if (entry->id < IPCP_ID_BITMAP_SIZE) {
         bitmap_set(dm->ipcp_id_bitmap, entry->id, 1);
         /* Build and insert an IPC process entry in the hash table. */
-        entry->name         = req->name;
-        req->name           = NULL; /* move */
-        entry->dif          = dif;
-        entry->addr         = RL_ADDR_NULL;
-        entry->refcnt       = 1;
-        entry->txhdroom     = 0;
-        entry->rxhdroom     = 0;
-        entry->tailroom     = 0;
-        entry->max_sdu_size = (1 << 16) - 1;
+        entry->name             = req->name;
+        req->name               = NULL; /* move */
+        entry->dif              = dif;
+        entry->addr             = RL_ADDR_NULL;
+        entry->flow_del_wait_ms = 4000;
+        entry->refcnt           = 1;
+        entry->txhdroom         = 0;
+        entry->rxhdroom         = 0;
+        entry->tailroom         = 0;
+        entry->max_sdu_size     = (1 << 16) - 1;
         INIT_LIST_HEAD(&entry->registered_appls);
         spin_lock_init(&entry->regapp_lock);
         init_waitqueue_head(&entry->uipcp_wqh);
@@ -1166,7 +1167,8 @@ __flow_put(struct flow_entry *entry, bool lock)
         atomic_inc(&entry->refcnt);
         PV("FLOWREFCNT %u ++: %u\n", entry->local_port,
            atomic_read(&entry->refcnt));
-        flows_putq_add(entry, msecs_to_jiffies(5000) /* should be MPL */);
+        flows_putq_add(entry, msecs_to_jiffies(
+                                  ipcp->flow_del_wait_ms) /* should be MPL */);
         if (lock) {
             FUNLOCK(dm);
         }
@@ -2105,6 +2107,9 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         } else if (strcmp(req->name, "mss") == 0) {
             ret =
                 rl_configstr_to_u32(req->value, &entry->max_sdu_size, &notify);
+        } else if (strcmp(req->name, "flow-del-wait-ms") == 0) {
+            ret =
+                rl_configstr_to_u32(req->value, &entry->flow_del_wait_ms, NULL);
         } else {
             ret = -EINVAL; /* unknown request */
         }
@@ -2165,6 +2170,8 @@ rl_ipcp_config_get(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             snprintf(valbuf, sizeof(valbuf), "%u", entry->rxhdroom);
         } else if (strcmp(req->param_name, "mss") == 0) {
             snprintf(valbuf, sizeof(valbuf), "%u", entry->max_sdu_size);
+        } else if (strcmp(req->param_name, "flow-del-wait-ms") == 0) {
+            snprintf(valbuf, sizeof(valbuf), "%u", entry->flow_del_wait_ms);
         } else {
             ret = -EINVAL; /* unknown request */
         }

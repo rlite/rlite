@@ -16,6 +16,8 @@ rlite-ctl ipcp-config mio csum inet || exit 1
 rlite-ctl ipcp-config-get mio csum | grep "\<inet\>" || exit 1
 rlite-ctl ipcp-config mio csum none || exit 1
 rlite-ctl ipcp-config-get mio csum | grep "\<none\>" || exit 1
+rlite-ctl ipcp-config mio flow-del-wait-ms 381 || exit 1
+rlite-ctl ipcp-config-get mio flow-del-wait-ms | grep "\<381\>" || exit 1
 # Negative tests
 rlite-ctl ipcp-config-get mio fakeparam && exit 1
 rlite-ctl ipcp-config mio csum wrong && exit 1
