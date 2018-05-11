@@ -202,7 +202,7 @@ message DFTEntry {  // information about a
                     // directoryforwardingtable entry
   required APName appl_name = 1;
   required string ipcp_name = 2;  // The name of the hosting IPCP
-  optional uint64 timestamp = 3;  // TODO turn into a seqnum
+  optional uint64 seqnum = 3;
 }
 
 message DFTSlice {  // carries information about

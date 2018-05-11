@@ -33,20 +33,12 @@ using namespace std;
 
 namespace Uipcps {
 
-static uint64_t
-time64()
-{
-    auto now = std::chrono::system_clock::now();
-    return std::chrono::duration_cast<std::chrono::microseconds>(
-               now.time_since_epoch())
-        .count();
-}
-
 class FullyReplicatedDFT : public DFT {
     /* Directory Forwarding Table, mapping application name (std::string)
      * to a set of nodes that registered that name. All nodes are considered
      * equivalent. */
     std::multimap<std::string, std::unique_ptr<gpb::DFTEntry>> dft_table;
+    uint64_t seqnum_next = 1;
 
 public:
     RL_NODEFAULT_NONCOPIABLE(FullyReplicatedDFT);
@@ -126,7 +118,7 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
 
     dft_entry->set_ipcp_name(rib->myname);
     dft_entry->set_allocated_appl_name(apname2gpb(appl_name));
-    dft_entry->set_timestamp(time64());
+    dft_entry->set_seqnum(seqnum_next++);
 
     /* Get all the entries for 'appl_name', and see if there
      * is an entry associated to this uipcp. */
@@ -201,7 +193,7 @@ FullyReplicatedDFT::mod_table(const gpb::DFTEntry &e, bool add,
     if (add) {
         bool collision = (mit != range.second);
 
-        if (!collision || e.timestamp() > mit->second->timestamp()) {
+        if (!collision || e.seqnum() > mit->second->seqnum()) {
             if (collision) {
                 /* Remove the collided entry. */
                 if (removed) {
@@ -290,7 +282,7 @@ FullyReplicatedDFT::dump(stringstream &ss) const
 
         ss << "    Application: " << apname2string(entry->appl_name())
            << ", Remote node: " << entry->ipcp_name()
-           << ", Timestamp: " << entry->timestamp() << endl;
+           << ", Seqnum: " << entry->seqnum() << endl;
     }
 
     ss << endl;
@@ -394,6 +386,7 @@ class CentralizedFaultTolerantDFT : public DFT {
             }
         };
         std::unordered_map<raft::LogIndex, PendingReq> pending;
+        uint64_t seqnum_next = 1;
 
     public:
         Replica(CentralizedFaultTolerantDFT *dft)
@@ -453,6 +446,7 @@ class CentralizedFaultTolerantDFT : public DFT {
             }
         };
         std::unordered_map</*invoke_id*/ int, PendingReq> pending;
+        uint64_t seqnum_next = 1;
 
         void mod_pending_timer();
 
@@ -693,7 +687,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
             op_code = m->op_code;
             dft_entry.set_ipcp_name(parent->rib->myname);
             dft_entry.set_allocated_appl_name(apname2gpb(appl_name));
-            dft_entry.set_timestamp(time64());
+            dft_entry.set_seqnum(seqnum_next++);
 
             /* Set the 'pending' map before sending, in case we are sending to
              * ourselves (and so we wouldn't find the entry in the map).*/
@@ -945,7 +939,7 @@ CentralizedFaultTolerantDFT::Replica::apply(raft::LogIndex index,
 
     e.set_ipcp_name(c->ipcp_name);
     e.set_allocated_appl_name(apname2gpb(c->appl_name));
-    e.set_timestamp(time64());
+    e.set_seqnum(seqnum_next++);
     assert(c->opcode == Command::OpcodeSet || c->opcode == Command::OpcodeDel);
     impl->mod_table(e, c->opcode == Command::OpcodeSet, nullptr, nullptr);
 
