@@ -1119,17 +1119,24 @@ __flow_put(struct flow_entry *entry, bool lock)
         return;
     }
 
-    if (!atomic_dec_and_test(&entry->refcnt)) {
-        /* Flow is still being used by someone. */
-        return;
-    }
-
     dtp  = &entry->dtp;
     ipcp = entry->txrx.ipcp;
     dm   = ipcp->dm;
 
     if (lock) {
         FLOCK(dm);
+    }
+
+    /* Although the flow reference counter does not generally need to be
+     * accessed under FLOCK(), here it is necessary to avoid a race
+     * condition. If we decremented the reference counter before taking
+     * the FLOCK, a CPU could call flow_get (or similar) after the
+     * reference counter drops to 0 and before the FLOCK is taken,
+     * which would basically result into a double free. */
+    if (!atomic_dec_and_test(&entry->refcnt)) {
+        /* Flow is still being used by someone. */
+        FUNLOCK(dm);
+        return;
     }
 
     entry->flags |= RL_FLOW_DEALLOCATED;
