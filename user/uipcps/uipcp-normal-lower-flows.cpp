@@ -425,12 +425,22 @@ FullyReplicatedLFDB::neighs_refresh(size_t limit)
     auto it = db.find(rib->myname);
     assert(it != db.end());
 
+    auto age_thresh = rib->get_param_value<Msecs>(Routing::Prefix, "age-max");
+    age_thresh      = age_thresh * 90 / 100;
+
     for (auto jt = it->second.begin(); jt != it->second.end();) {
         gpb::LowerFlowList lfl;
 
         while (lfl.flows_size() < static_cast<int>(limit) &&
                jt != it->second.end()) {
-            jt->second.set_seqnum(jt->second.seqnum() + 1);
+            auto age = Secs(jt->second.age());
+
+            /* Refresh the entry by incrementing its sequence number if
+             * we are getting close to the maximum age. */
+            if (age > age_thresh) {
+                jt->second.set_seqnum(jt->second.seqnum() + 1);
+                jt->second.set_age(0);
+            }
             *lfl.add_flows() = jt->second;
             jt++;
         }
@@ -465,20 +475,15 @@ FullyReplicatedLFDB::age_incr()
     for (auto &kvi : db) {
         list<unordered_map<NodeId, gpb::LowerFlow>::iterator> discard_list;
 
-        if (kvi.first == rib->myname) {
-            /* Don't age local entries, we pretend they
-             * are always refreshed. */
-            continue;
-        }
-
         for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
             auto next_age = Secs(jt->second.age());
 
             next_age += std::chrono::duration_cast<Secs>(age_inc_intval);
             jt->second.set_age(next_age.count());
 
-            if (next_age > age_max) {
-                /* Insert this into the list of entries to be discarded. */
+            if (kvi.first != rib->myname && next_age > age_max) {
+                /* Insert this into the list of entries to be discarded. Don't
+                 * discard local entries. */
                 discard_list.push_back(jt);
             }
         }
