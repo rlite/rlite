@@ -498,9 +498,13 @@ UipcpRib::UipcpRib(struct uipcp *_u)
         PolicyParam(Secs(int(kRIBRefreshIntvalSecs)));
 
     policy_mod(FlowAllocator::Prefix, "local");
+    assert(fa);
     policy_mod(AddrAllocator::Prefix, "distributed");
+    assert(addra);
     policy_mod(DFT::Prefix, "fully-replicated");
+    assert(dft);
     policy_mod(Routing::Prefix, "link-state");
+    assert(routing);
 
     /* Insert handlers for common RIB objects. */
     rib_handler_register(Neighbor::TableName, &UipcpRib::neighbors_handler);
@@ -589,10 +593,7 @@ UipcpRib::~UipcpRib()
     keepalive_timers.clear();
     enrollment_resources.clear();
     neighbors.clear();
-    addra.reset();
-    dft.reset();
-    routing.reset();
-    fa.reset();
+    components.clear();
 
     for (auto &kv : pending_fa_reqs) {
         for (auto &p : kv.second) {
@@ -1268,8 +1269,17 @@ UipcpRib::policy_mod(const std::string &component,
     /* Set the new policy. */
     policies[component] = policy_name;
     UPD(uipcp, "set %s policy to %s\n", component.c_str(), policy_name.c_str());
-    /* Invoke the policy builder. */
-    policy_builder->builder(this);
+    /* Invoke the policy builder and install the policy. */
+    components[component] = std::move(policy_builder->builder(this));
+    if (component == DFT::Prefix) {
+        dft = dynamic_cast<DFT *>(components[component].get());
+    } else if (component == Routing::Prefix) {
+        routing = dynamic_cast<Routing *>(components[component].get());
+    } else if (component == FlowAllocator::Prefix) {
+        fa = dynamic_cast<FlowAllocator *>(components[component].get());
+    } else if (component == AddrAllocator::Prefix) {
+        addra = dynamic_cast<AddrAllocator *>(components[component].get());
+    }
     /* Register the new RIB paths. */
     for (const std::string &path : policy_builder->paths) {
         RibHandler h;

@@ -732,7 +732,7 @@ UipcpRib::fa_lib_init()
     available_policies[FlowAllocator::Prefix].insert(PolicyBuilder(
         "local",
         [](UipcpRib *rib) {
-            rib->fa = utils::make_unique<LocalFlowAllocator>(rib);
+            return utils::make_unique<LocalFlowAllocator>(rib);
         },
         {FlowAllocator::TableName},
         {{"force-flow-control", PolicyParam(false)},

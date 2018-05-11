@@ -408,13 +408,14 @@ struct AddrAllocator : public Component {
  * policy for an IPCP component. */
 struct PolicyBuilder {
     std::string name;
-    std::function<void(UipcpRib *)> builder = [](UipcpRib *) {};
+    std::function<std::unique_ptr<Component>(UipcpRib *)> builder =
+        [](UipcpRib *) { return nullptr; };
     std::list<std::string> paths;
     std::list<std::pair<std::string, PolicyParam>> params;
 
     PolicyBuilder(const std::string &policy_name) : name(policy_name) {}
     PolicyBuilder(const std::string &policy_name,
-                  std::function<void(UipcpRib *)> fun,
+                  std::function<std::unique_ptr<Component>(UipcpRib *)> fun,
                   std::list<std::string> ps                         = {},
                   std::list<std::pair<std::string, PolicyParam>> pp = {})
         : PolicyBuilder(policy_name)
@@ -553,13 +554,17 @@ struct UipcpRib {
     void dft_lookup_resolved(const std::string &name,
                              const std::string &remote_node);
 
-    std::unique_ptr<AddrAllocator> addra;
+    /* Address allocator. */
+    AddrAllocator *addra = nullptr;
 
     /* Directory Forwarding Table. */
-    std::unique_ptr<DFT> dft;
+    DFT *dft = nullptr;
+
+    /* For supported flows. */
+    FlowAllocator *fa = nullptr;
 
     /* Lower Flow Database. */
-    std::unique_ptr<Routing> routing;
+    Routing *routing = nullptr;
 
     /* Timer ID for LFDB synchronization with neighbors. */
     std::unique_ptr<TimeoutEvent> sync_timer;
@@ -567,8 +572,9 @@ struct UipcpRib {
     /* For A-DATA messages. */
     InvokeIdMgr invoke_id_mgr;
 
-    /* For supported flows. */
-    std::unique_ptr<FlowAllocator> fa;
+    /* Auxiliary map containing raw pointers to the components above.
+     * Useful to implement demultiplexing. */
+    std::unordered_map<std::string, std::unique_ptr<Component>> components;
 
 #ifdef RL_USE_QOS_CUBES
     /* Available QoS cubes. */

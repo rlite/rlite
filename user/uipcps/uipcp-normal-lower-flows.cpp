@@ -1061,19 +1061,18 @@ UipcpRib::routing_lib_init()
     available_policies[Routing::Prefix].insert(PolicyBuilder(
         "link-state",
         [](UipcpRib *rib) {
-            rib->routing = utils::make_unique<FullyReplicatedLFDB>(rib, false);
+            return utils::make_unique<FullyReplicatedLFDB>(rib, false);
         },
         {Routing::TableName}, link_state_params));
     available_policies[Routing::Prefix].insert(PolicyBuilder(
         "link-state-lfa",
         [](UipcpRib *rib) {
-            rib->routing = utils::make_unique<FullyReplicatedLFDB>(rib, true);
+            return utils::make_unique<FullyReplicatedLFDB>(rib, true);
         },
         {Routing::TableName}, link_state_params));
-    available_policies[Routing::Prefix].insert(
-        PolicyBuilder("static", [](UipcpRib *rib) {
-            rib->routing = utils::make_unique<StaticRouting>(rib);
-        }));
+    available_policies[Routing::Prefix].insert(PolicyBuilder(
+        "static",
+        [](UipcpRib *rib) { return utils::make_unique<StaticRouting>(rib); }));
 }
 
 } // namespace rlite

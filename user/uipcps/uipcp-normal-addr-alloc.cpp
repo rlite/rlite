@@ -741,12 +741,12 @@ UipcpRib::addra_lib_init()
 {
     available_policies[AddrAllocator::Prefix].insert(
         PolicyBuilder("static", [](UipcpRib *rib) {
-            rib->addra = utils::make_unique<StaticAddrAllocator>(rib);
+            return utils::make_unique<StaticAddrAllocator>(rib);
         }));
     available_policies[AddrAllocator::Prefix].insert(PolicyBuilder(
         "distributed",
         [](UipcpRib *rib) {
-            rib->addra = utils::make_unique<DistributedAddrAllocator>(rib);
+            return utils::make_unique<DistributedAddrAllocator>(rib);
         },
         {AddrAllocator::TableName},
         {{"nack-wait",
@@ -755,8 +755,8 @@ UipcpRib::addra_lib_init()
     available_policies[AddrAllocator::Prefix].insert(PolicyBuilder(
         "centralized-fault-tolerant",
         [](UipcpRib *rib) {
-            rib->addra =
-                utils::make_unique<CentralizedFaultTolerantAddrAllocator>(rib);
+            return utils::make_unique<CentralizedFaultTolerantAddrAllocator>(
+                rib);
         },
         {AddrAllocator::TableName},
         {{"replicas", PolicyParam(string())},

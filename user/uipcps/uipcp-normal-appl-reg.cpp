@@ -742,16 +742,16 @@ CentralizedFaultTolerantDFT::Replica::replica_process_rib_msg(
 void
 UipcpRib::dft_lib_init()
 {
-    available_policies[DFT::Prefix].insert(PolicyBuilder(
-        "fully-replicated",
-        [](UipcpRib *rib) {
-            rib->dft = utils::make_unique<FullyReplicatedDFT>(rib);
-        },
-        {DFT::TableName}));
+    available_policies[DFT::Prefix].insert(
+        PolicyBuilder("fully-replicated",
+                      [](UipcpRib *rib) {
+                          return utils::make_unique<FullyReplicatedDFT>(rib);
+                      },
+                      {DFT::TableName}));
     available_policies[DFT::Prefix].insert(PolicyBuilder(
         "centralized-fault-tolerant",
         [](UipcpRib *rib) {
-            rib->dft = utils::make_unique<CentralizedFaultTolerantDFT>(rib);
+            return utils::make_unique<CentralizedFaultTolerantDFT>(rib);
         },
         {DFT::TableName},
         {{"replicas", PolicyParam(string())},
