@@ -1914,6 +1914,36 @@ rl_reg_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
 }
 
 static int
+configstr_to_u16(const char *src, uint16_t *dst, int *changed)
+{
+    uint16_t v;
+    int ret = kstrtou16(src, 10, &v);
+
+    if (ret == 0) {
+        if (changed) {
+            *changed = *dst != v;
+        }
+        *dst = v;
+    }
+    return ret;
+}
+
+static int
+configstr_to_u32(const char *src, uint32_t *dst, int *changed)
+{
+    uint32_t v;
+    int ret = kstrtou32(src, 10, &v);
+
+    if (ret == 0) {
+        if (changed) {
+            *changed = *dst != v;
+        }
+        *dst = v;
+    }
+    return ret;
+}
+
+static int
 rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_config *req = (struct rl_kmsg_ipcp_config *)bmsg;
@@ -1944,29 +1974,11 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         /* This operation was not managed by ops.config, let's see if
          *  we can manage it here. */
         if (strcmp(req->name, "txhdroom") == 0) {
-            uint8_t hdroom;
-
-            ret = kstrtou8(req->value, 10, &hdroom);
-            if (ret == 0) {
-                entry->txhdroom = hdroom;
-            }
-
+            ret = configstr_to_u16(req->value, &entry->txhdroom, NULL);
         } else if (strcmp(req->name, "rxhdroom") == 0) {
-            uint8_t hdroom;
-
-            ret = kstrtou8(req->value, 10, &hdroom);
-            if (ret == 0) {
-                entry->rxhdroom = hdroom;
-            }
-
+            ret = configstr_to_u16(req->value, &entry->rxhdroom, NULL);
         } else if (strcmp(req->name, "mss") == 0) {
-            uint32_t max_sdu_size;
-
-            ret = kstrtou32(req->value, 10, &max_sdu_size);
-            if (ret == 0) {
-                notify              = entry->max_sdu_size != max_sdu_size;
-                entry->max_sdu_size = max_sdu_size;
-            }
+            ret = configstr_to_u32(req->value, &entry->max_sdu_size, &notify);
         } else {
             ret = -EINVAL; /* unknown request */
         }

@@ -314,7 +314,7 @@ rl_io_write_iter(struct kiocb *iocb,
     }
 
     while (left) {
-        size_t copylen = min(left, ipcp->max_sdu_size);
+        size_t copylen = min(left, (size_t)ipcp->max_sdu_size);
 
         rb = rl_buf_alloc(copylen, ipcp->txhdroom, ipcp->tailroom, GFP_KERNEL);
         if (unlikely(!rb)) {
