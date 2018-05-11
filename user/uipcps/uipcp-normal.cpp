@@ -474,7 +474,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
                     kAddrAllocDistrNackWaitSecsMax);
     params_map[DFT::Prefix]["replicas"] = PolicyParam(string());
     params_map[uipcp_rib::EnrollmentPrefix]["timeout"] =
-        PolicyParam(kEnrollTimeout);
+        PolicyParam(kEnrollTimeoutMsecs);
     params_map[uipcp_rib::EnrollmentPrefix]["keepalive"] =
         PolicyParam(kKeepaliveTimeout);
     params_map[uipcp_rib::EnrollmentPrefix]["keepalive-thresh"] =

@@ -575,12 +575,12 @@ struct uipcp_rib {
      * RIB synchronizations. */
     static constexpr int kRIBRefreshIntval = 30;
 
-    /* Default value for keepalive parameter. */
+    /* Default value for keepalive parameters. */
     static constexpr int kKeepaliveTimeout = 10;
-
-    /* Timeout intervals are expressed in milliseconds. */
     static constexpr int kKeepaliveThresh = 3;
-    static constexpr int kEnrollTimeout   = 7000;
+
+    /* Enrollment timeouts in milliseconds. */
+    static constexpr int kEnrollTimeoutMsecs   = 7000;
 
     /* Default value for the A timer in milliseconds. */
     static constexpr int kATimerMsecsDflt = 20;
