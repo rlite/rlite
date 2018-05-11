@@ -24,4 +24,5 @@ rlite-ctl dif-policy-param-mod dd enrollment wrong-parameter 300 && exit 1
 rlite-ctl dif-policy-param-mod dd enrollment timeout wrong-value && exit 1
 rlite-ctl dif-policy-param-mod dd resalloc reliable-flows 1023 && exit 1
 rlite-ctl dif-policy-param-mod dd ribd refresh-intval false && exit 1
+rlite-ctl dif-policy-param-mod dd enrollment keepalive 10 && exit 1
 exit 0
