@@ -37,7 +37,7 @@
 #include <linux/netdevice.h>
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
-#include <linux/spinlock.h>
+#include <linux/rwlock.h>
 #include <linux/if_ether.h>
 
 #define ETH_P_RLITE 0xD1F0
@@ -81,7 +81,7 @@ struct rl_shim_eth {
 #define ETH_UPPER_NAMES 4
     char *upper_names[ETH_UPPER_NAMES];
     struct list_head arp_table;
-    spinlock_t arpt_lock;
+    rwlock_t arpt_lock;
     struct timer_list arp_resolver_tmr;
     bool arp_tmr_shutdown;
     struct list_head node;
@@ -139,8 +139,7 @@ rl_shim_eth_register(struct ipcp_entry *ipcp, char *appl, int reg)
 
 /* To be called under arpt_lock. */
 static struct arpt_entry *
-arp_lookup_direct_b(struct rl_shim_eth *priv, const char *dst_app,
-                    int dst_app_len)
+arpt_tpa_lookup(struct rl_shim_eth *priv, const char *dst_app, int dst_app_len)
 {
     struct arpt_entry *entry;
 
@@ -244,7 +243,7 @@ arp_resolver_cb(
 
     skb_queue_head_init(&skbq);
 
-    spin_lock_bh(&priv->arpt_lock);
+    write_lock_bh(&priv->arpt_lock);
 
     /* Scan the ARP table looking for incomplete entries. For each
      * incomplete entry found, generate a corresponding ARP request message.
@@ -277,7 +276,7 @@ arp_resolver_cb(
                   jiffies + msecs_to_jiffies(ARP_TMR_INT_MS));
     }
 
-    spin_unlock_bh(&priv->arpt_lock);
+    write_unlock_bh(&priv->arpt_lock);
 
     /* Send all the generated requests. */
     for (;;) {
@@ -322,10 +321,9 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
         return -EINVAL;
     }
 
-    spin_lock_bh(&priv->arpt_lock);
+    write_lock_bh(&priv->arpt_lock);
 
-    entry =
-        arp_lookup_direct_b(priv, flow->remote_appl, strlen(flow->remote_appl));
+    entry = arpt_tpa_lookup(priv, flow->remote_appl, strlen(flow->remote_appl));
     if (entry) {
         /* ARP entry already exist for remote application. */
         int ret;
@@ -337,7 +335,7 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
             ret = 0;
         }
 
-        spin_unlock_bh(&priv->arpt_lock);
+        write_unlock_bh(&priv->arpt_lock);
 
         if (ret == 0) {
             rl_fa_resp_arrived(ipcp, flow->local_port, 0, 0, 0, 0, NULL, false);
@@ -348,14 +346,14 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     entry = rl_alloc(sizeof(*entry), GFP_ATOMIC | __GFP_ZERO, RL_MT_SHIMDATA);
     if (!entry) {
-        spin_unlock_bh(&priv->arpt_lock);
+        write_unlock_bh(&priv->arpt_lock);
         goto nomem;
     }
 
     entry->tpa = rl_strdup(flow->remote_appl, GFP_ATOMIC, RL_MT_SHIMDATA);
     entry->spa = rl_strdup(flow->local_appl, GFP_ATOMIC, RL_MT_SHIMDATA);
     if (!entry->tpa || !entry->spa) {
-        spin_unlock_bh(&priv->arpt_lock);
+        write_unlock_bh(&priv->arpt_lock);
         goto nomem;
     }
 
@@ -367,7 +365,7 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
     rl_flow_stats_init(&entry->stats);
     list_add_tail(&entry->node, &priv->arp_table);
 
-    spin_unlock_bh(&priv->arpt_lock);
+    write_unlock_bh(&priv->arpt_lock);
 
     skb = arp_create(priv, ARPOP_REQUEST, flow->local_appl,
                      strlen(flow->local_appl), flow->remote_appl,
@@ -378,12 +376,12 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     dev_queue_xmit(skb);
 
-    spin_lock_bh(&priv->arpt_lock);
+    write_lock_bh(&priv->arpt_lock);
     if (!timer_pending(&priv->arp_resolver_tmr)) {
         mod_timer(&priv->arp_resolver_tmr,
                   jiffies + msecs_to_jiffies(ARP_TMR_INT_MS));
     }
-    spin_unlock_bh(&priv->arpt_lock);
+    write_unlock_bh(&priv->arpt_lock);
 
     return 0;
 
@@ -413,10 +411,9 @@ rl_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct rl_buf *rb, *tmp;
     int ret = -ENXIO;
 
-    spin_lock_bh(&priv->arpt_lock);
+    write_lock_bh(&priv->arpt_lock);
 
-    entry =
-        arp_lookup_direct_b(priv, flow->remote_appl, strlen(flow->remote_appl));
+    entry = arpt_tpa_lookup(priv, flow->remote_appl, strlen(flow->remote_appl));
     if (entry) {
         /* Drain the temporary rx queue. Calling rl_sdu_rx_flow() while
          * holding the ARP table spinlock it's not the best option, but
@@ -439,7 +436,7 @@ rl_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
         ret = 0;
     }
 
-    spin_unlock_bh(&priv->arpt_lock);
+    write_unlock_bh(&priv->arpt_lock);
 
     return ret;
 }
@@ -471,7 +468,7 @@ shim_eth_arp_rx(struct rl_shim_eth *priv, struct arphdr *arp, int len)
         return;
     }
 
-    spin_lock_bh(&priv->arpt_lock);
+    write_lock_bh(&priv->arpt_lock);
 
     if (ntohs(arp->ar_op) == ARPOP_REQUEST) {
         struct arpt_entry *entry;
@@ -532,7 +529,7 @@ shim_eth_arp_rx(struct rl_shim_eth *priv, struct arphdr *arp, int len)
         /* Update the ARP table with an entry SPA --> SHA. */
         struct arpt_entry *entry;
 
-        entry = arp_lookup_direct_b(priv, spa, arp->ar_pln);
+        entry = arpt_tpa_lookup(priv, spa, arp->ar_pln);
         if (!entry) {
             /* Gratuitous ARP reply. Don't accept it (for now). */
             PI("Dropped gratuitous ARP reply\n");
@@ -558,7 +555,7 @@ shim_eth_arp_rx(struct rl_shim_eth *priv, struct arphdr *arp, int len)
     }
 
 out:
-    spin_unlock_bh(&priv->arpt_lock);
+    write_unlock_bh(&priv->arpt_lock);
 
     if (flow) {
         /* This ARP reply is interpreted as a positive flow allocation
@@ -578,6 +575,20 @@ out:
     (*((uint16_t *)(m1) + 2) == *((uint16_t *)(m2) + 2) &&                     \
      *((uint32_t *)m1) == *((uint32_t *)m2))
 
+static struct arpt_entry *
+arpt_rx_lookup(struct rl_shim_eth *priv, char *source_mac)
+{
+    struct arpt_entry *entry;
+
+    list_for_each_entry (entry, &priv->arp_table, node) {
+        if (entry->complete && mac_equal(source_mac, entry->tha)) {
+            return entry;
+        }
+    }
+
+    return NULL;
+}
+
 static void
 shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
 {
@@ -585,8 +596,6 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     struct rl_buf *rb;
     struct ethhdr *hh = eth_hdr(skb);
     struct arpt_entry *entry;
-    struct flow_entry *flow = NULL;
-    bool match              = false;
 
     NPD("SHIM ETH PDU from %02X:%02X:%02X:%02X:%02X:%02X [%d]\n",
         hh->h_source[0], hh->h_source[1], hh->h_source[2], hh->h_source[3],
@@ -613,31 +622,29 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
 
     /* Shortcutting was not possible, we have to lookup the flow from
      * the source MAC address. */
+    read_lock_bh(&priv->arpt_lock);
 
-    spin_lock_bh(&priv->arpt_lock);
+    entry = arpt_rx_lookup(priv, hh->h_source);
 
-    list_for_each_entry (entry, &priv->arp_table, node) {
-        if (entry->complete && mac_equal(hh->h_source, entry->tha)) {
-            match = true;
-            flow  = entry->flow;
-            break;
-        }
-    }
+    if (likely(entry && entry->flow)) {
+        struct flow_entry *flow = entry->flow;
 
-    if (likely(flow)) {
         entry->stats.rx_pkt++;
         entry->stats.rx_byte += rb->len;
-        spin_unlock_bh(&priv->arpt_lock);
+        read_unlock_bh(&priv->arpt_lock);
 
         rl_sdu_rx_flow(ipcp, flow, rb, true);
 
         return;
     }
+    read_unlock_bh(&priv->arpt_lock);
 
     /* Here we are the flow allocation slave, we cannot be the flow
-     * allocation initiator. */
-
-    if (!match) {
+     * allocation initiator. We need to do the lookup again, as we
+     * have dropped the read lock. */
+    write_lock_bh(&priv->arpt_lock);
+    entry = arpt_rx_lookup(priv, hh->h_source);
+    if (!entry) {
         RPD(1,
             "PDU from unknown source MAC "
             "%02X:%02X:%02X:%02X:%02X:%02X\n",
@@ -693,12 +700,12 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     entry->stats.rx_pkt++;
     entry->stats.rx_byte += rb->len;
 
-    spin_unlock_bh(&priv->arpt_lock);
+    write_unlock_bh(&priv->arpt_lock);
     return;
 
 drop:
     entry->stats.rx_err++;
-    spin_unlock_bh(&priv->arpt_lock);
+    write_unlock_bh(&priv->arpt_lock);
     rl_buf_free(rb);
 }
 
@@ -949,7 +956,7 @@ rl_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
     struct rl_shim_eth *priv = (struct rl_shim_eth *)ipcp->priv;
     struct arpt_entry *entry;
 
-    spin_lock_bh(&priv->arpt_lock);
+    write_lock_bh(&priv->arpt_lock);
 
     list_for_each_entry (entry, &priv->arp_table, node) {
         if (entry->flow == flow) {
@@ -968,7 +975,7 @@ rl_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
         }
     }
 
-    spin_unlock_bh(&priv->arpt_lock);
+    write_unlock_bh(&priv->arpt_lock);
 
     return 0;
 }
@@ -979,15 +986,14 @@ rl_shim_eth_flow_get_stats(struct flow_entry *flow, struct rl_flow_stats *stats)
     struct arpt_entry *flow_priv = (struct arpt_entry *)flow->priv;
     struct rl_shim_eth *priv     = (struct rl_shim_eth *)flow->txrx.ipcp->priv;
 
+    (void)priv;
     stats->tx_pkt  = flow_priv->stats.tx_pkt;
     stats->tx_byte = flow_priv->stats.tx_byte;
     stats->tx_err  = flow_priv->stats.tx_err;
 
-    spin_lock_bh(&priv->arpt_lock);
     stats->rx_pkt  = flow_priv->stats.rx_pkt;
     stats->rx_byte = flow_priv->stats.rx_byte;
     stats->rx_err  = flow_priv->stats.rx_err;
-    spin_unlock_bh(&priv->arpt_lock);
 
     return 0;
 }
@@ -1014,7 +1020,7 @@ shim_eth_netdev_notify(struct notifier_block *nb, unsigned long event,
 
         /* This netdev is managed by one of our IPCPs. Scan the ARP table
          * to fetch the flows that are being used by upper IPCPs. */
-        spin_lock_bh(&priv->arpt_lock);
+        write_lock_bh(&priv->arpt_lock);
         list_for_each_entry (entry, &priv->arp_table, node) {
             struct flow_entry *flow = entry->flow;
             int ret;
@@ -1056,7 +1062,7 @@ shim_eth_netdev_notify(struct notifier_block *nb, unsigned long event,
                 }
             }
         }
-        spin_unlock_bh(&priv->arpt_lock);
+        write_unlock_bh(&priv->arpt_lock);
         break;
     }
 
@@ -1079,7 +1085,7 @@ rl_shim_eth_create(struct ipcp_entry *ipcp)
     priv->netdev    = NULL;
     priv->xmit_busy = NULL;
     INIT_LIST_HEAD(&priv->arp_table);
-    spin_lock_init(&priv->arpt_lock);
+    rwlock_init(&priv->arpt_lock);
 #ifdef RL_HAVE_TIMER_SETUP
     timer_setup(&priv->arp_resolver_tmr, arp_resolver_cb, 0);
 #else  /* !RL_HAVE_TIMER_SETUP */
@@ -1109,7 +1115,7 @@ rl_shim_eth_destroy(struct ipcp_entry *ipcp)
     list_del(&priv->node);
     mutex_unlock(&shims_lock);
 
-    spin_lock_bh(&priv->arpt_lock);
+    write_lock_bh(&priv->arpt_lock);
     list_for_each_entry_safe (entry, tmp, &priv->arp_table, node) {
         list_del_init(&entry->node);
         if (entry->spa) {
@@ -1119,7 +1125,7 @@ rl_shim_eth_destroy(struct ipcp_entry *ipcp)
         rl_free(entry, RL_MT_SHIMDATA);
     }
     priv->arp_tmr_shutdown = true;
-    spin_unlock_bh(&priv->arpt_lock);
+    write_unlock_bh(&priv->arpt_lock);
 
     del_timer_sync(&priv->arp_resolver_tmr);
 
