@@ -4,6 +4,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <memory>
+#include <iomanip>
 
 #include "uipcp-normal.hpp"
 #include "uipcp-normal-ceft.hpp"
@@ -366,7 +367,7 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
         virtual int process_rib_msg(
             const CDAPMessage *rm, rlm_addr_t src_addr,
             std::vector<CommandToSubmit> *commands) override;
-        void dump(std::stringstream &ss) const {} // TODO
+        void dump(std::stringstream &ss) const;
     };
     std::unique_ptr<Replica> raft;
 
@@ -561,6 +562,17 @@ CentralizedFaultTolerantAddrAllocator::Client::process_rib_msg(
     }
 
     return 0;
+}
+
+void
+CentralizedFaultTolerantAddrAllocator::Replica::dump(
+    std::stringstream &ss) const
+{
+    ss << "Address Allocation Table:" << std::endl;
+    for (const auto &kv : table) {
+        ss << "    " << std::setw(20) << kv.first;
+        ss << ": " << kv.second << std::endl;
+    }
 }
 
 /* Apply a command to the replicated state machine. We just need to update our
