@@ -544,15 +544,17 @@ CentralizedFaultTolerantAddrAllocator::Client::allocate(
     if (synchro->allocated.wait_for(lk, timeout) == std::cv_status::timeout) {
         UPE(rib->uipcp, "Address allocation for IPCP '%s' timed out\n",
             ipcp_name.c_str());
-        return -1;
+        ret = -1;
+    } else {
+        UPD(rib->uipcp, "Address %lu successfully allocated for IPCP '%s'\n",
+            (long unsigned)synchro->address, ipcp_name.c_str());
+        *addr = synchro->address;
+        ret   = 0;
     }
-    UPD(rib->uipcp, "Address %lu successfully allocated for IPCP '%s'\n",
-        (long unsigned)synchro->address, ipcp_name.c_str());
-    *addr = synchro->address;
 
     rib->lock();
 
-    return 0;
+    return ret;
 }
 
 int
