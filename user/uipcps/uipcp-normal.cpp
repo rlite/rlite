@@ -488,9 +488,9 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map[FlowAllocator::Prefix]["initial-credit"] =
         PolicyParam(kFlowControlInitialCredit);
     params_map[FlowAllocator::Prefix]["initial-a"] =
-        PolicyParam(kATimerMsecsDflt);
+        PolicyParam(std::chrono::milliseconds(int(kATimerMsecsDflt)));
     params_map[FlowAllocator::Prefix]["initial-rtx-timeout"] =
-        PolicyParam(kRtxTimerMsecsDflt);
+        PolicyParam(std::chrono::milliseconds(int(kRtxTimerMsecsDflt)));
     params_map[FlowAllocator::Prefix]["max-rtxq-len"] =
         PolicyParam(kRtxQueueMaxLen);
     params_map[uipcp_rib::ResourceAllocPrefix]["reliable-flows"] =

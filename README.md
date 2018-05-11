@@ -1048,8 +1048,8 @@ of a normal IPCP process:
 | enrollment          | *                 | auto-reconnect     | Automatically re-enroll to neighbors pruned because unresponsive. |
 | flowalloc           | local             | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
 | flowalloc           | local             | max-rtxq-len       | Maximum size of the retransmission queue (in PDUs). |
-| flowalloc           | local             | initial-rtx-timeout| Initial value for the DTCP retransmission timer (in milliseconds). |
-| flowalloc           | local             | initial-a          | Initial value for the DTCP A timer (in milliseconds). |
+| flowalloc           | local             | initial-rtx-timeout| Initial value for the DTCP retransmission timer. |
+| flowalloc           | local             | initial-a          | Initial value for the DTCP A timer. |
 | flowalloc           | local             | initial-credit     | Initial size of the DTCP flow control window (in PDUs). |
 | flowalloc           | local             | max-cwq-len        | Maximum size of the DTCP closed window queue (in PDUs). |
 | resalloc            | *                 | reliable-flows     | Use dedicated reliable N-1-flows for management traffic rather than reusing kernel-bound unreliable N-1 flows if possible (boolean). |

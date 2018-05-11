@@ -31,12 +31,12 @@ rlite-ctl dif-policy-param-mod dd enrollment auto-reconnect false || exit 1
 rlite-ctl dif-policy-param-list dd enrollment auto-reconnect | grep false || exit 1
 rlite-ctl dif-policy-param-mod dd flowalloc force-flow-control true || exit 1
 rlite-ctl dif-policy-param-list dd flowalloc force-flow-control | grep true || exit 1
-rlite-ctl dif-policy-param-mod dd flowalloc initial-a 41 || exit 1
-rlite-ctl dif-policy-param-list dd flowalloc initial-a | grep 41 || exit 1
+rlite-ctl dif-policy-param-mod dd flowalloc initial-a 41ms || exit 1
+rlite-ctl dif-policy-param-list dd flowalloc initial-a | grep 41ms || exit 1
 rlite-ctl dif-policy-param-mod dd flowalloc initial-credit 184 || exit 1
 rlite-ctl dif-policy-param-list dd flowalloc initial-credit | grep 184 || exit 1
-rlite-ctl dif-policy-param-mod dd flowalloc initial-rtx-timeout 1791 || exit 1
-rlite-ctl dif-policy-param-list dd flowalloc initial-rtx-timeout | grep 1791 || exit 1
+rlite-ctl dif-policy-param-mod dd flowalloc initial-rtx-timeout 1791ms || exit 1
+rlite-ctl dif-policy-param-list dd flowalloc initial-rtx-timeout | grep 1791ms || exit 1
 rlite-ctl dif-policy-param-mod dd flowalloc max-cwq-len 2961 || exit 1
 rlite-ctl dif-policy-param-mod dd flowalloc max-rtxq-len 915 || exit 1
 rlite-ctl dif-policy-param-list dd flowalloc max-cwq-len | grep 2961 || exit 1
