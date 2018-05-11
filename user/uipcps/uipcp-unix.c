@@ -656,9 +656,17 @@ socket_server(struct uipcps *uipcps)
 
         ret = pthread_create(&wi->th, NULL, worker_fn, wi);
         if (ret) {
-            PE("pthread_create() failed [%d]\n", errno);
+            PE("pthread_create() failed [%s]\n", strerror(ret));
+            if (ret != EAGAIN) {
+                /* Unrecoverable error. */
+                exit(EXIT_FAILURE);
+            }
+            /* Temporary failure due to lack of system resources. Wait a bit
+             * and retry. */
             close(wi->cfd);
             rl_free(wi, RL_MT_MISC);
+            sleep(3);
+            continue;
         }
 
         list_add_tail(&wi->node, &threads);
