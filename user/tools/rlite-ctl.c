@@ -72,6 +72,35 @@ struct cmd_descriptor {
     int (*func)(int argc, char **argv, struct cmd_descriptor *cd);
 };
 
+static void *
+malloc_or_quit(size_t size)
+{
+    void *mem = malloc(size);
+    if (!mem) {
+        PE("malloc(%u) failed\n", (unsigned)size);
+        exit(EXIT_FAILURE);
+    }
+    return mem;
+}
+
+static void *
+strdup_or_quit(const char *s)
+{
+    void *copy;
+
+    if (!s) {
+        return NULL;
+    }
+
+    copy = strdup(s);
+    if (!copy) {
+        PE("strdup(%u)\n", (unsigned)strlen(s));
+        exit(EXIT_FAILURE);
+    }
+
+    return copy;
+}
+
 static struct ipcp_attrs *
 lookup_ipcp_by_name(const char *name)
 {
@@ -452,8 +481,8 @@ ipcp_config(int argc, char **argv, struct cmd_descriptor *cd)
     req.hdr.msg_type = RLITE_U_IPCP_CONFIG;
     req.hdr.event_id = 0;
     req.ipcp_id      = attrs->id;
-    req.name         = strdup(param_name);
-    req.value        = strdup(param_value);
+    req.name         = strdup_or_quit(param_name);
+    req.value        = strdup_or_quit(param_value);
 
     return request_response(RLITE_MB(&req), NULL, TO_DFLT_MSECS);
 }
@@ -492,13 +521,9 @@ ipcp_config_get(int argc, char **argv, struct cmd_descriptor *cd)
 static int
 str_count_elems(const char *s)
 {
-    char *copy = strdup(s);
+    char *copy = strdup_or_quit(s);
     char *ctmp = copy;
     int n;
-
-    if (!copy) {
-        return -1;
-    }
 
     for (n = 0;; n++, ctmp = NULL) {
         if (strtok(ctmp, ", ") == NULL) {
@@ -583,20 +608,13 @@ ipcp_sched_config(int argc, char **argv, struct cmd_descriptor *cd)
         }
 
         /* Allocate array for weights. */
-        arr = malloc(n * sizeof(arr[0]));
-        if (!arr) {
-            return -1;
-        }
+        arr = malloc_or_quit(n * sizeof(arr[0]));
 
         /* Parse weights into the array. */
         {
-            char *copy = strdup(argv[5]);
+            char *copy = strdup_or_quit(argv[5]);
             char *ctmp = copy;
             int i;
-
-            if (!copy) {
-                return -1;
-            }
 
             for (i = 0;; i++, ctmp = NULL) {
                 char *token = strtok(ctmp, ", ");
@@ -639,11 +657,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
     ipcp_name = argv[0];
     dif_name  = argv[1];
 
-    req.ipcp_name = strdup(ipcp_name);
-    if (!req.ipcp_name) {
-        PE("Out of memory\n");
-        return -1;
-    }
+    req.ipcp_name = strdup_or_quit(ipcp_name);
 
     attrs = lookup_ipcp_by_name(req.ipcp_name);
     if (!attrs) {
@@ -653,7 +667,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
 
     req.hdr.msg_type = RLITE_U_IPCP_REGISTER;
     req.hdr.event_id = 0;
-    req.dif_name     = strdup(dif_name);
+    req.dif_name     = strdup_or_quit(dif_name);
     req.reg          = reg;
 
     return request_response(RLITE_MB(&req), NULL, TO_DFLT_MSECS);
@@ -688,11 +702,7 @@ ipcp_enroll_common(int argc, char **argv, rl_msg_t msg_type)
     supp_dif_name   = argv[2];
     neigh_ipcp_name = (argc >= 4) ? argv[3] : NULL;
 
-    req.ipcp_name = strdup(ipcp_name);
-    if (!req.ipcp_name) {
-        PE("Out of memory\n");
-        return -1;
-    }
+    req.ipcp_name = strdup_or_quit(ipcp_name);
 
     attrs = lookup_ipcp_by_name(req.ipcp_name);
     if (!attrs) {
@@ -702,9 +712,9 @@ ipcp_enroll_common(int argc, char **argv, rl_msg_t msg_type)
 
     req.hdr.msg_type  = msg_type;
     req.hdr.event_id  = 0;
-    req.dif_name      = strdup(dif_name);
-    req.neigh_name    = neigh_ipcp_name ? strdup(neigh_ipcp_name) : NULL;
-    req.supp_dif_name = strdup(supp_dif_name);
+    req.dif_name      = strdup_or_quit(dif_name);
+    req.neigh_name    = strdup_or_quit(neigh_ipcp_name);
+    req.supp_dif_name = strdup_or_quit(supp_dif_name);
 
     ret = request_response(RLITE_MB(&req), NULL, /*to_msecs=*/30000);
     if (ret) {
@@ -1000,12 +1010,8 @@ static char *
 component_name_wrap(const char *name)
 {
     int len    = strlen(name) + 30;
-    char *wrap = malloc(len);
+    char *wrap = malloc_or_quit(len);
 
-    if (!wrap) {
-        perror("malloc()");
-        return NULL;
-    }
     strcpy(wrap, "/mgmt/");
     strcat(wrap, name);
 
@@ -1032,9 +1038,9 @@ ipcp_policy_mod(int argc, char **argv, struct cmd_descriptor *cd)
             PE("Could not find any IPCP in DIF %s\n", name);
             return -1;
         }
-        req.ipcp_name = strdup(attrs->name);
+        req.ipcp_name = strdup_or_quit(attrs->name);
     } else {
-        req.ipcp_name = strdup(name);
+        req.ipcp_name = strdup_or_quit(name);
         attrs         = lookup_ipcp_by_name(req.ipcp_name);
         if (!attrs) {
             PE("Could not find IPC process %s\n", name);
@@ -1045,7 +1051,7 @@ ipcp_policy_mod(int argc, char **argv, struct cmd_descriptor *cd)
     req.hdr.msg_type = RLITE_U_IPCP_POLICY_MOD;
     req.hdr.event_id = 0;
     req.comp_name    = component_name_wrap(comp_name);
-    req.policy_name  = strdup(policy_name);
+    req.policy_name  = strdup_or_quit(policy_name);
 
     return request_response(RLITE_MB(&req), NULL, TO_DFLT_MSECS);
 }
@@ -1072,9 +1078,9 @@ ipcp_policy_param_mod(int argc, char **argv, struct cmd_descriptor *cd)
             PE("Could not find any IPCP in DIF %s\n", name);
             return -1;
         }
-        req.ipcp_name = strdup(attrs->name);
+        req.ipcp_name = strdup_or_quit(attrs->name);
     } else {
-        req.ipcp_name = strdup(name);
+        req.ipcp_name = strdup_or_quit(name);
         attrs         = lookup_ipcp_by_name(req.ipcp_name);
         if (!attrs) {
             PE("Could not find IPC process %s\n", name);
@@ -1085,8 +1091,8 @@ ipcp_policy_param_mod(int argc, char **argv, struct cmd_descriptor *cd)
     req.hdr.msg_type = RLITE_U_IPCP_POLICY_PARAM_MOD;
     req.hdr.event_id = 0;
     req.comp_name    = component_name_wrap(comp_name);
-    req.param_name   = strdup(param_name);
-    req.param_value  = strdup(param_value);
+    req.param_name   = strdup_or_quit(param_name);
+    req.param_value  = strdup_or_quit(param_value);
 
     return request_response(RLITE_MB(&req), NULL, TO_DFLT_MSECS);
 }
@@ -1101,7 +1107,7 @@ ipcp_enroller_mod(int argc, char **argv, struct cmd_descriptor *cd, int enable)
     assert(argc >= 1);
     ipcp_name = argv[0];
 
-    req.ipcp_name = strdup(ipcp_name);
+    req.ipcp_name = strdup_or_quit(ipcp_name);
     attrs         = lookup_ipcp_by_name(req.ipcp_name);
     if (!attrs) {
         PE("Could not find IPC process %s\n", ipcp_name);
@@ -1161,8 +1167,8 @@ ipcp_neigh_disconnect(int argc, char **argv, struct cmd_descriptor *cd)
     ipcp_name  = argv[0];
     neigh_name = argv[1];
 
-    req.ipcp_name  = strdup(ipcp_name);
-    req.neigh_name = strdup(neigh_name);
+    req.ipcp_name  = strdup_or_quit(ipcp_name);
+    req.neigh_name = strdup_or_quit(neigh_name);
     attrs          = lookup_ipcp_by_name(req.ipcp_name);
     if (!attrs) {
         PE("Could not find IPC process %s\n", ipcp_name);
@@ -1191,9 +1197,9 @@ ipcp_route_mod(int argc, char **argv, struct cmd_descriptor *cd)
         next_hops = argv[2];
     }
 
-    req.ipcp_name = strdup(ipcp_name);
-    req.dest_name = strdup(dest_name);
-    req.next_hops = next_hops ? strdup(next_hops) : NULL;
+    req.ipcp_name = strdup_or_quit(ipcp_name);
+    req.dest_name = strdup_or_quit(dest_name);
+    req.next_hops = strdup_or_quit(next_hops);
     attrs         = lookup_ipcp_by_name(req.ipcp_name);
     if (!attrs) {
         PE("Could not find IPC process %s\n", ipcp_name);
@@ -1254,9 +1260,9 @@ ipcp_rib_show(int argc, char **argv, struct cmd_descriptor *cd)
                 PE("Could not find any IPCP in DIF %s\n", name);
                 return -1;
             }
-            req.ipcp_name = strdup(attrs->name);
+            req.ipcp_name = strdup_or_quit(attrs->name);
         } else {
-            req.ipcp_name = strdup(name);
+            req.ipcp_name = strdup_or_quit(name);
             attrs         = lookup_ipcp_by_name(req.ipcp_name);
             if (!attrs) {
                 PE("Could not find IPC process %s\n", name);
@@ -1269,7 +1275,7 @@ ipcp_rib_show(int argc, char **argv, struct cmd_descriptor *cd)
             PE("Could not find any IPCP\n");
             return -1;
         }
-        req.ipcp_name = strdup(attrs->name);
+        req.ipcp_name = strdup_or_quit(attrs->name);
     }
 
     if (strcmp(cd->name, "dif-rib-show") == 0 ||
@@ -1314,16 +1320,16 @@ ipcp_policy_list(int argc, char **argv, struct cmd_descriptor *cd)
             PE("Could not find any IPCP\n");
             return -1;
         }
-        req.ipcp_name = strdup(attrs->name);
+        req.ipcp_name = strdup_or_quit(attrs->name);
     } else if (strcmp(cd->name, "dif-policy-list") == 0) {
         attrs = ipcp_by_dif(name);
         if (!attrs) {
             PE("Could not find any IPCP in DIF %s\n", name);
             return -1;
         }
-        req.ipcp_name = strdup(attrs->name);
+        req.ipcp_name = strdup_or_quit(attrs->name);
     } else {
-        req.ipcp_name = strdup(name);
+        req.ipcp_name = strdup_or_quit(name);
         attrs         = lookup_ipcp_by_name(req.ipcp_name);
         if (!attrs) {
             PE("Could not find IPC process %s\n", name);
@@ -1364,16 +1370,16 @@ ipcp_policy_param_list(int argc, char **argv, struct cmd_descriptor *cd)
             PE("Could not find any IPCP\n");
             return -1;
         }
-        req.ipcp_name = strdup(attrs->name);
+        req.ipcp_name = strdup_or_quit(attrs->name);
     } else if (strcmp(cd->name, "dif-policy-param-list") == 0) {
         attrs = ipcp_by_dif(name);
         if (!attrs) {
             PE("Could not find any IPCP in DIF %s\n", name);
             return -1;
         }
-        req.ipcp_name = strdup(attrs->name);
+        req.ipcp_name = strdup_or_quit(attrs->name);
     } else {
-        req.ipcp_name = strdup(name);
+        req.ipcp_name = strdup_or_quit(name);
         attrs         = lookup_ipcp_by_name(req.ipcp_name);
         if (!attrs) {
             PE("Could not find IPC process %s\n", name);
@@ -1384,7 +1390,7 @@ ipcp_policy_param_list(int argc, char **argv, struct cmd_descriptor *cd)
     req.hdr.msg_type = RLITE_U_IPCP_POLICY_PARAM_LIST_REQ;
     req.hdr.event_id = 0;
     req.comp_name    = comp_name ? component_name_wrap(comp_name) : NULL;
-    req.param_name   = param_name ? strdup(param_name) : NULL;
+    req.param_name   = strdup_or_quit(param_name);
 
     return request_response(RLITE_MB(&req), ipcp_rib_show_handler,
                             TO_DFLT_MSECS);
@@ -1431,12 +1437,7 @@ ipcps_load()
         assert(upd->hdr.msg_type == RLITE_KER_IPCP_UPDATE);
 
         if (upd->update_type == RL_IPCP_UPDATE_ADD) {
-            attrs = malloc(sizeof(*attrs));
-            if (!attrs) {
-                PE("Out of memory\n");
-                ret = -1;
-                break;
-            }
+            attrs = malloc_or_quit(sizeof(*attrs));
 
             attrs->id           = upd->ipcp_id;
             attrs->name         = upd->ipcp_name;

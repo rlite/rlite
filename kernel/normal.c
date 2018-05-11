@@ -119,6 +119,10 @@ rina_pci_dump(struct rina_pci *pci)
        (long unsigned)pci->seqnum);
 }
 
+/*
+ * Support for PDU schedulers.
+ */
+
 struct rl_sched_fifo {
     struct rb_list q;
     int qlen;
