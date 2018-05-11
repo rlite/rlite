@@ -14,7 +14,8 @@ rlite-ctl dif-policy-param-mod dd resalloc reliable-flows true || exit 1
 rlite-ctl dif-policy-param-mod dd resalloc reliable-n-flows true || exit 1
 rlite-ctl dif-policy-param-mod dd resalloc broadcast-enroller true || exit 1
 rlite-ctl dif-policy-param-mod dd ribd refresh-intval 10s || exit 1
-rlite-ctl dif-policy-param-mod dd routing age-incr-intval 10 || exit 1
+rlite-ctl dif-policy-param-mod dd routing age-incr-intval 10s || exit 1
+rlite-ctl dif-policy-param-mod dd routing age-max 199s || exit 1
 rlite-ctl dif-policy-param-mod dd addralloc nack-wait 1s || exit 1
 rlite-ctl dif-policy-param-mod dd addralloc nack-wait 99s || exit 1
 

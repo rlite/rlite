@@ -49,10 +49,10 @@ rlite-ctl dif-policy-param-mod dd resalloc broadcast-enroller true || exit 1
 rlite-ctl dif-policy-param-list dd resalloc broadcast-enroller | grep true || exit 1
 rlite-ctl dif-policy-param-mod dd ribd refresh-intval 916s || exit 1
 rlite-ctl dif-policy-param-list dd ribd refresh-intval | grep 916000ms || exit 1
-rlite-ctl dif-policy-param-mod dd routing age-incr-intval 107 || exit 1
-rlite-ctl dif-policy-param-mod dd routing age-max 771 || exit 1
-rlite-ctl dif-policy-param-list dd routing age-incr-intval | grep 107 || exit 1
-rlite-ctl dif-policy-param-list dd routing age-max | grep 771 || exit 1
+rlite-ctl dif-policy-param-mod dd routing age-incr-intval 107s || exit 1
+rlite-ctl dif-policy-param-mod dd routing age-max 771s || exit 1
+rlite-ctl dif-policy-param-list dd routing age-incr-intval | grep 107000ms || exit 1
+rlite-ctl dif-policy-param-list dd routing age-max | grep 771000ms || exit 1
 
 # Expect failure on the following ones
 rlite-ctl dif-policy-param-list dd wrong-component timeout 4004ms && exit 1

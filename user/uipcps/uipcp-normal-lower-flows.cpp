@@ -442,8 +442,8 @@ void
 uipcp_rib::age_incr_tmr_restart()
 {
     age_incr_timer = make_unique<TimeoutEvent>(
-        std::chrono::seconds(
-            get_param_value<int>(Routing::Prefix, "age-incr-intval")),
+        get_param_value<std::chrono::milliseconds>(Routing::Prefix,
+                                                   "age-incr-intval"),
         uipcp, this, [](struct uipcp *uipcp, void *arg) {
             uipcp_rib *rib = (uipcp_rib *)arg;
             rib->age_incr_timer->fired();
@@ -456,10 +456,10 @@ void
 FullyReplicatedLFDB::age_incr()
 {
     std::lock_guard<std::mutex> guard(rib->mutex);
-    unsigned int age_inc_intval =
-        rib->get_param_value<int>(Routing::Prefix, "age-incr-intval");
-    unsigned int age_max =
-        rib->get_param_value<int>(Routing::Prefix, "age-max");
+    auto age_inc_intval = rib->get_param_value<std::chrono::milliseconds>(
+        Routing::Prefix, "age-incr-intval");
+    auto age_max = rib->get_param_value<std::chrono::milliseconds>(
+        Routing::Prefix, "age-max");
     gpb::LowerFlowList prop_lfl;
 
     for (auto &kvi : db) {
@@ -472,9 +472,13 @@ FullyReplicatedLFDB::age_incr()
         }
 
         for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
-            jt->second.set_age(jt->second.age() + age_inc_intval);
+            auto next_age = std::chrono::seconds(jt->second.age());
 
-            if (jt->second.age() > age_max) {
+            next_age += std::chrono::duration_cast<std::chrono::seconds>(
+                age_inc_intval);
+            jt->second.set_age(next_age.count());
+
+            if (next_age > age_max) {
                 /* Insert this into the list of entries to be discarded. */
                 discard_list.push_back(jt);
             }

@@ -502,8 +502,9 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map[uipcp_rib::RibDaemonPrefix]["refresh-intval"] =
         PolicyParam(std::chrono::seconds(int(kRIBRefreshIntvalSecs)));
     params_map[Routing::Prefix]["age-incr-intval"] =
-        PolicyParam(kAgeIncrIntval);
-    params_map[Routing::Prefix]["age-max"] = PolicyParam(kAgeMax);
+        PolicyParam(std::chrono::seconds(int(kAgeIncrIntvalSecs)));
+    params_map[Routing::Prefix]["age-max"] =
+        PolicyParam(std::chrono::seconds(int(kAgeMaxSecs)));
 
     policy_mod(FlowAllocator::Prefix, "local");
     policy_mod(AddrAllocator::Prefix, "distributed");
