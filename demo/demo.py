@@ -464,8 +464,8 @@ if args.namespaces:
         assert(len(shim['vms']) == 2)
         vm0 = shim['vms'][0]
         vm1 = shim['vms'][1]
-        veth0 = '%s.%s' % (shim['name'], vm0)
-        veth1 = '%s.%s' % (shim['name'], vm1)
+        veth0 = '%s.%s' % (shim['name'][:7], vm0[:7])
+        veth1 = '%s.%s' % (shim['name'][:7], vm1[:7])
         outs += '(\n'\
                 'sudo ip link add %s type veth peer name %s\n'\
                 ') &\n'\
