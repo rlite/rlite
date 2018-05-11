@@ -206,7 +206,7 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
     const char *objbuf  = nullptr;
     raft::RaftSMOutput out;
     size_t objlen = 0;
-    int ret;
+    int ret       = 0;
 
     if (src_addr == RL_ADDR_NULL) {
         UPE(uipcp, "Source address not set\n");
@@ -293,6 +293,10 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
             pending[index] = utils::make_unique<PendingResp>(
                 std::move(command.second), src_addr, curr_term());
         }
+    }
+
+    if (ret) {
+        return ret;
     }
 
     /* Complete raft processing. */
