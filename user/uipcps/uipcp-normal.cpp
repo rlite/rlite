@@ -91,8 +91,8 @@ std::string uipcp_rib::RibDaemonPrefix     = "/mgmt/ribd";
 std::unordered_map<std::string, std::set<PolicyBuilder>>
     uipcp_rib::available_policies;
 
-TimeoutEvent::TimeoutEvent(std::chrono::milliseconds d, struct uipcp *u,
-                           void *a, uipcp_tmr_cb_t _cb)
+TimeoutEvent::TimeoutEvent(Msecs d, struct uipcp *u, void *a,
+                           uipcp_tmr_cb_t _cb)
     : delta(d), uipcp(u), arg(a), cb(_cb)
 {
     tmrid = uipcp_loop_schedule(uipcp, delta.count(), cb, arg);
@@ -473,12 +473,12 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     dt_constants.set_ctrl_seq_num_width(dt_constants.seq_num_width());
 
     params_map[AddrAllocator::Prefix]["nack-wait"] =
-        PolicyParam(std::chrono::seconds(int(kAddrAllocDistrNackWaitSecs)));
+        PolicyParam(Secs(int(kAddrAllocDistrNackWaitSecs)));
     params_map[DFT::Prefix]["replicas"] = PolicyParam(string());
     params_map[uipcp_rib::EnrollmentPrefix]["timeout"] =
-        PolicyParam(std::chrono::milliseconds(int(kEnrollTimeoutMsecs)));
+        PolicyParam(Msecs(int(kEnrollTimeoutMsecs)));
     params_map[uipcp_rib::EnrollmentPrefix]["keepalive"] =
-        PolicyParam(std::chrono::seconds(int(kKeepaliveTimeoutSecs)));
+        PolicyParam(Secs(int(kKeepaliveTimeoutSecs)));
     params_map[uipcp_rib::EnrollmentPrefix]["keepalive-thresh"] =
         PolicyParam(kKeepaliveThresh);
     params_map[uipcp_rib::EnrollmentPrefix]["auto-reconnect"] =
@@ -490,9 +490,9 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map[FlowAllocator::Prefix]["initial-credit"] =
         PolicyParam(kFlowControlInitialCredit);
     params_map[FlowAllocator::Prefix]["initial-a"] =
-        PolicyParam(std::chrono::milliseconds(int(kATimerMsecsDflt)));
+        PolicyParam(Msecs(int(kATimerMsecsDflt)));
     params_map[FlowAllocator::Prefix]["initial-rtx-timeout"] =
-        PolicyParam(std::chrono::milliseconds(int(kRtxTimerMsecsDflt)));
+        PolicyParam(Msecs(int(kRtxTimerMsecsDflt)));
     params_map[FlowAllocator::Prefix]["max-rtxq-len"] =
         PolicyParam(kRtxQueueMaxLen);
     params_map[uipcp_rib::ResourceAllocPrefix]["reliable-flows"] =
@@ -502,11 +502,11 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map[uipcp_rib::ResourceAllocPrefix]["broadcast-enroller"] =
         PolicyParam(true);
     params_map[uipcp_rib::RibDaemonPrefix]["refresh-intval"] =
-        PolicyParam(std::chrono::seconds(int(kRIBRefreshIntvalSecs)));
+        PolicyParam(Secs(int(kRIBRefreshIntvalSecs)));
     params_map[Routing::Prefix]["age-incr-intval"] =
-        PolicyParam(std::chrono::seconds(int(kAgeIncrIntvalSecs)));
+        PolicyParam(Secs(int(kAgeIncrIntvalSecs)));
     params_map[Routing::Prefix]["age-max"] =
-        PolicyParam(std::chrono::seconds(int(kAgeMaxSecs)));
+        PolicyParam(Secs(int(kAgeMaxSecs)));
 
     policy_mod(FlowAllocator::Prefix, "local");
     policy_mod(AddrAllocator::Prefix, "distributed");
@@ -587,7 +587,7 @@ uipcp_rib::~uipcp_rib()
         /* We must sleep out of the lock, to give the threads the opportunity
          * to go ahead and terminate. */
         UPD(uipcp, "Waiting for %d enrollment threads to terminate...\n", num);
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::this_thread::sleep_for(Msecs(500));
         lock();
     }
 
@@ -741,7 +741,7 @@ uipcp_rib::dump(std::stringstream &ss) const
 
             if (neigh->second->enrollment_complete()) {
                 ss << "[Enrolled, heard "
-                   << std::chrono::duration_cast<std::chrono::seconds>(
+                   << std::chrono::duration_cast<Secs>(
                           std::chrono::system_clock::now() -
                           neigh->second->unheard_since)
                           .count()
@@ -1322,10 +1322,9 @@ uipcp_rib::policy_param_mod(const std::string &component,
 
     /* Fix-ups. */
     {
-        auto eto = get_param_value<std::chrono::milliseconds>(
-            uipcp_rib::EnrollmentPrefix, "timeout");
-        auto ato = get_param_value<std::chrono::milliseconds>(
-            AddrAllocator::Prefix, "nack-wait");
+        auto eto =
+            get_param_value<Msecs>(uipcp_rib::EnrollmentPrefix, "timeout");
+        auto ato = get_param_value<Msecs>(AddrAllocator::Prefix, "nack-wait");
         auto minval = ato * 150 / 100;
 
         if (eto < minval) {
@@ -1786,9 +1785,9 @@ uipcp_rib::get_param_value<string>(const std::string &component,
 }
 
 template <>
-std::chrono::milliseconds
-uipcp_rib::get_param_value<std::chrono::milliseconds>(
-    const std::string &component, const std::string &param_name)
+Msecs
+uipcp_rib::get_param_value<Msecs>(const std::string &component,
+                                  const std::string &param_name)
 {
     assert(params_map.count(component) &&
            params_map[component].count(param_name));
@@ -1820,7 +1819,7 @@ PolicyParam::PolicyParam(int param_value, int range_min, int range_max)
     max     = range_max;
 }
 
-PolicyParam::PolicyParam(std::chrono::milliseconds val)
+PolicyParam::PolicyParam(Msecs val)
 {
     type   = PolicyParamType::Duration;
     durval = val;
@@ -1876,7 +1875,7 @@ PolicyParam::set_value(const std::string &param_value,
             if (m[2].str() == "s") {
                 x *= 1000;
             }
-            durval = std::chrono::milliseconds(x);
+            durval = Msecs(x);
         } else {
             *error_reason = "Invalid duration value (ex. 100ms)";
             return -1;
@@ -1912,7 +1911,7 @@ PolicyParam::get_string_value() const
     return stringval;
 };
 
-std::chrono::milliseconds
+Msecs
 PolicyParam::get_duration_value() const
 {
     assert(type == PolicyParamType::Duration);

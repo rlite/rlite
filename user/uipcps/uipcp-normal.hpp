@@ -68,6 +68,9 @@ namespace Uipcps {
 #define rl_delete(_exp, _ty) delete _exp
 #endif /* RL_MEMTRACK */
 
+using Msecs = std::chrono::milliseconds;
+using Secs  = std::chrono::seconds;
+
 enum class PolicyParamType {
     Int = 0,
     Bool,
@@ -85,13 +88,13 @@ struct PolicyParam {
     int min;
     int max;
     std::string stringval;
-    std::chrono::milliseconds durval;
+    Msecs durval;
 
     PolicyParam();
     PolicyParam(bool param_value);
     PolicyParam(int param_value, int range_min = 0, int range_max = 0);
     PolicyParam(const std::string &s);
-    PolicyParam(const std::chrono::milliseconds durval);
+    PolicyParam(const Msecs durval);
 
     friend std::ostream &operator<<(std::ostream &os, const PolicyParam &param);
 
@@ -99,7 +102,7 @@ struct PolicyParam {
     bool get_bool_value() const;
     int get_int_value() const;
     std::string get_string_value() const;
-    std::chrono::milliseconds get_duration_value() const;
+    Msecs get_duration_value() const;
 };
 
 struct Neighbor;
@@ -107,7 +110,7 @@ struct NeighFlow;
 struct uipcp_rib;
 
 struct TimeoutEvent {
-    std::chrono::milliseconds delta;
+    Msecs delta;
     struct uipcp *uipcp = nullptr;
     void *arg           = nullptr;
     uipcp_tmr_cb_t cb   = nullptr;
@@ -115,8 +118,7 @@ struct TimeoutEvent {
 
     RL_NONCOPIABLE(TimeoutEvent);
     RL_NONMOVABLE(TimeoutEvent);
-    TimeoutEvent(std::chrono::milliseconds d, struct uipcp *u, void *a,
-                 uipcp_tmr_cb_t _cb);
+    TimeoutEvent(Msecs d, struct uipcp *u, void *a, uipcp_tmr_cb_t _cb);
     void clear();
     void fired();
     bool is_pending() const { return tmrid != -1; }
@@ -816,8 +818,8 @@ int uipcp_rib::get_param_value<int>(const std::string &component,
                                     const std::string &param_name);
 
 template <>
-std::chrono::milliseconds uipcp_rib::get_param_value<std::chrono::milliseconds>(
-    const std::string &component, const std::string &param_name);
+Msecs uipcp_rib::get_param_value<Msecs>(const std::string &component,
+                                        const std::string &param_name);
 
 gpb::APName *apname2gpb(const std::string &name);
 std::string apname2string(const gpb::APName &gname);

@@ -453,7 +453,7 @@ class CentralizedFaultTolerantDFT : public DFT {
                        const raft::ReplicaId &r, uint32_t event_id)
                 : op_code(op), appl_name(a), replica(r), kevent_id(event_id)
             {
-                t = std::chrono::system_clock::now() + std::chrono::seconds(3);
+                t = std::chrono::system_clock::now() + Secs(3);
             }
         };
         std::unordered_map</*invoke_id*/ int, PendingReq> pending;
@@ -557,9 +557,8 @@ CentralizedFaultTolerantDFT::reconfigure()
             raft = make_unique<Replica>(this);
             peers.erase(it); /* remove myself */
 
-            raft->set_election_timeout(std::chrono::milliseconds(1000),
-                                       std::chrono::milliseconds(2000));
-            raft->set_heartbeat_timeout(std::chrono::milliseconds(100));
+            raft->set_election_timeout(Msecs(1000), Msecs(2000));
+            raft->set_heartbeat_timeout(Msecs(100));
             raft->set_verbosity(raft::RaftSM::kVerboseInfo);
 
             raft::RaftSMOutput out;
@@ -618,8 +617,8 @@ CentralizedFaultTolerantDFT::Client::mod_pending_timer()
         timer = nullptr;
     } else {
         timer = make_unique<TimeoutEvent>(
-            std::chrono::duration_cast<std::chrono::milliseconds>(t_min - now),
-            parent->rib->uipcp, this, [](struct uipcp *uipcp, void *arg) {
+            std::chrono::duration_cast<Msecs>(t_min - now), parent->rib->uipcp,
+            this, [](struct uipcp *uipcp, void *arg) {
                 auto cli =
                     static_cast<CentralizedFaultTolerantDFT::Client *>(arg);
                 cli->timer->fired();

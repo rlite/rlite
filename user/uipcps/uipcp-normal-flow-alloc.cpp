@@ -262,8 +262,8 @@ LocalFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
 {
     bool force_flow_control =
         rib->get_param_value<bool>(FlowAllocator::Prefix, "force-flow-control");
-    auto initial_a = rib->get_param_value<std::chrono::milliseconds>(
-        FlowAllocator::Prefix, "initial-a");
+    auto initial_a =
+        rib->get_param_value<Msecs>(FlowAllocator::Prefix, "initial-a");
 
     memset(cfg, 0, sizeof(*cfg));
 
@@ -279,8 +279,8 @@ LocalFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
         cfg->dtcp.rtx.max_time_to_retry = 15; /* unused for now */
         cfg->dtcp.rtx.data_rxms_max     = RL_DATA_RXMS_MAX_DFLT;
         cfg->dtcp.rtx.initial_rtx_timeout =
-            rib->get_param_value<std::chrono::milliseconds>(
-                   FlowAllocator::Prefix, "initial-rtx-timeout")
+            rib->get_param_value<Msecs>(FlowAllocator::Prefix,
+                                        "initial-rtx-timeout")
                 .count();
         cfg->dtcp.rtx.max_rtxq_len =
             rib->get_param_value<int>(FlowAllocator::Prefix, "max-rtxq-len");
