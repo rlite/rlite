@@ -957,7 +957,12 @@ rl_sched_replace(struct rl_normal *priv, const char *sched_name)
 {
     struct rl_sched_ops *ops = NULL;
     struct rl_sched *sched   = NULL;
-    struct rl_sched *old;
+    struct rl_sched *old     = priv->sched;
+
+    if (old && sched_name && !strcmp(old->ops.name, sched_name)) {
+        /* Nothing to do. */
+        return 0;
+    }
 
     if (rl_ipcp_has_flows(priv->ipcp, /*report_all=*/false)) {
         /* Do not allow scheduler changes if this IPCP is being
@@ -999,7 +1004,6 @@ rl_sched_replace(struct rl_normal *priv, const char *sched_name)
         init_waitqueue_head(&sched->wqh);
     }
 
-    old         = priv->sched;
     priv->sched = sched;
 
     if (old) {
