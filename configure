@@ -240,6 +240,7 @@ configure options:
     --no-kernel                 Don't build kernel code
     --no-user                   Don't build userspace code
     --sanitize-includes         Use IWYU if available
+    --clang                     Use clang/clang++ compilers for the build
 EOF
 }
 
@@ -259,6 +260,7 @@ BUILD_KERNEL="y"
 BUILD_USER="y"
 CLANG_PREFIX=""
 IWYU="n"
+USE_CLANG="n"
 
 # Option parsing
 while [[ $# > 0 ]]
@@ -357,6 +359,10 @@ do
         IWYU="y"
         ;;
 
+        "--clang")
+        USE_CLANG="y"
+        ;;
+
         *)
         echo "Unknown option '$key'"
         echo "Try ./configure --help"
@@ -423,6 +429,10 @@ ln -sf ../../common/ker-numtables.c ker-numtables.c
 ln -sf ../../common/utils.c utils.c
 )
 
+if [[ "$USE_CLANG" == "y" ]]; then
+    export CC=/usr/bin/clang
+    export CXX=/usr/bin/clang++
+fi
 
 if [ ${BUILD_USER} == "y" ]; then
     # Configure CMake for out-of-tree build
