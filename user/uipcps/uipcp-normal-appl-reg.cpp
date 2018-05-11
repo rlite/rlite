@@ -680,18 +680,16 @@ protected:
     std::unique_ptr<TimeoutEvent> timer;
 
     struct PendingReq {
-        gpb::OpCode op_code;
-        std::string appl_name;
         raft::ReplicaId replica;
-        uint32_t kevent_id;
+        gpb::OpCode op_code;
         std::chrono::system_clock::time_point t;
         PendingReq() = default;
-        PendingReq(gpb::OpCode op, const std::string &a,
-                   const raft::ReplicaId &r, uint32_t event_id)
-            : op_code(op), appl_name(a), replica(r), kevent_id(event_id)
+        PendingReq(const raft::ReplicaId &replica, gpb::OpCode op_code)
+            : replica(replica), op_code(op_code)
         {
             t = std::chrono::system_clock::now() + Secs(3);
         }
+        virtual std::unique_ptr<PendingReq> clone() const = 0;
     };
     std::unordered_map</*invoke_id*/ int, std::unique_ptr<PendingReq>> pending;
 
@@ -735,9 +733,9 @@ CeftClient::mod_pending_timer()
     for (auto mit = pending.begin(); mit != pending.end();) {
         if (mit->second->t <= now) {
             /* This request has expired. */
-            UPW(rib->uipcp, "DFT '%s' request for name '%s' timed out\n",
+            UPW(rib->uipcp, "'%s' request to replica '%s' timed out\n",
                 CDAPMessage::opcode_repr(mit->second->op_code).c_str(),
-                mit->second->appl_name.c_str());
+                mit->second->replica.c_str());
             if (mit->second->replica == leader_id) {
                 /* We got a timeout on the leader, let's forget about it. */
                 UPD(rib->uipcp, "Forgetting about raft leader %s\n",
@@ -825,6 +823,23 @@ class CentralizedFaultTolerantDFT : public DFT {
     /* In case of client, a pointer to client-side data structures. */
     class Client : public CeftClient {
         uint64_t seqnum_next = 1;
+
+        struct PendingReq : public CeftClient::PendingReq {
+            std::string appl_name;
+            uint32_t kevent_id;
+            PendingReq() = default;
+            PendingReq(const raft::ReplicaId &replica, gpb::OpCode op_code,
+                       const std::string &appl_name, uint32_t kevent_id)
+                : CeftClient::PendingReq(replica, op_code),
+                  appl_name(appl_name),
+                  kevent_id(kevent_id)
+            {
+            }
+            std::unique_ptr<CeftClient::PendingReq> clone() const override
+            {
+                return make_unique<PendingReq>(*this);
+            }
+        };
 
     public:
         Client(CentralizedFaultTolerantDFT *dft,
@@ -932,7 +947,7 @@ CeftClient::read_from_replicas(std::unique_ptr<CDAPMessage> m,
     for (const auto &r : replicas) {
         if (reader_id.empty() || r == reader_id) {
             auto mc  = make_unique<CDAPMessage>(*m);
-            auto prc = make_unique<PendingReq>(*pr);
+            auto prc = pr->clone();
             int invoke_id;
             int ret;
 
@@ -964,7 +979,7 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
 
     m->m_read(ObjClass, TableName + "/" + appl_name);
 
-    auto pr = make_unique<PendingReq>(m->op_code, appl_name, string(), 0);
+    auto pr = make_unique<PendingReq>(string(), m->op_code, appl_name, 0);
     int ret = read_from_replicas(std::move(m), std::move(pr));
     if (ret) {
         return ret;
@@ -1009,7 +1024,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
             /* Set the 'pending' map before sending, in case we are sending to
              * ourselves (and so we wouldn't find the entry in the map).*/
             m->invoke_id = invoke_id = rib->invoke_id_mgr.get_invoke_id();
-            pending[invoke_id] = make_unique<PendingReq>(op_code, appl_name, r,
+            pending[invoke_id] = make_unique<PendingReq>(r, op_code, appl_name,
                                                          req->hdr.event_id);
             ret = rib->send_to_dst_node(std::move(m), r, &dft_entry, nullptr);
             if (ret) {
@@ -1057,6 +1072,7 @@ CentralizedFaultTolerantDFT::Client::rib_handler(
             rm->invoke_id);
         return 0;
     }
+    PendingReq const *pr = dynamic_cast<PendingReq *>(pi->second.get());
 
     /* Check that rm->op_code is consistent with the pending request. */
     if (pi->second->op_code + 1 != rm->op_code) {
@@ -1087,11 +1103,9 @@ CentralizedFaultTolerantDFT::Client::rib_handler(
         if (rm->op_code == gpb::M_WRITE_R) {
             /* Registrations need a response. */
             uipcp_appl_register_resp(uipcp, rm->result ? RLITE_ERR : RLITE_SUCC,
-                                     pi->second->kevent_id,
-                                     pi->second->appl_name.c_str());
+                                     pr->kevent_id, pr->appl_name.c_str());
         }
-        UPD(uipcp, "Application %s %sregistration %s\n",
-            pi->second->appl_name.c_str(),
+        UPD(uipcp, "Application %s %sregistration %s\n", pr->appl_name.c_str(),
             rm->op_code == gpb::M_WRITE_R ? "" : "un",
             rm->result ? "failed" : "was successful");
         break;
@@ -1100,13 +1114,13 @@ CentralizedFaultTolerantDFT::Client::rib_handler(
 
         if (rm->result) {
             UPD(uipcp, "Lookup of name '%s' failed remotely [%s]\n",
-                pi->second->appl_name.c_str(), rm->result_reason.c_str());
+                pr->appl_name.c_str(), rm->result_reason.c_str());
         } else {
             rm->get_obj_value(remote_node);
             UPD(uipcp, "Lookup of name '%s' resolved to node '%s'\n",
-                pi->second->appl_name.c_str(), remote_node.c_str());
+                pr->appl_name.c_str(), remote_node.c_str());
         }
-        rib->dft_lookup_resolved(pi->second->appl_name, remote_node);
+        rib->dft_lookup_resolved(pr->appl_name, remote_node);
         break;
     }
     default:
