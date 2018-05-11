@@ -1291,6 +1291,8 @@ UipcpRib::policy_mod(const std::string &component,
     /* Reconfigure the new component, if necessary. */
     if (component == DFT::Prefix) {
         dft->reconfigure();
+    } else if (component == AddrAllocator::Prefix) {
+        addra->reconfigure();
     }
 
     return ret;
@@ -1333,7 +1335,12 @@ UipcpRib::policy_param_mod(const std::string &component,
     UPD(uipcp, "set %s policy param %s <== '%s'\n", component.c_str(),
         param_name.c_str(), param_value.c_str());
 
-    /* Invoke the reconfigure() method if available. */
+    /* Invoke the reconfigure() method if available.
+     * TODO: Figure out a better way to handle policy setup. Point is that
+     * some parameters can be dynamically changed anytime (e.g. timeouts),
+     * while others must be prepared before the policy can become operative
+     * (e.g. replicas for ceft). We should handle those parameters
+     * differently. */
     if (component == DFT::Prefix) {
         dft->reconfigure();
     } else if (component == AddrAllocator::Prefix) {

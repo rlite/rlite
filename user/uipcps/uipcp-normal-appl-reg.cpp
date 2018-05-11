@@ -479,12 +479,16 @@ CentralizedFaultTolerantDFT::reconfigure()
     list<raft::ReplicaId> peers;
     string replicas;
 
+    if (client) {
+        return 0; /* nothing to do */
+    }
+
     replicas = rib->get_param_value<std::string>(DFT::Prefix, "replicas");
     if (replicas.empty()) {
         UPW(rib->uipcp, "replicas param not configured\n");
-    } else {
-        UPD(rib->uipcp, "replicas = %s\n", replicas.c_str());
+        return 0;
     }
+    UPD(rib->uipcp, "replicas = %s\n", replicas.c_str());
     peers = strsplit(replicas, ',');
 
     /* Create the client anyway. */
