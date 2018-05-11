@@ -39,6 +39,8 @@
 
 #define RMTQ_MAX_SIZE (1 << 17)
 
+static LIST_HEAD(rl_pdu_schedulers);
+
 /* PCI header to be used for transfer PDUs.
  * The order of the fields is extremely important, because we only
  * accept struct layouts where the compiler does not insert any
@@ -176,6 +178,14 @@ sched_fifo_deq(struct rl_sched *sched)
 
     return rb;
 }
+
+static struct rl_sched_ops rl_sched_fifo_ops = {
+    .name      = "fifo",
+    .priv_size = sizeof(struct rl_sched_fifo),
+    .init      = sched_fifo_init,
+    .fini      = sched_fifo_fini,
+    .enq       = sched_fifo_enq,
+    .deq       = sched_fifo_deq};
 
 /* In general RL_PCI_LEN != sizeof(struct rina_pci) and
  * RL_PCI_CTRL_LEN != sizeof(struct rina_pci_ctrl), since
@@ -839,10 +849,26 @@ sched_deq_worker(struct work_struct *w)
  * TODO Eventually we would like to support run-time replacement,
  * probably using sleeping RCU. */
 static int
-rl_sched_replace(struct rl_normal *priv, struct rl_sched_ops *ops)
+rl_sched_replace(struct rl_normal *priv, const char *sched_name)
 {
-    struct rl_sched *sched = NULL;
+    struct rl_sched_ops *ops = NULL;
+    struct rl_sched *sched   = NULL;
     struct rl_sched *old;
+
+    if (sched_name != NULL) {
+        struct rl_sched_ops *cur;
+
+        list_for_each_entry (cur, &rl_pdu_schedulers, node) {
+            if (!strcmp(sched_name, cur->name)) {
+                ops = cur;
+                break;
+            }
+        }
+        if (ops == NULL) {
+            /* Could not find a PDU scheduler named 'sched_name'. */
+            return -1;
+        }
+    }
 
     if (ops) {
         sched = rl_alloc(sizeof(*sched) + ops->priv_size,
@@ -852,6 +878,7 @@ rl_sched_replace(struct rl_normal *priv, struct rl_sched_ops *ops)
         }
 
         sched->ops = *ops;
+        INIT_LIST_HEAD(&sched->ops.node);
         if (sched->ops.init(sched)) {
             rl_free(sched, RL_MT_SHIM);
             return -1;
@@ -1960,16 +1987,8 @@ rl_normal_create(struct ipcp_entry *ipcp)
 
     INIT_WORK(&priv->sched_deq_work, sched_deq_worker);
     if (false) {
-        struct rl_sched_ops fifo_ops = {
-            .name      = "fifo",
-            .priv_size = sizeof(struct rl_sched_fifo),
-            .init      = sched_fifo_init,
-            .fini      = sched_fifo_fini,
-            .enq       = sched_fifo_enq,
-            .deq       = sched_fifo_deq};
-
-        if (rl_sched_replace(priv, &fifo_ops)) {
-            PE("Failed to replace PDU scheduler with '%s'\n", fifo_ops.name);
+        if (rl_sched_replace(priv, "fifo")) {
+            PE("Failed to replace PDU scheduler with fifo\n");
         }
     }
 
@@ -2045,6 +2064,9 @@ rl_normal_init(void)
     PI("Flavour %s: DT PCI %u bytes, CTRL PCI %u bytes\n", SHIM_DIF_TYPE,
        (unsigned)sizeof(struct rina_pci),
        (unsigned)sizeof(struct rina_pci_ctrl));
+
+    /* Build the (static) list of PDU schedulers. */
+    list_add_tail(&rl_sched_fifo_ops.node, &rl_pdu_schedulers);
 
     return rl_ipcp_factory_register(&normal_factory);
 }

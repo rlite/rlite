@@ -761,6 +761,7 @@ struct rl_sched_ops {
     void (*fini)(struct rl_sched *);
     int (*enq)(struct rl_sched *, struct rl_buf *);
     struct rl_buf *(*deq)(struct rl_sched *);
+    struct list_head node;
 };
 
 struct rl_sched {
