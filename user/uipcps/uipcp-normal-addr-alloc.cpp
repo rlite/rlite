@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <sstream>
 #include <string>
 #include <unistd.h>
@@ -356,13 +357,22 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
         rlm_addr_t next_unused_address = 1;
 
     public:
-        Replica(CentralizedFaultTolerantAddrAllocator *aa)
+        Replica(CentralizedFaultTolerantAddrAllocator *aa,
+                std::list<raft::ReplicaId> peers)
             : CeftReplica(aa->rib, std::string("ceft-aa-") + aa->rib->myname,
                           aa->rib->myname,
                           std::string("/tmp/ceft-aa-") +
                               std::to_string(aa->rib->uipcp->id) +
                               std::string("-") + aa->rib->myname,
-                          sizeof(Command), AddrAllocator::TableName){};
+                          sizeof(Command), AddrAllocator::TableName)
+        {
+            /* Allocate addresses for the replicas in advance. */
+            std::vector<raft::ReplicaId> peersv(peers.begin(), peers.end());
+            std::sort(peersv.begin(), peersv.end());
+            for (const auto &peer : peersv) {
+                table[peer] = next_unused_address++;
+            }
+        };
         int apply(const char *const serbuf) override;
         virtual int process_rib_msg(
             const CDAPMessage *rm, rlm_addr_t src_addr,
@@ -478,7 +488,7 @@ CentralizedFaultTolerantAddrAllocator::reconfigure()
         if (*it == rib->myname) {
             /* I'm one of the replicas. Create a Raft state machine and
              * initialize it. */
-            raft = make_unique<Replica>(this);
+            raft = make_unique<Replica>(this, peers);
             peers.erase(it); /* remove myself */
 
             return raft->init(peers);
