@@ -70,6 +70,7 @@ struct arpt_entry {
 };
 
 struct eth_tx_queue {
+#define RL_TXQ_XMIT_BUSY 0
     unsigned long xmit_busy;
 } __attribute__((aligned(64)));
 
@@ -762,7 +763,7 @@ shim_eth_skb_destructor(struct sk_buff *skb)
     struct ipcp_entry *ipcp  = flow->txrx.ipcp;
     struct rl_shim_eth *priv = ipcp->priv;
 
-    if (test_and_clear_bit(0,
+    if (test_and_clear_bit(RL_TXQ_XMIT_BUSY,
                            &priv->txq[skb_get_queue_mapping(skb)].xmit_busy)) {
         rl_write_restart_flows(ipcp);
     }
@@ -775,7 +776,7 @@ rl_shim_eth_flow_writeable(struct flow_entry *flow)
     int i;
 
     for (i = 0; i < priv->netdev->num_tx_queues; i++) {
-        if (!test_bit(0, &priv->txq[i].xmit_busy)) {
+        if (!test_bit(RL_TXQ_XMIT_BUSY, &priv->txq[i].xmit_busy)) {
             return true;
         }
     }
@@ -853,7 +854,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         RPV(1, "dev_queue_xmit() failed [%d]\n", ret);
         entry->stats.tx_err++;
         for (i = 0; i < priv->netdev->num_tx_queues; i++) {
-            set_bit(0, &priv->txq[i].xmit_busy);
+            set_bit(RL_TXQ_XMIT_BUSY, &priv->txq[i].xmit_busy);
         }
 #ifndef RL_SKB
         return -EAGAIN; /* backpressure */
