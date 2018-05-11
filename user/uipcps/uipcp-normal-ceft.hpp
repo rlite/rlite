@@ -74,6 +74,7 @@ protected:
     UipcpRib *rib = nullptr;
 
 public:
+    RL_NODEFAULT_NONCOPIABLE(CeftReplica);
     CeftReplica(UipcpRib *rib, const std::string &smname,
                 const raft::ReplicaId &myname, std::string logname,
                 size_t cmd_size, const std::string rib_obj_name)
@@ -137,6 +138,7 @@ protected:
     void mod_pending_timer();
 
 public:
+    RL_NODEFAULT_NONCOPIABLE(CeftClient);
     CeftClient(UipcpRib *rib, std::list<raft::ReplicaId> names)
         : rib(rib), replicas(std::move(names))
     {

@@ -58,7 +58,6 @@ public:
                    unsigned int limit) const override;
     int neighs_refresh(size_t limit) override;
 
-    /* Helper function shared with CentralizedFaultTolerantDFT::Replica. */
     void mod_table(const gpb::DFTEntry &e, bool add, gpb::DFTSlice *added,
                    gpb::DFTSlice *removed);
 };
