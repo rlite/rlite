@@ -748,6 +748,8 @@ RoutingEngine::compute_next_hops(const NodeId &local_node)
         cout << ss.str();
     }
 
+    rib->stats.routing_table_compute++;
+
     return 0;
 }
 
@@ -910,6 +912,7 @@ RoutingEngine::compute_fwd_table()
     }
 
     next_ports = next_ports_new;
+    rib->stats.fwd_table_compute++;
 
     return 0;
 }

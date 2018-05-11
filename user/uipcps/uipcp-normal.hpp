@@ -571,6 +571,11 @@ struct UipcpRib {
     /* Timer ID for age increment of LFDB entries. */
     std::unique_ptr<TimeoutEvent> age_incr_timer;
 
+    struct {
+        uint64_t routing_table_compute;
+        uint64_t fwd_table_compute;
+    } stats;
+
     /* Time interval (in seconds) between two consecutive increments
      * of the age of LFDB entries. */
     static constexpr int kAgeIncrIntvalSecs = 10;
