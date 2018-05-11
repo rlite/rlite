@@ -167,8 +167,8 @@ rl_normal_destroy(struct ipcp_entry *ipcp)
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
 
     cancel_work_sync(&priv->sched_deq_work);
-    if (priv->sched_destroy) {
-        priv->sched_destroy(priv);
+    if (priv->sched_ops.destroy) {
+        priv->sched_ops.destroy(priv);
     }
 
     rl_pduft_flush(ipcp);
@@ -782,7 +782,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
 
         for (;;) {
             current->state = TASK_INTERRUPTIBLE;
-            if (priv->sched_enq(priv, rb)) {
+            if (priv->sched_ops.enq(priv, rb)) {
                 /* The queue backlog is becoming too large. */
 
                 if (maysleep) {
@@ -800,7 +800,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                     /* Since we cannot sleep, we help the dequeuer to do its
                      * job, rather than dropping. We dequeue a single PDU and
                      * retry. */
-                    struct rl_buf *drb = priv->sched_deq(priv);
+                    struct rl_buf *drb = priv->sched_ops.deq(priv);
 
                     BUG_ON(!drb);
                     rb_list_enq(drb, &drbs);
@@ -1227,7 +1227,7 @@ sched_deq_worker(struct work_struct *w)
         /* Dequeue a batch of PDUs. */
         spin_lock_bh(&priv->sched_qlock);
         for (i = 0; i < 8; i++) {
-            rb = priv->sched_deq(priv);
+            rb = priv->sched_ops.deq(priv);
             if (!rb) {
                 break;
             }
@@ -1260,15 +1260,17 @@ sched_deq_worker(struct work_struct *w)
 static void
 rl_sched_init(struct rl_normal *priv)
 {
-    priv->sched_create  = sched_fifo_create;
-    priv->sched_destroy = sched_fifo_destroy;
-    priv->sched_enq     = sched_fifo_enq;
-    priv->sched_deq     = sched_fifo_deq;
+    struct rl_sched_ops fifo_ops = {.create  = sched_fifo_create,
+                                    .destroy = sched_fifo_destroy,
+                                    .enq     = sched_fifo_enq,
+                                    .deq     = sched_fifo_deq};
+
+    priv->sched_ops = fifo_ops;
 
     spin_lock_init(&priv->sched_qlock);
     INIT_WORK(&priv->sched_deq_work, sched_deq_worker);
     init_waitqueue_head(&priv->sched_wqh);
-    priv->sched_priv = priv->sched_create(priv);
+    priv->sched_priv = priv->sched_ops.create(priv);
     if (!priv->sched_priv) {
         PE("Failed to init PDU scheduler\n");
     }

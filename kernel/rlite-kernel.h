@@ -752,6 +752,15 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
     txrx->flags  = 0;
 }
 
+struct rl_normal;
+
+struct rl_sched_ops {
+    void *(*create)(struct rl_normal *);
+    void (*destroy)(struct rl_normal *);
+    int (*enq)(struct rl_normal *, struct rl_buf *);
+    struct rl_buf *(*deq)(struct rl_normal *);
+};
+
 /* Implementation of the normal IPCP. */
 struct rl_normal {
     struct ipcp_entry *ipcp;
@@ -769,11 +778,8 @@ struct rl_normal {
     spinlock_t sched_qlock;
     struct work_struct sched_deq_work;
     wait_queue_head_t sched_wqh;
-    void *(*sched_create)(struct rl_normal *);
-    void (*sched_destroy)(struct rl_normal *);
-    int (*sched_enq)(struct rl_normal *, struct rl_buf *);
-    struct rl_buf *(*sched_deq)(struct rl_normal *);
     void *sched_priv;
+    struct rl_sched_ops sched_ops;
 };
 
 void dtp_init(struct dtp *dtp);
