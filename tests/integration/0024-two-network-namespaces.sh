@@ -57,4 +57,9 @@ ip netns exec red rlite-ctl dif-policy-param-list mydif dft replicas | grep "\<o
 
 # Check application connectivity
 ip netns exec red rinaperf -z rpinst1 -p 1 -c 7 -i 20 || abort
+
+# Check if uipcp-stats-show works
+ip netns exec red rlite-ctl uipcp-stats-show || abort
+ip netns exec green rlite-ctl uipcp-stats-show || abort
+
 cleanup
