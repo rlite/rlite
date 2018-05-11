@@ -149,7 +149,23 @@ main(int argc, char **argv)
      * destination node. */
     std::list<std::pair<TestLFDB::LinksList, ReachabilityTests>> test_vectors =
         {{/*links=*/{{0, 1}, {0, 3}, {1, 2}, {2, 3}},
-          /*reachability_tests=*/{{1, 1}, {2, 2}, {3, 1}}}};
+          /*reachability_tests=*/{{1, 1}, {2, 2}, {3, 1}}},
+         {/*links=*/{{0, 1},
+                     {0, 2},
+                     {0, 3},
+                     {1, 4},
+                     {2, 3},
+                     {2, 5},
+                     {3, 4},
+                     {3, 5},
+                     {4, 5},
+                     {4, 6},
+                     {4, 7},
+                     {5, 6},
+                     {6, 7},
+                     {7, 8}},
+          /*reachability_tests=*/{
+              {1, 1}, {2, 1}, {3, 1}, {4, 2}, {5, 2}, {6, 3}, {7, 3}, {8, 4}}}};
 
     {
         /* Generate a grid-shaped network of size 'sqn' x 'sqn'. */
