@@ -486,6 +486,9 @@ RaftSM::prepare_append_entries(LogReplicateStrategy strategy, RaftSMOutput *out)
         if (strategy == LogReplicateStrategy::Unacked &&
             now >= kv.second.last_ae_time + RtxTimeout) {
             kv.second.next_index_unacked = kv.second.next_index_acked;
+            if (kv.second.next_index_unacked < last_log_index) {
+                IOS_INF() << "Retransmitting to " << kv.first << endl;
+            }
         }
 
         do {
