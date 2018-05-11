@@ -1266,7 +1266,7 @@ UipcpRib::policy_mod(const std::string &component,
         return 0; /* nothing to do */
     }
 
-    /* Unregister previous RIB paths, if any. */
+    /* Unregister previous RIB paths and parameters, if any. */
     if (!policies[component].empty()) {
         auto prev_builder =
             available_policies[component].find(policies[component]);
@@ -1281,6 +1281,14 @@ UipcpRib::policy_mod(const std::string &component,
             UPV(uipcp, "policy param '%s.%s' unregistered\n", component.c_str(),
                 pp.first.c_str());
         }
+    }
+
+    /* Register the new policy parameters. This is done before building the
+     * component, as parameters may be needed during creation. */
+    for (const auto &pp : policy_builder->params) {
+        params_map[component][pp.first] = pp.second;
+        UPV(uipcp, "policy param '%s.%s' registered\n", component.c_str(),
+            pp.first.c_str());
     }
 
     /* Set the new policy. */
@@ -1304,12 +1312,6 @@ UipcpRib::policy_mod(const std::string &component,
                                                      const MsgSrcInfo &src) {
             return components[component]->rib_handler(rm, src);
         });
-    }
-    /* Register the new policy parameters. */
-    for (const auto &pp : policy_builder->params) {
-        params_map[component][pp.first] = pp.second;
-        UPV(uipcp, "policy param '%s.%s' registered\n", component.c_str(),
-            pp.first.c_str());
     }
     /* Reconfigure the new component, if necessary. */
     if (components[component]) {
