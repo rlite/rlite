@@ -61,8 +61,8 @@ enum {
     RLITE_KER_REG_FETCH,             /* 29 */
     RLITE_KER_REG_FETCH_RESP,        /* 30 */
     RLITE_KER_FLOW_STATE,            /* 31 */
-    RLITE_KER_IPCP_STATS_REQ,    /* 32 */
-    RLITE_KER_IPCP_STATS_RESP,   /* 33 */
+    RLITE_KER_IPCP_STATS_REQ,        /* 32 */
+    RLITE_KER_IPCP_STATS_RESP,       /* 33 */
     RLITE_KER_IPCP_CONFIG_GET_REQ,   /* 34 */
     RLITE_KER_IPCP_CONFIG_GET_RESP,  /* 35 */
 

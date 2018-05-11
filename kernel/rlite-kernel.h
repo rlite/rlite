@@ -700,7 +700,8 @@ void __flow_put(struct flow_entry *flow, bool lock);
 #define flow_put(_f)                                                           \
     do {                                                                       \
         if (_f)                                                                \
-            PV("FLOWREFCNT %u --: %u\n", (_f)->local_port, atomic_read(&(_f)->refcnt) - 1);  \
+            PV("FLOWREFCNT %u --: %u\n", (_f)->local_port,                     \
+               atomic_read(&(_f)->refcnt) - 1);                                \
         __flow_put(_f, true);                                                  \
     } while (0)
 

@@ -913,7 +913,8 @@ flow_get(rl_port_t port_id)
     flow = flow_lookup(port_id);
     if (flow) {
         atomic_inc(&flow->refcnt);
-        PV("FLOWREFCNT %u ++: %u\n", flow->local_port, atomic_read(&flow->refcnt));
+        PV("FLOWREFCNT %u ++: %u\n", flow->local_port,
+           atomic_read(&flow->refcnt));
     }
     FRUNLOCK();
 
@@ -934,7 +935,8 @@ flow_get_by_cep(unsigned int cep_id)
     hlist_for_each_entry (entry, head, node_cep) {
         if (entry->local_cep == cep_id) {
             atomic_inc(&entry->refcnt);
-            PV("FLOWREFCNT %u ++: %u\n", entry->local_port, atomic_read(&entry->refcnt));
+            PV("FLOWREFCNT %u ++: %u\n", entry->local_port,
+               atomic_read(&entry->refcnt));
             FRUNLOCK();
             return entry;
         }
@@ -1052,7 +1054,7 @@ __flow_put(struct flow_entry *entry, bool lock)
         FLOCK();
     }
 
-    dtp = &entry->dtp;
+    dtp  = &entry->dtp;
     ipcp = entry->txrx.ipcp;
     entry->flags |= RL_FLOW_DEALLOCATED;
 
@@ -1080,7 +1082,8 @@ __flow_put(struct flow_entry *entry, bool lock)
         /* Reference counter is zero here, we need to reset it
          * to 1 and let the delayed remove function do its job. */
         atomic_inc(&entry->refcnt);
-        PV("FLOWREFCNT %u ++: %u\n", entry->local_port, atomic_read(&entry->refcnt));
+        PV("FLOWREFCNT %u ++: %u\n", entry->local_port,
+           atomic_read(&entry->refcnt));
         flows_putq_add(entry, msecs_to_jiffies(5000) /* should be MPL */);
         if (lock) {
             FUNLOCK();
@@ -1311,7 +1314,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper, uint32_t event_id,
         }
         entry->event_id = event_id;
         atomic_set(&entry->refcnt, 1); /* Cogito, ergo sum. */
-        entry->flags    = RL_FLOW_PENDING | RL_FLOW_NEVER_BOUND;
+        entry->flags = RL_FLOW_PENDING | RL_FLOW_NEVER_BOUND;
         memcpy(&entry->spec, flowspec, sizeof(*flowspec));
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp);
@@ -1327,7 +1330,8 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper, uint32_t event_id,
         dtp_init(&entry->dtp);
 
         atomic_inc(&entry->refcnt); /* on behalf of the caller */
-        PV("FLOWREFCNT %u = %u\n", entry->local_port, atomic_read(&entry->refcnt));
+        PV("FLOWREFCNT %u = %u\n", entry->local_port,
+           atomic_read(&entry->refcnt));
 
         /* Start the unbound timer */
         flows_putq_add(entry, RL_UNBOUND_FLOW_TO);
@@ -1393,7 +1397,8 @@ flow_make_mortal(struct flow_entry *flow)
          * set to 1. */
         flow->flags &= ~RL_FLOW_NEVER_BOUND;
         atomic_dec(&flow->refcnt);
-        PV("FLOWREFCNT %u --: %u\n", flow->local_port, atomic_read(&flow->refcnt));
+        PV("FLOWREFCNT %u --: %u\n", flow->local_port,
+           atomic_read(&flow->refcnt));
     }
 
     FUNLOCK();
@@ -2252,8 +2257,7 @@ rl_ipcp_uipcp_wait(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 static int
 rl_rmt_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
-    struct rl_kmsg_ipcp_stats_req *req =
-        (struct rl_kmsg_ipcp_stats_req *)bmsg;
+    struct rl_kmsg_ipcp_stats_req *req = (struct rl_kmsg_ipcp_stats_req *)bmsg;
     struct rl_kmsg_ipcp_stats_resp resp;
     struct ipcp_entry *ipcp;
     int ret = -EINVAL; /* Report failure by default. */
@@ -2266,7 +2270,8 @@ rl_rmt_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         resp.hdr.msg_type = RLITE_KER_IPCP_STATS_RESP;
         resp.hdr.event_id = req->hdr.event_id;
         /* Collect stats from all the CPUs. */
-        for_each_possible_cpu(cpu) {
+        for_each_possible_cpu(cpu)
+        {
             struct rl_ipcp_stats *cpustats = this_cpu_ptr(ipcp->stats);
 
             resp.stats.tx_pkt += cpustats->tx_pkt;
@@ -3047,7 +3052,7 @@ static rl_msg_handler_t rl_ctrl_handlers[] = {
     [RLITE_KER_IPCP_QOS_SUPPORTED]    = rl_ipcp_qos_supported,
     [RLITE_KER_APPL_MOVE]             = rl_appl_move,
     [RLITE_KER_REG_FETCH]             = rl_reg_fetch,
-    [RLITE_KER_IPCP_STATS_REQ]    = rl_rmt_get_stats,
+    [RLITE_KER_IPCP_STATS_REQ]        = rl_rmt_get_stats,
     [RLITE_KER_IPCP_CONFIG_GET_REQ]   = rl_ipcp_config_get,
 #ifdef RL_MEMTRACK
     [RLITE_KER_MEMTRACK_DUMP] = rl_memtrack_dump,

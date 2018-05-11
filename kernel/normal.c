@@ -594,7 +594,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
     DECLARE_WAITQUEUE(wait, current);
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
-    bool maysleep = flags & RL_RMT_F_MAYSLEEP;
+    bool maysleep               = flags & RL_RMT_F_MAYSLEEP;
     struct rl_ipcp_stats *stats = this_cpu_ptr(ipcp->stats);
     int ret;
 
@@ -1386,8 +1386,8 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
                  struct flow_entry *lower_flow)
 {
     struct rl_ipcp_stats *stats = this_cpu_ptr(ipcp->stats);
-    struct rl_normal *priv = ipcp->priv;
-    struct rina_pci *pci   = RL_BUF_PCI(rb);
+    struct rl_normal *priv      = ipcp->priv;
+    struct rina_pci *pci        = RL_BUF_PCI(rb);
     struct flow_entry *flow;
     rl_seq_t seqnum    = pci->seqnum;
     struct rl_buf *crb = NULL;

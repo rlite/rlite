@@ -653,22 +653,24 @@ ipcp_stats(int argc, char **argv, struct cmd_descriptor *cd)
     }
 
     byteprint(sbuf, sizeof(sbuf), stats.rmt.fwd_byte);
-    printf(
-        "Statistcs for IPCP %lu:\n"
-        "    fwd_pkt        = %llu\n"
-        "    fwd_byte       = %s\n"
-        "    queued_pkt     = %llu\n"
-        "    queue_drop     = %llu\n"
-        "    noroute_drop   = %llu\n"
-        "    csum_drop      = %llu\n"
-        "    ttl_drop       = %llu\n"
-        "    noflow_drop    = %llu\n"
-        "    other_drop     = %llu\n",
-        (unsigned long)ipcp_id, (unsigned long long)stats.rmt.fwd_pkt, sbuf,
-        (unsigned long long)stats.rmt.queued_pkt, (unsigned long long)stats.rmt.queue_drop,
-        (unsigned long long)stats.rmt.noroute_drop, (unsigned long long)stats.rmt.csum_drop,
-        (unsigned long long)stats.rmt.ttl_drop, (unsigned long long)stats.rmt.noflow_drop,
-        (unsigned long long)stats.rmt.other_drop);
+    printf("Statistcs for IPCP %lu:\n"
+           "    fwd_pkt        = %llu\n"
+           "    fwd_byte       = %s\n"
+           "    queued_pkt     = %llu\n"
+           "    queue_drop     = %llu\n"
+           "    noroute_drop   = %llu\n"
+           "    csum_drop      = %llu\n"
+           "    ttl_drop       = %llu\n"
+           "    noflow_drop    = %llu\n"
+           "    other_drop     = %llu\n",
+           (unsigned long)ipcp_id, (unsigned long long)stats.rmt.fwd_pkt, sbuf,
+           (unsigned long long)stats.rmt.queued_pkt,
+           (unsigned long long)stats.rmt.queue_drop,
+           (unsigned long long)stats.rmt.noroute_drop,
+           (unsigned long long)stats.rmt.csum_drop,
+           (unsigned long long)stats.rmt.ttl_drop,
+           (unsigned long long)stats.rmt.noflow_drop,
+           (unsigned long long)stats.rmt.other_drop);
 
     return 0;
 }
