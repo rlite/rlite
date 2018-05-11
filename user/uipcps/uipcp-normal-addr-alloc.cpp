@@ -378,6 +378,15 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
             const CDAPMessage *rm, rlm_addr_t src_addr,
             std::vector<CommandToSubmit> *commands) override;
         void dump(std::stringstream &ss) const;
+
+        rlm_addr_t lookup(const std::string &ipcp_name) const
+        {
+            const auto mit = table.find(ipcp_name);
+            if (mit == table.end()) {
+                return RL_ADDR_NULL;
+            }
+            return mit->second;
+        }
     };
     std::unique_ptr<Replica> raft;
 
@@ -439,10 +448,10 @@ public:
     int allocate(const std::string &ipcp_name, rlm_addr_t *addr) override
     {
         if (raft) {
-            /* We may be the leader or a follower, but here we can behave as as
-             * any client to improve code reuse. We also set the leader, since
-             * we know it. */
-            client->set_leader_id(raft->leader_name());
+            /* Addresses in the cluster are pre-allocated to bootstrap
+             * the address allocation infrastructure. */
+            *addr = raft->lookup(ipcp_name);
+            return 0;
         }
         return client->allocate(ipcp_name, addr);
     }
