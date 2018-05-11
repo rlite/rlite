@@ -26,6 +26,8 @@
 #include <vector>
 #include <cassert>
 #include <chrono>
+#include <unistd.h>
+#include <cmath>
 
 #include "uipcp-normal-lfdb.hpp"
 
@@ -58,21 +60,59 @@ struct TestLFDB : public rlite::LFDB {
     }
 };
 
-int
-main()
+static void
+usage()
 {
+    std::cout << "lfdb-test -n SIZE\n"
+                 "          -v be verbose\n"
+                 "          -h show this help and exit\n";
+}
+
+int
+main(int argc, char **argv)
+{
+    int verbosity = 0;
+    int n         = 100;
+    int opt;
+
+    while ((opt = getopt(argc, argv, "hvn:")) != -1) {
+        switch (opt) {
+        case 'h':
+            usage();
+            return 0;
+
+        case 'v':
+            verbosity++;
+            break;
+
+        case 'n':
+            n = std::atoi(optarg);
+            break;
+
+        default:
+            std::cout << "    Unrecognized option " << static_cast<char>(opt)
+                      << std::endl;
+            usage();
+            return -1;
+        }
+    }
+
     std::list<TestLFDB::LinksList> test_vectors = {
         {{0, 2}, {0, 3}, {0, 4}, {2, 4}, {3, 4}}};
 
     {
         /* Grid-shaped network of size NxN. */
         TestLFDB::LinksList links;
-        const int n = 10;
+        int sqn = static_cast<int>(std::sqrt(n));
 
-        auto coord = [n](int i, int j) { return i * n + j; };
+        if (sqn < 1) {
+            sqn = 1;
+        }
 
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < n - 1; j++) {
+        auto coord = [sqn](int i, int j) { return i * sqn + j; };
+
+        for (int i = 0; i < sqn; i++) {
+            for (int j = 0; j < sqn - 1; j++) {
                 links.push_back({coord(i, j), coord(i, j + 1)});
                 links.push_back({coord(j, i), coord(j + 1, i)});
             }
@@ -95,7 +135,7 @@ main()
         auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now() - start);
 
-        if (false) {
+        if (verbosity) {
             std::stringstream ss;
             lfdb.dump(ss);
             lfdb.dump_routing(ss, root);
