@@ -1419,6 +1419,17 @@ arranged in a tree, with a single normal DIF including them all. On a machine
 with 64 GB of RAM it is possible to deploy a ring of 350 nodes, when
 giving each node the default amount of memory.
 
+To scale even more, it is necessary to switch from fully isolated Virtual
+Machines to Linux network namespaces. In this way all the nodes will share
+the same kernel (although with separate IPCPs and uipcps), but it is possible
+to scale up to 1000 nodes or more. To use namespaces instead of VMs, it
+is sufficient to add the `-C` option to any demonstrator invocation, e.g.
+
+    $ ./demo.py -Crk0 --tree 800
+
+On `up.sh`, the demonstrator will setup network namespaces instead of
+spawning VMs.
+
 
 ## 9. RINA API documentation
 A convenient way to introduce the RINA API is to show how a simple application
