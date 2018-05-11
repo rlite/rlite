@@ -31,15 +31,25 @@
 
 #include "uipcp-normal-lfdb.hpp"
 
+/* A type to represent a single routing table, excluding the default next
+ * hop. */
 using NextHops = std::unordered_map<rlite::NodeId, std::list<rlite::NodeId>>;
+
+/* A type to represent a collection of routing tables, one for each node
+ * in a network. */
 using RoutingTables =
     std::unordered_map<rlite::NodeId, std::pair<NextHops, rlite::NodeId>>;
+
+/* Representation of a list of reachability tests. See the description
+ * below. */
 using ReachabilityTests = std::vector<std::pair<int, int>>;
 
 struct TestLFDB : public rlite::LFDB {
     using LinksList = std::vector<std::pair<int, int>>;
     LinksList links;
 
+    /* Populate rlite::LFDB::db from the list of links coming from
+     * the test vector. */
     TestLFDB(const LinksList &links, bool lfa_enabled)
         : rlite::LFDB(lfa_enabled, /*verbose=*/false), links(links)
     {
@@ -89,7 +99,7 @@ reachable(const RoutingTables &rtables, int src_node, int dst_node,
             cur = rt.second;
         }
         if (verbose) {
-            std::cout << "     hopping to " << cur << std::endl;
+            std::cout << "     hop to " << cur << std::endl;
         }
     }
     return cur == dst && expected_nhops == 0;
@@ -132,12 +142,20 @@ main(int argc, char **argv)
         }
     }
 
+    /* Test vectors are stored in a list of pairs. Each pair is made of a list
+     * of links and a list of reachability tests. A list of links describes
+     * a network graph, where nodes are integer numbers; each link in the list
+     * is a pair of integers, which represents a link between two nodes. An
+     * item in list of reachability tests is a pair of integers; the first
+     * integer refers to a destination node to be reached (from node 0), and
+     * the second integer refers to the number of expected hops to reach the
+     * destination node. */
     std::list<std::pair<TestLFDB::LinksList, ReachabilityTests>> test_vectors =
-        {{/*links=*/{{0, 1}, {0, 2}, {0, 3}, {1, 3}, {2, 3}},
-          /*reach=*/{{1, 1}}}};
+        {{/*links=*/{{0, 1}, {0, 3}, {1, 2}, {2, 3}},
+          /*reachability_tests=*/{{1, 1}, {2, 2}, {3, 1}}}};
 
     {
-        /* Grid-shaped network of size NxN. */
+        /* Generate a grid-shaped network of size NxN. */
         TestLFDB::LinksList links;
         ReachabilityTests tests;
         int sqn = static_cast<int>(std::sqrt(n));
@@ -166,6 +184,8 @@ main(int argc, char **argv)
 
         std::cout << "Test vector #" << counter << std::endl;
 
+        /* Build the lfdb object under test by populating it with the
+         * links in the test vector. */
         TestLFDB lfdb(links, /*lfa_enabled=*/false);
 
         if (verbosity >= 2) {
@@ -175,9 +195,11 @@ main(int argc, char **argv)
         }
         assert(!links.empty());
 
+        /* Compute the routing tables for each node in the network and
+         * store them into 'rtables'. */
         RoutingTables rtables;
-
         auto start = std::chrono::system_clock::now();
+
         for (const auto &kv : lfdb.db) {
             const rlite::NodeId &source = kv.first;
 
@@ -193,6 +215,8 @@ main(int argc, char **argv)
         auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now() - start);
 
+        /* Use 'rtables' to carry out all the reachability tests defined for
+         * this network. */
         for (const auto &rtest : reachability_tests) {
             const int src_node = 0;
             if (!reachable(rtables, /*src_node=*/src_node,
