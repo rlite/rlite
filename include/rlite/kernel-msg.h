@@ -201,6 +201,7 @@ struct rl_kmsg_appl_register_resp {
     char *appl_name;
 };
 
+/* application --> kernel to finalize a registration operation. */
 struct rl_kmsg_appl_move {
     struct rl_msg_hdr hdr;
 
