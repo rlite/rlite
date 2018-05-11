@@ -692,8 +692,8 @@ CentralizedFaultTolerantDFT::Replica::replica_process_rib_msg(
         appl_name = apname2string(dft_entry.appl_name());
         /* Fill in the command struct (already serialized). */
         strncpy(c->ipcp_name, dft_entry.ipcp_name().c_str(),
-                sizeof(c->ipcp_name));
-        strncpy(c->appl_name, appl_name.c_str(), sizeof(c->appl_name));
+                sizeof(c->ipcp_name) - 1);
+        strncpy(c->appl_name, appl_name.c_str(), sizeof(c->appl_name) - 1);
         c->opcode = rm->op_code == gpb::M_WRITE ? Command::OpcodeSet
                                                 : Command::OpcodeDel;
         /* Prepare the response. */

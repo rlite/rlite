@@ -705,7 +705,7 @@ CentralizedFaultTolerantAddrAllocator::Replica::replica_process_rib_msg(
             Command *c = reinterpret_cast<Command *>(cbuf.get());
 
             /* Fill in the command struct (already serialized). */
-            strncpy(c->ipcp_name, ipcp_name.c_str(), sizeof(c->ipcp_name));
+            strncpy(c->ipcp_name, ipcp_name.c_str(), sizeof(c->ipcp_name) - 1);
             c->opcode = Command::OpcodeSet;
 
             /* Return the command to the caller. */
