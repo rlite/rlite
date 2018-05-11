@@ -540,21 +540,25 @@ CentralizedFaultTolerantAddrAllocator::Client::allocate(
      * the RIB lock before waiting. */
     rib->unlock();
 
-    std::unique_lock<std::mutex> lk(synchro->mutex);
+    {
+        std::unique_lock<std::mutex> lk(synchro->mutex);
 
-    while (!synchro->allocated) {
-        if (synchro->allocation_complete.wait_for(lk, timeout) ==
-            std::cv_status::timeout) {
-            UPE(rib->uipcp, "Address allocation for IPCP '%s' timed out\n",
-                ipcp_name.c_str());
-            rib->lock();
-            return -1;
+        while (!synchro->allocated) {
+            if (synchro->allocation_complete.wait_for(lk, timeout) ==
+                std::cv_status::timeout) {
+                UPE(rib->uipcp, "Address allocation for IPCP '%s' timed out\n",
+                    ipcp_name.c_str());
+                rib->lock();
+                return -1;
+            }
         }
-    }
 
-    UPD(rib->uipcp, "Address %lu successfully allocated for IPCP '%s'\n",
-        (long unsigned)synchro->address, ipcp_name.c_str());
-    *addr = synchro->address;
+        UPD(rib->uipcp, "Address %lu successfully allocated for IPCP '%s'\n",
+            (long unsigned)synchro->address, ipcp_name.c_str());
+        *addr = synchro->address;
+        /* We need to drop synchro->mutex before trying to acquire the RIB
+         * lock, in order to avoid AB/BA deadlock. */
+    }
 
     rib->lock();
 
