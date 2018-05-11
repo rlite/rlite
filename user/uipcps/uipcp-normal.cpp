@@ -504,10 +504,6 @@ UipcpRib::UipcpRib(struct uipcp *_u)
         PolicyParam(true);
     params_map[UipcpRib::RibDaemonPrefix]["refresh-intval"] =
         PolicyParam(Secs(int(kRIBRefreshIntvalSecs)));
-    params_map[Routing::Prefix]["age-incr-intval"] =
-        PolicyParam(Secs(int(kAgeIncrIntvalSecs)));
-    params_map[Routing::Prefix]["age-max"] =
-        PolicyParam(Secs(int(kAgeMaxSecs)));
 
     policy_mod(FlowAllocator::Prefix, "local");
     policy_mod(AddrAllocator::Prefix, "distributed");

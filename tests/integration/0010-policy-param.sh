@@ -25,6 +25,7 @@ rlite-ctl dif-policy-param-mod dd resalloc broadcast-enroller true || exit 1
 
 rlite-ctl dif-policy-param-mod dd ribd refresh-intval 10s || exit 1
 
+rlite-ctl dif-policy-mod dd routing link-state || exit 1
 rlite-ctl dif-policy-param-mod dd routing age-incr-intval 10s || exit 1
 rlite-ctl dif-policy-param-mod dd routing age-max 199s || exit 1
 

@@ -226,6 +226,13 @@ public:
                    unsigned int limit) const override;
     int neighs_refresh(size_t limit) override;
     void age_incr() override;
+
+    /* Time interval (in seconds) between two consecutive increments
+     * of the age of LFDB entries. */
+    static constexpr int kAgeIncrIntvalSecs = 10;
+
+    /* Max age (in seconds) for an LFDB entry not to be discarded. */
+    static constexpr int kAgeMaxSecs = 900;
 };
 
 /* The add method has overwrite semantic, and possibly resets the age.
@@ -1046,18 +1053,23 @@ StaticRouting::route_mod(const struct rl_cmsg_ipcp_route_mod *req)
 void
 UipcpRib::routing_lib_init()
 {
+    std::list<std::pair<std::string, PolicyParam>> link_state_params = {
+        {"age-incr-intval",
+         PolicyParam(Secs(int(FullyReplicatedLFDB::kAgeIncrIntvalSecs)))},
+        {"age-max", PolicyParam(Secs(int(FullyReplicatedLFDB::kAgeMaxSecs)))}};
+
     available_policies[Routing::Prefix].insert(PolicyBuilder(
         "link-state",
         [](UipcpRib *rib) {
             rib->routing = make_unique<FullyReplicatedLFDB>(rib, false);
         },
-        {Routing::TableName}));
+        {Routing::TableName}, link_state_params));
     available_policies[Routing::Prefix].insert(PolicyBuilder(
         "link-state-lfa",
         [](UipcpRib *rib) {
             rib->routing = make_unique<FullyReplicatedLFDB>(rib, true);
         },
-        {Routing::TableName}));
+        {Routing::TableName}, link_state_params));
     available_policies[Routing::Prefix].insert(PolicyBuilder(
         "static",
         [](UipcpRib *rib) { rib->routing = make_unique<StaticRouting>(rib); }));

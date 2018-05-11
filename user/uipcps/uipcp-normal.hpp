@@ -589,13 +589,6 @@ struct UipcpRib {
         uint64_t fa_response_issued;
     } stats;
 
-    /* Time interval (in seconds) between two consecutive increments
-     * of the age of LFDB entries. */
-    static constexpr int kAgeIncrIntvalSecs = 10;
-
-    /* Max age (in seconds) for an LFDB entry not to be discarded. */
-    static constexpr int kAgeMaxSecs = 900;
-
     /* Time interval (in seconds) between two consecutive periodic
      * RIB synchronizations. */
     static constexpr int kRIBRefreshIntvalSecs = 30;

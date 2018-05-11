@@ -57,6 +57,7 @@ rlite-ctl dif-policy-param-list dd resalloc broadcast-enroller | grep true || ex
 rlite-ctl dif-policy-param-mod dd ribd refresh-intval 916s || exit 1
 rlite-ctl dif-policy-param-list dd ribd refresh-intval | grep 916000ms || exit 1
 
+rlite-ctl dif-policy-mod dd routing link-state || exit 1
 rlite-ctl dif-policy-param-mod dd routing age-incr-intval 107s || exit 1
 rlite-ctl dif-policy-param-mod dd routing age-max 771s || exit 1
 rlite-ctl dif-policy-param-list dd routing age-incr-intval | grep 107000ms || exit 1
