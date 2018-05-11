@@ -974,8 +974,13 @@ CentralizedFaultTolerantDFT::Client::appl_register(
 
     mod_pending_timer();
 
-    UPI(rib->uipcp, "Write request '%s <= %llu' issued\n", appl_name.c_str(),
-        (long long unsigned)rib->myaddr);
+    if (req->reg) {
+        UPD(rib->uipcp, "Write request '%s <= %llu' issued\n",
+            appl_name.c_str(), (long long unsigned)rib->myaddr);
+    } else {
+        UPD(rib->uipcp, "Write request 'delete %s' issued\n",
+            appl_name.c_str());
+    }
 
     return 0;
 }
