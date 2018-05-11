@@ -565,33 +565,42 @@ CentralizedFaultTolerantAddrAllocator::Replica::process_rib_msg(
     /* Recover the name of the IPCP for which we want to allocate or
      * lookup the address. */
     string ipcp_name = rm->obj_name.substr(rm->obj_name.rfind("/") + 1);
+    const auto mit   = table.find(ipcp_name);
 
     if (rm->op_code == gpb::M_WRITE) {
-        /* We received an M_WRITE sent by Client::allocate().
-         * We are the leader. Let's allocate an address and submit the
-         * request to the Raft state machine. */
-        auto cbuf  = std::unique_ptr<char[]>(new char[sizeof(Command)]);
-        Command *c = reinterpret_cast<Command *>(cbuf.get());
+        /* We received an M_WRITE sent by Client::allocate() and we are the
+         * leader. */
+        auto m = make_unique<CDAPMessage>();
 
-        /* Fill in the command struct (already serialized). */
-        strncpy(c->ipcp_name, ipcp_name.c_str(), sizeof(c->ipcp_name));
-        c->address = next_unused_address;
-        c->opcode  = Command::OpcodeSet;
-
-        /* Prepare the response. */
-        auto m       = make_unique<CDAPMessage>();
         m->op_code   = gpb::M_WRITE_R;
         m->obj_name  = rm->obj_name;
         m->obj_class = rm->obj_class;
         m->invoke_id = rm->invoke_id;
-        m->set_obj_value((static_cast<int64_t>(c->address)));
 
-        /* Return the command to the caller. */
-        commands->push_back(make_pair(std::move(cbuf), std::move(m)));
+        if (mit != table.end()) {
+            /* An address has already been allocated. Raft is not needed,
+             * just return it. */
+            m->set_obj_value((static_cast<int64_t>(mit->second)));
+            rib->send_to_dst_addr(std::move(m), src_addr);
+        } else {
+            /* Let's allocate an address and submit the request to the Raft
+             * state machine. */
+            auto cbuf  = std::unique_ptr<char[]>(new char[sizeof(Command)]);
+            Command *c = reinterpret_cast<Command *>(cbuf.get());
+
+            /* Fill in the command struct (already serialized). */
+            strncpy(c->ipcp_name, ipcp_name.c_str(), sizeof(c->ipcp_name));
+            c->address = next_unused_address;
+            c->opcode  = Command::OpcodeSet;
+
+            m->set_obj_value((static_cast<int64_t>(c->address)));
+
+            /* Return the command to the caller. */
+            commands->push_back(make_pair(std::move(cbuf), std::move(m)));
+        }
     } else if (rm->op_code == gpb::M_READ) {
         /* We received an an M_READ. Look up the IPCP in the map. */
-        auto m         = make_unique<CDAPMessage>();
-        const auto mit = table.find(ipcp_name);
+        auto m = make_unique<CDAPMessage>();
 
         m->m_read_r(rm->obj_class, rm->obj_name, /*obj_inst=*/0,
                     /*result=*/mit == table.end() ? -1 : 0,
