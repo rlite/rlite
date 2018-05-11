@@ -34,6 +34,7 @@
 using NextHops = std::unordered_map<rlite::NodeId, std::list<rlite::NodeId>>;
 using RoutingTables =
     std::unordered_map<rlite::NodeId, std::pair<NextHops, rlite::NodeId>>;
+using ReachabilityTests = std::vector<std::pair<int, int>>;
 
 struct TestLFDB : public rlite::LFDB {
     using LinksList = std::vector<std::pair<int, int>>;
@@ -64,13 +65,19 @@ struct TestLFDB : public rlite::LFDB {
     }
 };
 
+/* Returns true if the routing tables are able to route a packet from
+ * 'src_node' to 'dst_node' with exactly 'n' hops. */
 static bool
-reachable(const RoutingTables &rtables, int src_node, int dst_node, int n)
+reachable(const RoutingTables &rtables, int src_node, int dst_node,
+          int expected_nhops, const bool verbose)
 {
     rlite::NodeId dst = std::to_string(dst_node);
     rlite::NodeId cur = std::to_string(src_node);
 
-    for (; n >= 0 && cur != dst; n--) {
+    if (verbose) {
+        std::cout << "---> Start from node " << cur << std::endl;
+    }
+    for (; expected_nhops >= 0 && cur != dst; expected_nhops--) {
         const auto &rt                 = rtables.at(cur);
         NextHops::const_iterator nhops = rt.first.find(dst);
 
@@ -81,8 +88,11 @@ reachable(const RoutingTables &rtables, int src_node, int dst_node, int n)
             /* Not found, use default next hop. */
             cur = rt.second;
         }
+        if (verbose) {
+            std::cout << "     hopping to " << cur << std::endl;
+        }
     }
-    return cur == dst && n == 0;
+    return cur == dst && expected_nhops == 0;
 }
 
 static void
@@ -122,12 +132,14 @@ main(int argc, char **argv)
         }
     }
 
-    std::list<TestLFDB::LinksList> test_vectors = {
-        {{0, 1}, {0, 2}, {0, 3}, {1, 3}, {2, 3}}};
+    std::list<std::pair<TestLFDB::LinksList, ReachabilityTests>> test_vectors =
+        {{/*links=*/{{0, 1}, {0, 2}, {0, 3}, {1, 3}, {2, 3}},
+          /*reach=*/{{1, 1}}}};
 
     {
         /* Grid-shaped network of size NxN. */
         TestLFDB::LinksList links;
+        ReachabilityTests tests;
         int sqn = static_cast<int>(std::sqrt(n));
 
         if (sqn < 2) {
@@ -143,16 +155,20 @@ main(int argc, char **argv)
             }
         }
 
-        test_vectors.push_back(std::move(links));
+        tests.push_back({1, 1});
+        test_vectors.push_back(make_pair(std::move(links), tests));
     }
 
     int counter = 1;
-    for (const auto &links : test_vectors) {
-        std::cout << "Test vector #" << counter++ << std::endl;
+    for (const auto &p : test_vectors) {
+        TestLFDB::LinksList links            = p.first;
+        ReachabilityTests reachability_tests = p.second;
+
+        std::cout << "Test vector #" << counter << std::endl;
 
         TestLFDB lfdb(links, /*lfa_enabled=*/false);
 
-        if (verbosity) {
+        if (verbosity >= 2) {
             std::stringstream ss;
             lfdb.dump(ss);
             std::cout << ss.str();
@@ -166,7 +182,7 @@ main(int argc, char **argv)
             const rlite::NodeId &source = kv.first;
 
             lfdb.compute_next_hops(source);
-            if (verbosity) {
+            if (verbosity >= 2) {
                 std::stringstream ss;
                 lfdb.dump_routing(ss, source);
                 std::cout << ss.str();
@@ -177,11 +193,23 @@ main(int argc, char **argv)
         auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now() - start);
 
-        if (reachable(rtables, 0, 1, 1)) {
-            std::cout << "Reachable!" << std::endl;
+        for (const auto &rtest : reachability_tests) {
+            const int src_node = 0;
+            if (!reachable(rtables, /*src_node=*/src_node,
+                           /*dst_node=*/rtest.first,
+                           /*expected_nhops=*/rtest.second,
+                           /*verbose=*/verbosity >= 1)) {
+                std::cerr << "Cannot reach node " << rtest.first
+                          << " from node " << src_node << " in " << rtest.second
+                          << " steps" << std::endl;
+                std::cout << "Test # " << counter << " failed" << std::endl;
+                return -1;
+            }
         }
 
-        std::cout << "Completed in " << delta.count() << " ms" << std::endl;
+        std::cout << "Test # " << counter << " completed in " << delta.count()
+                  << " ms" << std::endl;
+        counter++;
     }
 
     return 0;
