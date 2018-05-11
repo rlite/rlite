@@ -577,10 +577,10 @@ struct uipcp_rib {
 
     /* Default value for keepalive parameters. */
     static constexpr int kKeepaliveTimeout = 10;
-    static constexpr int kKeepaliveThresh = 3;
+    static constexpr int kKeepaliveThresh  = 3;
 
     /* Enrollment timeouts in milliseconds. */
-    static constexpr int kEnrollTimeoutMsecs   = 7000;
+    static constexpr int kEnrollTimeoutMsecs = 7000;
 
     /* Default value for the A timer in milliseconds. */
     static constexpr int kATimerMsecsDflt = 20;
