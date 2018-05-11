@@ -167,11 +167,13 @@ union rl_buf_ctx {
         unsigned long jiffies;
     } rtx;
 
+#ifdef RL_RMT_QUEUES
     struct {
         /* Used in the TX datapath when this rb ends up into
          * an RMT queue. */
         struct flow_entry *compl_flow;
     } rmt;
+#endif /* RL_RMT_QUEUES */
 
     struct {
         /* Used in the RX datapath for flow control. */
