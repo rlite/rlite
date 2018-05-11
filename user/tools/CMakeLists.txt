@@ -20,7 +20,7 @@ add_executable(test-wifi test-wifi.c)
 
 target_include_directories(iporinad PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
-target_link_libraries(rinaperf rina-api ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(rinaperf rina-api ${CMAKE_THREAD_LIBS_INIT} m)
 target_link_libraries(rina-echo-async rina-api)
 target_link_libraries(rlite-ctl rina-api rlite-conf)
 target_link_libraries(rina-gw rina-api fdfwd)

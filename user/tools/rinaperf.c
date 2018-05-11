@@ -43,6 +43,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <fcntl.h>
+#include <math.h>
 
 #include <rina/api.h>
 
@@ -141,7 +142,7 @@ struct rp_result_msg {
 } __attribute__((packed));
 
 typedef int (*perf_fn_t)(struct worker *);
-typedef void (*report_fn_t)(struct rp_result_msg *snd,
+typedef void (*report_fn_t)(struct worker *w, struct rp_result_msg *snd,
                             struct rp_result_msg *rcv);
 
 struct worker {
@@ -159,6 +160,9 @@ struct worker {
     int cfd; /* control file descriptor */
     int dfd; /* data file descriptor */
     int retcode;
+#define WINSIZE 2048
+    unsigned int win_idx;
+    uint32_t win[WINSIZE];
 };
 
 struct rinaperf {
@@ -209,6 +213,7 @@ worker_init(struct worker *w, struct rinaperf *rp)
 {
     w->rp  = rp;
     w->cfd = w->dfd = -1;
+    w->win_idx      = 0;
 }
 
 static void
@@ -324,6 +329,8 @@ ping_client(struct worker *w)
                         PRINTF("[%lu.%06lu] ", (unsigned long)recv_time.tv_sec,
                                (unsigned long)recv_time.tv_usec);
                     }
+                    w->win[w->win_idx] = ns;
+                    w->win_idx         = (w->win_idx + 1) % WINSIZE;
                     PRINTF("%d bytes from server: rtt = %.3f ms\n", ret,
                            ((float)ns) / 1000000.0);
                 } else {
@@ -423,7 +430,8 @@ ping_server(struct worker *w)
 }
 
 static void
-ping_report(struct rp_result_msg *snd, struct rp_result_msg *rcv)
+rr_report(struct worker *w, struct rp_result_msg *snd,
+          struct rp_result_msg *rcv)
 {
     PRINTF("%10s %15s %10s %10s %15s\n", "", "Transactions", "Kpps", "Mbps",
            "Latency (ns)");
@@ -435,6 +443,49 @@ ping_report(struct rp_result_msg *snd, struct rp_result_msg *rcv)
             "Receiver", rcv->cnt, (double)rcv->pps/1000.0,
                 (double)rcv->bps/1000000.0, rcv->latency);
 #endif
+}
+
+static void
+ping_report(struct worker *w, struct rp_result_msg *snd,
+            struct rp_result_msg *rcv)
+{
+    unsigned num_samples = (snd->cnt > WINSIZE) ? WINSIZE : w->win_idx;
+    double stddev;
+    double avg;
+    double sum;
+    double min = 10e8;
+    double max = 0.0;
+    int i;
+
+    if (num_samples == 0) {
+        return;
+    }
+
+    for (sum = 0.0, i = 0; i < num_samples; i++) {
+        double sample = w->win[i];
+        sum += sample;
+        if (sample < min) {
+            min = sample;
+        }
+        if (sample > max) {
+            max = sample;
+        }
+    }
+    avg = sum / num_samples;
+    for (sum = 0.0, i = 0; i < num_samples; i++) {
+        double sample = w->win[i];
+        sum += (sample - avg) * (sample - avg);
+    }
+    stddev = sqrt(sum / num_samples);
+
+    /* Convert to microseconds. */
+    min /= 1000.0;
+    avg /= 1000.0;
+    max /= 1000.0;
+    stddev /= 1000.0;
+
+    printf("min %.2f us avg %.2f us max %.2f us stddev %.2f us\n", min, avg,
+           max, stddev);
 }
 
 static int
@@ -735,7 +786,8 @@ perf_server(struct worker *w)
 }
 
 static void
-perf_report(struct rp_result_msg *snd, struct rp_result_msg *rcv)
+perf_report(struct worker *w, struct rp_result_msg *snd,
+            struct rp_result_msg *rcv)
 {
     PRINTF("%10s %12s %10s %10s\n", "", "Packets", "Kpps", "Mbps");
     PRINTF("%-10s %12llu %10.3f %10.3f\n", "Sender",
@@ -769,7 +821,7 @@ static struct rp_test_desc descs[] = {
         .opcode      = RP_OPCODE_RR,
         .client_fn   = ping_client,
         .server_fn   = ping_server,
-        .report_fn   = ping_report,
+        .report_fn   = rr_report,
     },
     {
         .name        = "perf",
@@ -967,39 +1019,37 @@ client_worker_function(void *opaque)
         goto out;
     }
 
-    if (!w->ping) {
-        /* Wait for the result message from the server and read it. */
-        pfd.fd     = w->cfd;
-        pfd.events = POLLIN;
-        ret        = poll(&pfd, 1, CLI_RESULT_TIMEOUT_MSECS);
-        if (ret <= 0) {
-            if (ret < 0) {
-                perror("poll(result)");
-            } else {
-                PRINTF("Timeout while waiting for result message\n");
-            }
-            goto out;
+    /* Wait for the result message from the server and read it. */
+    pfd.fd     = w->cfd;
+    pfd.events = POLLIN;
+    ret        = poll(&pfd, 1, CLI_RESULT_TIMEOUT_MSECS);
+    if (ret <= 0) {
+        if (ret < 0) {
+            perror("poll(result)");
+        } else {
+            PRINTF("Timeout while waiting for result message\n");
         }
-
-        ret = read(w->cfd, &rmsg, sizeof(rmsg));
-        if (ret != sizeof(rmsg)) {
-            if (ret < 0) {
-                perror("read(result)");
-            } else {
-                PRINTF("Error reading result message: wrong length %d "
-                       "(should be %lu)\n",
-                       ret, (unsigned long int)sizeof(rmsg));
-            }
-            goto out;
-        }
-
-        rmsg.cnt     = le64toh(rmsg.cnt);
-        rmsg.pps     = le64toh(rmsg.pps);
-        rmsg.bps     = le64toh(rmsg.bps);
-        rmsg.latency = le64toh(rmsg.latency);
-
-        w->desc->report_fn(&w->result, &rmsg);
+        goto out;
     }
+
+    ret = read(w->cfd, &rmsg, sizeof(rmsg));
+    if (ret != sizeof(rmsg)) {
+        if (ret < 0) {
+            perror("read(result)");
+        } else {
+            PRINTF("Error reading result message: wrong length %d "
+                   "(should be %lu)\n",
+                   ret, (unsigned long int)sizeof(rmsg));
+        }
+        goto out;
+    }
+
+    rmsg.cnt     = le64toh(rmsg.cnt);
+    rmsg.pps     = le64toh(rmsg.pps);
+    rmsg.bps     = le64toh(rmsg.bps);
+    rmsg.latency = le64toh(rmsg.latency);
+
+    w->desc->report_fn(w, &w->result, &rmsg);
 
     w->retcode = 0;
 out:
