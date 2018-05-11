@@ -183,6 +183,12 @@ struct rl_msg_layout rl_ker_numtables[] = {
                        1 * sizeof(char *),
             .strings = 1,
         },
+    [RLITE_KER_IPCP_SCHED_WRR] =
+        {
+            .copylen = sizeof(struct rl_kmsg_ipcp_sched_wrr) -
+                       1 * sizeof(struct rl_msg_array_field),
+            .arrays = 1,
+        },
     [RLITE_KER_MSG_MAX] =
         {
             .copylen = 0,

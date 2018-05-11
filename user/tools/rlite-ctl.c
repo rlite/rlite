@@ -487,6 +487,145 @@ ipcp_config_get(int argc, char **argv, struct cmd_descriptor *cd)
     return param_value ? 0 : -1;
 }
 
+/* Helper function that counts how many tokens are there in
+ * a string. TODO use strtok_r */
+static int
+str_count_elems(const char *s)
+{
+    char *copy = strdup(s);
+    char *ctmp = copy;
+    int n;
+
+    if (!copy) {
+        return -1;
+    }
+
+    for (n = 0;; n++, ctmp = NULL) {
+        if (strtok(ctmp, ", ") == NULL) {
+            break;
+        }
+    }
+    free(copy);
+
+    return n;
+}
+
+static int
+kernel_control_write(struct rl_msg_base *msg)
+{
+    int ret;
+    int fd;
+
+    fd = rina_open();
+    if (fd < 0) {
+        return fd;
+    }
+
+    ret = rl_write_msg(fd, msg, 0);
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, msg);
+    close(fd);
+
+    return ret;
+}
+
+static int
+ipcp_sched_config(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    const char *ipcp_name;
+    const char *sched_name;
+    struct ipcp_attrs *attrs;
+
+    assert(argc >= 3);
+    ipcp_name  = argv[0];
+    sched_name = argv[1];
+
+    /* The request specifies an IPCP: lookup that. */
+    attrs = lookup_ipcp_by_name(ipcp_name);
+    if (!attrs) {
+        PE("Could not find a suitable IPC process\n");
+        return -1;
+    }
+
+    if (!strcmp(sched_name, "wrr")) {
+        /* Weighted Round Robin configuration. Example:
+         *   ipcp-sched-config x.IPCP wrr quantum 1500 weights 2,5,10
+         * */
+        struct rl_kmsg_ipcp_sched_wrr req;
+        uint32_t *arr;
+        int n;
+
+        if (argc < 6) {
+            PE("Not enough arguments for wrr. Example:\n"
+               "  ipcp-sched-config x.IPCP wrr quantum 1500 weights 2,5,10\n");
+            return -1;
+        }
+
+        if (strcmp(argv[2], "quantum")) {
+            PE("Missing 'quantum' argument\n");
+            return -1;
+        }
+        req.quantum = atoi(argv[3]);
+        if (req.quantum == 0 || req.quantum > 1000000) {
+            PE("Invalid quantum '%s'\n", argv[3]);
+            return -1;
+        }
+
+        if (strcmp(argv[4], "weights")) {
+            PE("Missing 'weights' argument\n");
+            return -1;
+        }
+
+        /* Count weights. */
+        n = str_count_elems(argv[5]);
+        if (n <= 0) {
+            PE("No valid weights\n");
+            return -1;
+        }
+
+        /* Allocate array for weights. */
+        arr = malloc(n * sizeof(arr[0]));
+        if (!arr) {
+            return -1;
+        }
+
+        /* Parse weights into the array. */
+        {
+            char *copy = strdup(argv[5]);
+            char *ctmp = copy;
+            int i;
+
+            if (!copy) {
+                return -1;
+            }
+
+            for (i = 0;; i++, ctmp = NULL) {
+                char *token = strtok(ctmp, ", ");
+                if (token == NULL) {
+                    break;
+                }
+                arr[i] = atoi(token);
+                if (arr[i] <= 0 || arr[i] >= 1000) {
+                    PE("Invalid weight '%s'\n", token);
+                    return -1;
+                }
+            }
+        }
+
+        /* Build the request. */
+        req.ipcp_hdr.hdr.msg_type = RLITE_KER_IPCP_SCHED_WRR;
+        req.ipcp_hdr.hdr.event_id = 0;
+        req.ipcp_hdr.ipcp_id      = attrs->id;
+        req.weights.elem_size     = sizeof(arr[0]);
+        req.weights.num_elements  = n;
+        req.weights.slots.dwords  = arr;
+
+        return kernel_control_write(RLITE_MB(&req));
+    }
+
+    PE("Unknown scheduler '%s'\n", sched_name);
+    return -1;
+}
+
 static int
 ipcp_register_common(int argc, char **argv, unsigned int reg,
                      struct cmd_descriptor *cd)
@@ -1369,6 +1508,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage    = "IPCP_NAME PARAM_NAME",
         .num_args = 2,
         .func     = ipcp_config_get,
+    },
+    {
+        .name     = "ipcp-sched-config",
+        .usage    = "IPCP_NAME SCHED_NAME [...]",
+        .num_args = 3,
+        .func     = ipcp_sched_config,
     },
     {
         .name     = "ipcp-register",

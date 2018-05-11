@@ -86,7 +86,7 @@ rl_read_next_msg(int rfd, int quiet)
 }
 
 int
-rl_write_msg(int rfd, struct rl_msg_base *msg, int quiet)
+rl_write_msg(int rfd, const struct rl_msg_base *msg, int quiet)
 {
     char serbuf[4096];
     unsigned int serlen;

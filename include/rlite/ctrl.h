@@ -35,7 +35,7 @@
 extern "C" {
 #endif
 
-int rl_write_msg(int rfd, struct rl_msg_base *msg, int quiet);
+int rl_write_msg(int rfd, const struct rl_msg_base *msg, int quiet);
 
 struct rl_msg_base *rl_read_next_msg(int rfd, int quiet);
 

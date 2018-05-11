@@ -2089,7 +2089,7 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     }
 
     ret = -ENOSYS; /* parameter not implemented */
-    /* Check if the IPCP knows how to change this paramter. */
+    /* Check if the IPCP knows how to change this parameter. */
     mutex_lock(&entry->lock);
     if (entry->ops.config) {
         ret = entry->ops.config(entry, req->name, req->value, &notify);
@@ -2151,7 +2151,7 @@ rl_ipcp_config_get(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     }
 
     ret = -ENOSYS; /* parameter not implemented */
-    /* Check if the IPCP knows how to change this paramter. */
+    /* Check if the IPCP knows how to change this parameter. */
     mutex_lock(&entry->lock);
     if (entry->ops.config_get) {
         ret = entry->ops.config_get(entry, req->param_name, valbuf,
@@ -2188,6 +2188,33 @@ rl_ipcp_config_get(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     }
 
     ipcp_put(entry);
+
+    return ret;
+}
+
+static int
+rl_ipcp_sched_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
+{
+    struct rl_msg_ipcp *imsg = (struct rl_msg_ipcp *)bmsg;
+    struct ipcp_entry *ipcp;
+    int ret;
+
+    /* Find the IPC process entry corresponding to req->ipcp_id and
+     * fill the DIF name field. */
+    ipcp = ipcp_get(rc->dm, imsg->ipcp_id);
+    if (!ipcp) {
+        return -EINVAL;
+    }
+
+    ret = -ENOSYS; /* not implemented */
+    /* Check if the IPCP knows how to change this parameter. */
+    mutex_lock(&ipcp->lock);
+    if (ipcp->ops.sched_config) {
+        ret = ipcp->ops.sched_config(ipcp, bmsg);
+    }
+    mutex_unlock(&ipcp->lock);
+
+    ipcp_put(ipcp);
 
     return ret;
 }
@@ -3149,6 +3176,7 @@ static rl_msg_handler_t rl_ctrl_handlers[] = {
     [RLITE_KER_REG_FETCH]             = rl_reg_fetch,
     [RLITE_KER_IPCP_STATS_REQ]        = rl_ipcp_get_stats,
     [RLITE_KER_IPCP_CONFIG_GET_REQ]   = rl_ipcp_config_get,
+    [RLITE_KER_IPCP_SCHED_WRR]        = rl_ipcp_sched_config,
 #ifdef RL_MEMTRACK
     [RLITE_KER_MEMTRACK_DUMP] = rl_memtrack_dump,
 #endif /* RL_MEMTRACK */

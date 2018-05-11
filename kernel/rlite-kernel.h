@@ -462,6 +462,7 @@ struct ipcp_ops {
                           struct flow_entry **lower_flow);
 
     int (*qos_supported)(struct ipcp_entry *ipcp, struct rina_flow_spec *spec);
+    int (*sched_config)(struct ipcp_entry *ipcp, struct rl_msg_base *bmsg);
 };
 
 struct txrx {

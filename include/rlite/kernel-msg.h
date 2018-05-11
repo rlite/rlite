@@ -65,6 +65,7 @@ enum {
     RLITE_KER_IPCP_STATS_RESP,       /* 33 */
     RLITE_KER_IPCP_CONFIG_GET_REQ,   /* 34 */
     RLITE_KER_IPCP_CONFIG_GET_RESP,  /* 35 */
+    RLITE_KER_IPCP_SCHED_WRR,        /* 36 */
 
     RLITE_KER_MSG_MAX,
 };
@@ -442,6 +443,15 @@ struct rl_kmsg_ipcp_stats_resp {
     struct rl_msg_hdr hdr;
 
     struct rl_ipcp_stats stats;
+};
+
+/* application --> kernel message to configure a WRR PDU scheduler. */
+struct rl_kmsg_ipcp_sched_wrr {
+    struct rl_msg_ipcp ipcp_hdr;
+
+    uint32_t quantum;
+    /* WRR weights are dwords. */
+    struct rl_msg_array_field weights;
 };
 
 #endif /* __RLITE_KER_H__ */

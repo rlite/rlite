@@ -21,6 +21,7 @@
 #include <linux/types.h>
 #include "rlite/utils.h"
 #include "rlite-kernel.h"
+#include "rlite/kernel-msg.h"
 
 #include <linux/module.h>
 #include <linux/aio.h>
@@ -1253,6 +1254,26 @@ rl_normal_config_get(struct ipcp_entry *ipcp, const char *param_name, char *buf,
 }
 
 static int
+rl_normal_sched_config(struct ipcp_entry *ipcp, struct rl_msg_base *bmsg)
+{
+    int ret = -ENOSYS;
+    switch (bmsg->hdr.msg_type) {
+    case RLITE_KER_IPCP_SCHED_WRR: {
+        struct rl_kmsg_ipcp_sched_wrr *req =
+            (struct rl_kmsg_ipcp_sched_wrr *)bmsg;
+        int i;
+        PD("QUANTUM %u\n", req->quantum);
+        for (i = 0; i < req->weights.num_elements; i++) {
+            PD("  WEIGHT %u\n", req->weights.slots.dwords[i]);
+        }
+        ret = 0;
+    }
+    }
+
+    return ret;
+}
+
+static int
 rl_normal_qos_supported(struct ipcp_entry *ipcp, struct rina_flow_spec *spec)
 {
     /* For the moment being we boast about being able to support any QoS.
@@ -2068,6 +2089,7 @@ static struct ipcp_factory normal_factory = {
     .ops.sdu_rx             = rl_normal_sdu_rx,
     .ops.flow_writeable     = rl_normal_flow_writeable,
     .ops.qos_supported      = rl_normal_qos_supported,
+    .ops.sched_config       = rl_normal_sched_config,
 };
 
 static int __init

@@ -132,6 +132,13 @@ struct rl_msg_base_resp {
     uint8_t pad1[7];
 };
 
+/* Base message augmented with an ipcp_id. */
+struct rl_msg_ipcp {
+    struct rl_msg_hdr hdr;
+    rl_ipcp_id_t ipcp_id;
+    uint16_t pad1;
+};
+
 /* Some useful macros for casting. */
 #define RLITE_MB(m) (struct rl_msg_base *)(m)
 #define RLITE_MBR(m) (struct rl_msg_base_resp *)(m)
