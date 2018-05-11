@@ -78,11 +78,11 @@ void
 LFDB::compute_shortest_paths(
     const NodeId &source_node,
     const std::unordered_map<NodeId, std::list<Edge>> &graph,
-    std::unordered_map<NodeId, Info> &info)
+    std::unordered_map<NodeId, DijkstraInfo> &info)
 {
     /* Initialize the per-node info map. */
     for (const auto &kvg : graph) {
-        struct Info inf;
+        struct DijkstraInfo inf;
 
         inf.dist    = UINT_MAX;
         inf.visited = false;
@@ -118,12 +118,12 @@ LFDB::compute_shortest_paths(
         }
 
         const std::list<Edge> &edges = graph.at(min_node);
-        Info &info_min               = info[min_node];
+        DijkstraInfo &info_min       = info[min_node];
 
         info_min.visited = true;
 
         for (const Edge &edge : edges) {
-            Info &info_to = info[edge.to];
+            DijkstraInfo &info_to = info[edge.to];
 
             if (info_to.dist > info_min.dist + edge.cost) {
                 info_to.dist = info_min.dist + edge.cost;
@@ -146,9 +146,10 @@ LFDB::compute_shortest_paths(
 int
 LFDB::compute_next_hops(const NodeId &local_node)
 {
-    std::unordered_map<NodeId, std::unordered_map<NodeId, Info>> neigh_infos;
+    std::unordered_map<NodeId, std::unordered_map<NodeId, DijkstraInfo>>
+        neigh_infos;
     std::unordered_map<NodeId, std::list<Edge>> graph;
-    std::unordered_map<NodeId, Info> info;
+    std::unordered_map<NodeId, DijkstraInfo> info;
 
     /* Clean up state left from the previous run. */
     next_hops.clear();

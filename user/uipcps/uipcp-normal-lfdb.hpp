@@ -43,7 +43,7 @@ struct LFDB {
         Edge(Edge &&) = default;
     };
 
-    struct Info {
+    struct DijkstraInfo {
         unsigned int dist;
         NodeId nhop;
         bool visited;
@@ -80,7 +80,7 @@ public:
     void compute_shortest_paths(
         const NodeId &source_node,
         const std::unordered_map<NodeId, std::list<Edge>> &graph,
-        std::unordered_map<NodeId, Info> &info);
+        std::unordered_map<NodeId, DijkstraInfo> &info);
 
     int compute_next_hops(const NodeId &local_node);
 
