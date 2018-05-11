@@ -6,6 +6,7 @@ import time
 import sys
 import re
 import os
+import errno
 
 
 # Clean up a string or bytearray that comes from process output
@@ -21,19 +22,42 @@ def strclean(s):
     return s
 
 def daemonize():
-    try:
-        pid = os.fork()
-        if pid > 0:
-            # Exit parent
-            sys.exit(0)
-    except OSError as e:
-        printf("Fork failed: %d (%s)\n" % (e.errno, e.strerror))
-        quit()
-        sys.exit(1)
+    while 1:
+        try:
+            pid = os.fork()
+            if pid > 0:
+                # Exit parent
+                sys.exit(0)
+            # Go ahead with the child
+            break
+        except OSError as e:
+            if e.errno != errno.EAGAIN:
+                printf("Fork failed: %d (%s)\n" % (e.errno, e.strerror))
+                quit()
+                sys.exit(1)
+            # Temporary failure. Wait and retry.
+            time.sleep(2)
 
     # Decouple from parent environment
     os.chdir("/")
     os.setsid()
+
+def process_retry(fun, params):
+    while 1:
+        try:
+            return fun(params, stderr = subprocess.STDOUT)
+        except OSError as e:
+            if e.errno != errno.EAGAIN:
+                # Propagate the exception to the caller
+                raise
+            # Temporary lack of resources, let's wait a bit and retry
+            time.sleep(3)
+
+def process_call_retry(params):
+    process_retry(subprocess.check_call, params)
+
+def process_output_retry(params):
+    return process_retry(subprocess.check_output, params)
 
 
 description = "Simple configuration tool for rlite"
@@ -61,10 +85,10 @@ configured = False
 daemonized = False
 
 try:
-    subprocess.check_call(['modprobe', 'rlite'], stderr = subprocess.STDOUT)
-    subprocess.check_call(['modprobe', 'rlite-normal'], stderr = subprocess.STDOUT)
-    subprocess.check_call(['modprobe', 'rlite-shim-eth'], stderr = subprocess.STDOUT)
-    subprocess.check_call(['modprobe', 'rlite-shim-udp4'], stderr = subprocess.STDOUT)
+    process_call_retry(['modprobe', 'rlite'])
+    process_call_retry(['modprobe', 'rlite-normal'])
+    process_call_retry(['modprobe', 'rlite-shim-eth'])
+    process_call_retry(['modprobe', 'rlite-shim-udp4'])
 except Exception as ee:
     print("Error: failed to modprobe rlite modules")
     quit()
@@ -72,16 +96,16 @@ except Exception as ee:
 while True:
     # Check if rlite-uipcps it still there.
     try:
-        o = subprocess.check_output(['rlite-ctl', 'probe'], stderr = subprocess.STDOUT)
+        o = process_output_retry(['rlite-ctl', 'probe'])
     except Exception as e:
         # Not there, we need to respawn it and force reconfiguration.
         print("Could not probe rlite-uipcps daemon, spawning ...")
-        subprocess.call(['pkill', 'rlite-uipcps'])
         try:
+            process_retry(subprocess.call, ['pkill', 'rlite-uipcps'])
             configured = False
-            subprocess.check_call(['rlite-uipcps', '-d'])
+            process_call_retry(['rlite-uipcps', '-d'])
         except Exception as ee:
-            print("Error: Failed to start rlite-uipcps")
+            print("Error: Failed to start rlite-uipcps [%s]" % ee.strerror)
             quit()
         # Probe again to make sure the daemon is up and running.
         continue
@@ -90,7 +114,7 @@ while True:
     # we can go ahead and execute the initscript. Otherwise we wait
     # for a while and probe again.
     if configured:
-        time.sleep(5)
+        time.sleep(10)
         continue
 
     print(">>> Running initscript ...")
@@ -129,7 +153,7 @@ while True:
     for cmd in cmds:
         cmdargs = ['rlite-ctl'] + cmd[1]
         try:
-            o = subprocess.check_output(cmdargs, stderr = subprocess.STDOUT)
+            o = process_output_retry(cmdargs)
         except Exception as e:
             o = strclean(e.output)
             print("Failure at %s:%s --> %s" % (args.script, cmd[0], o))
@@ -152,7 +176,7 @@ while True:
         cmdargs = ['rlite-ctl'] + cmd[1]
         while 1:
             try:
-                o = subprocess.check_output(cmdargs, stderr = subprocess.STDOUT)
+                o = process_output_retry(cmdargs)
                 break
             except Exception as e:
                 o = strclean(e.output)
