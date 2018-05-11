@@ -31,6 +31,8 @@
 
 #include "uipcp-normal-lfdb.hpp"
 
+using NextHops = std::unordered_map<rlite::NodeId, std::list<rlite::NodeId>>;
+
 struct TestLFDB : public rlite::LFDB {
     using LinksList = std::vector<std::pair<int, int>>;
     LinksList links;
@@ -57,6 +59,17 @@ struct TestLFDB : public rlite::LFDB {
             db[lf1.local_node()][lf1.remote_node()] = lf1;
             db[lf2.local_node()][lf2.remote_node()] = lf2;
         }
+    }
+
+    bool reachable(int src_node, int dst_node, int n)
+    {
+        std::string src = std::to_string(src_node);
+        std::string dst = std::to_string(dst_node);
+        std::string cur = src;
+
+        for (; n >= 0; n--) {
+        }
+        return true;
     }
 };
 
@@ -105,8 +118,8 @@ main(int argc, char **argv)
         TestLFDB::LinksList links;
         int sqn = static_cast<int>(std::sqrt(n));
 
-        if (sqn < 1) {
-            sqn = 1;
+        if (sqn < 2) {
+            sqn = 2;
         }
 
         auto coord = [sqn](int i, int j) { return i * sqn + j; };
@@ -127,20 +140,30 @@ main(int argc, char **argv)
 
         TestLFDB lfdb(links, /*lfa_enabled=*/false);
 
-        assert(!links.empty());
-
-        auto root  = std::to_string(links.front().first);
-        auto start = std::chrono::system_clock::now();
-        lfdb.compute_next_hops(root);
-        auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now() - start);
-
         if (verbosity) {
             std::stringstream ss;
             lfdb.dump(ss);
-            lfdb.dump_routing(ss, root);
             std::cout << ss.str();
         }
+        assert(!links.empty());
+
+        std::unordered_map<rlite::NodeId, NextHops> rtables;
+
+        auto start = std::chrono::system_clock::now();
+        for (const auto &kv : lfdb.db) {
+            const rlite::NodeId &source = kv.first;
+
+            lfdb.compute_next_hops(source);
+            if (verbosity) {
+                std::stringstream ss;
+                lfdb.dump_routing(ss, source);
+                std::cout << ss.str();
+            }
+            rtables[source] = std::move(lfdb.next_hops);
+        }
+        auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now() - start);
+
         std::cout << "Completed in " << delta.count() << " ms" << std::endl;
     }
 
