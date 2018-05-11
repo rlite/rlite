@@ -869,6 +869,8 @@ if args.namespaces:
 
     # Kill the daemons and unload the modules
     outs += 'sleep 1\n'\
+            'sudo pkill -f -9 rina-echo-async\n'\
+            'sudo pkill -f -9 rinaperf\n'\
             'sudo pkill -f -9 rlite-node-config\n'\
             'sudo pkill -f -9 rlite-uipcps\n'\
             'sleep 1\n'\
