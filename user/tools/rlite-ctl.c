@@ -600,7 +600,7 @@ ipcp_enroll_retry(int argc, char **argv, struct cmd_descriptor *cd)
         if (!ret) {
             break;
         }
-        sleep(i + 1);
+        sleep(5 + 3 * i);
         PI("Retry #%d...\n", i + 1);
     }
 
