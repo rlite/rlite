@@ -3,6 +3,7 @@
 cleanup() {
     local ret=0
     pkill iporinad || ret=1
+    rm -f iporinad1.conf iporinad2.conf
     rlite-ctl reset || ret=1
     [ "$ret" != 0 ] && return 1 || return 0
 }
@@ -29,5 +30,4 @@ EOF
 iporinad -wv -c iporinad1.conf || abort
 iporinad -wv -c iporinad2.conf || abort
 sleep 2
-pkill iporinad || abort
 cleanup
