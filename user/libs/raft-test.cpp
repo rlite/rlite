@@ -510,7 +510,7 @@ run_simulation(const list<TestEvent> &external_events)
                 /* On the first active replica, check that there are no missing
                  * commands. */
                 set<uint32_t> missing_commands =
-                    kv.second->get_missing_commands(std::move(set<uint32_t>()),
+                    kv.second->get_missing_commands(set<uint32_t>(),
                                                     input_counter);
 
                 for (const auto cmd : missing_commands) {
