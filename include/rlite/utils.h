@@ -127,6 +127,10 @@ extern int rl_verbosity;
     if (rl_verbosity >= RL_VERB_INFO)                                          \
     PRINTFUN1(FMT, ##__VA_ARGS__)
 
+#define PW(FMT, ...)                                                           \
+    if (rl_verbosity >= RL_VERB_WARN)                                          \
+    PRINTFUN2("WRN", FMT, ##__VA_ARGS__)
+
 #define PV(FMT, ...)                                                           \
     if (rl_verbosity >= RL_VERB_VERY)                                          \
     PRINTFUN2("DBG", FMT, ##__VA_ARGS__)

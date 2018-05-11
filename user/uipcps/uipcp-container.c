@@ -1498,13 +1498,13 @@ topo_lower_flow_removed(struct uipcps *uipcps, unsigned int upper_id,
     lower = uipcp_lookup(uipcps, lower_id);
     if (lower == NULL) {
         pthread_mutex_unlock(&uipcps->lock);
-        PE("Could not find node %u\n", lower_id);
+        PW("Could not find node %u\n", lower_id);
         return -1;
     }
 
     if (upper == NULL) {
         pthread_mutex_unlock(&uipcps->lock);
-        PE("Could not find node %u\n", upper_id);
+        PW("Could not find node %u\n", upper_id);
         return -1;
     }
 
