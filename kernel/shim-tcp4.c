@@ -67,7 +67,6 @@ struct shim_tcp4_flow {
     bool cur_rx_hdr;
 
     struct mutex rxw_lock;
-    spinlock_t txstats_lock;
 };
 
 #define INET4_MAX_TXQ_LEN 64
@@ -276,7 +275,6 @@ rl_shim_tcp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     priv->sock = sock;
     INIT_WORK(&priv->rxw, tcp4_rx_worker);
     mutex_init(&priv->rxw_lock);
-    spin_lock_init(&priv->txstats_lock);
 
     /* Initialize TCP reader state machine. */
     priv->cur_rx_rb     = NULL;
@@ -362,15 +360,11 @@ tcp4_xmit(struct shim_tcp4_flow *flow_priv, struct rl_buf *rb)
             PI("kernel_sendmsg(): partial write %d/%d\n", ret, (int)rb->len);
         }
 
-        spin_lock_bh(&flow_priv->txstats_lock);
         stats->tx_err++;
-        spin_unlock_bh(&flow_priv->txstats_lock);
     } else {
         NPD("kernel_sendmsg(%d + 2)\n", (int)rb->len);
-        spin_lock_bh(&flow_priv->txstats_lock);
         stats->tx_pkt++;
         stats->tx_byte += rb->len;
-        spin_unlock_bh(&flow_priv->txstats_lock);
     }
 
     rl_buf_free(rb);
