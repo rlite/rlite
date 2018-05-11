@@ -800,17 +800,13 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
             list<std::string> components = {DFT::Prefix};
             for (const auto &c : components) {
                 for (const auto &kv : rib->params_map[c]) {
+                    std::stringstream oss;
                     std::string val;
 
                     m = CDAPMessage();
                     m.m_write(kv.first, c + "/params");
-                    switch (rib->get_param_type(c, kv.first)) {
-                    case PolicyParamType::String:
-                        val = rib->get_param_value<string>(c, kv.first);
-                        break;
-                    default:
-                        assert(false);
-                    }
+                    oss << kv.second;
+                    val = oss.str();
                     if (!val.empty()) {
                         m.set_obj_value(val);
                         ret = nf->send_to_port_id(&m);
