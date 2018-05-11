@@ -3538,7 +3538,7 @@ rl_dm_get(void)
 
     /* Data model not found for the current namespace. Let's create one and
      * return it. */
-    dm = rl_alloc(sizeof(*dm), GFP_KERNEL, RL_MT_MISC);
+    dm = rl_alloc(sizeof(*dm), GFP_KERNEL, RL_MT_DM);
     if (dm == NULL) {
         return NULL;
     }
@@ -3614,7 +3614,7 @@ rl_dm_put(struct rl_dm *dm)
     put_net(dm->net);
     PD("Data model for namespace %p destroyed\n", dm->net);
     dm->net = NULL;
-    rl_free(dm, RL_MT_MISC);
+    rl_free(dm, RL_MT_DM);
 }
 
 static int __init

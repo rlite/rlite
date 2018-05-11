@@ -802,6 +802,7 @@ typedef enum {
     RL_MT_SHIM,
     RL_MT_UPQ,
     RL_MT_DIF,
+    RL_MT_DM,
     RL_MT_IPCP,
     RL_MT_REGAPP,
     RL_MT_FLOW,
