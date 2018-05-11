@@ -918,7 +918,8 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
         /* Failure comes from log inconsistencies. We need to decrement
          * next_index_acked and next_index_unacked and retry. */
         follower.next_index_acked = follower.next_index_unacked =
-            resp.log_index;
+            std::max(static_cast<LogIndex>(1),
+                     std::min(resp.log_index, follower.next_index_acked - 1));
     }
 
     return 0;
