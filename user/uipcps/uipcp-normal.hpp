@@ -388,7 +388,10 @@ struct AddrAllocator {
     virtual ~AddrAllocator() {}
 
     virtual int reconfigure() { return 0; }
-    virtual void dump(std::stringstream &ss) const                       = 0;
+    virtual void dump(std::stringstream &ss) const = 0;
+    /* Allocate an address. Note that this method is synchronous, and so it
+     * should not be called by the uipcp event loop. It is designed to be called
+     * by the enroller thread or other auxiliary threads. */
     virtual int allocate(const std::string &ipcp_name, rlm_addr_t *addr) = 0;
     virtual int rib_handler(const CDAPMessage *rm,
                             std::shared_ptr<NeighFlow> const &nf,

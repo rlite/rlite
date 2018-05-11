@@ -1,6 +1,9 @@
 #include <sstream>
 #include <string>
 #include <unistd.h>
+#include <condition_variable>
+#include <mutex>
+#include <memory>
 
 #include "uipcp-normal.hpp"
 #include "uipcp-normal-ceft.hpp"
@@ -369,11 +372,23 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
 
     /* In case of client, a pointer to client-side data structures. */
     class Client : public CeftClient {
+        struct Synchronizer {
+            std::condition_variable allocated;
+            std::mutex mutex;
+            rlm_addr_t address = RL_ADDR_NULL;
+        };
         struct PendingReq : public CeftClient::PendingReq {
+            /* The IPCP to allocate the address for. */
             std::string ipcp_name;
+            /* Synchronization variables for the client RIB handler to inform
+             * the enroller thread about the allocated address. */
+            std::shared_ptr<Synchronizer> synchro;
             PendingReq() = default;
-            PendingReq(gpb::OpCode op_code, const std::string &ipcp_name)
-                : CeftClient::PendingReq(op_code), ipcp_name(ipcp_name)
+            PendingReq(gpb::OpCode op_code, const std::string &ipcp_name,
+                       const std::shared_ptr<Synchronizer> &synchro)
+                : CeftClient::PendingReq(op_code),
+                  ipcp_name(ipcp_name),
+                  synchro(synchro)
             {
             }
             std::unique_ptr<CeftClient::PendingReq> clone() const override
@@ -476,11 +491,13 @@ int
 CentralizedFaultTolerantAddrAllocator::Client::allocate(
     const std::string &ipcp_name, rlm_addr_t *addr)
 {
-    auto m = make_unique<CDAPMessage>();
+    auto m       = make_unique<CDAPMessage>();
+    auto synchro = std::make_shared<Synchronizer>();
 
+    *addr = RL_ADDR_NULL;
     m->m_create(ObjClass, TableName + "/" + ipcp_name);
 
-    auto pr = make_unique<PendingReq>(m->op_code, ipcp_name);
+    auto pr = make_unique<PendingReq>(m->op_code, ipcp_name, synchro);
     int ret = send_to_replicas(std::move(m), std::move(pr), OpSemantics::Put);
     if (ret) {
         return ret;
@@ -488,6 +505,18 @@ CentralizedFaultTolerantAddrAllocator::Client::allocate(
 
     UPI(rib->uipcp, "Issued address allocation request for IPCP '%s'\n",
         ipcp_name.c_str());
+
+    /* Wait for the address allocation to complete. */
+    std::unique_lock<std::mutex> lk(synchro->mutex);
+    // TODO use timeout parameter
+    if (synchro->allocated.wait_for(lk, Secs(4)) == std::cv_status::timeout) {
+        UPE(rib->uipcp, "Address allocation for IPCP '%s' timed out\n",
+            ipcp_name.c_str());
+        return -1;
+    }
+    UPD(rib->uipcp, "Address %lu successfully allocated for IPCP '%s'\n",
+        (long unsigned)synchro->address, ipcp_name.c_str());
+    *addr = synchro->address;
 
     return 0;
 }
@@ -503,18 +532,27 @@ CentralizedFaultTolerantAddrAllocator::Client::process_rib_msg(
     switch (rm->op_code) {
     case gpb::M_READ_R:
     case gpb::M_CREATE_R: {
+        rlm_addr_t address = RL_ADDR_NULL;
+
         if (rm->result) {
             UPD(uipcp, "Address %s for IPCP '%s' failed remotely [%s]\n",
                 rm->op_code == gpb::M_CREATE_R ? "allocation" : "lookup",
                 pr->ipcp_name.c_str(), rm->result_reason.c_str());
         } else {
-            int64_t allocated_address;
+            int64_t addr;
 
-            rm->get_obj_value(allocated_address);
+            rm->get_obj_value(addr);
+            address = static_cast<rlm_addr_t>(addr);
             UPD(uipcp, "Address %llu %s for IPCP '%s'\n",
-                (long long unsigned)allocated_address,
+                (long long unsigned)address,
                 rm->op_code == gpb::M_CREATE_R ? "allocated" : "looked up",
                 pr->ipcp_name.c_str());
+        }
+
+        if (rm->op_code == gpb::M_CREATE_R) {
+            std::lock_guard<std::mutex> guard(pr->synchro->mutex);
+            pr->synchro->address = address;
+            pr->synchro->allocated.notify_one();
         }
         break;
     }

@@ -603,6 +603,9 @@ CentralizedFaultTolerantDFT::Client::process_rib_msg(
             UPD(uipcp, "Lookup of name '%s' resolved to node '%s'\n",
                 pr->appl_name.c_str(), remote_node.c_str());
         }
+
+        /* Flush any pending flow allocation requests that were
+         * waiting for the result of this lookup. */
         rib->dft_lookup_resolved(pr->appl_name, remote_node);
         break;
     }
