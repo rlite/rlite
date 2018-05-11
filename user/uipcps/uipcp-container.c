@@ -1229,7 +1229,7 @@ topo_visit(struct uipcps *uipcps)
 
             msz = (int)ipn->max_sdu_size - (int)e->uipcp->topo.hdrsize;
             if (msz < 0) {
-                msz = 0;  /* just to be on the safe side */
+                msz = 0; /* just to be on the safe side */
             }
             if (e->uipcp->topo.max_sdu_size > msz) {
                 e->uipcp->topo.max_sdu_size = msz;

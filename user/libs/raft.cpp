@@ -178,6 +178,7 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
         servers[rid].match_index      = 0;
         servers[rid].next_index_acked = servers[rid].next_index_unacked =
             last_log_index + 1;
+        servers[rid].last_ae_time = std::chrono::system_clock::now();
     }
 
     /* Initialization is complete, we can set the election timer and return to
@@ -479,8 +480,12 @@ RaftSM::log_entry_get_command(LogIndex index, char *const serbuf)
 int
 RaftSM::prepare_append_entries(LogReplicateStrategy strategy, RaftSMOutput *out)
 {
+    auto now = std::chrono::system_clock::now();
+
     for (auto &kv : servers) {
-        if (strategy == LogReplicateStrategy::Unacked) {
+        if (strategy == LogReplicateStrategy::Unacked &&
+            now >= kv.second.last_ae_time +
+                      std::chrono::milliseconds(int(kRetransmissionMsecs))) {
             kv.second.next_index_unacked = kv.second.next_index_acked;
         }
 
@@ -513,6 +518,9 @@ RaftSM::prepare_append_entries(LogReplicateStrategy strategy, RaftSMOutput *out)
                     std::make_pair(term, std::move(bufcopy)));
             }
             kv.second.next_index_unacked = i;
+            if (!msg->entries.empty()) {
+                kv.second.last_ae_time = now;
+            }
             out->output_messages.push_back(make_pair(kv.first, std::move(msg)));
         } while (kv.second.next_index_unacked < last_log_index);
     }
@@ -714,6 +722,7 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
         kv.second.match_index      = 0;
         kv.second.next_index_acked = kv.second.next_index_unacked =
             last_log_index + 1;
+        kv.second.last_ae_time = std::chrono::system_clock::now();
     }
 
     /* Prepare heartbeat messages for the other replicas and set the

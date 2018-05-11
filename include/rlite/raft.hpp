@@ -204,6 +204,11 @@ class RaftSM {
          * be replicated on that replica. Initialized to 0, increases
          * monotonically. */
         LogIndex match_index;
+
+        /* We record the last time we sent a RaftAppendEntries message with
+         * one or more entries. This is used to avoid useless retransmissions
+         * that closely follow a submit(). */
+        std::chrono::system_clock::time_point last_ae_time;
     };
 
     std::map<ReplicaId, Server> servers;
@@ -324,6 +329,14 @@ class RaftSM {
         std::chrono::milliseconds(500);
     std::chrono::milliseconds HeartbeatTimeout = std::chrono::milliseconds(100);
 
+    unsigned int verbosity = kVerboseVery;
+
+    /* Statistics. */
+    struct Stats {
+        /* Number of discarded log entries, due to partial replication. */
+        unsigned int discarded = 0;
+    } stats;
+
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,
            std::string logname, size_t cmd_size, std::ostream &ioe,
@@ -406,12 +419,6 @@ public:
         return HeartbeatTimeout;
     }
 
-    /* Statistics. */
-    struct Stats {
-        /* Number of discarded log entries, due to partial replication. */
-        unsigned int discarded = 0;
-    };
-
     Stats get_stats() { return stats; };
 
     static constexpr unsigned int kVerboseQuiet = 0;
@@ -427,9 +434,7 @@ public:
      * message. */
     static constexpr size_t kMaxLogChunkBytes = 1000;
 
-private:
-    Stats stats;
-    unsigned int verbosity = kVerboseVery;
+    static constexpr unsigned int kRetransmissionMsecs = 0;
 };
 
 } /* namespace raft */
