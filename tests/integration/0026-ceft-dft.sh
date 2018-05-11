@@ -38,8 +38,6 @@ for cont in s1 s2 s3 c; do
     ip link set veth.${cont}h master vethbr0 || abort
 done
 
-brctl show vethbr0  # TODO remove me
-
 # Normal over shim setup in all the namespaces
 for cont in s1 s2 s3 c; do
     ip netns exec ${cont} ip link set lo up || abort

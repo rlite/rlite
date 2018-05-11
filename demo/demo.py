@@ -428,9 +428,6 @@ VMTHRESH = 10
 if not args.backend:
     args.backend = 'tap' if len(demo.vms) <= VMTHRESH else 'udp'
 
-if args.backend == 'tap':
-    which('brctl', sudo=True)
-
 if not args.enrollment_order:
     args.enrollment_order = 'sequential' if len(demo.vms) <= VMTHRESH else 'parallel'
 
@@ -448,7 +445,7 @@ outs =  '#!/bin/bash\n'             \
 if args.backend == 'tap':
     for shim in sorted(demo.shims):
         outs += '(\n'                               \
-                'sudo brctl addbr %(br)s\n'         \
+                'sudo ip link add name %(br)s type bridge\n'\
                 'sudo ip link set %(br)s up\n'      \
                 ') &\n' % {'br': shim}
     outs += 'wait\n'
@@ -500,7 +497,7 @@ else:
             outs += '(\n'                                           \
                     'sudo ip tuntap add mode tap name %(tap)s\n'    \
                     'sudo ip link set %(tap)s up\n'                 \
-                    'sudo brctl addif %(br)s %(tap)s\n'             \
+                    'sudo ip link set %(tap)s master %(br)s\n'             \
                         % {'tap': tap, 'br': shim}
 
             if demo.shims[shim]['type'] == 'eth' and demo.shims[shim]['speed'] > 0:
@@ -888,7 +885,7 @@ elif args.backend == 'tap':
             shim = port['shim']
 
             outs += '(\n'                                           \
-                    'sudo brctl delif %(br)s %(tap)s\n'             \
+                    'sudo ip link set %(tap)s nomaster\n'           \
                     'sudo ip link set %(tap)s down\n'               \
                     'sudo ip tuntap del mode tap name %(tap)s\n'    \
                     ') &\n'                                         \
@@ -898,7 +895,7 @@ elif args.backend == 'tap':
     for shim in sorted(demo.shims):
         outs += '(\n'                                   \
                 'sudo ip link set %(br)s down\n'        \
-                'sudo brctl delbr %(br)s\n'             \
+                'sudo ip link del %(br)s type bridge\n' \
                 ') &\n' % {'br': shim}
     outs += 'wait\n'
 
