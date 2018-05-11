@@ -695,6 +695,8 @@ protected:
 
     int read_from_replicas(std::unique_ptr<CDAPMessage> m,
                            std::unique_ptr<PendingReq> pr);
+    int send_to_replicas(std::unique_ptr<CDAPMessage> m,
+                         std::unique_ptr<PendingReq> pr);
     void mod_pending_timer();
 
 public:
@@ -938,6 +940,7 @@ CentralizedFaultTolerantDFT::reconfigure()
     return 0;
 }
 
+// TODO merge read_from and send_to, and move them up
 int
 CeftClient::read_from_replicas(std::unique_ptr<CDAPMessage> m,
                                std::unique_ptr<PendingReq> pr)
@@ -954,7 +957,37 @@ CeftClient::read_from_replicas(std::unique_ptr<CDAPMessage> m,
             mc->invoke_id = invoke_id = rib->invoke_id_mgr.get_invoke_id();
             prc->replica              = r;
             pending[invoke_id]        = std::move(prc);
+            ret = rib->send_to_dst_node(std::move(mc), r, nullptr, nullptr);
+            if (ret) {
+                pending.erase(invoke_id);
+                return ret;
+            }
+        }
+    }
 
+    mod_pending_timer();
+
+    return 0;
+}
+
+int
+CeftClient::send_to_replicas(std::unique_ptr<CDAPMessage> m,
+                             std::unique_ptr<PendingReq> pr)
+{
+    /* If we know who is the leader, we send it to the leader only; otherwise
+     * we send it to all the replicas. */
+    for (const auto &r : replicas) {
+        if (leader_id.empty() || r == leader_id) {
+            auto mc  = make_unique<CDAPMessage>(*m);
+            auto prc = pr->clone();
+            int invoke_id;
+            int ret;
+
+            /* Set the 'pending' map before sending, in case we are sending to
+             * ourselves (and so we wouldn't find the entry in the map).*/
+            mc->invoke_id = invoke_id = rib->invoke_id_mgr.get_invoke_id();
+            prc->replica              = r;
+            pending[invoke_id]        = std::move(prc);
             ret = rib->send_to_dst_node(std::move(mc), r, nullptr, nullptr);
             if (ret) {
                 pending.erase(invoke_id);
@@ -998,43 +1031,33 @@ int
 CentralizedFaultTolerantDFT::Client::appl_register(
     const struct rl_kmsg_appl_register *req)
 {
+    /* Prepare an M_WRITE or M_DELETE message for a write/delete operation. */
     string appl_name(req->appl_name);
+    auto m = make_unique<CDAPMessage>();
+    int ret;
 
-    /* Prepare an M_WRITE or M_DELETE message for a write/delete operation.
-     * If we know who is the leader, we send it to the leader only; otherwise
-     * we send it to all the replicas. */
-    for (const auto &r : replicas) {
-        if (leader_id.empty() || r == leader_id) {
-            auto m = make_unique<CDAPMessage>();
-            gpb::OpCode op_code;
-            gpb::DFTEntry dft_entry;
-            int invoke_id;
-            int ret;
-
-            if (req->reg) {
-                m->m_write(ObjClass, TableName);
-            } else {
-                m->m_delete(ObjClass, TableName);
-            }
-            op_code = m->op_code;
-            dft_entry.set_ipcp_name(rib->myname);
-            dft_entry.set_allocated_appl_name(apname2gpb(appl_name));
-            dft_entry.set_seqnum(seqnum_next++);
-
-            /* Set the 'pending' map before sending, in case we are sending to
-             * ourselves (and so we wouldn't find the entry in the map).*/
-            m->invoke_id = invoke_id = rib->invoke_id_mgr.get_invoke_id();
-            pending[invoke_id] = make_unique<PendingReq>(r, op_code, appl_name,
-                                                         req->hdr.event_id);
-            ret = rib->send_to_dst_node(std::move(m), r, &dft_entry, nullptr);
-            if (ret) {
-                pending.erase(invoke_id);
-                return ret;
-            }
-        }
+    if (req->reg) {
+        m->m_write(ObjClass, TableName);
+    } else {
+        m->m_delete(ObjClass, TableName);
     }
 
-    mod_pending_timer();
+    auto pr = make_unique<PendingReq>(string(), m->op_code, appl_name,
+                                      req->hdr.event_id);
+    gpb::DFTEntry dft_entry;
+
+    dft_entry.set_ipcp_name(rib->myname);
+    dft_entry.set_allocated_appl_name(apname2gpb(appl_name));
+    dft_entry.set_seqnum(seqnum_next++);
+    ret = rib->obj_serialize(m.get(), &dft_entry);
+    if (ret) {
+        return ret;
+    }
+
+    ret = send_to_replicas(std::move(m), std::move(pr));
+    if (ret) {
+        return ret;
+    }
 
     if (req->reg) {
         UPD(rib->uipcp, "Write request '%s <= %llu' issued\n",
