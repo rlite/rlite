@@ -425,7 +425,7 @@ class Demo:
             # as a cluster for a centralized-fault-tolerant component
             # (e.g. for DFT or the address allocator).
             enrolled = set([dif_center[dif]])
-            self.cluster5[dif] = [self.vms[dif_center[dif]]['id']]
+            self.cluster5[dif] = [self.vms[dif_center[dif]]['name']]
             frontier = FrontierSet([dif_center[dif]])
             edges_covered = set()
             while not frontier.empty():
@@ -442,7 +442,7 @@ class Demo:
                         self.vms[edge[0]]['enrolling'].append(dif)
                         frontier.add(edge[0])
                         if len(self.cluster5[dif]) < 5:
-                            self.cluster5[dif].append(self.vms[edge[0]]['id'])
+                            self.cluster5[dif].append(self.vms[edge[0]]['name'])
 
             self.lowerflowallocs[dif] = []
             if self.enrollment_strategy == 'full-mesh':
@@ -479,7 +479,7 @@ class Demo:
             elif self.addr_alloc_policy == "centralized-fault-tolerant":
                 replicas = []
                 for nname in self.cluster5[dif]:
-                    replicas.append('%(dif)s.%(id)s.IPCP' % {'dif': dif, 'id': nname})
+                    replicas.append('%(dif)s.%(vmname)s.IPCP' % {'dif': dif, 'vmname': nname})
                 params.append('replicas=%s' % (','.join(replicas)))
             self.dif_policies[dif].append({
                 'path': 'addralloc',
@@ -513,7 +513,8 @@ class Demo:
                 'idx': port['idx'],
                 'shim': port['shim'],
                 'id': vm['id'],
-                'shimtype': shim['type']
+                'vmname': vm['name'],
+                'shimtype': shim['type'],
             }
             if mac2ifname:
                 vars_dict['mac'] = port['mac']
@@ -523,11 +524,11 @@ class Demo:
                 outs += 'PORT%(idx)s=%(ifname)s\n' % vars_dict
             outs += '$SUDO ip link set $PORT%(idx)s up\n' % vars_dict
             ctrl_cmds.append(
-                'ipcp-create %(shim)s.%(id)s.IPCP shim-%(shimtype)s %(shim)s.DIF\n'
+                'ipcp-create %(shim)s.%(vmname)s.IPCP shim-%(shimtype)s %(shim)s.DIF\n'
                 % vars_dict)
             if shim['type'] == 'eth':
                 ctrl_cmds.append(
-                    'ipcp-config %(shim)s.%(id)s.IPCP netdev $PORT%(idx)s\n' %
+                    'ipcp-config %(shim)s.%(vmname)s.IPCP netdev $PORT%(idx)s\n' %
                     vars_dict)
             elif shim['type'] == 'udp4':
                 outs += '$SUDO ip addr add %s dev $PORT%s\n' % (port['ip'],
@@ -558,16 +559,18 @@ class Demo:
         for dif in self.dif_ordering:
             if dif not in self.shims and vmname in self.difs[dif]:
                 ctrl_cmds.append(
-                    'ipcp-create %(dif)s.%(id)s.IPCP normal%(flsuf)s %(dif)s.DIF\n'
+                    'ipcp-create %(dif)s.%(vmname)s.IPCP normal%(flsuf)s %(dif)s.DIF\n'
                     % {
                         'dif': dif,
                         'id': vm['id'],
+                        'vmname': vm['name'],
                         'flsuf': self.flavour_suffix
                     })
                 if self.csum == "inet":
-                    ctrl_cmds.append('ipcp-config %(dif)s.%(id)s.IPCP csum inet\n' % {
+                    ctrl_cmds.append('ipcp-config %(dif)s.%(vmname)s.IPCP csum inet\n' % {
                                 'dif': dif,
-                                'id': vm['id']
+                                'id': vm['id'],
+                                'vmname': vm['name'],
                             })
 
                 for p in self.dif_policies[dif]:
@@ -588,7 +591,7 @@ class Demo:
 
                             def replfun(m):
                                 return "%s.%s.IPCP" % (
-                                    dif, self.vms[m.group(1)]['id'])
+                                    dif, self.vms[m.group(1)]['name'])
 
                             pvalue = re.sub(r'\$([\w-]+)', replfun, pvalue)
                             ctrl_cmds.append(
@@ -602,9 +605,10 @@ class Demo:
 
                 if self.addr_alloc_policy == "static":
                     ctrl_cmds.append(
-                        'ipcp-config %(dif)s.%(id)s.IPCP address %(id)d\n' % {
+                        'ipcp-config %(dif)s.%(vmname)s.IPCP address %(id)d\n' % {
                             'dif': dif,
-                            'id': vm['id']
+                            'id': vm['id'],
+                            'vmname': vm['name'],
                         })
 
                 if self.reliable_flows:
@@ -645,16 +649,18 @@ class Demo:
 
             # Scan all the lower DIFs of the current DIF, for the current node
             for lower_dif in sorted(self.difs[dif][vmname]):
-                vars_dict = {'dif': dif, 'id': vm['id'], 'lodif': lower_dif}
+                vars_dict = {'dif': dif,
+                             'vmname': vm['name'],
+                             'lodif': lower_dif}
                 ctrl_cmds.append(
-                    'ipcp-register %(dif)s.%(id)s.IPCP %(lodif)s.DIF\n' %
+                    'ipcp-register %(dif)s.%(vmname)s.IPCP %(lodif)s.DIF\n' %
                     vars_dict)
                 del vars_dict
 
             if dif not in vm['enrolling']:
-                vars_dict = {'dif': dif, 'id': vm['id']}
+                vars_dict = {'dif': dif, 'vmname': vm['name']}
                 ctrl_cmds.append(
-                    'ipcp-enroller-enable %(dif)s.%(id)s.IPCP\n' % vars_dict)
+                    'ipcp-enroller-enable %(dif)s.%(vmname)s.IPCP\n' % vars_dict)
                 print("Node %s is the enrollment master for DIF %s" % (vmname,
                                                                        dif))
                 del vars_dict
@@ -686,15 +692,15 @@ class Demo:
 
                 vars_dict = {
                     'id': vm['id'],
-                    'pvid': self.vms[enrollment['enroller']]['id'],
+                    'pvname': self.vms[enrollment['enroller']]['name'],
                     'vmname': vmname,
                     'oper': oper,
                     'dif': dif,
                     'ldif': enrollment['lower_dif']
                 }
-                cmd = 'ipcp-%(oper)s %(dif)s.%(id)s.IPCP %(dif)s.DIF %(ldif)s.DIF' % vars_dict
+                cmd = 'ipcp-%(oper)s %(dif)s.%(vmname)s.IPCP %(dif)s.DIF %(ldif)s.DIF' % vars_dict
                 if not self.broadcast_enrollment:
-                    cmd += ' %(dif)s.%(pvid)s.IPCP' % vars_dict
+                    cmd += ' %(dif)s.%(pvname)s.IPCP' % vars_dict
                 cmd += '\n'
                 del vars_dict
                 enroll_cmds.append(cmd)

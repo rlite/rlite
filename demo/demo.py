@@ -642,8 +642,8 @@ for vmname in sorted(demo.vms):
         # Scan all the lower DIFs of the current DIF, for the current node
         for lower_dif in sorted(demo.difs[dif][vmname]):
             if lower_dif in demo.shims and demo.shims[lower_dif]['type'] == 'udp4':
-                vars_dict = {'dif': dif, 'id': vm['id']}
-                demo.dns_mappings[lower_dif][vmname]['name'] = '%(dif)s.%(id)s.IPCP' % vars_dict
+                vars_dict = {'dif': dif, 'id': vm['id'], 'vmname': vmname}
+                demo.dns_mappings[lower_dif][vmname]['name'] = '%(dif)s.%(vmname)s.IPCP' % vars_dict
                 del vars_dict
 
 
@@ -784,7 +784,7 @@ if args.enrollment_order == 'sequential':
                 oper = 'enroll-retry'
 
             vars_dict = {'id': vm['id'],
-                         'pvid': demo.vms[enrollment['enroller']]['id'],
+                         'pvname': demo.vms[enrollment['enroller']]['name'],
                          'vmname': vm['name'],
                          'dif': dif, 'ldif': enrollment['lower_dif'],
                           'sudo': sudo,
@@ -794,10 +794,10 @@ if args.enrollment_order == 'sequential':
 
             outs += 'set -x\n'\
                     'SUDO=%(sudo)s\n'\
-                    '$SUDO rlite-ctl ipcp-%(oper)s %(dif)s.%(id)s.IPCP %(dif)s.DIF '\
+                    '$SUDO rlite-ctl ipcp-%(oper)s %(dif)s.%(vmname)s.IPCP %(dif)s.DIF '\
                             '%(ldif)s.DIF ' % vars_dict
             if not demo.broadcast_enrollment:
-                outs += '%(dif)s.%(pvid)s.IPCP\n' % vars_dict
+                outs += '%(dif)s.%(pvname)s.IPCP\n' % vars_dict
             else:
                 outs += '\n'
 

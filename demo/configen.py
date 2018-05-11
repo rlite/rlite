@@ -232,11 +232,12 @@ class Configen(Demo):
                 'idx': port['idx'],
                 'shim': port['shim'],
                 'id': vm['id'],
+                'vmname': vm['name'],
                 'shimtype': shim['type']
             }
             if vars_dict['shimtype'] == 'udp':
                 ctrl_cmds.append(
-                    'ipcp-create %(shim)s.%(id)s.IPCP shim-%(shimtype)s %(shim)s.DIF\n'
+                    'ipcp-create %(shim)s.%(vmname)s.IPCP shim-%(shimtype)s %(shim)s.DIF\n'
                     % vars_dict)
             del vars_dict
 
