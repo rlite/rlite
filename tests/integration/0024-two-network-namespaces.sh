@@ -37,6 +37,7 @@ ip netns exec green rlite-ctl ipcp-config green.eth netdev veth.green || abort
 ip netns exec green rlite-ctl ipcp-create green.n normal mydif || abort
 ip netns exec green rlite-ctl ipcp-enroller-enable green.n || abort
 ip netns exec green rlite-ctl ipcp-register green.n edif || abort
+ip netns exec green rlite-ctl dif-policy-param-mod mydif addralloc nack-wait-secs 1 || abort
 
 # Normal over shim eth setup in the red namespace
 ip netns exec red ip link set lo up || abort
