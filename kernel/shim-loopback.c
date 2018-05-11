@@ -161,8 +161,8 @@ flow_allocate_req_work(struct work_struct *w)
     int ret;
 
     ret =
-        rl_fa_req_arrived(faw->ipcp, 0, faw->remote_port, 0, 0, faw->local_appl,
-                          faw->remote_appl, NULL, NULL, false);
+        rl_fa_req_arrived(faw->ipcp, 0, faw->remote_port, 0, 0, 0,
+                          faw->local_appl, faw->remote_appl, NULL, NULL, false);
     if (ret) {
         PE("Failed to report flow allocation request\n");
     }

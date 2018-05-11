@@ -522,7 +522,8 @@ LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm,
                                   * kernel */
     uipcp_issue_fa_req_arrived(
         rib->uipcp, freq->uid, freq->src_port(), freq->connections(0).src_cep(),
-        remote_addr, local_appl.c_str(), remote_appl.c_str(), &flowcfg);
+        freq->connections(0).qosid(), remote_addr, local_appl.c_str(),
+        remote_appl.c_str(), &flowcfg);
     flow_reqs_in[freq->uid] = std::move(freq);
     rib->stats.fa_request_received++;
 

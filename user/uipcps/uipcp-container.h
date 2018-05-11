@@ -313,9 +313,9 @@ int uipcp_pduft_del(struct uipcp *uipcp, rlm_addr_t dst_addr,
 int uipcp_pduft_flush(struct uipcp *uipcp);
 
 int uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
-                               rl_port_t remote_port, uint32_t remote_cep,
-                               rlm_addr_t remote_addr, const char *local_appl,
-                               const char *remote_appl,
+                               rl_port_t remote_port, rlm_cepid_t remote_cep,
+                               rlm_qosid_t qos_id, rlm_addr_t remote_addr,
+                               const char *local_appl, const char *remote_appl,
                                const struct rl_flow_config *flowcfg);
 
 int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,

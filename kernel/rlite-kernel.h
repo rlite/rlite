@@ -681,8 +681,8 @@ struct net *rl_ipcp_net(struct ipcp_entry *ipcp);
 bool rl_ipcp_has_flows(struct ipcp_entry *ipcp, bool report);
 int rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                       rl_port_t remote_port, rlm_cepid_t remote_cep,
-                      rlm_addr_t remote_addr, const char *local_appl,
-                      const char *remote_appl,
+                      rlm_qosid_t qos_id, rlm_addr_t remote_addr,
+                      const char *local_appl, const char *remote_appl,
                       const struct rl_flow_config *flowcfg,
                       const struct rina_flow_spec *flowspec, bool maysleep);
 

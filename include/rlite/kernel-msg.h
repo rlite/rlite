@@ -339,7 +339,7 @@ struct rl_kmsg_uipcp_fa_req_arrived {
     rl_ipcp_id_t ipcp_id;
     rl_port_t remote_port;
     rlm_cepid_t remote_cep;
-    uint32_t pad1;
+    rlm_qosid_t qos_id;
     rlm_addr_t remote_addr;
     struct rl_flow_config flowcfg;
     struct rina_flow_spec flowspec;

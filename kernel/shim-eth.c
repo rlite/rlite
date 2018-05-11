@@ -682,7 +682,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
             goto drop;
         }
 
-        ret = rl_fa_req_arrived(ipcp, 0, 0, 0, 0, priv->upper_names[i],
+        ret = rl_fa_req_arrived(ipcp, 0, 0, 0, 0, 0, priv->upper_names[i],
                                 entry->tpa, NULL, NULL, false);
 
         if (ret) {

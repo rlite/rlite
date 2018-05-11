@@ -170,9 +170,9 @@ flowcfg2flowspec(struct rina_flow_spec *spec, const struct rl_flow_config *cfg)
 
 int
 uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
-                           rl_port_t remote_port, uint32_t remote_cep,
-                           rlm_addr_t remote_addr, const char *local_appl,
-                           const char *remote_appl,
+                           rl_port_t remote_port, rlm_cepid_t remote_cep,
+                           rlm_qosid_t qos_id, rlm_addr_t remote_addr,
+                           const char *local_appl, const char *remote_appl,
                            const struct rl_flow_config *flowcfg)
 {
     struct rl_kmsg_uipcp_fa_req_arrived req;
@@ -186,6 +186,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
     req.ipcp_id      = uipcp->id;
     req.remote_port  = remote_port;
     req.remote_cep   = remote_cep;
+    req.qos_id       = qos_id;
     req.remote_addr  = remote_addr;
     if (flowcfg) {
         memcpy(&req.flowcfg, flowcfg, sizeof(*flowcfg));
