@@ -123,7 +123,7 @@ rina_pci_dump(struct rina_pci *pci)
 
 #define RL_PCI_CTRL_LEN (RL_PCI_LEN + 6 * sizeof(rl_seq_t))
 
-static void sched_deq_worker(struct work_struct *w);
+static void rl_sched_init(struct rl_normal *priv);
 
 static void *
 rl_normal_create(struct ipcp_entry *ipcp)
@@ -154,11 +154,7 @@ rl_normal_create(struct ipcp_entry *ipcp)
     priv->ttl  = RL_TTL_DFLT;
     priv->csum = false;
 
-    rb_list_init(&priv->sched_q);
-    priv->sched_qlen = 0;
-    spin_lock_init(&priv->sched_qlock);
-    INIT_WORK(&priv->sched_deq_work, sched_deq_worker);
-    init_waitqueue_head(&priv->sched_wqh);
+    rl_sched_init(priv);
 
     PD("New IPC created [%p]\n", priv);
 
@@ -170,14 +166,9 @@ rl_normal_destroy(struct ipcp_entry *ipcp)
 {
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
 
-    {
-        struct rl_buf *rb, *tmp;
-
-        cancel_work_sync(&priv->sched_deq_work);
-        rb_list_foreach_safe (rb, tmp, &priv->sched_q) {
-            rb_list_del(rb);
-            rl_buf_free(rb);
-        }
+    cancel_work_sync(&priv->sched_deq_work);
+    if (priv->sched_destroy) {
+        priv->sched_destroy(priv);
     }
 
     rl_pduft_flush(ipcp);
@@ -610,6 +601,73 @@ inet_wrapsum(uint32_t sum)
 
 #define RMTQ_MAX_SIZE (1 << 17)
 
+struct rl_sched_fifo {
+    struct rb_list q;
+    int qlen;
+};
+
+static void *
+sched_fifo_create(struct rl_normal *priv)
+{
+    struct rl_sched_fifo *sched =
+        rl_alloc(sizeof(*sched), GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
+
+    if (!sched) {
+        return NULL;
+    }
+
+    rb_list_init(&sched->q);
+    sched->qlen = 0;
+
+    return sched;
+}
+
+static void
+sched_fifo_destroy(struct rl_normal *priv)
+{
+    struct rl_sched_fifo *sched = priv->sched_priv;
+    struct rl_buf *rb, *tmp;
+
+    rb_list_foreach_safe (rb, tmp, &sched->q) {
+        rb_list_del(rb);
+        rl_buf_free(rb);
+    }
+    sched->qlen = 0;
+    rl_free(sched, RL_MT_SHIM);
+}
+
+static int
+sched_fifo_enq(struct rl_normal *priv, struct rl_buf *rb)
+{
+    struct rl_sched_fifo *sched = priv->sched_priv;
+
+    if (sched->qlen > RMTQ_MAX_SIZE) {
+        return -1;
+    }
+
+    rb_list_enq(rb, &sched->q);
+    sched->qlen += rl_buf_truesize(rb);
+
+    return 0;
+}
+
+static struct rl_buf *
+sched_fifo_deq(struct rl_normal *priv)
+{
+    struct rl_sched_fifo *sched = priv->sched_priv;
+    struct rl_buf *rb;
+
+    if (rb_list_empty(&sched->q)) {
+        return NULL;
+    }
+    rb = rb_list_front(&sched->q);
+    rb_list_del(rb);
+    sched->qlen -= rl_buf_truesize(rb);
+    BUG_ON(sched->qlen < 0);
+
+    return rb;
+}
+
 static int
 rmt_tx_to_lower(struct ipcp_entry *ipcp, struct flow_entry *lower_flow,
                 struct rl_buf *rb, unsigned flags)
@@ -712,19 +770,19 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
         struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
         bool maysleep               = flags & RL_RMT_F_MAYSLEEP;
         DECLARE_WAITQUEUE(wait, current);
+        struct rb_list drbs;
         int ret = 0;
 
         if (maysleep) {
             add_wait_queue(&priv->sched_wqh, &wait);
         }
+        rb_list_init(&drbs);
+        RL_BUF_RMT(rb).lower_flow = lower_flow;
+        spin_lock_bh(&priv->sched_qlock);
 
         for (;;) {
-            struct rl_buf *drb = NULL;
-
             current->state = TASK_INTERRUPTIBLE;
-
-            spin_lock_bh(&priv->sched_qlock);
-            if (priv->sched_qlen > RMTQ_MAX_SIZE) {
+            if (priv->sched_enq(priv, rb)) {
                 /* The queue backlog is becoming too large. */
 
                 if (maysleep) {
@@ -736,45 +794,23 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                         ret = -EINTR; /* -ERESTARTSYS */
                         break;
                     }
-
                     schedule();
-                    continue;
-                }
+                    spin_lock_bh(&priv->sched_qlock);
+                } else {
+                    /* Since we cannot sleep, we help the dequeuer to do its
+                     * job, rather than dropping. We dequeue a single PDU and
+                     * retry. */
+                    struct rl_buf *drb = priv->sched_deq(priv);
 
-                /* Since we cannot sleep, we help the dequeuer to do its job,
-                 * rather than dropping. We dequeue and send a single PDU. */
-                BUG_ON(rb_list_empty(&priv->sched_q));
-                drb = rb_list_front(&priv->sched_q);
-                rb_list_del(drb);
-                priv->sched_qlen -= rl_buf_truesize(drb);
-                BUG_ON(priv->sched_qlen < 0);
+                    BUG_ON(!drb);
+                    rb_list_enq(drb, &drbs);
+                }
+                continue;
             }
 
-            /* Simple FIFO enqueue logic, to be replaced with a
-             * scheduling algorithm. */
-            RL_BUF_RMT(rb).lower_flow = lower_flow;
-            rb_list_enq(rb, &priv->sched_q);
-            priv->sched_qlen += rl_buf_truesize(rb);
+            rb = NULL;
             stats->rmt.queued_pkt++;
             spin_unlock_bh(&priv->sched_qlock);
-
-            if (drb) {
-                /* Overwrite both 'rb' and 'lower_flow' in order to reuse the
-                 * direct path call to rmt_tx_to_lower() below. */
-                rb         = drb;
-                lower_flow = RL_BUF_RMT(drb).lower_flow;
-                BUG_ON(!lower_flow);
-                /* We must make sure that RL_RMT_F_CONSUME is set, otherwise the
-                 * rmt_tx_to_lower() below could return -EAGAIN, and the caller
-                 * would try to retransmit the same rb. This would result in
-                 * panics, as the 'rb' changed. */
-                flags |= RL_RMT_F_CONSUME;
-            } else {
-                /* We don't need to help the dequeuer, so we just kick it and
-                 * report that the PDU was handled. */
-                schedule_work(&priv->sched_deq_work);
-                rb = NULL;
-            }
 
             break;
         }
@@ -784,11 +820,24 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
             remove_wait_queue(&priv->sched_wqh, &wait);
         }
 
-        if (!rb) {
-            return ret;
+        /* Kick the dequeuer, since we enqueued a new PDU ('rb'). */
+        schedule_work(&priv->sched_deq_work);
+
+        if (unlikely(!rb_list_empty(&drbs))) {
+            struct rl_buf *drb, *tmp;
+
+            /* We cannot backpressure here, so we need to force consumption. */
+            flags |= RL_RMT_F_CONSUME;
+            rb_list_foreach_safe (drb, tmp, &drbs) {
+                rb_list_del(drb);
+                lower_flow = RL_BUF_RMT(drb).lower_flow;
+                BUG_ON(!lower_flow);
+                rmt_tx_to_lower(ipcp, lower_flow, drb, flags);
+            }
         }
 
-        /* Go ahead and transmit the rb dequeued from the scheduler. */
+        /* Report that the PDU was handled. */
+        return 0;
     }
 
     /* Direct path, bypassing the PDU scheduler. */
@@ -1173,19 +1222,17 @@ sched_deq_worker(struct work_struct *w)
 
     for (;;) {
         struct rl_buf *rb, *tmp;
-        bool wake_up;
+        int i;
 
+        /* Dequeue a batch of PDUs. */
         spin_lock_bh(&priv->sched_qlock);
-        /* Simple FIFO dequeue logic, to be replaced by some scheduling
-         * algorithm. */
-        rb_list_foreach_safe (rb, tmp, &priv->sched_q) {
-            rb_list_del(rb);
+        for (i = 0; i < 8; i++) {
+            rb = priv->sched_deq(priv);
+            if (!rb) {
+                break;
+            }
             rb_list_enq(rb, &ready);
-            priv->sched_qlen -= rl_buf_truesize(rb);
-            BUG_ON(priv->sched_qlen < 0);
-            break;
         }
-        wake_up = priv->sched_qlen < RMTQ_MAX_SIZE / 2;
         spin_unlock_bh(&priv->sched_qlock);
 
         if (rb_list_empty(&ready)) {
@@ -1201,12 +1248,29 @@ sched_deq_worker(struct work_struct *w)
                             RL_RMT_F_MAYSLEEP | RL_RMT_F_CONSUME);
         }
 
-        if (wake_up) {
+        if (true) {
             /* Wake up processes that may be blocked waiting for more space on
              * the scheduler queue. */
             wake_up_interruptible_poll(&priv->sched_wqh,
                                        POLLOUT | POLLWRBAND | POLLWRNORM);
         }
+    }
+}
+
+static void
+rl_sched_init(struct rl_normal *priv)
+{
+    priv->sched_create  = sched_fifo_create;
+    priv->sched_destroy = sched_fifo_destroy;
+    priv->sched_enq     = sched_fifo_enq;
+    priv->sched_deq     = sched_fifo_deq;
+
+    spin_lock_init(&priv->sched_qlock);
+    INIT_WORK(&priv->sched_deq_work, sched_deq_worker);
+    init_waitqueue_head(&priv->sched_wqh);
+    priv->sched_priv = priv->sched_create(priv);
+    if (!priv->sched_priv) {
+        PE("Failed to init PDU scheduler\n");
     }
 }
 

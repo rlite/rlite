@@ -766,11 +766,14 @@ struct rl_normal {
     rwlock_t pduft_lock;
 
     /* Support for PDU scheduling. */
-    struct rb_list sched_q;
-    int sched_qlen;
     spinlock_t sched_qlock;
     struct work_struct sched_deq_work;
     wait_queue_head_t sched_wqh;
+    void *(*sched_create)(struct rl_normal *);
+    void (*sched_destroy)(struct rl_normal *);
+    int (*sched_enq)(struct rl_normal *, struct rl_buf *);
+    struct rl_buf *(*sched_deq)(struct rl_normal *);
+    void *sched_priv;
 };
 
 void dtp_init(struct dtp *dtp);
