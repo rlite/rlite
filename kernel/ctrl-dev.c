@@ -109,6 +109,14 @@ struct registered_appl {
 #define PORT_ID_HASHTABLE_BITS 10
 #define CEP_ID_HASHTABLE_BITS 10
 
+/* Global data structures, shared by all the rl_dm instances. In other works
+ * this is common to all the network namespaces. */
+static struct rl_global {
+    /* Lock for ipcp_factories. */
+    struct mutex lock;
+    struct list_head ipcp_factories;
+} rl_global;
+
 /* The rlite data model.
  * Main data structure containing all the rlite kernel objects for a given
  * network namespace. Objects include IPCPs, DIFs, registered applications,
@@ -131,8 +139,6 @@ struct rl_dm {
     /* Bitmap to manage connection endpoint ids. */
     DECLARE_BITMAP(cep_id_bitmap, CEP_ID_BITMAP_SIZE);
 
-    struct list_head ipcp_factories;
-
     struct list_head difs;
 
     /* Lock for flows table. */
@@ -148,7 +154,7 @@ struct rl_dm {
      * are currently opened. */
     struct list_head ctrl_devs;
 
-    /* Lock for ipcp_factories and ctrl_devs list */
+    /* Lock for the ctrl_devs list */
     struct mutex general_lock;
 
     /* Data structures for deferred removal of registered_appl structs. */
@@ -198,7 +204,7 @@ ipcp_factories_find(const char *dif_type)
         return NULL;
     }
 
-    list_for_each_entry (factory, &rl_dm.ipcp_factories, node) {
+    list_for_each_entry (factory, &rl_global.ipcp_factories, node) {
         if (strcmp(factory->dif_type, dif_type) == 0) {
             return factory;
         }
@@ -216,7 +222,7 @@ rl_ipcp_factory_register(struct ipcp_factory *factory)
         return -EINVAL;
     }
 
-    mutex_lock(&rl_dm.general_lock);
+    mutex_lock(&rl_global.lock);
 
     if (ipcp_factories_find(factory->dif_type)) {
         ret = -EBUSY;
@@ -238,11 +244,11 @@ rl_ipcp_factory_register(struct ipcp_factory *factory)
     /* Insert the new factory into the IPC process factories
      * list. Ownership is not passed, it stills remains to
      * the invoking IPCP module. */
-    list_add_tail(&factory->node, &rl_dm.ipcp_factories);
+    list_add_tail(&factory->node, &rl_global.ipcp_factories);
 
     PI("IPC processes factory '%s' registered\n", factory->dif_type);
 out:
-    mutex_unlock(&rl_dm.general_lock);
+    mutex_unlock(&rl_global.lock);
 
     return ret;
 }
@@ -253,11 +259,11 @@ rl_ipcp_factory_unregister(const char *dif_type)
 {
     struct ipcp_factory *factory;
 
-    mutex_lock(&rl_dm.general_lock);
+    mutex_lock(&rl_global.lock);
 
     factory = ipcp_factories_find(dif_type);
     if (!factory) {
-        mutex_unlock(&rl_dm.general_lock);
+        mutex_unlock(&rl_global.lock);
         return -EINVAL;
     }
 
@@ -265,7 +271,7 @@ rl_ipcp_factory_unregister(const char *dif_type)
      * the factory object. */
     list_del_init(&factory->node);
 
-    mutex_unlock(&rl_dm.general_lock);
+    mutex_unlock(&rl_global.lock);
 
     PI("IPC processes factory '%s' unregistered\n", dif_type);
 
@@ -607,7 +613,7 @@ ipcp_add(struct rl_kmsg_ipcp_create *req, rl_ipcp_id_t *ipcp_id)
 
     BUG_ON(entry == NULL);
 
-    mutex_lock(&rl_dm.general_lock);
+    mutex_lock(&rl_global.lock);
 
     factory = ipcp_factories_find(req->dif_type);
     if (!factory) {
@@ -641,7 +647,7 @@ ipcp_add(struct rl_kmsg_ipcp_create *req, rl_ipcp_id_t *ipcp_id)
     *ipcp_id = entry->id;
 
 out:
-    mutex_unlock(&rl_dm.general_lock);
+    mutex_unlock(&rl_global.lock);
     if (ret) {
         ipcp_put(entry);
     }
@@ -3419,6 +3425,9 @@ rlite_init(void)
 {
     int ret;
 
+    mutex_init(&rl_global.lock);
+    INIT_LIST_HEAD(&rl_global.ipcp_factories);
+
     bitmap_zero(rl_dm.ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
     hash_init(rl_dm.ipcp_table);
     bitmap_zero(rl_dm.port_id_bitmap, PORT_ID_BITMAP_SIZE);
@@ -3430,7 +3439,6 @@ rlite_init(void)
     spin_lock_init(&rl_dm.ipcps_lock);
     spin_lock_init(&rl_dm.difs_lock);
     spin_lock_init(&rl_dm.appl_removeq_lock);
-    INIT_LIST_HEAD(&rl_dm.ipcp_factories);
     INIT_LIST_HEAD(&rl_dm.difs);
     INIT_LIST_HEAD(&rl_dm.ctrl_devs);
     INIT_LIST_HEAD(&rl_dm.appl_removeq);
