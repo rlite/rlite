@@ -84,6 +84,7 @@ struct pci_sizes {
     uint16_t pdulen;
     uint16_t cepid;
     uint16_t qosid;
+    uint16_t pad1[3];
 };
 
 /* Actual values for data transfer constants: can be redefined at

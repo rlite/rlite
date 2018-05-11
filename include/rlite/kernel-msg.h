@@ -101,7 +101,8 @@ struct rl_kmsg_ipcp_create_resp {
     struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
-} __attribute__((packed));
+    char pad1[6];
+};
 
 /* application --> kernel message to destroy an IPC process. */
 #define rl_kmsg_ipcp_destroy rl_kmsg_ipcp_create_resp
@@ -113,6 +114,7 @@ struct rl_kmsg_flow_fetch {
     /* If ipcp_id != ~0 filter flows by ipcp_id, otherwise
      * fetch all of them. */
     rl_ipcp_id_t ipcp_id;
+    char pad1[6];
 };
 
 /* application <-- kernel message to fetch flow information. */
@@ -120,14 +122,14 @@ struct rl_kmsg_flow_fetch_resp {
     struct rl_msg_hdr hdr;
 
     uint8_t end;
+    uint8_t flow_control;
     rl_ipcp_id_t ipcp_id;
     rl_port_t local_port;
     rl_port_t remote_port;
     rlm_addr_t local_addr;
     rlm_addr_t remote_addr;
     struct rina_flow_spec spec;
-    uint8_t flow_control;
-} __attribute__((packed));
+};
 
 #define rl_kmsg_reg_fetch rl_kmsg_flow_fetch
 
@@ -137,8 +139,9 @@ struct rl_kmsg_reg_fetch_resp {
     uint8_t end;
     uint8_t pending; /* Is registration pending ? */
     rl_ipcp_id_t ipcp_id;
+    uint32_t pad1;
     char *appl_name;
-} __attribute__((packed));
+};
 
 #define RL_IPCP_UPDATE_ADD 0x01
 #define RL_IPCP_UPDATE_UPD 0x02
@@ -150,17 +153,19 @@ struct rl_kmsg_ipcp_update {
     struct rl_msg_hdr hdr;
 
     uint8_t update_type;
+    uint8_t pad1;
     rl_ipcp_id_t ipcp_id;
+    uint32_t max_sdu_size;
     rlm_addr_t ipcp_addr;
     uint16_t txhdroom;
     uint16_t rxhdroom;
     uint16_t tailroom;
-    uint32_t max_sdu_size;
+    uint16_t pad2;
     struct pci_sizes pcisizes;
     char *ipcp_name;
     char *dif_name;
     char *dif_type;
-} __attribute__((packed));
+};
 
 #define RL_FLOW_STATE_DOWN 0
 #define RL_FLOW_STATE_UP 1
@@ -172,7 +177,8 @@ struct rl_kmsg_flow_state {
     rl_ipcp_id_t ipcp_id;
     rl_port_t local_port;
     uint16_t flow_state;
-} __attribute__((packed));
+    uint16_t pad1;
+};
 
 /* application --> kernel to register a name. */
 struct rl_kmsg_appl_register {
@@ -190,28 +196,28 @@ struct rl_kmsg_appl_register_resp {
     rl_ipcp_id_t ipcp_id;
     uint8_t reg;
     uint8_t response;
+    uint32_t pad1;
     char *appl_name;
-} __attribute__((packed));
+};
 
 struct rl_kmsg_appl_move {
     struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
-    int fd; /* where to move */
+    uint16_t pad1;
+    int32_t fd; /* where to move */
 };
 
 /* application --> kernel to initiate a flow allocation. */
 struct rl_kmsg_fa_req {
     struct rl_msg_hdr hdr;
 
-    rl_ipcp_id_t upper_ipcp_id;
-    char pad1[2];
     struct rina_flow_spec flowspec;
 
     /* The local port, local CEP and unique id are filled by kernel before
      * reflection to userspace. */
+    rl_ipcp_id_t upper_ipcp_id;
     rl_port_t local_port;
-    char pad2[2];
     uint32_t local_cep;
     uint32_t uid;
 
@@ -228,9 +234,10 @@ struct rl_kmsg_fa_req {
 struct rl_kmsg_fa_resp_arrived {
     struct rl_msg_hdr hdr;
 
-    uint8_t response;
     rl_port_t port_id;
-} __attribute__((packed));
+    uint8_t response;
+    uint8_t pad1[5];
+};
 
 /* application <-- kernel to notify an incoming flow request. */
 struct rl_kmsg_fa_req_arrived {
@@ -257,34 +264,37 @@ struct rl_kmsg_fa_resp {
     /* The ipcp_id_bind field tells to bind the kernel datapath for this
      * flow to the specified upper IPCP. */
     rl_ipcp_id_t upper_ipcp_id;
-    uint8_t response;
     rl_port_t port_id;
+    uint8_t response;
+    uint8_t pad1;
     uint32_t cep_id; /* Filled by kernel before reflecting to userspace. */
-} __attribute__((packed));
+};
 
 /* application --> kernel to configure an IPC process. */
 struct rl_kmsg_ipcp_config {
     struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
+    uint16_t pad1[3];
     char *name;
     char *value;
-} __attribute__((packed));
+};
 
 /* application --> kernel to ask for IPCP config value. */
 struct rl_kmsg_ipcp_config_get_req {
     struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
+    uint16_t pad1[3];
     char *param_name;
-} __attribute__((packed));
+};
 
 /* application <-- kernel to return IPCP config value. */
 struct rl_kmsg_ipcp_config_get_resp {
     struct rl_msg_hdr hdr;
 
     char *param_value;
-} __attribute__((packed));
+};
 
 /* application --> kernel to modifty an IPCP PDUFT
  * (PDU Forwarding Table) entry. */
@@ -293,12 +303,13 @@ struct rl_kmsg_ipcp_pduft_mod {
 
     /* The IPCP whose PDUFT is to be modified. */
     rl_ipcp_id_t ipcp_id;
-    /* The address of a remote IPCP. */
-    rlm_addr_t dst_addr;
     /* The local port through which the remote IPCP
      * can be reached. */
-    uint16_t local_port;
-} __attribute__((packed));
+    rl_port_t local_port;
+    uint32_t pad1;
+    /* The address of a remote IPCP. */
+    rlm_addr_t dst_addr;
+};
 
 /* application --> kernel message to flush the PDUFT of an IPC Process. */
 #define rl_kmsg_ipcp_pduft_flush rl_kmsg_ipcp_create_resp
@@ -309,7 +320,8 @@ struct rl_kmsg_ipcp_uipcp_set {
     struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
-} __attribute__((packed));
+    uint16_t pad1[3];
+};
 
 #define rl_kmsg_ipcp_uipcp_wait rl_kmsg_ipcp_uipcp_set
 

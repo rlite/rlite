@@ -51,9 +51,9 @@ extern "C" {
 struct rina_flow_spec {
     uint32_t version; /* version number to allow for extensions */
 #define RINA_FLOW_SPEC_VERSION 2
+    uint32_t max_delay;     /* in microseconds */
     uint64_t max_sdu_gap;   /* in SDUs */
     uint64_t avg_bandwidth; /* in bits per second */
-    uint32_t max_delay;     /* in microseconds */
 #define RINA_FLOW_SPEC_LOSS_MAX 10000
     uint16_t max_loss;         /* from 0 (0%) to 10000 (100%) */
     uint8_t in_order_delivery; /* boolean */
