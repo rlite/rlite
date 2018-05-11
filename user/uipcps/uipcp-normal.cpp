@@ -1231,7 +1231,8 @@ int
 UipcpRib::policy_mod(const std::string &component,
                      const std::string &policy_name)
 {
-    int ret = 0;
+    RibHandler h = nullptr;
+    int ret      = 0;
 
     if (!available_policies.count(component)) {
         UPE(uipcp, "Unknown component %s\n", component.c_str());
@@ -1273,27 +1274,19 @@ UipcpRib::policy_mod(const std::string &component,
     components[component] = std::move(policy_builder->builder(this));
     if (component == DFT::Prefix) {
         dft = dynamic_cast<DFT *>(components[component].get());
+        h   = &UipcpRib::dft_handler;
     } else if (component == Routing::Prefix) {
         routing = dynamic_cast<Routing *>(components[component].get());
+        h       = &UipcpRib::routing_handler;
     } else if (component == FlowAllocator::Prefix) {
         fa = dynamic_cast<FlowAllocator *>(components[component].get());
+        h  = &UipcpRib::flows_handler;
     } else if (component == AddrAllocator::Prefix) {
         addra = dynamic_cast<AddrAllocator *>(components[component].get());
+        h     = &UipcpRib::addr_alloc_handler;
     }
     /* Register the new RIB paths. */
     for (const std::string &path : policy_builder->paths) {
-        RibHandler h;
-        if (component == DFT::Prefix) {
-            h = &UipcpRib::dft_handler;
-        } else if (component == Routing::Prefix) {
-            h = &UipcpRib::routing_handler;
-        } else if (component == FlowAllocator::Prefix) {
-            h = &UipcpRib::flows_handler;
-        } else if (component == AddrAllocator::Prefix) {
-            h = &UipcpRib::addr_alloc_handler;
-        } else {
-            assert(false);
-        }
         rib_handler_register(path, h);
     }
     /* Register the new policy parameters. */
@@ -1303,10 +1296,8 @@ UipcpRib::policy_mod(const std::string &component,
             pp.first.c_str());
     }
     /* Reconfigure the new component, if necessary. */
-    if (component == DFT::Prefix) {
-        dft->reconfigure();
-    } else if (component == AddrAllocator::Prefix) {
-        addra->reconfigure();
+    if (components[component]) {
+        components[component]->reconfigure();
     }
 
     return ret;
@@ -1349,16 +1340,9 @@ UipcpRib::policy_param_mod(const std::string &component,
     UPD(uipcp, "set %s policy param %s <== '%s'\n", component.c_str(),
         param_name.c_str(), param_value.c_str());
 
-    /* Invoke the reconfigure() method if available.
-     * TODO: Figure out a better way to handle policy setup. Point is that
-     * some parameters can be dynamically changed anytime (e.g. timeouts),
-     * while others must be prepared before the policy can become operative
-     * (e.g. replicas for ceft). We should handle those parameters
-     * differently. */
-    if (component == DFT::Prefix) {
-        dft->reconfigure();
-    } else if (component == AddrAllocator::Prefix) {
-        addra->reconfigure();
+    /* Invoke the reconfigure() method if available. */
+    if (components[component]) {
+        components[component]->reconfigure();
     }
 
     /* Fix-ups. */
