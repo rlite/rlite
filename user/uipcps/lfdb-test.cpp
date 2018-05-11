@@ -203,6 +203,28 @@ main(int argc, char **argv)
             make_pair(std::move(links), std::move(reachability_tests)));
     }
 
+    {
+        /* Generate a ring network with 'n' links. */
+        TestLFDB::LinksList links;
+        ReachabilityTests reachability_tests;
+
+        for (int i = 0; i < n; i++) {
+            int next_i = (i == n - 1) ? 0 : i + 1;
+            links.push_back({i, next_i});
+        }
+
+        for (int i = 1; i < n; i++) {
+            if (i <= n / 2) {
+                reachability_tests.push_back({i, i});
+            } else {
+                reachability_tests.push_back({i, n - i});
+            }
+        }
+
+        test_vectors.push_back(
+            make_pair(std::move(links), std::move(reachability_tests)));
+    }
+
     int counter = 1;
     for (const auto &p : test_vectors) {
         TestLFDB::LinksList links            = p.first;
