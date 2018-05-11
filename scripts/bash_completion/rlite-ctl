@@ -35,11 +35,8 @@ _rlite_ctl() {
         ipcp-* | uipcp* )
             CHOICES=$(ipcps_list)
         ;;
-        wrr )
-            CHOICES="quantum"
-        ;;
-        pfifo )
-            CHOICES="levels"
+        wrr | pfifo )
+            CHOICES="qsize"
         ;;
         sched )
             CHOICES=$SCHEDS
