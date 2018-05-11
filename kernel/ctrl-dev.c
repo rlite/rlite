@@ -1657,7 +1657,7 @@ ipcp_del(struct rl_ctrl *rc, rl_ipcp_id_t ipcp_id)
         return -ENXIO;
     }
 
-    ret = ipcp_put(entry); /* To match the ipcp_get(). */
+    ipcp_put(entry); /* To match the ipcp_get(). */
 
     if (entry->flags & RL_K_IPCP_ZOMBIE) {
         /* If this happens it means that someone already asked for this IPCP to
@@ -2890,8 +2890,7 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     if (resp->kevent_id != flow_entry->event_id) {
         PE("kevent_id mismatch: %u != %u\n", resp->kevent_id,
            flow_entry->event_id);
-        flow_put(flow_entry);
-        return ret;
+        goto out;
     }
 
     BUG_ON(rc != flow_entry->upper.rc);
@@ -2921,6 +2920,9 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     if (!resp->response && resp->upper_ipcp_id != 0xffff) {
         ret = upper_ipcp_flow_bind(rc, resp->upper_ipcp_id, flow_entry);
+        if (ret) {
+            goto out;
+        }
     }
 
     /* Notify the involved IPC process about the response. */
@@ -2944,12 +2946,11 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
                                     (const struct rl_msg_base *)resp, true);
         }
     }
-
+out:
     if (ret || resp->response) {
         flows_putq_del(flow_entry);
         flow_put(flow_entry);
     }
-out:
 
     flow_put(flow_entry);
 

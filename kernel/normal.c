@@ -1587,7 +1587,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         RL_BUF_RX(rb).cons_seqnum = seqnum;
         rl_buf_pci_pop(rb);
 
-        ret = rl_sdu_rx_flow(ipcp, flow, rb, qlimit);
+        rl_sdu_rx_flow(ipcp, flow, rb, qlimit);
 
         goto snd_crb;
     }

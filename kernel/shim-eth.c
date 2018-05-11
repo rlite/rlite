@@ -217,7 +217,7 @@ arp_create(struct rl_shim_eth *priv, uint16_t op, const char *spa, int spa_len,
     /* Fill in the zero-padded Target Protocol Address. */
     memcpy(ptr, tpa, tpa_len);
     memset(ptr + tpa_len, 0, pa_len - tpa_len);
-    ptr += pa_len;
+    /* ptr += pa_len; */
 
     return skb;
 }
