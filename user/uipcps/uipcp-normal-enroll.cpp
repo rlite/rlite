@@ -394,6 +394,11 @@ EnrollmentResources::next_enroll_msg(std::unique_lock<std::mutex> &lk)
             UPW(neigh->rib->uipcp, "Timed out\n");
             return nullptr;
         }
+        if (!nf->conn->connected()) {
+            UPW(neigh->rib->uipcp, "Enrollment stopped by remote peer %s\n",
+                neigh->ipcp_name.c_str());
+            return nullptr;
+        }
     }
 
     msg = std::move(msgs.front());

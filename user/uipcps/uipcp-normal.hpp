@@ -441,7 +441,12 @@ struct EnrollmentResources {
     std::shared_ptr<Neighbor> neigh;
     int flow_fd; /* for debugging only */
     bool initiator;
+
+    /* Messages received through the uipcp event loop. */
     std::list<std::unique_ptr<const CDAPMessage>> msgs;
+
+    /* The thread used for enrollment and associated synchronization
+     * variables. */
     std::thread th;
     std::condition_variable msgs_avail;
     std::condition_variable stopped;
