@@ -157,6 +157,41 @@ def graph_node_depth(graph, node, ub):
     return level
 
 
+def access_prologue(args, vm, outs):
+    token = None
+    if args.namespaces:
+        scriptname = '.%s.initscript' % vm['name']
+        outs += 'cat > %s << \'EOI\'\n' % scriptname
+        outs += '#!/bin/bash\n'
+        token = scriptname
+    else:
+        outs += 'DONE=255\n'\
+                'while [ $DONE != "0" ]; do\n'\
+                '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
+                % {'ssh': vm['ssh'], 'username': args.user, 'sshopts': args.sshopts}
+    return outs, token
+
+def access_epilogue(args, vm, outs, token):
+    if args.namespaces:
+        scriptname = token
+        outs += 'EOI\n'\
+                'chmod +x %(script)s\n'\
+                'sudo ip netns exec %(nsname)s bash %(script)s\n'\
+                '#rm %(script)s\n'\
+                    % {'script': scriptname, 'nsname': vm['nsname']}
+    else:
+        outs +=     ''\
+                    'sleep 1\n'\
+                    'true\n'\
+                'ENDSSH\n'\
+            '   DONE=$?\n'\
+            '   if [ $DONE != "0" ]; then\n'\
+            '       sleep 1\n'\
+            '   fi\n'\
+            'done\n'
+    return outs
+
+
 description = "Python script to generate rlite deployments based on light VMs"
 epilog = "2015-2016 Vincenzo Maffione <v.maffione@gmail.com>"
 
@@ -268,9 +303,9 @@ if not args.namespaces:
 subprocess.call(['chmod', '0400', 'buildroot/buildroot_rsa'])
 
 # Some variables that could become options
-sshopts = '-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
+args.sshopts = '-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
 if not args.image:
-    sshopts += '-o IdentityFile=buildroot/buildroot_rsa '
+    args.sshopts += '-o IdentityFile=buildroot/buildroot_rsa '
 sudo = 'sudo' if args.image != '' and not args.namespaces else ''
 vmimgpath = 'buildroot/rootfs.cpio'
 
@@ -346,7 +381,7 @@ fout.write(args.user)
 fout.close()
 
 fout = open('sshopts', 'w')
-fout.write(sshopts)
+fout.write(args.sshopts)
 fout.close()
 
 demo = Demo(flavour_suffix=flavour_suffix,
@@ -601,15 +636,7 @@ for vmname in sorted(demo.vms):
             outs += 'SUBSHELLS=""\n'
 
     outs += '(\n'
-    if args.namespaces:
-        scriptname = '.%s.initscript' % vmname
-        outs += 'cat > %s << \'EOI\'\n' % scriptname
-        outs += '#!/bin/bash\n'
-    else:
-        outs += 'DONE=255\n'\
-                'while [ $DONE != "0" ]; do\n'\
-                '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
-                % {'ssh': vm['ssh'], 'username': args.user, 'sshopts': sshopts}
+    outs, token = access_prologue(args, vm, outs)
 
     outs +=         'set -x\n'\
                     'SUDO=%(sudo)s\n' % {'sudo': sudo}
@@ -704,22 +731,7 @@ for vmname in sorted(demo.vms):
                      'randmax': args.rand_max,
                      'randintv': args.rand_interval }
 
-    if args.namespaces:
-        outs += 'EOI\n'\
-                'chmod +x %(script)s\n'\
-                'sudo ip netns exec %(nsname)s bash %(script)s\n'\
-                '#rm %(script)s\n'\
-                    % {'script': scriptname, 'nsname': vm['nsname']}
-    else:
-        outs +=     ''\
-                    'sleep 1\n'\
-                    'true\n'\
-                'ENDSSH\n'\
-            '   DONE=$?\n'\
-            '   if [ $DONE != "0" ]; then\n'\
-            '       sleep 1\n'\
-            '   fi\n'\
-            'done\n'
+    outs = access_epilogue(args, vm, outs, token)
 
     outs += ') &\n'\
             'SUBSHELLS="$SUBSHELLS $!"\n\n'
@@ -759,7 +771,7 @@ if args.enrollment_order == 'sequential':
                 outs += 'DONE=255\n'\
                     'while [ $DONE != "0" ]; do\n'\
                     '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
-                    % {'ssh': vm['ssh'], 'username': args.user, 'sshopts': sshopts}
+                    % {'ssh': vm['ssh'], 'username': args.user, 'sshopts': args.sshopts}
 
             outs += 'set -x\n'\
                     'SUDO=%(sudo)s\n'\
@@ -954,7 +966,7 @@ if args.register:
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
             '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
-                    '#set -x\n' % {'sshopts': sshopts, 'username': args.user,
+                    '#set -x\n' % {'sshopts': args.sshopts, 'username': args.user,
                                   'ssh': demo.vms[pivot]['ssh']}
 
         for vmname in sorted(demo.difs[dif]):
@@ -995,7 +1007,7 @@ if not args.namespaces:
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
             '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost <<ENDSSH\n'\
-                            % {'sshopts': sshopts, 'username': args.user,
+                            % {'sshopts': args.sshopts, 'username': args.user,
                                   'ssh': vm['ssh'],
                                   'dif': dif, 'vmname': vmname}
 
@@ -1032,7 +1044,7 @@ else:
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
             '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost <<ENDSSH\n'\
-                            % {'sshopts': sshopts, 'username': args.user,
+                            % {'sshopts': args.sshopts, 'username': args.user,
                                   'ssh': vm['ssh'],
                                   'dif': dif, 'vmname': vmname}
 
