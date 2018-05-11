@@ -379,16 +379,6 @@ class Demo:
             print("             DIFs dependency graph: %s" % difsdeps_adj)
             quit(1)
 
-        for dif in self.dif_ordering:
-            if dif not in self.dif_policies:
-                self.dif_policies[dif] = []
-            self.dif_policies[dif].append({
-                'path': 'addralloc',
-                'nodes': [],
-                'ps': self.addr_alloc_policy,
-                'parms': []
-            })
-
         # Compute DIF graphs
         for dif in sorted(self.difs):
             neighsets = dict()
@@ -470,6 +460,33 @@ class Demo:
                                     edge[1]
                                 })
                                 edges_covered.add((cur, edge[0]))
+
+        # Generate policy directives for address allocation
+        for dif in self.dif_ordering:
+            if dif in self.shims:
+                continue
+            if dif not in self.dif_policies:
+                self.dif_policies[dif] = []
+            params = []
+            if self.addr_alloc_policy == "distributed":
+                if self.enrollment_order != 'parallel' or len(self.vms) < 30:
+                    nack_wait_secs = 1
+                elif len(self.vms) >= 100:
+                    nack_wait_secs = 10
+                else:
+                    nack_wait_secs = 5
+                params.append('nack-wait=%ds' % nack_wait_secs)
+            elif self.addr_alloc_policy == "centralized-fault-tolerant":
+                replicas = []
+                for nname in self.cluster5[dif]:
+                    replicas.append('%(dif)s.%(id)s.IPCP' % {'dif': dif, 'id': nname})
+                params.append('replicas=%s' % (','.join(replicas)))
+            self.dif_policies[dif].append({
+                'path': 'addralloc',
+                'nodes': [],
+                'ps': self.addr_alloc_policy,
+                'parms': params
+            })
 
     def assign_shim_ids(self):
         shim_id = 1
@@ -589,29 +606,7 @@ class Demo:
                             'dif': dif,
                             'id': vm['id']
                         })
-                elif self.addr_alloc_policy == "distributed":
-                    if self.enrollment_order != 'parallel' or len(self.vms) < 30:
-                        nack_wait_secs = 1
-                    elif len(self.vms) >= 100:
-                        nack_wait_secs = 10
-                    else:
-                        nack_wait_secs = 5
-                    ctrl_cmds.append(
-                        'dif-policy-param-mod %(dif)s.DIF addralloc nack-wait %(nws)ds\n'
-                        % {
-                            'dif': dif,
-                            'nws': nack_wait_secs
-                        })
-                elif self.addr_alloc_policy == "centralized-fault-tolerant":
-                    replicas = []
-                    for nname in self.cluster5[dif]:
-                        replicas.append('%(dif)s.%(id)s.IPCP' % {'dif': dif, 'id': nname})
-                    ctrl_cmds.append(
-                        'dif-policy-param-mod %(dif)s.DIF addralloc replicas %(replicas)s\n'
-                        % {
-                            'dif': dif,
-                            'replicas': ','.join(replicas)
-                        })
+
                 if self.reliable_flows:
                     ctrl_cmds.append(
                         'dif-policy-param-mod %(dif)s.DIF resalloc reliable-flows true\n'
