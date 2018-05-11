@@ -61,8 +61,9 @@ operator==(const gpb::LowerFlow &a, const gpb::LowerFlow &o)
            a.remote_node() == o.remote_node() && a.cost() == o.cost();
 }
 
-/* Simple class that wraps a Lower Flow database. Used as a component within
- * the other classes. */
+/* The Lower Flows database, with functionalities to compute the next hops,
+ * i.e. the Dijkstra algorithm. This has also optional support for the Loop
+ * Free Alternate algorithm. */
 struct LFDB {
     struct Edge {
         NodeId to;
@@ -349,7 +350,7 @@ public:
      * the routing table. */
     void schedule_recomputation() { recompute = true; }
 
-    /* Step 3. Forwarding table computation and kernel update. */
+    /* Forwarding table computation and kernel update. */
     int compute_fwd_table();
 
 private:
@@ -381,403 +382,6 @@ private:
     /* Timer to provide an upper bound for the coalescing period. */
     std::unique_ptr<TimeoutEvent> coalesce_timer;
 };
-
-class FullyReplicatedLFDB : public Routing {
-    /* Routing engine. */
-    RoutingEngine re;
-
-    /* Timer ID for age increment of LFDB entries. */
-    std::unique_ptr<TimeoutEvent> age_incr_timer;
-
-public:
-    RL_NODEFAULT_NONCOPIABLE(FullyReplicatedLFDB);
-    FullyReplicatedLFDB(UipcpRib *rib, bool lfa)
-        : Routing(rib), re(rib, /*lfa_enabled=*/lfa)
-    {
-        age_incr_tmr_restart();
-    }
-    ~FullyReplicatedLFDB() { age_incr_timer.reset(); }
-
-    void dump(std::stringstream &ss) const override;
-    void dump_routing(std::stringstream &ss) const override
-    {
-        re.dump(ss, rib->myname);
-    }
-
-    bool add(const gpb::LowerFlow &lf);
-    bool del(const NodeId &local_node, const NodeId &remote_node);
-    void update_local(const std::string &neigh_name) override;
-    void update_kernel(bool force = true) override;
-    int flow_state_update(struct rl_kmsg_flow_state *upd) override;
-    void neigh_disconnected(const std::string &neigh_name) override;
-
-    int rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src) override;
-
-    int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
-                   unsigned int limit) const override;
-    int neighs_refresh(size_t limit) override;
-    void age_incr();
-    void age_incr_tmr_restart();
-
-    /* Time interval (in seconds) between two consecutive increments
-     * of the age of LFDB entries. */
-    static constexpr int kAgeIncrIntvalSecs = 10;
-
-    /* Max age (in seconds) for an LFDB entry not to be discarded. */
-    static constexpr int kAgeMaxSecs = 900;
-};
-
-/* The add method has overwrite semantic, and possibly resets the age.
- * Returns true if something changed. */
-bool
-FullyReplicatedLFDB::add(const gpb::LowerFlow &lf)
-{
-    auto it            = re.db.find(lf.local_node());
-    string repr        = to_string(lf);
-    gpb::LowerFlow lfz = lf;
-
-    lfz.set_age(0);
-
-    if (it == re.db.end() || it->second.count(lf.remote_node()) == 0) {
-        /* Not there, we should add the entry. */
-        if (lf.local_node() == rib->myname &&
-            rib->get_neighbor(lf.remote_node(), /*create=*/false) == nullptr) {
-            /* Someone is telling us to add an entry where we are the local
-             * node, but there is no neighbor. Discard the update. */
-            UPD(rib->uipcp, "Lower flow %s not added (no such neighbor)\n",
-                repr.c_str());
-            return false;
-        }
-        re.db[lf.local_node()][lf.remote_node()] = lfz;
-        re.schedule_recomputation();
-        UPD(rib->uipcp, "Lower flow %s added\n", repr.c_str());
-        return true;
-    }
-
-    /* Entry is already there. Update if needed (this expression
-     * was obtained by means of a Karnaugh map on three variables:
-     * local, newer, equal). */
-    bool local_entry = (lfz.local_node() == rib->myname);
-    bool newer       = lfz.seqnum() > it->second[lfz.remote_node()].seqnum();
-    bool equal       = lfz == it->second[lfz.remote_node()];
-    if ((!local_entry && newer) || (local_entry && !equal)) {
-        it->second[lfz.remote_node()] = std::move(lfz); /* Update the entry */
-        if (equal) {
-            /* The affected flow entry is just refreshed, but it did not
-             * change. No recomputation is needed. */
-            UPV(rib->uipcp, "Lower flow %s refreshed\n", repr.c_str());
-        } else {
-            /* The affected flow entry changed, so we ask the RoutingEngine
-             * for recomputation. */
-            UPD(rib->uipcp, "Lower flow %s updated\n", repr.c_str());
-            re.schedule_recomputation();
-        }
-        return true;
-    }
-
-    return false;
-}
-
-/* Returns true if something changed. */
-bool
-FullyReplicatedLFDB::del(const NodeId &local_node, const NodeId &remote_node)
-{
-    auto it = re.db.find(local_node);
-    unordered_map<NodeId, gpb::LowerFlow>::iterator jt;
-    string repr;
-
-    if (it == re.db.end()) {
-        return false;
-    }
-
-    jt = it->second.find(remote_node);
-
-    if (jt == it->second.end()) {
-        return false;
-    }
-    repr = to_string(jt->second);
-
-    it->second.erase(jt);
-
-    UPD(rib->uipcp, "Lower flow %s removed\n", repr.c_str());
-
-    return true;
-}
-
-void
-FullyReplicatedLFDB::update_local(const string &node_name)
-{
-    gpb::LowerFlowList lfl;
-    gpb::LowerFlow *lf;
-    std::unique_ptr<CDAPMessage> sm;
-
-    if (rib->get_neighbor(node_name, false) == nullptr) {
-        return; /* Not our neighbor. */
-    }
-
-    lf = lfl.add_flows();
-    lf->set_local_node(rib->myname);
-    lf->set_remote_node(node_name);
-    lf->set_cost(1);
-    lf->set_seqnum(1); /* not meaningful */
-    lf->set_state(true);
-    lf->set_age(0);
-
-    sm = utils::make_unique<CDAPMessage>();
-    sm->m_create(ObjClass, TableName);
-    rib->send_to_myself(std::move(sm), &lfl);
-}
-
-int
-FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
-{
-    const char *objbuf;
-    size_t objlen;
-    bool add_f = true;
-
-    if (rm->op_code != gpb::M_CREATE && rm->op_code != gpb::M_DELETE) {
-        UPE(rib->uipcp, "M_CREATE or M_DELETE expected\n");
-        return 0;
-    }
-
-    if (rm->op_code == gpb::M_DELETE) {
-        add_f = false;
-    }
-
-    rm->get_obj_value(objbuf, objlen);
-    if (!objbuf) {
-        UPE(rib->uipcp, "M_START does not contain a nested message\n");
-        abort();
-        return 0;
-    }
-
-    gpb::LowerFlowList lfl;
-    gpb::LowerFlowList prop_lfl;
-
-    lfl.ParseFromArray(objbuf, objlen);
-
-    for (const gpb::LowerFlow &f : lfl.flows()) {
-        if (add_f) {
-            if (add(f)) {
-                *prop_lfl.add_flows() = f;
-            }
-
-        } else {
-            if (del(f.local_node(), f.remote_node())) {
-                *prop_lfl.add_flows() = f;
-            }
-        }
-    }
-
-    if (prop_lfl.flows_size() > 0) {
-        /* Send the received lower flows to the other neighbors. */
-        rib->neighs_sync_obj_excluding(src.neigh, add_f, ObjClass, TableName,
-                                       &prop_lfl);
-
-        /* Update the kernel routing table. */
-        update_kernel(/*force=*/false);
-    }
-
-    return 0;
-}
-
-void
-FullyReplicatedLFDB::update_kernel(bool force)
-{
-    /* Update the routing table. */
-    if (force) {
-        re.schedule_recomputation();
-    }
-    re.update_kernel_routing(rib->myname);
-}
-
-int
-FullyReplicatedLFDB::flow_state_update(struct rl_kmsg_flow_state *upd)
-{
-    UPD(rib->uipcp, "Flow %u goes %s\n", upd->local_port,
-        upd->flow_state == RL_FLOW_STATE_UP ? "up" : "down");
-
-    re.flow_state_update(upd);
-
-    return 0;
-}
-
-void
-FullyReplicatedLFDB::dump(std::stringstream &ss) const
-{
-    ss << "Lower Flow Database:" << endl;
-    for (const auto &kvi : re.db) {
-        for (const auto &kvj : kvi.second) {
-            const gpb::LowerFlow &flow = kvj.second;
-
-            ss << "    Local: " << flow.local_node()
-               << ", Remote: " << flow.remote_node()
-               << ", Cost: " << flow.cost() << ", Seqnum: " << flow.seqnum()
-               << ", State: " << flow.state() << ", Age: " << flow.age()
-               << endl;
-        }
-    }
-
-    ss << endl;
-}
-
-int
-FullyReplicatedLFDB::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
-                                unsigned int limit) const
-{
-    gpb::LowerFlowList lfl;
-    auto func =
-        std::bind(&NeighFlow::sync_obj, nf, true, ObjClass, TableName, &lfl);
-    int ret = 0;
-
-    for (const auto &kvi : re.db) {
-        for (const auto &kvj : kvi.second) {
-            const gpb::LowerFlow &flow = kvj.second;
-
-            *lfl.add_flows() = flow;
-            if (lfl.flows_size() >= static_cast<int>(limit)) {
-                ret |= func();
-                lfl = gpb::LowerFlowList();
-            }
-        }
-    }
-
-    if (lfl.flows_size() > 0) {
-        ret |= func();
-    }
-
-    return ret;
-}
-
-int
-FullyReplicatedLFDB::neighs_refresh(size_t limit)
-{
-    unordered_map<NodeId, gpb::LowerFlow>::iterator jt;
-    int ret = 0;
-
-    if (re.db.size() == 0) {
-        /* Still not enrolled to anyone, nothing to do. */
-        return 0;
-    }
-
-    /* Fetch the map containing all the LFDB entries with the local
-     * address corresponding to me. */
-    auto it = re.db.find(rib->myname);
-    assert(it != re.db.end());
-
-    auto age_thresh = rib->get_param_value<Msecs>(Routing::Prefix, "age-max");
-    age_thresh      = age_thresh * 30 / 100;
-
-    for (auto jt = it->second.begin(); jt != it->second.end();) {
-        gpb::LowerFlowList lfl;
-
-        while (lfl.flows_size() < static_cast<int>(limit) &&
-               jt != it->second.end()) {
-            auto age = Secs(jt->second.age());
-
-            /* Renew the entry by incrementing its sequence number if
-             * we reached ~1/3 of the maximum age. */
-            if (age >= age_thresh) {
-                jt->second.set_seqnum(jt->second.seqnum() + 1);
-                jt->second.set_age(0);
-            }
-            *lfl.add_flows() = jt->second;
-            jt++;
-        }
-        ret |= rib->neighs_sync_obj_all(true, ObjClass, TableName, &lfl);
-    }
-
-    return ret;
-}
-
-void
-FullyReplicatedLFDB::age_incr_tmr_restart()
-{
-    age_incr_timer = utils::make_unique<TimeoutEvent>(
-        rib->get_param_value<Msecs>(Routing::Prefix, "age-incr-intval"),
-        rib->uipcp, this, [](struct uipcp *uipcp, void *arg) {
-            FullyReplicatedLFDB *r = (FullyReplicatedLFDB *)arg;
-            std::lock_guard<std::mutex> guard(r->rib->mutex);
-            r->age_incr_timer->fired();
-            r->age_incr();
-        });
-}
-
-/* Called from timer context, under RIB lock. */
-void
-FullyReplicatedLFDB::age_incr()
-{
-    auto age_inc_intval =
-        rib->get_param_value<Msecs>(Routing::Prefix, "age-incr-intval");
-    auto age_max = rib->get_param_value<Msecs>(Routing::Prefix, "age-max");
-    gpb::LowerFlowList prop_lfl;
-
-    for (auto &kvi : re.db) {
-        list<unordered_map<NodeId, gpb::LowerFlow>::iterator> discard_list;
-
-        for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
-            auto next_age = Secs(jt->second.age());
-
-            next_age += std::chrono::duration_cast<Secs>(age_inc_intval);
-            jt->second.set_age(next_age.count());
-
-            if (kvi.first != rib->myname && next_age > age_max) {
-                /* Insert this into the list of entries to be discarded. Don't
-                 * discard local entries. */
-                discard_list.push_back(jt);
-            }
-        }
-
-        for (const auto &dit : discard_list) {
-            UPI(rib->uipcp, "Discarded lower-flow %s (age)\n",
-                to_string(dit->second).c_str());
-            *prop_lfl.add_flows() = dit->second;
-            kvi.second.erase(dit);
-        }
-    }
-
-    if (prop_lfl.flows_size() > 0) {
-        rib->neighs_sync_obj_all(/*create=*/false, ObjClass, TableName,
-                                 &prop_lfl);
-        /* Update the routing table. */
-        update_kernel();
-    }
-
-    /* Reschedule */
-    age_incr_tmr_restart();
-}
-
-void
-FullyReplicatedLFDB::neigh_disconnected(const std::string &neigh_name)
-{
-    gpb::LowerFlowList prop_lfl;
-
-    for (auto &kvi : re.db) {
-        list<unordered_map<NodeId, gpb::LowerFlow>::iterator> discard_list;
-
-        for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
-            if ((kvi.first == rib->myname && jt->first == neigh_name) ||
-                (kvi.first == neigh_name && jt->first == rib->myname)) {
-                /* Insert this into the list of entries to be discarded. */
-                discard_list.push_back(jt);
-            }
-        }
-
-        for (const auto &dit : discard_list) {
-            UPI(rib->uipcp, "Discarded lower-flow %s (neighbor disconnected)\n",
-                to_string(dit->second).c_str());
-            *prop_lfl.add_flows() = dit->second;
-            kvi.second.erase(dit);
-        }
-    }
-
-    if (prop_lfl.flows_size() > 0) {
-        rib->neighs_sync_obj_all(/*create=*/false, ObjClass, TableName,
-                                 &prop_lfl);
-        /* Update the routing table. */
-        update_kernel();
-    }
-}
 
 void
 RoutingEngine::flow_state_update(struct rl_kmsg_flow_state *upd)
@@ -993,6 +597,404 @@ RoutingEngine::update_kernel_routing(const NodeId &addr)
     compute_fwd_table();
 }
 
+/* Link state routing, optionally supporting LFA. */
+class LinkStateRouting : public Routing {
+    /* Routing engine. */
+    RoutingEngine re;
+
+    /* Timer ID for age increment of LFDB entries. */
+    std::unique_ptr<TimeoutEvent> age_incr_timer;
+
+public:
+    RL_NODEFAULT_NONCOPIABLE(LinkStateRouting);
+    LinkStateRouting(UipcpRib *rib, bool lfa)
+        : Routing(rib), re(rib, /*lfa_enabled=*/lfa)
+    {
+        age_incr_tmr_restart();
+    }
+    ~LinkStateRouting() { age_incr_timer.reset(); }
+
+    void dump(std::stringstream &ss) const override;
+    void dump_routing(std::stringstream &ss) const override
+    {
+        re.dump(ss, rib->myname);
+    }
+
+    bool add(const gpb::LowerFlow &lf);
+    bool del(const NodeId &local_node, const NodeId &remote_node);
+    void update_local(const std::string &neigh_name) override;
+    void update_kernel(bool force = true) override;
+    int flow_state_update(struct rl_kmsg_flow_state *upd) override;
+    void neigh_disconnected(const std::string &neigh_name) override;
+
+    int rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src) override;
+
+    int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
+                   unsigned int limit) const override;
+    int neighs_refresh(size_t limit) override;
+    void age_incr();
+    void age_incr_tmr_restart();
+
+    /* Time interval (in seconds) between two consecutive increments
+     * of the age of LFDB entries. */
+    static constexpr int kAgeIncrIntvalSecs = 10;
+
+    /* Max age (in seconds) for an LFDB entry not to be discarded. */
+    static constexpr int kAgeMaxSecs = 900;
+};
+
+/* The add method has overwrite semantic, and possibly resets the age.
+ * Returns true if something changed. */
+bool
+LinkStateRouting::add(const gpb::LowerFlow &lf)
+{
+    auto it            = re.db.find(lf.local_node());
+    string repr        = to_string(lf);
+    gpb::LowerFlow lfz = lf;
+
+    lfz.set_age(0);
+
+    if (it == re.db.end() || it->second.count(lf.remote_node()) == 0) {
+        /* Not there, we should add the entry. */
+        if (lf.local_node() == rib->myname &&
+            rib->get_neighbor(lf.remote_node(), /*create=*/false) == nullptr) {
+            /* Someone is telling us to add an entry where we are the local
+             * node, but there is no neighbor. Discard the update. */
+            UPD(rib->uipcp, "Lower flow %s not added (no such neighbor)\n",
+                repr.c_str());
+            return false;
+        }
+        re.db[lf.local_node()][lf.remote_node()] = lfz;
+        re.schedule_recomputation();
+        UPD(rib->uipcp, "Lower flow %s added\n", repr.c_str());
+        return true;
+    }
+
+    /* Entry is already there. Update if needed (this expression
+     * was obtained by means of a Karnaugh map on three variables:
+     * local, newer, equal). */
+    bool local_entry = (lfz.local_node() == rib->myname);
+    bool newer       = lfz.seqnum() > it->second[lfz.remote_node()].seqnum();
+    bool equal       = lfz == it->second[lfz.remote_node()];
+    if ((!local_entry && newer) || (local_entry && !equal)) {
+        it->second[lfz.remote_node()] = std::move(lfz); /* Update the entry */
+        if (equal) {
+            /* The affected flow entry is just refreshed, but it did not
+             * change. No recomputation is needed. */
+            UPV(rib->uipcp, "Lower flow %s refreshed\n", repr.c_str());
+        } else {
+            /* The affected flow entry changed, so we ask the RoutingEngine
+             * for recomputation. */
+            UPD(rib->uipcp, "Lower flow %s updated\n", repr.c_str());
+            re.schedule_recomputation();
+        }
+        return true;
+    }
+
+    return false;
+}
+
+/* Returns true if something changed. */
+bool
+LinkStateRouting::del(const NodeId &local_node, const NodeId &remote_node)
+{
+    auto it = re.db.find(local_node);
+    unordered_map<NodeId, gpb::LowerFlow>::iterator jt;
+    string repr;
+
+    if (it == re.db.end()) {
+        return false;
+    }
+
+    jt = it->second.find(remote_node);
+
+    if (jt == it->second.end()) {
+        return false;
+    }
+    repr = to_string(jt->second);
+
+    it->second.erase(jt);
+
+    UPD(rib->uipcp, "Lower flow %s removed\n", repr.c_str());
+
+    return true;
+}
+
+void
+LinkStateRouting::update_local(const string &node_name)
+{
+    gpb::LowerFlowList lfl;
+    gpb::LowerFlow *lf;
+    std::unique_ptr<CDAPMessage> sm;
+
+    if (rib->get_neighbor(node_name, false) == nullptr) {
+        return; /* Not our neighbor. */
+    }
+
+    lf = lfl.add_flows();
+    lf->set_local_node(rib->myname);
+    lf->set_remote_node(node_name);
+    lf->set_cost(1);
+    lf->set_seqnum(1); /* not meaningful */
+    lf->set_state(true);
+    lf->set_age(0);
+
+    sm = utils::make_unique<CDAPMessage>();
+    sm->m_create(ObjClass, TableName);
+    rib->send_to_myself(std::move(sm), &lfl);
+}
+
+int
+LinkStateRouting::rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
+{
+    const char *objbuf;
+    size_t objlen;
+    bool add_f = true;
+
+    if (rm->op_code != gpb::M_CREATE && rm->op_code != gpb::M_DELETE) {
+        UPE(rib->uipcp, "M_CREATE or M_DELETE expected\n");
+        return 0;
+    }
+
+    if (rm->op_code == gpb::M_DELETE) {
+        add_f = false;
+    }
+
+    rm->get_obj_value(objbuf, objlen);
+    if (!objbuf) {
+        UPE(rib->uipcp, "M_START does not contain a nested message\n");
+        abort();
+        return 0;
+    }
+
+    gpb::LowerFlowList lfl;
+    gpb::LowerFlowList prop_lfl;
+
+    lfl.ParseFromArray(objbuf, objlen);
+
+    for (const gpb::LowerFlow &f : lfl.flows()) {
+        if (add_f) {
+            if (add(f)) {
+                *prop_lfl.add_flows() = f;
+            }
+
+        } else {
+            if (del(f.local_node(), f.remote_node())) {
+                *prop_lfl.add_flows() = f;
+            }
+        }
+    }
+
+    if (prop_lfl.flows_size() > 0) {
+        /* Send the received lower flows to the other neighbors. */
+        rib->neighs_sync_obj_excluding(src.neigh, add_f, ObjClass, TableName,
+                                       &prop_lfl);
+
+        /* Update the kernel routing table. */
+        update_kernel(/*force=*/false);
+    }
+
+    return 0;
+}
+
+void
+LinkStateRouting::update_kernel(bool force)
+{
+    /* Update the routing table. */
+    if (force) {
+        re.schedule_recomputation();
+    }
+    re.update_kernel_routing(rib->myname);
+}
+
+int
+LinkStateRouting::flow_state_update(struct rl_kmsg_flow_state *upd)
+{
+    UPD(rib->uipcp, "Flow %u goes %s\n", upd->local_port,
+        upd->flow_state == RL_FLOW_STATE_UP ? "up" : "down");
+
+    re.flow_state_update(upd);
+
+    return 0;
+}
+
+void
+LinkStateRouting::dump(std::stringstream &ss) const
+{
+    ss << "Lower Flow Database:" << endl;
+    for (const auto &kvi : re.db) {
+        for (const auto &kvj : kvi.second) {
+            const gpb::LowerFlow &flow = kvj.second;
+
+            ss << "    Local: " << flow.local_node()
+               << ", Remote: " << flow.remote_node()
+               << ", Cost: " << flow.cost() << ", Seqnum: " << flow.seqnum()
+               << ", State: " << flow.state() << ", Age: " << flow.age()
+               << endl;
+        }
+    }
+
+    ss << endl;
+}
+
+int
+LinkStateRouting::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
+                             unsigned int limit) const
+{
+    gpb::LowerFlowList lfl;
+    auto func =
+        std::bind(&NeighFlow::sync_obj, nf, true, ObjClass, TableName, &lfl);
+    int ret = 0;
+
+    for (const auto &kvi : re.db) {
+        for (const auto &kvj : kvi.second) {
+            const gpb::LowerFlow &flow = kvj.second;
+
+            *lfl.add_flows() = flow;
+            if (lfl.flows_size() >= static_cast<int>(limit)) {
+                ret |= func();
+                lfl = gpb::LowerFlowList();
+            }
+        }
+    }
+
+    if (lfl.flows_size() > 0) {
+        ret |= func();
+    }
+
+    return ret;
+}
+
+int
+LinkStateRouting::neighs_refresh(size_t limit)
+{
+    unordered_map<NodeId, gpb::LowerFlow>::iterator jt;
+    int ret = 0;
+
+    if (re.db.size() == 0) {
+        /* Still not enrolled to anyone, nothing to do. */
+        return 0;
+    }
+
+    /* Fetch the map containing all the LFDB entries with the local
+     * address corresponding to me. */
+    auto it = re.db.find(rib->myname);
+    assert(it != re.db.end());
+
+    auto age_thresh = rib->get_param_value<Msecs>(Routing::Prefix, "age-max");
+    age_thresh      = age_thresh * 30 / 100;
+
+    for (auto jt = it->second.begin(); jt != it->second.end();) {
+        gpb::LowerFlowList lfl;
+
+        while (lfl.flows_size() < static_cast<int>(limit) &&
+               jt != it->second.end()) {
+            auto age = Secs(jt->second.age());
+
+            /* Renew the entry by incrementing its sequence number if
+             * we reached ~1/3 of the maximum age. */
+            if (age >= age_thresh) {
+                jt->second.set_seqnum(jt->second.seqnum() + 1);
+                jt->second.set_age(0);
+            }
+            *lfl.add_flows() = jt->second;
+            jt++;
+        }
+        ret |= rib->neighs_sync_obj_all(true, ObjClass, TableName, &lfl);
+    }
+
+    return ret;
+}
+
+void
+LinkStateRouting::age_incr_tmr_restart()
+{
+    age_incr_timer = utils::make_unique<TimeoutEvent>(
+        rib->get_param_value<Msecs>(Routing::Prefix, "age-incr-intval"),
+        rib->uipcp, this, [](struct uipcp *uipcp, void *arg) {
+            LinkStateRouting *r = (LinkStateRouting *)arg;
+            std::lock_guard<std::mutex> guard(r->rib->mutex);
+            r->age_incr_timer->fired();
+            r->age_incr();
+        });
+}
+
+/* Called from timer context, under RIB lock. */
+void
+LinkStateRouting::age_incr()
+{
+    auto age_inc_intval =
+        rib->get_param_value<Msecs>(Routing::Prefix, "age-incr-intval");
+    auto age_max = rib->get_param_value<Msecs>(Routing::Prefix, "age-max");
+    gpb::LowerFlowList prop_lfl;
+
+    for (auto &kvi : re.db) {
+        list<unordered_map<NodeId, gpb::LowerFlow>::iterator> discard_list;
+
+        for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
+            auto next_age = Secs(jt->second.age());
+
+            next_age += std::chrono::duration_cast<Secs>(age_inc_intval);
+            jt->second.set_age(next_age.count());
+
+            if (kvi.first != rib->myname && next_age > age_max) {
+                /* Insert this into the list of entries to be discarded. Don't
+                 * discard local entries. */
+                discard_list.push_back(jt);
+            }
+        }
+
+        for (const auto &dit : discard_list) {
+            UPI(rib->uipcp, "Discarded lower-flow %s (age)\n",
+                to_string(dit->second).c_str());
+            *prop_lfl.add_flows() = dit->second;
+            kvi.second.erase(dit);
+        }
+    }
+
+    if (prop_lfl.flows_size() > 0) {
+        rib->neighs_sync_obj_all(/*create=*/false, ObjClass, TableName,
+                                 &prop_lfl);
+        /* Update the routing table. */
+        update_kernel();
+    }
+
+    /* Reschedule */
+    age_incr_tmr_restart();
+}
+
+void
+LinkStateRouting::neigh_disconnected(const std::string &neigh_name)
+{
+    gpb::LowerFlowList prop_lfl;
+
+    for (auto &kvi : re.db) {
+        list<unordered_map<NodeId, gpb::LowerFlow>::iterator> discard_list;
+
+        for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
+            if ((kvi.first == rib->myname && jt->first == neigh_name) ||
+                (kvi.first == neigh_name && jt->first == rib->myname)) {
+                /* Insert this into the list of entries to be discarded. */
+                discard_list.push_back(jt);
+            }
+        }
+
+        for (const auto &dit : discard_list) {
+            UPI(rib->uipcp, "Discarded lower-flow %s (neighbor disconnected)\n",
+                to_string(dit->second).c_str());
+            *prop_lfl.add_flows() = dit->second;
+            kvi.second.erase(dit);
+        }
+    }
+
+    if (prop_lfl.flows_size() > 0) {
+        rib->neighs_sync_obj_all(/*create=*/false, ObjClass, TableName,
+                                 &prop_lfl);
+        /* Update the routing table. */
+        update_kernel();
+    }
+}
+
 class StaticRouting : public Routing {
     /* Routing engine, only used to compute kernel fowarding tables. */
     RoutingEngine re;
@@ -1057,19 +1059,19 @@ UipcpRib::routing_lib_init()
 {
     std::list<std::pair<std::string, PolicyParam>> link_state_params = {
         {"age-incr-intval",
-         PolicyParam(Secs(int(FullyReplicatedLFDB::kAgeIncrIntvalSecs)))},
-        {"age-max", PolicyParam(Secs(int(FullyReplicatedLFDB::kAgeMaxSecs)))}};
+         PolicyParam(Secs(int(LinkStateRouting::kAgeIncrIntvalSecs)))},
+        {"age-max", PolicyParam(Secs(int(LinkStateRouting::kAgeMaxSecs)))}};
 
     available_policies[Routing::Prefix].insert(PolicyBuilder(
         "link-state",
         [](UipcpRib *rib) {
-            return utils::make_unique<FullyReplicatedLFDB>(rib, false);
+            return utils::make_unique<LinkStateRouting>(rib, false);
         },
         {Routing::TableName}, link_state_params));
     available_policies[Routing::Prefix].insert(PolicyBuilder(
         "link-state-lfa",
         [](UipcpRib *rib) {
-            return utils::make_unique<FullyReplicatedLFDB>(rib, true);
+            return utils::make_unique<LinkStateRouting>(rib, true);
         },
         {Routing::TableName}, link_state_params));
     available_policies[Routing::Prefix].insert(PolicyBuilder(
