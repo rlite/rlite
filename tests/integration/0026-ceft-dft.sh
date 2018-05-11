@@ -56,8 +56,8 @@ done
 
 # S1 is going to be the enrollment master, the others enroll to it
 ip netns exec s1 rlite-ctl dif-policy-param-mod ceftdif addralloc nack-wait 1s || abort
-ip netns exec s1 rlite-ctl dif-policy-param-mod ceftdif dft replicas s1.n,s2.n,s3.n || abort
 ip netns exec s1 rlite-ctl dif-policy-mod ceftdif dft centralized-fault-tolerant || abort
+ip netns exec s1 rlite-ctl dif-policy-param-mod ceftdif dft replicas s1.n,s2.n,s3.n || abort
 ip netns exec s1 rlite-ctl dif-policy-mod ceftdif routing link-state-lfa || abort
 ip netns exec s1 rlite-ctl ipcp-enroller-enable s1.n || abort
 for cont in s2 s3 c; do
