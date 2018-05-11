@@ -10,10 +10,10 @@ rlite-ctl ipcp-config pippo sched nonexistent && exit 1
 # Check that we can set the WRR scheduler and configure it
 rlite-ctl ipcp-config pippo sched wrr || exit 1
 rlite-ctl ipcp-sched-config pippo wrr quantum 1600 && exit 1
-rlite-ctl ipcp-sched-config pippo wrr weights 1,2,5 && exit 1
+rlite-ctl ipcp-sched-config pippo wrr weights 2,4,10 && exit 1
 rlite-ctl ipcp-sched-config pippo wrr quantum 1600 weights "" && exit 1
-rlite-ctl ipcp-sched-config pippo wrr quantum xyz weights 1,2,5 && exit 1
-rlite-ctl ipcp-sched-config pippo wrr quantum 1600 weights 1,2,5 || exit 1
+rlite-ctl ipcp-sched-config pippo wrr quantum xyz weights 2,4,10 && exit 1
+rlite-ctl ipcp-sched-config pippo wrr quantum 1600 weights 2,4,10 || exit 1
 rlite-ctl ipcp-config-get pippo sched | grep "\<wrr\>" || exit 1
 
 # Check that we can set the FIFO scheduler and remove it

@@ -195,28 +195,49 @@ static struct rl_sched_ops rl_sched_fifo_ops = {
 
 struct rl_sched_wrr {
     /* Array indexed by qos_id. */
-    struct {
+    struct rl_sched_wrr_queue {
         struct rb_list q;
         int qlen;
         /* Normalized weight.
          *    w_n = w_u * K / w_u_min * quantum / K
          */
-        unsigned weight;
+        unsigned int weight;
+        /* Amount of credit left (in bytes). */
+        int credit;
     } * queues;
-    unsigned int num_queues;
+    /* Number of queues (traffic classes). */
+    rl_qosid_t num_queues;
     /* Quantum in bytes. */
     unsigned int quantum;
+    /* Current class to dequeue from. */
+    unsigned int cur_class;
 };
 
 static int
 sched_wrr_do_config(struct rl_sched *sched, unsigned int quantum,
-                    unsigned int num_queues, unsigned int weights[])
+                    rl_qosid_t num_queues, unsigned int weights[])
 {
     struct rl_sched_wrr *sched_priv = RL_SCHED_PRIV(sched);
+    unsigned int min_weight         = -1;
     int i;
 
+    if (quantum == 0 || num_queues == 0) {
+        /* Invalid parameters. */
+        return -1;
+    }
+
+    /* Find the minimum weight and check that it is not 0. */
+    for (i = 0; i < num_queues; i++) {
+        min_weight = min(min_weight, weights[i]);
+    }
+    if (min_weight < 1) {
+        return -1;
+    }
+
+    /* Clean up the old queues (if any). */
     sched->ops.fini(sched);
 
+    /* Build the new queues. */
     sched_priv->num_queues = num_queues;
     sched_priv->quantum    = quantum;
     sched_priv->queues = rl_alloc(num_queues * sizeof(sched_priv->queues[0]),
@@ -224,11 +245,22 @@ sched_wrr_do_config(struct rl_sched *sched, unsigned int quantum,
     if (!sched_priv->queues) {
         return -ENOMEM;
     }
+
     for (i = 0; i < num_queues; i++) {
-        rb_list_init(&sched_priv->queues[i].q);
-        sched_priv->queues[i].qlen   = 0;
-        sched_priv->queues[i].weight = weights[i];
+        struct rl_sched_wrr_queue *wrrq = sched_priv->queues + i;
+        uint64_t norm_weight            = weights[i];
+
+        /* Normalize the weight to the minimum one. */
+        norm_weight <<= 20;
+        norm_weight /= min_weight;
+        norm_weight *= quantum;
+        norm_weight >>= 20;
+        wrrq->weight = wrrq->credit = norm_weight;
+        rb_list_init(&wrrq->q);
+        wrrq->qlen = 0;
     }
+
+    sched_priv->cur_class = 0;
 
     return 0;
 }
@@ -247,7 +279,7 @@ sched_wrr_init(struct rl_sched *sched)
 {
     unsigned int weights[2] = {1, 4};
 
-    return sched_wrr_do_config(sched, /*quantum=*/1500, /*num_queues=*/2,
+    return sched_wrr_do_config(sched, /*quantum=*/2000, /*num_queues=*/2,
                                /*weights=*/weights);
 }
 
@@ -262,12 +294,14 @@ sched_wrr_fini(struct rl_sched *sched)
     }
 
     for (i = 0; i < sched_priv->num_queues; i++) {
+        struct rl_sched_wrr_queue *wrrq = sched_priv->queues + i;
         struct rl_buf *rb, *tmp;
-        rb_list_foreach_safe (rb, tmp, &sched_priv->queues[i].q) {
+
+        rb_list_foreach_safe (rb, tmp, &wrrq->q) {
             rb_list_del(rb);
             rl_buf_free(rb);
         }
-        sched_priv->queues[i].qlen = 0;
+        wrrq->qlen = 0;
     }
 
     rl_free(sched_priv->queues, RL_MT_SHIM);
@@ -276,13 +310,62 @@ sched_wrr_fini(struct rl_sched *sched)
 static int
 sched_wrr_enq(struct rl_sched *sched, struct rl_buf *rb)
 {
-    return -1;
+    struct rl_sched_wrr *sched_priv = RL_SCHED_PRIV(sched);
+    rl_qosid_t qos_class =
+        min((rl_qosid_t)(sched_priv->num_queues - 1), RL_BUF_PCI(rb)->qos_id);
+    struct rl_sched_wrr_queue *wrrq = sched_priv->queues + qos_class;
+
+    if (wrrq->qlen > RMTQ_MAX_SIZE) {
+        return -1;
+    }
+
+    rb_list_enq(rb, &wrrq->q);
+    wrrq->qlen += rl_buf_truesize(rb);
+
+    return 0;
+}
+
+static inline rl_qosid_t
+sched_next_class(rl_qosid_t qos_class, rl_qosid_t num_classes)
+{
+    if (++qos_class == num_classes) {
+        qos_class = 0;
+    }
+    return qos_class;
 }
 
 static struct rl_buf *
 sched_wrr_deq(struct rl_sched *sched)
 {
-    return NULL;
+    struct rl_sched_wrr *sched_priv = RL_SCHED_PRIV(sched);
+    rl_qosid_t n                    = sched_priv->num_queues;
+    struct rl_buf *rb               = NULL;
+    rl_qosid_t qos_class;
+
+    for (qos_class = sched_priv->cur_class; n > 0;
+         n--, qos_class = sched_next_class(qos_class, sched_priv->num_queues)) {
+        struct rl_sched_wrr_queue *wrrq = sched_priv->queues + qos_class;
+
+        if (!rb_list_empty(&wrrq->q) && wrrq->credit > 0) {
+            rb = rb_list_front(&wrrq->q);
+            rb_list_del(rb);
+            wrrq->qlen -= rl_buf_truesize(rb);
+            BUG_ON(wrrq->qlen < 0);
+
+            wrrq->credit -= rb->len;
+            if (wrrq->credit <= 0) {
+                /* Reload the credit and proceed to the next class. */
+                wrrq->credit = wrrq->weight;
+                qos_class = sched_next_class(qos_class, sched_priv->num_queues);
+            }
+            break;
+        }
+    }
+
+    /* Update the current class. */
+    sched_priv->cur_class = qos_class;
+
+    return rb;
 }
 
 static struct rl_sched_ops rl_sched_wrr_ops = {
