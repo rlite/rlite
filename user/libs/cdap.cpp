@@ -26,7 +26,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <time.h>
+#include <chrono>
 #include <memory>
 
 #include "rlite/utils.h"
@@ -242,10 +242,10 @@ CDAPValidationTable::CDAPValidationTable()
 
 static struct CDAPValidationTable vt;
 
-CDAPConn::CDAPConn(int arg_fd, long arg_version, unsigned int ds)
+CDAPConn::CDAPConn(int arg_fd, long arg_version, std::chrono::seconds ds)
     : invoke_id_mgr(ds)
 {
-    discard_secs = ds;
+    discard_time = ds;
     fd           = arg_fd;
     version      = arg_version;
     state        = ConnState::NONE;
@@ -261,7 +261,7 @@ CDAPConn::reset()
     state         = ConnState::NONE;
     local_appl    = string();
     remote_appl   = string();
-    invoke_id_mgr = InvokeIdMgr(discard_secs);
+    invoke_id_mgr = InvokeIdMgr(discard_time);
     PV("Connection reset to %s\n", conn_state_repr(state));
 }
 
@@ -325,9 +325,9 @@ CDAPConn::conn_state_repr(ConnState st)
     return nullptr;
 }
 
-InvokeIdMgr::InvokeIdMgr(unsigned int ds)
+InvokeIdMgr::InvokeIdMgr(std::chrono::seconds ds)
 {
-    discard_secs   = ds;
+    discard_time   = ds;
     invoke_id_next = 1;
 }
 
@@ -336,10 +336,10 @@ void
 InvokeIdMgr::__discard(unordered_set<Id, IdHasher> &pending)
 {
     vector<unordered_set<Id, IdHasher>::iterator> torm;
-    time_t now = time(nullptr);
+    auto now = std::chrono::system_clock::now();
 
     for (auto i = pending.begin(); i != pending.end(); i++) {
-        if (now - i->created > static_cast<time_t>(discard_secs)) {
+        if (now - i->created > discard_time) {
             torm.push_back(i);
         }
     }
@@ -352,7 +352,7 @@ InvokeIdMgr::__discard(unordered_set<Id, IdHasher> &pending)
 void
 InvokeIdMgr::discard()
 {
-    if (discard_secs < ~0U) {
+    if (discard_time != std::chrono::seconds::max()) {
         __discard(pending_invoke_ids);
         __discard(pending_invoke_ids_remote);
     }
@@ -364,11 +364,11 @@ InvokeIdMgr::__put_invoke_id(unordered_set<Id, IdHasher> &pending,
 {
     discard();
 
-    if (!pending.count(Id(invoke_id, 0))) {
+    if (!pending.count(Id(invoke_id))) {
         return -1;
     }
 
-    pending.erase(Id(invoke_id, 0));
+    pending.erase(Id(invoke_id));
 
     NPD("put %d\n", invoke_id);
 
@@ -381,11 +381,12 @@ InvokeIdMgr::get_invoke_id()
     discard();
 
     while (invoke_id_next == 0 ||
-           pending_invoke_ids.count(Id(invoke_id_next, 0))) {
+           pending_invoke_ids.count(Id(invoke_id_next))) {
         invoke_id_next++;
     }
 
-    pending_invoke_ids.insert(Id(invoke_id_next, time(nullptr)));
+    pending_invoke_ids.insert(
+        Id(invoke_id_next, std::chrono::system_clock::now()));
 
     NPD("got %d\n", invoke_id_next);
 
@@ -403,11 +404,12 @@ InvokeIdMgr::get_invoke_id_remote(int invoke_id)
 {
     discard();
 
-    if (pending_invoke_ids_remote.count(Id(invoke_id, 0))) {
+    if (pending_invoke_ids_remote.count(Id(invoke_id))) {
         return -1;
     }
 
-    pending_invoke_ids_remote.insert(Id(invoke_id, time(nullptr)));
+    pending_invoke_ids_remote.insert(
+        Id(invoke_id, std::chrono::system_clock::now()));
 
     NPD("got %d\n", invoke_id);
 

@@ -47,9 +47,12 @@ struct CDAPAuthValue {
 class InvokeIdMgr {
     struct Id {
         int iid;
-        time_t created;
+        std::chrono::system_clock::time_point created;
 
-        Id(int i, time_t t) : iid(i), created(t) {}
+        Id(int i, std::chrono::system_clock::time_point t) : iid(i), created(t)
+        {
+        }
+        Id(int i) : iid(i), created(std::chrono::system_clock::time_point()) {}
         Id(const Id &o) : iid(o.iid), created(o.created) {}
         bool operator==(const Id &o) const { return iid == o.iid; }
         bool operator!=(const Id &o) const { return iid != o.iid; }
@@ -68,7 +71,7 @@ class InvokeIdMgr {
 
     std::unordered_set<Id, IdHasher> pending_invoke_ids;
     int invoke_id_next;
-    unsigned discard_secs;
+    std::chrono::seconds discard_time;
     std::unordered_set<Id, IdHasher> pending_invoke_ids_remote;
 
     int __put_invoke_id(std::unordered_set<Id, IdHasher> &pending,
@@ -77,7 +80,8 @@ class InvokeIdMgr {
     void discard();
 
 public:
-    InvokeIdMgr(unsigned discard_secs = CDAP_DISCARD_SECS_DFLT);
+    InvokeIdMgr(std::chrono::seconds discard_time =
+                    std::chrono::seconds(CDAP_DISCARD_SECS_DFLT));
     int get_invoke_id();
     int put_invoke_id(int invoke_id);
     int get_invoke_id_remote(int invoke_id);
@@ -92,7 +96,7 @@ struct CDAPMessage;
 
 class CDAPConn {
     InvokeIdMgr invoke_id_mgr;
-    unsigned int discard_secs;
+    std::chrono::seconds discard_time;
 
 #ifndef SWIG
     enum class ConnState {
@@ -110,7 +114,8 @@ class CDAPConn {
 
 public:
     CDAPConn(int fd, long version = 1,
-             unsigned int discard_secs = CDAP_DISCARD_SECS_DFLT);
+             std::chrono::seconds discard_time =
+                 std::chrono::seconds(CDAP_DISCARD_SECS_DFLT));
     ~CDAPConn();
 
     /* @invoke_id is not meaningful for request messages. */
