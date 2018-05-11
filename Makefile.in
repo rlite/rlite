@@ -5,7 +5,7 @@ KERNBUILDDIR=@KERNBUILDDIR@
 all: usr ker
 
 usr:
-	cd build && $(MAKE)
+	cd build && @CLANG_PREFIX@ $(MAKE)
 
 ker:
 	$(MAKE) -C $(KERNBUILDDIR) M=$(KERNMODDIR) PWD=$(shell pwd)/kernel \

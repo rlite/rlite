@@ -256,6 +256,7 @@ KERNBUILDDIR="/lib/modules/`uname -r`/build"
 DEBUG="n"
 BUILD_KERNEL="y"
 BUILD_USER="y"
+CLANG_PREFIX=""
 
 # Option parsing
 while [[ $# > 0 ]]
@@ -371,6 +372,10 @@ fi
 if [ ${BUILD_USER} == "y" ]; then
     # Make sure CMake is installed
     which cmake || no_cmake
+    # Check if we have
+    if [ $DEBUG == "y" ] && [ $(which scan-build) ]; then
+        CLANG_PREFIX="scan-build"
+    fi
 fi
 
 rm -f config.log
@@ -420,7 +425,7 @@ if [ ${BUILD_USER} == "y" ]; then
 
     (
     cd build
-    cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug -DDEBUG=${DEBUG} -DWITH_SWIG=${WITH_SWIG}
+    ${CLANG_PREFIX} cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug -DDEBUG=${DEBUG} -DWITH_SWIG=${WITH_SWIG}
     ) | tee -a config.log
 fi
 
@@ -429,6 +434,7 @@ cp Makefile.in Makefile
 sed -i "s|@INSTALL_MOD_PATH@|${INSTALL_PREFIX}${LIBMODPREFIX}|g" Makefile
 sed -i "s|@ROOTDIR@|$PWD|g" Makefile
 sed -i "s|@KERNBUILDDIR@|$KERNBUILDDIR|g" Makefile
+sed -i "s|@CLANG_PREFIX@|${CLANG_PREFIX}|g" Makefile
 sed -i "s|@WITH_SHIM_UDP4@|${WITH_SHIM_UDP4}|g" Makefile
 sed -i "s|@WITH_SHIM_TCP4@|${WITH_SHIM_TCP4}|g" Makefile
 
