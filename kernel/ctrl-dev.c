@@ -2272,7 +2272,7 @@ rl_rmt_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         /* Collect stats from all the CPUs. */
         for_each_possible_cpu(cpu)
         {
-            struct rl_ipcp_stats *cpustats = this_cpu_ptr(ipcp->stats);
+            struct rl_ipcp_stats *cpustats = per_cpu_ptr(ipcp->stats, cpu);
 
             resp.stats.tx_pkt += cpustats->tx_pkt;
             resp.stats.tx_byte += cpustats->tx_byte;
