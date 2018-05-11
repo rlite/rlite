@@ -1215,7 +1215,9 @@ daemonize(void)
         exit(EXIT_FAILURE);
     }
 
-    chdir("/");
+    if (chdir("/")) {
+        exit(EXIT_FAILURE);
+    }
 }
 
 static int
