@@ -2272,25 +2272,14 @@ rl_ipcp_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         for_each_possible_cpu(cpu)
         {
             struct rl_ipcp_stats *cpustats = per_cpu_ptr(ipcp->stats, cpu);
+            unsigned num   = sizeof(resp.stats) / sizeof(resp.stats.tx_pkt);
+            uint64_t *ssrc = (uint64_t *)cpustats;
+            uint64_t *sdst = (uint64_t *)&resp.stats;
+            unsigned i;
 
-            resp.stats.tx_pkt += cpustats->tx_pkt;
-            resp.stats.tx_byte += cpustats->tx_byte;
-            resp.stats.tx_err += cpustats->tx_err;
-            resp.stats.rx_pkt += cpustats->rx_pkt;
-            resp.stats.rx_byte += cpustats->rx_byte;
-            resp.stats.rx_err += cpustats->rx_err;
-            resp.stats.rtx_pkt += cpustats->rtx_pkt;
-            resp.stats.rtx_byte += cpustats->rtx_byte;
-
-            resp.stats.rmt.fwd_pkt += cpustats->rmt.fwd_pkt;
-            resp.stats.rmt.fwd_byte += cpustats->rmt.fwd_byte;
-            resp.stats.rmt.queued_pkt += cpustats->rmt.queued_pkt;
-            resp.stats.rmt.queue_drop += cpustats->rmt.queue_drop;
-            resp.stats.rmt.noroute_drop += cpustats->rmt.noroute_drop;
-            resp.stats.rmt.csum_drop += cpustats->rmt.csum_drop;
-            resp.stats.rmt.ttl_drop += cpustats->rmt.ttl_drop;
-            resp.stats.rmt.noflow_drop += cpustats->rmt.noflow_drop;
-            resp.stats.rmt.other_drop += cpustats->rmt.other_drop;
+            for (i = 0; i < num; i++, sdst++, ssrc++) {
+                *sdst += *ssrc;
+            }
         }
         ret = rl_upqueue_append(rc, (const struct rl_msg_base *)&resp, false);
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));

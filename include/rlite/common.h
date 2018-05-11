@@ -257,6 +257,7 @@ struct rl_flow_stats {
     uint64_t rx_overrun_byte;
 };
 
+/* RMT statistics. All counters must be 64 bits wide. */
 struct rl_rmt_stats {
     uint64_t fwd_pkt;
     uint64_t fwd_byte;
@@ -269,7 +270,7 @@ struct rl_rmt_stats {
     uint64_t other_drop;
 };
 
-/* IPCP statistics. */
+/* IPCP statistics. All counters must be 64 bits wide. */
 struct rl_ipcp_stats {
     uint64_t tx_pkt;
     uint64_t tx_byte;
