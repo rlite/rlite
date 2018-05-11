@@ -1005,7 +1005,7 @@ UipcpRib::enrollment_rsrc_get(std::shared_ptr<NeighFlow> const &nf,
         try {
             enrollment_resources[nf->flow_fd] =
                 utils::make_unique<EnrollmentResources>(nf, neigh, initiator);
-        } catch (std::system_error) {
+        } catch (std::system_error &e) {
             UPW(uipcp,
                 "Failed to spawn enrollment thread for neigh '%s'"
                 "(resource temporarily unavailable)\n",
