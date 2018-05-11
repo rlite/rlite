@@ -48,11 +48,11 @@ struct rx_entry {
 struct rl_shim_loopback {
     struct ipcp_entry *ipcp;
 
-    unsigned int drop_fract;
-    unsigned int drop_cdown;
+    uint32_t drop_fract;
+    uint32_t drop_cur;
 
     /* Queuing data structures. */
-    bool queued;
+    uint16_t queued; /* bool */
     struct rx_entry rxr[RX_ENTRIES];
     unsigned int rdh;
     unsigned int rdt;
@@ -296,9 +296,9 @@ rl_shim_loopback_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *tx_flow,
         bool drop = false;
 
         spin_lock_bh(&priv->lock);
-        if (--priv->drop_cdown == 0) {
-            priv->drop_cdown = priv->drop_fract;
-            drop             = true;
+        if (++priv->drop_cur >= priv->drop_fract) {
+            priv->drop_cur = 0;
+            drop           = true;
         }
         spin_unlock_bh(&priv->lock);
 
@@ -368,32 +368,15 @@ rl_shim_loopback_config(struct ipcp_entry *ipcp, const char *param_name,
     int ret                       = -ENOSYS;
 
     if (strcmp(param_name, "queued") == 0) {
-        unsigned int queued;
-
-        ret = kstrtouint(param_value, 10, &queued);
-        if (ret == 0) {
-            spin_lock_bh(&priv->lock);
-            priv->queued = queued ? 1 : 0;
-            spin_unlock_bh(&priv->lock);
-        }
-
-        if (ret == 0) {
-            PD("queued set to %u\n", priv->queued);
-        }
+        spin_lock_bh(&priv->lock);
+        ret = rl_configstr_to_u16(param_value, &priv->queued, NULL);
+        spin_unlock_bh(&priv->lock);
 
     } else if (strcmp(param_name, "drop_fract") == 0) {
-        unsigned int drop_fract;
-
-        ret = kstrtouint(param_value, 10, &drop_fract);
-        if (ret == 0) {
-            spin_lock_bh(&priv->lock);
-            priv->drop_fract = priv->drop_cdown = drop_fract;
-            spin_unlock_bh(&priv->lock);
-        }
-
-        if (ret == 0) {
-            PD("drop_fract set to %u\n", priv->drop_fract);
-        }
+        spin_lock_bh(&priv->lock);
+        ret = rl_configstr_to_u32(param_value, &priv->drop_fract, NULL);
+        priv->drop_cur = 0;
+        spin_unlock_bh(&priv->lock);
     }
 
     return ret;
