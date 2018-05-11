@@ -860,8 +860,8 @@ if args.namespaces:
 
     # Kill the daemons and unload the modules
     outs += 'sleep 1\n'\
-            'sudo pkill rlite-node-config\n'\
-            'sudo pkill rlite-uipcps\n'\
+            'sudo pkill -9 rlite-node-config\n'\
+            'sudo pkill -9 rlite-uipcps\n'\
             'sleep 1\n'\
             'sudo rmmod rlite-normal%(flsuf)s\n'\
             'sudo rmmod rlite-shim-eth\n'\
