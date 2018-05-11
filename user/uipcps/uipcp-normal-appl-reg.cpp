@@ -704,6 +704,15 @@ public:
     {
     }
     int process_timeout();
+    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+                    std::shared_ptr<Neighbor> const &neigh,
+                    rlm_addr_t src_addr);
+
+    /* Called from rib_handler() to perform implementation specific
+     * processing.*/
+    virtual int process_rib_msg(const CDAPMessage *rm,
+                                CeftClient::PendingReq *const bpr,
+                                rlm_addr_t src_addr) = 0;
 
     /* For external hints. */
     void set_leader_id(const raft::ReplicaId &name)
@@ -883,13 +892,12 @@ class CentralizedFaultTolerantDFT : public DFT {
             : CeftClient(dft->rib, std::move(names))
         {
         }
+        int process_rib_msg(const CDAPMessage *rm,
+                            CeftClient::PendingReq *const bpr,
+                            rlm_addr_t src_addr) override;
         int lookup_req(const std::string &appl_name, std::string *dst_node,
                        const std::string &preferred, uint32_t cookie);
         int appl_register(const struct rl_kmsg_appl_register *req);
-        int rib_handler(const CDAPMessage *rm,
-                        std::shared_ptr<NeighFlow> const &nf,
-                        std::shared_ptr<Neighbor> const &neigh,
-                        rlm_addr_t src_addr);
     };
     std::unique_ptr<Client> client;
 
@@ -1043,20 +1051,12 @@ CentralizedFaultTolerantDFT::Client::appl_register(
 }
 
 int
-CentralizedFaultTolerantDFT::Client::rib_handler(
-    const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-    std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)
+CeftClient::rib_handler(const CDAPMessage *rm,
+                        std::shared_ptr<NeighFlow> const &nf,
+                        std::shared_ptr<Neighbor> const &neigh,
+                        rlm_addr_t src_addr)
 {
     struct uipcp *uipcp = rib->uipcp;
-
-    /* We expect a M_WRITE_R, M_DELETE_R or M_READ_R, corresponding an
-     * M_WRITE/M_DELETE sent by Client::appl_register() or an M_READ sent by
-     * Client::lookup_req(). */
-    if (rm->op_code != gpb::M_WRITE_R && rm->op_code != gpb::M_DELETE_R &&
-        rm->op_code != gpb::M_READ_R) {
-        UPE(uipcp, "Cannot handle opcode %d\n", rm->op_code);
-        return 0;
-    }
 
     /* Lookup rm->invoke_id in the pending map and erase it. Lookup
      * may fail if we receive multiple responses (but not for the
@@ -1067,10 +1067,8 @@ CentralizedFaultTolerantDFT::Client::rib_handler(
             rm->invoke_id);
         return 0;
     }
-    PendingReq const *pr = dynamic_cast<PendingReq *>(pi->second.get());
-
     /* Check that rm->op_code is consistent with the pending request. */
-    if (pi->second->op_code + 1 != rm->op_code) {
+    if (rm->op_code != pi->second->op_code + 1) {
         UPE(uipcp, "Opcode mismatch for request with invoke id %d\n",
             rm->invoke_id);
         pending.erase(pi);
@@ -1091,6 +1089,22 @@ CentralizedFaultTolerantDFT::Client::rib_handler(
             UPD(uipcp, "Raft leader discovered: %s\n", leader_id.c_str());
         }
     }
+
+    /* Handle the message to the underlying implementation. */
+    int ret = process_rib_msg(rm, pi->second.get(), src_addr);
+    pending.erase(pi);
+    mod_pending_timer();
+
+    return ret;
+}
+
+int
+CentralizedFaultTolerantDFT::Client::process_rib_msg(
+    const CDAPMessage *rm, CeftClient::PendingReq *const bpr,
+    rlm_addr_t src_addr)
+{
+    PendingReq const *pr = dynamic_cast<PendingReq *>(bpr);
+    struct uipcp *uipcp  = rib->uipcp;
 
     switch (rm->op_code) {
     case gpb::M_WRITE_R:
@@ -1121,8 +1135,6 @@ CentralizedFaultTolerantDFT::Client::rib_handler(
     default:
         assert(false);
     }
-    pending.erase(pi);
-    mod_pending_timer();
 
     return 0;
 }
