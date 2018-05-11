@@ -668,6 +668,110 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
     return process_sm_output(std::move(out));
 }
 
+class CeftClient {
+protected:
+    UipcpRib *rib = nullptr;
+    std::list<raft::ReplicaId> replicas;
+    /* The leader, if we know who it is, otherwise the empty
+     * string. */
+    raft::ReplicaId leader_id;
+    /* The replica that responded first to an M_READ, if any. */
+    raft::ReplicaId reader_id;
+    std::unique_ptr<TimeoutEvent> timer;
+
+    struct PendingReq {
+        gpb::OpCode op_code;
+        std::string appl_name;
+        raft::ReplicaId replica;
+        uint32_t kevent_id;
+        std::chrono::system_clock::time_point t;
+        PendingReq() = default;
+        PendingReq(gpb::OpCode op, const std::string &a,
+                   const raft::ReplicaId &r, uint32_t event_id)
+            : op_code(op), appl_name(a), replica(r), kevent_id(event_id)
+        {
+            t = std::chrono::system_clock::now() + Secs(3);
+        }
+    };
+    std::unordered_map</*invoke_id*/ int, std::unique_ptr<PendingReq>> pending;
+
+    void mod_pending_timer();
+
+public:
+    CeftClient(UipcpRib *rib, std::list<raft::ReplicaId> names)
+        : rib(rib), replicas(std::move(names))
+    {
+    }
+    int process_timeout();
+
+    /* For external hints. */
+    void set_leader_id(const raft::ReplicaId &name)
+    {
+        leader_id = reader_id = name;
+    }
+};
+
+int
+CeftClient::process_timeout()
+{
+    std::lock_guard<std::mutex> guard(rib->mutex);
+
+    mod_pending_timer();
+
+    return 0;
+}
+
+/* Process the expired entries and rearm the timer according to the
+ * oldest pending request (i.e. the next one that is expiring); or
+ * stop it if there are no pending requests. */
+void
+CeftClient::mod_pending_timer()
+{
+    auto t_min = std::chrono::system_clock::time_point::max();
+    auto now   = std::chrono::system_clock::now();
+
+    for (auto mit = pending.begin(); mit != pending.end();) {
+        if (mit->second->t <= now) {
+            /* This request has expired. */
+            UPW(rib->uipcp, "DFT '%s' request for name '%s' timed out\n",
+                CDAPMessage::opcode_repr(mit->second->op_code).c_str(),
+                mit->second->appl_name.c_str());
+            if (mit->second->replica == leader_id) {
+                /* We got a timeout on the leader, let's forget about it. */
+                UPD(rib->uipcp, "Forgetting about raft leader %s\n",
+                    leader_id.c_str());
+                leader_id.clear();
+            } else if (mit->second->replica == reader_id) {
+                /* We got a timeout on the selected reader,
+                 * let's forget about it. */
+                UPD(rib->uipcp, "Forgetting about selected reader %s\n",
+                    reader_id.c_str());
+                reader_id.clear();
+            }
+            mit = pending.erase(mit);
+        } else {
+            if (mit->second->t < t_min) {
+                /* Update the oldest request. */
+                t_min = mit->second->t;
+            }
+            ++mit;
+        }
+    }
+
+    /* Update the timer. */
+    if (t_min == std::chrono::system_clock::time_point::max()) {
+        timer = nullptr;
+    } else {
+        timer = make_unique<TimeoutEvent>(
+            std::chrono::duration_cast<Msecs>(t_min - now), rib->uipcp, this,
+            [](struct uipcp *uipcp, void *arg) {
+                auto cli = static_cast<CeftClient *>(arg);
+                cli->timer->fired();
+                cli->process_timeout();
+            });
+    }
+}
+
 class CentralizedFaultTolerantDFT : public DFT {
     /* An instance of this class can be a state machine replica or it can just
      * be a client that will redirect requests to one of the replicas. */
@@ -717,40 +821,13 @@ class CentralizedFaultTolerantDFT : public DFT {
     std::unique_ptr<Replica> raft;
 
     /* In case of client, a pointer to client-side data structures. */
-    class Client {
-        UipcpRib *rib = nullptr;
-        std::list<raft::ReplicaId> replicas;
-        /* The leader, if we know who it is, otherwise the empty
-         * string. */
-        raft::ReplicaId leader_id;
-        /* The replica that responded first to an M_READ, if any. */
-        raft::ReplicaId reader_id;
-        std::unique_ptr<TimeoutEvent> timer;
-
-        struct PendingReq {
-            gpb::OpCode op_code;
-            std::string appl_name;
-            raft::ReplicaId replica;
-            uint32_t kevent_id;
-            std::chrono::system_clock::time_point t;
-            PendingReq() = default;
-            PendingReq(gpb::OpCode op, const std::string &a,
-                       const raft::ReplicaId &r, uint32_t event_id)
-                : op_code(op), appl_name(a), replica(r), kevent_id(event_id)
-            {
-                t = std::chrono::system_clock::now() + Secs(3);
-            }
-        };
-        std::unordered_map</*invoke_id*/ int, std::unique_ptr<PendingReq>>
-            pending;
+    class Client : public CeftClient {
         uint64_t seqnum_next = 1;
-
-        void mod_pending_timer();
 
     public:
         Client(CentralizedFaultTolerantDFT *dft,
                std::list<raft::ReplicaId> names)
-            : rib(dft->rib), replicas(std::move(names))
+            : CeftClient(dft->rib, std::move(names))
         {
         }
         int lookup_req(const std::string &appl_name, std::string *dst_node,
@@ -760,13 +837,6 @@ class CentralizedFaultTolerantDFT : public DFT {
                         std::shared_ptr<NeighFlow> const &nf,
                         std::shared_ptr<Neighbor> const &neigh,
                         rlm_addr_t src_addr);
-        int process_timeout();
-
-        /* For external hints. */
-        void set_leader_id(const raft::ReplicaId &name)
-        {
-            leader_id = reader_id = name;
-        }
     };
     std::unique_ptr<Client> client;
 
@@ -849,58 +919,6 @@ CentralizedFaultTolerantDFT::reconfigure()
     }
 
     return 0;
-}
-
-/* Process the expired entries and rearm the timer according to the
- * oldest pending request (i.e. the next one that is expiring); or
- * stop it if there are no pending requests. */
-void
-CentralizedFaultTolerantDFT::Client::mod_pending_timer()
-{
-    auto t_min = std::chrono::system_clock::time_point::max();
-    auto now   = std::chrono::system_clock::now();
-
-    for (auto mit = pending.begin(); mit != pending.end();) {
-        if (mit->second->t <= now) {
-            /* This request has expired. */
-            UPW(rib->uipcp, "DFT '%s' request for name '%s' timed out\n",
-                CDAPMessage::opcode_repr(mit->second->op_code).c_str(),
-                mit->second->appl_name.c_str());
-            if (mit->second->replica == leader_id) {
-                /* We got a timeout on the leader, let's forget about it. */
-                UPD(rib->uipcp, "Forgetting about raft leader %s\n",
-                    leader_id.c_str());
-                leader_id.clear();
-            } else if (mit->second->replica == reader_id) {
-                /* We got a timeout on the selected reader,
-                 * let's forget about it. */
-                UPD(rib->uipcp, "Forgetting about selected reader %s\n",
-                    reader_id.c_str());
-                reader_id.clear();
-            }
-            mit = pending.erase(mit);
-        } else {
-            if (mit->second->t < t_min) {
-                /* Update the oldest request. */
-                t_min = mit->second->t;
-            }
-            ++mit;
-        }
-    }
-
-    /* Update the timer. */
-    if (t_min == std::chrono::system_clock::time_point::max()) {
-        timer = nullptr;
-    } else {
-        timer = make_unique<TimeoutEvent>(
-            std::chrono::duration_cast<Msecs>(t_min - now), rib->uipcp, this,
-            [](struct uipcp *uipcp, void *arg) {
-                auto cli =
-                    static_cast<CentralizedFaultTolerantDFT::Client *>(arg);
-                cli->timer->fired();
-                cli->process_timeout();
-            });
-    }
 }
 
 int
@@ -994,16 +1012,6 @@ CentralizedFaultTolerantDFT::Client::appl_register(
         UPD(rib->uipcp, "Write request 'delete %s' issued\n",
             appl_name.c_str());
     }
-
-    return 0;
-}
-
-int
-CentralizedFaultTolerantDFT::Client::process_timeout()
-{
-    std::lock_guard<std::mutex> guard(rib->mutex);
-
-    mod_pending_timer();
 
     return 0;
 }
