@@ -680,16 +680,17 @@ struct net *rl_ipcp_net(struct ipcp_entry *ipcp);
 
 bool rl_ipcp_has_flows(struct ipcp_entry *ipcp, bool report);
 int rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
-                      rl_port_t remote_port, uint32_t remote_cep,
+                      rl_port_t remote_port, rlm_cepid_t remote_cep,
                       rlm_addr_t remote_addr, const char *local_appl,
                       const char *remote_appl,
                       const struct rl_flow_config *flowcfg,
                       const struct rina_flow_spec *flowspec, bool maysleep);
 
 int rl_fa_resp_arrived(struct ipcp_entry *ipcp, rl_port_t local_port,
-                       rl_port_t remote_port, uint32_t remote_cep,
-                       rlm_addr_t remote_addr, uint8_t response,
-                       struct rl_flow_config *flowcfg, bool maysleep);
+                       rl_port_t remote_port, rlm_cepid_t remote_cep,
+                       rlm_qosid_t qos_id, rlm_addr_t remote_addr,
+                       uint8_t response, struct rl_flow_config *flowcfg,
+                       bool maysleep);
 
 int rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
                       bool maysleep);
@@ -723,7 +724,7 @@ struct flow_entry *flow_get(struct rl_dm *dm, rl_port_t port_id);
 
 struct flow_entry *flow_nodm_get(rl_port_t port_id);
 
-struct flow_entry *flow_get_by_cep(struct rl_dm *dm, unsigned int cep_id);
+struct flow_entry *flow_get_by_cep(struct rl_dm *dm, rlm_cepid_t cep_id);
 
 void flow_get_ref(struct flow_entry *flow);
 

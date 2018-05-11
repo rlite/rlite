@@ -492,7 +492,7 @@ shim_udp4_fa_req(struct uipcp *uipcp, const struct rl_msg_base *msg)
     /* Issue a positive flow allocation response, pushing to the kernel
      * the socket file descriptor and the remote address. */
     udp4_flow_config_fill(ep, &cfg);
-    uipcp_issue_fa_resp_arrived(uipcp, ep->port_id, 0, 0, 0, 0, &cfg);
+    uipcp_issue_fa_resp_arrived(uipcp, ep->port_id, 0, 0, 0, 0, 0, &cfg);
 
     return 0;
 }

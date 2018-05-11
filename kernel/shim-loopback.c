@@ -224,7 +224,7 @@ flow_allocate_resp_work(struct work_struct *w)
     int ret;
 
     ret = rl_fa_resp_arrived(farw->ipcp, farw->local_port, farw->remote_port, 0,
-                             0, farw->response, NULL, false);
+                             0, 0, farw->response, NULL, false);
     if (ret) {
         PE("failed to report flow allocation response\n");
     }

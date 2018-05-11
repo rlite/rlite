@@ -2447,7 +2447,7 @@ rl_uipcp_fa_resp_arrived(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     ipcp = ipcp_get(rc->dm, req->ipcp_id);
     if (ipcp) {
         ret = rl_fa_resp_arrived(ipcp, req->local_port, req->remote_port,
-                                 req->remote_cep, req->remote_addr,
+                                 req->remote_cep, req->qos_id, req->remote_addr,
                                  req->response, &req->flowcfg, true);
     }
     ipcp_put(ipcp);
@@ -3073,8 +3073,8 @@ EXPORT_SYMBOL(rl_fa_req_arrived);
 /* (4): client application <-- kernel IPCP */
 int
 rl_fa_resp_arrived(struct ipcp_entry *ipcp, rl_port_t local_port,
-                   rl_port_t remote_port, uint32_t remote_cep,
-                   rlm_addr_t remote_addr, uint8_t response,
+                   rl_port_t remote_port, rlm_cepid_t remote_cep,
+                   rlm_qosid_t qos_id, rlm_addr_t remote_addr, uint8_t response,
                    struct rl_flow_config *flowcfg, bool maysleep)
 {
     struct flow_entry *flow_entry = NULL;
@@ -3099,6 +3099,7 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp, rl_port_t local_port,
     }
     flow_entry->remote_port = remote_port;
     flow_entry->remote_cep  = remote_cep;
+    flow_entry->qos_id      = qos_id;
     flow_entry->remote_addr = remote_addr;
     spin_unlock_bh(&flow_entry->txrx.rx_lock);
 

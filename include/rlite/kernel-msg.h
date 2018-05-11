@@ -223,7 +223,7 @@ struct rl_kmsg_fa_req {
      * reflection to userspace. */
     rl_ipcp_id_t upper_ipcp_id;
     rl_port_t local_port;
-    uint32_t local_cep;
+    rlm_cepid_t local_cep;
     uint32_t uid;
 
     /* A value associated to the requesting application. It may be used by
@@ -272,7 +272,7 @@ struct rl_kmsg_fa_resp {
     rl_port_t port_id;
     uint8_t response;
     uint8_t pad1;
-    uint32_t cep_id; /* Filled by kernel before reflecting to userspace. */
+    rlm_cepid_t cep_id; /* Filled by kernel before reflecting to userspace. */
 };
 
 /* application --> kernel to configure an IPC process. */
@@ -338,7 +338,7 @@ struct rl_kmsg_uipcp_fa_req_arrived {
     uint32_t kevent_id;
     rl_ipcp_id_t ipcp_id;
     rl_port_t remote_port;
-    uint32_t remote_cep;
+    rlm_cepid_t remote_cep;
     uint32_t pad1;
     rlm_addr_t remote_addr;
     struct rl_flow_config flowcfg;
@@ -359,8 +359,8 @@ struct rl_kmsg_uipcp_fa_resp_arrived {
     rl_port_t remote_port;
     uint8_t response;
     uint8_t pad1;
-    uint32_t remote_cep;
-    uint32_t pad2;
+    rlm_cepid_t remote_cep;
+    rlm_qosid_t qos_id;
     rlm_addr_t remote_addr;
     struct rl_flow_config flowcfg;
 };

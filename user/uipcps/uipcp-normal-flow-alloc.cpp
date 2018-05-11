@@ -65,9 +65,10 @@ UipcpRib::fa_req(struct rl_kmsg_fa_req *req)
             req->remote_appl);
         stats.fa_name_lookup_failed++;
 
-        return uipcp_issue_fa_resp_arrived(
-            uipcp, req->local_port, 0 /* don't care */, 0 /* don't care */,
-            0 /* don't care */, 1, nullptr);
+        return uipcp_issue_fa_resp_arrived(uipcp, req->local_port,
+                                           /*remote_port=*/0, /*remote_cep=*/0,
+                                           /*qos_id=*/0, /*remote_addr=*/0,
+                                           /*response=*/1, /*cfg=*/nullptr);
     }
 
     if (!remote_node.empty()) {
@@ -113,8 +114,9 @@ UipcpRib::dft_lookup_resolved(const std::string &appl_name,
         if (remote_node.empty()) {
             /* Return a negative flow allocation response. */
             uipcp_issue_fa_resp_arrived(uipcp, fr->local_port,
-                                        0 /* don't care */, 0 /* don't care */,
-                                        0 /* don't care */, 1, nullptr);
+                                        /*remote_port=*/0, /*remote_cep=*/0,
+                                        /*qos_id=*/0, /*remote_addr=*/0,
+                                        /*response=*/1, /*cfg=*/nullptr);
         } else {
             fa->fa_req(fr.get(), remote_node);
         }
@@ -461,8 +463,8 @@ LocalFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
 
     return uipcp_issue_fa_resp_arrived(
         rib->uipcp, freq->src_port(), freq->dst_port(),
-        freq->connections(0).dst_cep(), remote_addr, rm->result ? 1 : 0,
-        &freq->flowcfg);
+        freq->connections(0).dst_cep(), freq->connections(0).qosid(),
+        remote_addr, rm->result ? 1 : 0, &freq->flowcfg);
 }
 
 /* (2) Slave FA <-- Initiator FA : M_CREATE */

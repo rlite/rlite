@@ -319,8 +319,9 @@ int uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                                const struct rl_flow_config *flowcfg);
 
 int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
-                                rl_port_t remote_port, uint32_t remote_cep,
-                                rlm_addr_t remote_addr, uint8_t response,
+                                rl_port_t remote_port, rlm_cepid_t remote_cep,
+                                rlm_qosid_t qos_id, rlm_addr_t remote_addr,
+                                uint8_t response,
                                 const struct rl_flow_config *flowcfg);
 
 int uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port,

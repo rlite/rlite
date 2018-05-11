@@ -339,7 +339,8 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
         write_unlock_bh(&priv->arpt_lock);
 
         if (ret == 0) {
-            rl_fa_resp_arrived(ipcp, flow->local_port, 0, 0, 0, 0, NULL, false);
+            rl_fa_resp_arrived(ipcp, flow->local_port, 0, 0, 0, 0, 0, NULL,
+                               false);
         }
 
         return ret;
@@ -560,8 +561,8 @@ out:
     if (flow) {
         /* This ARP reply is interpreted as a positive flow allocation
          * response message. */
-        rl_fa_resp_arrived(flow->txrx.ipcp, flow->local_port, 0, 0, 0, 0, NULL,
-                           false);
+        rl_fa_resp_arrived(flow->txrx.ipcp, flow->local_port, 0, 0, 0, 0, 0,
+                           NULL, false);
     }
 
     if (skb) {

@@ -364,7 +364,7 @@ shim_tcp4_fa_req(struct uipcp *uipcp, const struct rl_msg_base *msg)
      */
     memset(&cfg, 0, sizeof(cfg));
     cfg.fd = ep->fd;
-    uipcp_issue_fa_resp_arrived(uipcp, ep->port_id, 0, 0, 0, 0, &cfg);
+    uipcp_issue_fa_resp_arrived(uipcp, ep->port_id, 0, 0, 0, 0, 0, &cfg);
 
     return 0;
 
