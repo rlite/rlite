@@ -261,8 +261,8 @@ out:
 int
 rl_conf_rmt_get_stats(rl_ipcp_id_t ipcp_id, struct rl_ipcp_stats *stats)
 {
-    struct rl_kmsg_ipcp_rmt_stats_req msg;
-    struct rl_kmsg_ipcp_rmt_stats_resp *resp;
+    struct rl_kmsg_ipcp_stats_req msg;
+    struct rl_kmsg_ipcp_stats_resp *resp;
     int ret;
     int fd;
 
@@ -276,7 +276,7 @@ rl_conf_rmt_get_stats(rl_ipcp_id_t ipcp_id, struct rl_ipcp_stats *stats)
     }
 
     memset(&msg, 0, sizeof(msg));
-    msg.hdr.msg_type = RLITE_KER_IPCP_RMT_STATS_REQ;
+    msg.hdr.msg_type = RLITE_KER_IPCP_STATS_REQ;
     msg.hdr.event_id = 1;
     msg.ipcp_id      = ipcp_id;
 
@@ -286,7 +286,7 @@ rl_conf_rmt_get_stats(rl_ipcp_id_t ipcp_id, struct rl_ipcp_stats *stats)
         goto out;
     }
 
-    resp = (struct rl_kmsg_ipcp_rmt_stats_resp *)wait_for_next_msg(fd, 3000);
+    resp = (struct rl_kmsg_ipcp_stats_resp *)wait_for_next_msg(fd, 3000);
     if (!resp) {
         ret = -1;
         goto out;

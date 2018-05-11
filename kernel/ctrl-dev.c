@@ -2252,9 +2252,9 @@ rl_ipcp_uipcp_wait(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 static int
 rl_rmt_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
-    struct rl_kmsg_ipcp_rmt_stats_req *req =
-        (struct rl_kmsg_ipcp_rmt_stats_req *)bmsg;
-    struct rl_kmsg_ipcp_rmt_stats_resp resp;
+    struct rl_kmsg_ipcp_stats_req *req =
+        (struct rl_kmsg_ipcp_stats_req *)bmsg;
+    struct rl_kmsg_ipcp_stats_resp resp;
     struct ipcp_entry *ipcp;
     int ret = -EINVAL; /* Report failure by default. */
 
@@ -2263,7 +2263,7 @@ rl_rmt_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         int cpu;
 
         memset(&resp, 0, sizeof(resp));
-        resp.hdr.msg_type = RLITE_KER_IPCP_RMT_STATS_RESP;
+        resp.hdr.msg_type = RLITE_KER_IPCP_STATS_RESP;
         resp.hdr.event_id = req->hdr.event_id;
         /* Collect stats from all the CPUs. */
         for_each_possible_cpu(cpu) {
@@ -3047,7 +3047,7 @@ static rl_msg_handler_t rl_ctrl_handlers[] = {
     [RLITE_KER_IPCP_QOS_SUPPORTED]    = rl_ipcp_qos_supported,
     [RLITE_KER_APPL_MOVE]             = rl_appl_move,
     [RLITE_KER_REG_FETCH]             = rl_reg_fetch,
-    [RLITE_KER_IPCP_RMT_STATS_REQ]    = rl_rmt_get_stats,
+    [RLITE_KER_IPCP_STATS_REQ]    = rl_rmt_get_stats,
     [RLITE_KER_IPCP_CONFIG_GET_REQ]   = rl_ipcp_config_get,
 #ifdef RL_MEMTRACK
     [RLITE_KER_MEMTRACK_DUMP] = rl_memtrack_dump,

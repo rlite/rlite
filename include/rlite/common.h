@@ -108,7 +108,7 @@ struct pci_sizes {
 #define RLITE_ERR 1
 
 /* Expected control API version. */
-#define RL_API_VERSION 2
+#define RL_API_VERSION 3
 
 /* All the possible messages begin like this. */
 struct rl_msg_hdr {

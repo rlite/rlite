@@ -61,8 +61,8 @@ enum {
     RLITE_KER_REG_FETCH,             /* 29 */
     RLITE_KER_REG_FETCH_RESP,        /* 30 */
     RLITE_KER_FLOW_STATE,            /* 31 */
-    RLITE_KER_IPCP_RMT_STATS_REQ,    /* 32 */
-    RLITE_KER_IPCP_RMT_STATS_RESP,   /* 33 */
+    RLITE_KER_IPCP_STATS_REQ,    /* 32 */
+    RLITE_KER_IPCP_STATS_RESP,   /* 33 */
     RLITE_KER_IPCP_CONFIG_GET_REQ,   /* 34 */
     RLITE_KER_IPCP_CONFIG_GET_RESP,  /* 35 */
 
@@ -405,7 +405,7 @@ struct rl_kmsg_ipcp_qos_supported {
 
 /* application --> kernel message to ask for
  * statistics of a given IPCP RMT. */
-struct rl_kmsg_ipcp_rmt_stats_req {
+struct rl_kmsg_ipcp_stats_req {
     struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
@@ -413,7 +413,7 @@ struct rl_kmsg_ipcp_rmt_stats_req {
 
 /* application <-- kernel message to report statistics
  * about a given IPCP RMT. */
-struct rl_kmsg_ipcp_rmt_stats_resp {
+struct rl_kmsg_ipcp_stats_resp {
     struct rl_msg_hdr hdr;
 
     struct rl_ipcp_stats stats;
