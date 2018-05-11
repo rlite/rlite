@@ -60,6 +60,10 @@ ip netns exec s1 rlite-ctl dif-policy-param-mod ceftdif addralloc replicas s1.n,
 ip netns exec s1 rlite-ctl ipcp-enroller-enable s1.n || abort
 for cont in s2 s3 c; do
     # Carry out the enrollment
+    if [ "$cont" == "c" ]; then
+        # Wait a little bit to let the cluster elect a leader
+        sleep 3
+    fi
     ip netns exec ${cont} rlite-ctl ipcp-enroll ${cont}.n ceftdif ethdif s1.n || abort
     # Check that policy were transferred on enrollment. No need to check policy
     # params, because we check for connectivity (which depends on correct
