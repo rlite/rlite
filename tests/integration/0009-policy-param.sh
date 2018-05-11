@@ -6,6 +6,7 @@ rlite-ctl ipcp-enroller-enable x || exit 1
 
 # Expect success on the following ones
 rlite-ctl dif-policy-param-mod dd addralloc nack-wait 4s || exit 1
+rlite-ctl dif-policy-param-mod dd addralloc replicas a,b,c || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment timeout 300ms || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment keepalive 4s || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment keepalive-thresh 2 || exit 1

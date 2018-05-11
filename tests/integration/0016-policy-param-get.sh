@@ -6,8 +6,8 @@ rlite-ctl ipcp-enroller-enable x || exit 1
 
 # List per-component parameters, checking that the number of lines is correct
 rlite-ctl dif-policy-param-list dd
-rlite-ctl dif-policy-param-list dd | wc -l | grep -q "\<18\>" || exit 1
-rlite-ctl dif-policy-param-list dd addralloc | wc -l | grep -q "\<1\>" || exit 1
+rlite-ctl dif-policy-param-list dd | wc -l | grep -q "\<19\>" || exit 1
+rlite-ctl dif-policy-param-list dd addralloc | wc -l | grep -q "\<2\>" || exit 1
 rlite-ctl dif-policy-param-list dd dft | wc -l | grep -q "\<1\>" || exit 1
 rlite-ctl dif-policy-param-list dd enrollment | wc -l | grep -q "\<4\>" || exit 1
 rlite-ctl dif-policy-param-list dd flowalloc | wc -l | grep -q "\<6\>" || exit 1
@@ -19,6 +19,8 @@ rlite-ctl dif-policy-param-list dd ribd | wc -l | grep -q "\<1\>" || exit 1
 # that the value got stored in the RIB.
 rlite-ctl dif-policy-param-mod dd addralloc nack-wait 2s || exit 1
 rlite-ctl dif-policy-param-list dd addralloc nack-wait | grep "\<2000ms\>" || exit 1
+rlite-ctl dif-policy-param-mod dd addralloc replicas a1,b2,c3,d,e || exit 1
+rlite-ctl dif-policy-param-list dd addralloc replicas | grep "a1,b2,c3,d,e" || exit 1
 rlite-ctl dif-policy-param-mod dd dft replicas r1,r2,r3,r4,r5 || exit 1
 rlite-ctl dif-policy-param-list dd dft replicas | grep "r1,r2,r3,r4,r5" || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment timeout 3000ms || exit 1
