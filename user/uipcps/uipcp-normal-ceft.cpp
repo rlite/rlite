@@ -264,7 +264,7 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
     } else {
         /* This is not a message belonging to the raft protocol. Forward it
          * to the underlying implementation. */
-        std::vector<std::unique_ptr<char[]>> commands;
+        std::vector<CommandToSubmit> commands;
 
         process_rib_msg(rm, src_addr, &commands);
 
@@ -272,8 +272,9 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
         for (const auto &command : commands) {
             raft::LogIndex index;
 
-            ret = submit(reinterpret_cast<const char *const>(command.get()),
-                         &index, &out);
+            ret =
+                submit(reinterpret_cast<const char *const>(command.first.get()),
+                       &index, &out);
             if (ret) {
                 UPE(uipcp, "Failed to submit command (%s) to the RaftSM\n",
                     rm->obj_class.c_str());

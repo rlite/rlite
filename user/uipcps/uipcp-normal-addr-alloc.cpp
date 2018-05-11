@@ -357,9 +357,9 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
                               std::string("-") + aa->rib->myname,
                           sizeof(Command), AddrAllocator::TableName){};
         int apply(const char *const serbuf) override;
-        int process_rib_msg(
+        virtual int process_rib_msg(
             const CDAPMessage *rm, rlm_addr_t src_addr,
-            std::vector<std::unique_ptr<char[]>> *commands) override;
+            std::vector<CommandToSubmit> *commands) override;
         void dump(std::stringstream &ss) const {} // TODO
     };
     std::unique_ptr<Replica> raft;
@@ -544,7 +544,7 @@ CentralizedFaultTolerantAddrAllocator::Replica::apply(const char *const serbuf)
 int
 CentralizedFaultTolerantAddrAllocator::Replica::process_rib_msg(
     const CDAPMessage *rm, rlm_addr_t src_addr,
-    std::vector<std::unique_ptr<char[]>> *commands)
+    std::vector<CommandToSubmit> *commands)
 {
     struct uipcp *uipcp = rib->uipcp;
 
@@ -579,7 +579,7 @@ CentralizedFaultTolerantAddrAllocator::Replica::process_rib_msg(
         c->address = next_unused_address++;
         c->opcode  = Command::OpcodeSet;
 
-        commands->push_back(std::move(cbuf));
+        commands->push_back(make_pair(std::move(cbuf), nullptr));
     } else if (rm->op_code == gpb::M_READ) {
         /* We received an an M_READ. Look up the IPCP in the map. */
         auto m         = make_unique<CDAPMessage>();

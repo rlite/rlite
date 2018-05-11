@@ -372,9 +372,8 @@ class CentralizedFaultTolerantDFT : public DFT {
                           sizeof(Command), DFT::TableName),
               impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
         int apply(const char *const serbuf) override;
-        int process_rib_msg(
-            const CDAPMessage *rm, rlm_addr_t src_addr,
-            std::vector<std::unique_ptr<char[]>> *commands) override;
+        int process_rib_msg(const CDAPMessage *rm, rlm_addr_t src_addr,
+                            std::vector<CommandToSubmit> *commands) override;
         int lookup_req(const std::string &appl_name, std::string *dst_node,
                        const std::string &preferred, uint32_t cookie)
         {
@@ -634,7 +633,7 @@ CentralizedFaultTolerantDFT::Replica::apply(const char *const serbuf)
 int
 CentralizedFaultTolerantDFT::Replica::process_rib_msg(
     const CDAPMessage *rm, rlm_addr_t src_addr,
-    std::vector<std::unique_ptr<char[]>> *commands)
+    std::vector<CommandToSubmit> *commands)
 {
     struct uipcp *uipcp = rib->uipcp;
     const char *objbuf  = nullptr;
@@ -683,7 +682,7 @@ CentralizedFaultTolerantDFT::Replica::process_rib_msg(
         c->opcode = rm->op_code == gpb::M_WRITE ? Command::OpcodeSet
                                                 : Command::OpcodeDel;
 
-        commands->push_back(std::move(cbuf));
+        commands->push_back(std::make_pair(std::move(cbuf), nullptr));
     } else if (rm->op_code == gpb::M_READ) {
         /* We received an an M_READ sent by Client::lookup_req().
          * Recover the application name, look it up in the DFT and

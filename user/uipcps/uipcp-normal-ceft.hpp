@@ -94,9 +94,10 @@ public:
                     std::shared_ptr<Neighbor> const &neigh,
                     rlm_addr_t src_addr);
     virtual int apply(const char *const serbuf) = 0;
-    virtual int process_rib_msg(
-        const CDAPMessage *rm, rlm_addr_t src_addr,
-        std::vector<std::unique_ptr<char[]>> *commands) = 0;
+    using CommandToSubmit =
+        std::pair<std::unique_ptr<char[]>, std::unique_ptr<CDAPMessage>>;
+    virtual int process_rib_msg(const CDAPMessage *rm, rlm_addr_t src_addr,
+                                std::vector<CommandToSubmit> *commands) = 0;
 };
 
 /* The CeftClient class provides the client-side generic glue functionalities
