@@ -347,7 +347,7 @@ struct Routing {
     virtual void dump_routing(std::stringstream &ss) const = 0;
 
     virtual void update_local(const std::string &neigh_name) {}
-    virtual void update_kernel() {}
+    virtual void update_kernel(bool force = true) {}
     virtual int flow_state_update(struct rl_kmsg_flow_state *upd) { return 0; }
 
     /* Called to flush all the local entries related to a given neighbor. */

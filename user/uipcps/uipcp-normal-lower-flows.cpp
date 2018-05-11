@@ -61,12 +61,6 @@ operator==(const gpb::LowerFlow &a, const gpb::LowerFlow &o)
            a.remote_node() == o.remote_node() && a.cost() == o.cost();
 }
 
-static bool
-operator!=(const gpb::LowerFlow &a, const gpb::LowerFlow &o)
-{
-    return !(a == o);
-}
-
 class RoutingEngine {
 public:
     RL_NODEFAULT_NONCOPIABLE(RoutingEngine);
@@ -80,6 +74,10 @@ public:
 
     /* Dump the routing table. */
     void dump(std::stringstream &ss) const;
+
+    /* Used by the routing class to ask the RoutingEngine to actually recompute
+     * the routing table. */
+    void schedule_recomputation() { recompute = true; }
 
 private:
     struct Edge {
@@ -120,6 +118,10 @@ private:
     /* Set of ports that are currently down. */
     std::unordered_set<rl_port_t> ports_down;
 
+    /* Should update_kernel_routing() really run the graph algorithms and
+     * udpate the kernel. */
+    bool recompute = true;
+
     /* Backpointer. */
     uipcp_rib *rib;
 
@@ -156,7 +158,7 @@ public:
     bool add(const gpb::LowerFlow &lf);
     bool del(const NodeId &local_node, const NodeId &remote_node);
     void update_local(const std::string &neigh_name) override;
-    void update_kernel() override;
+    void update_kernel(bool force = true) override;
     int flow_state_update(struct rl_kmsg_flow_state *upd) override;
     void neigh_disconnected(const std::string &neigh_name) override;
 
@@ -201,7 +203,6 @@ FullyReplicatedLFDB::add(const gpb::LowerFlow &lf)
     auto it            = db.find(lf.local_node());
     string repr        = to_string(lf);
     gpb::LowerFlow lfz = lf;
-    bool local_entry;
 
     lfz.set_age(0);
 
@@ -216,6 +217,7 @@ FullyReplicatedLFDB::add(const gpb::LowerFlow &lf)
             return false;
         }
         db[lf.local_node()][lf.remote_node()] = lfz;
+        re.schedule_recomputation();
         UPD(rib->uipcp, "Lower flow %s added\n", repr.c_str());
         return true;
     }
@@ -223,12 +225,21 @@ FullyReplicatedLFDB::add(const gpb::LowerFlow &lf)
     /* Entry is already there. Update if needed (this expression
      * was obtained by means of a Karnaugh map on three variables:
      * local, newer, equal). */
-    local_entry = (lfz.local_node() == rib->myname);
-    if ((!local_entry &&
-         lfz.seqnum() > it->second[lfz.remote_node()].seqnum()) ||
-        (local_entry && lfz != it->second[lfz.remote_node()])) {
+    bool local_entry = (lfz.local_node() == rib->myname);
+    bool newer       = lfz.seqnum() > it->second[lfz.remote_node()].seqnum();
+    bool equal       = lfz == it->second[lfz.remote_node()];
+    if ((!local_entry && newer) || (local_entry && !equal)) {
         it->second[lfz.remote_node()] = std::move(lfz); /* Update the entry */
-        UPV(rib->uipcp, "Lower flow %s updated\n", repr.c_str());
+        if (equal) {
+            /* The affected flow entry is just refreshed, but it did not
+             * change. No recomputation is needed. */
+            UPV(rib->uipcp, "Lower flow %s refreshed\n", repr.c_str());
+        } else {
+            /* The affected flow entry changed, so we ask the RoutingEngine
+             * for recomputation. */
+            UPD(rib->uipcp, "Lower flow %s updated\n", repr.c_str());
+            re.schedule_recomputation();
+        }
         return true;
     }
 
@@ -313,41 +324,41 @@ FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm,
 
     gpb::LowerFlowList lfl;
     gpb::LowerFlowList prop_lfl;
-    bool modified = false;
 
     lfl.ParseFromArray(objbuf, objlen);
 
     for (const gpb::LowerFlow &f : lfl.flows()) {
         if (add_f) {
             if (add(f)) {
-                modified              = true;
                 *prop_lfl.add_flows() = f;
             }
 
         } else {
             if (del(f.local_node(), f.remote_node())) {
-                modified              = true;
                 *prop_lfl.add_flows() = f;
             }
         }
     }
 
-    if (modified) {
+    if (prop_lfl.flows_size() > 0) {
         /* Send the received lower flows to the other neighbors. */
         rib->neighs_sync_obj_excluding(neigh, add_f, ObjClass, TableName,
                                        &prop_lfl);
 
         /* Update the kernel routing table. */
-        update_kernel();
+        update_kernel(/*force=*/false);
     }
 
     return 0;
 }
 
 void
-FullyReplicatedLFDB::update_kernel()
+FullyReplicatedLFDB::update_kernel(bool force)
 {
     /* Update the routing table. */
+    if (force) {
+      re.schedule_recomputation();
+    }
     re.update_kernel_routing(rib->myname);
 }
 
@@ -878,7 +889,12 @@ RoutingEngine::update_kernel_routing(const NodeId &addr)
 {
     assert(rib != nullptr);
 
-    UPV(rib->uipcp, "Recomputing routing and forwarding tables\n");
+    if (!recompute) {
+        return; /* Nothing to do. */
+    }
+    recompute = false;
+
+    UPD(rib->uipcp, "Recomputing routing and forwarding tables\n");
 
     /* Step 1: Run a shortest path algorithm. This phase produces the
      * 'next_hops' routing table. */
