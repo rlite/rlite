@@ -1136,7 +1136,7 @@ CDAPConn::msg_send(CDAPMessage *m, int invoke_id)
         return -1;
     }
 
-    delete serbuf;
+    delete[] serbuf;
 
     return n;
 }
