@@ -508,10 +508,14 @@ public:
     int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
                     std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)
     {
-        if (raft) {
-            return raft->rib_handler(rm, nf, neigh, src_addr);
+        if (!raft || (rm->obj_class == ObjClass && rm->is_response())) {
+            /* We may be a replica (raft != nullptr), but if this is a response
+             * to a request done by us with the role of simple clients we
+             * forward it to the client handler. */
+            return client->rib_handler(rm, nf, neigh, src_addr);
         }
-        return client->rib_handler(rm, nf, neigh, src_addr);
+
+        return raft->rib_handler(rm, nf, neigh, src_addr);
     }
 };
 
@@ -971,13 +975,6 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
     if (src_addr == RL_ADDR_NULL) {
         UPE(uipcp, "Source address not set\n");
         return 0;
-    }
-
-    if (rm->obj_class == ObjClass && rm->is_response()) {
-        /* This is a response to a request done by us with the
-         * role of simple clients. We forward it to the client
-         * handler. */
-        return parent->client->rib_handler(rm, nf, neigh, src_addr);
     }
 
     /* We don't expect an obj_value if this is a DFT read request. */
