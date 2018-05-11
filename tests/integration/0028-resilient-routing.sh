@@ -95,7 +95,7 @@ ip netns exec a rinaperf -z rpinstd -i 0 -c 1 || abort
 link_set ab down
 # Check that A can still connect to D (through C)
 ip netns exec a rinaperf -z rpinstd -i 0 -c 1 || abort
-# Now bring AB down
+# Now bring AC down
 link_set ac down
 # Check that A cannot connect to D
 ip netns exec a rinaperf -z rpinstd -i 0 -c 1 && abort
