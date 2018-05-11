@@ -1326,7 +1326,6 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper, uint32_t event_id,
         entry->uid = rl_dm.uid_cnt++; /* generate an unique id */
         INIT_LIST_HEAD(&entry->node_rm);
         entry->expires = ~0U;
-        rl_flow_stats_init(&entry->stats);
         dtp_init(&entry->dtp);
 
         atomic_inc(&entry->refcnt); /* on behalf of the caller */

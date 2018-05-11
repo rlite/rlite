@@ -140,6 +140,8 @@ rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
     } else {
         rb_list_enq(rb, &txrx->rx_q);
         txrx->rx_qsize += rl_buf_truesize(rb);
+        flow->stats.rx_pkt++;
+        flow->stats.rx_byte += rb->len;
     }
     spin_unlock_bh(&txrx->rx_lock);
     wake_up_interruptible_poll(&txrx->rx_wqh, POLLIN | POLLRDNORM | POLLRDBAND);
@@ -415,6 +417,8 @@ rl_io_write_iter(struct kiocb *iocb,
         something_sent = true;
         left -= copylen;
         tot += copylen;
+        flow->stats.tx_pkt++;
+        flow->stats.tx_byte += copylen;
     }
 
     return something_sent ? tot : ret;

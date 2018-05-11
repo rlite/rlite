@@ -248,25 +248,13 @@ rina_flow_spec_best_effort(struct rina_flow_spec *spec)
 }
 
 struct rl_flow_stats {
-    /* EFCP sender statistics: packets and bytes successfully
-     * processed for transmission, and packets dropped. */
+    /* Statistics for an rl_io device. */
     uint64_t tx_pkt;
     uint64_t tx_byte;
-    uint64_t tx_err;
-
-    /* EFCP receiver statistics: packets and bytes successfully
-     * processed for transmission, and packets dropped. */
     uint64_t rx_pkt;
     uint64_t rx_byte;
-    uint64_t rx_err;
-
-    /* Userspace RX queue statistics. */
     uint64_t rx_overrun_pkt;
     uint64_t rx_overrun_byte;
-
-    /* EFCP retransmission statistics. */
-    uint64_t rtx_pkt;
-    uint64_t rtx_byte;
 };
 
 struct rl_rmt_stats {
@@ -296,15 +284,6 @@ struct rl_ipcp_stats {
 
     struct rl_rmt_stats rmt;
 } __attribute__((aligned(64)));
-
-static inline void
-rl_flow_stats_init(struct rl_flow_stats *stats)
-{
-    stats->tx_pkt = stats->tx_byte = stats->tx_err = 0;
-    stats->rx_pkt = stats->rx_byte = stats->rx_err = 0;
-    stats->rtx_pkt = stats->rtx_byte = 0;
-    stats->rx_overrun_pkt = stats->rx_overrun_byte = 0;
-}
 
 /* DTP state exported to userspace. */
 struct rl_flow_dtp {
