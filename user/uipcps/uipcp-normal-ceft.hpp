@@ -48,9 +48,11 @@ class CeftReplica : public raft::RaftSM {
     struct PendingResp {
         std::unique_ptr<CDAPMessage> m;
         rlm_addr_t requestor_addr;
+        raft::Term term;
         PendingResp() = default;
-        PendingResp(std::unique_ptr<CDAPMessage> rm, rlm_addr_t addr)
-            : m(std::move(rm)), requestor_addr(addr)
+        PendingResp(std::unique_ptr<CDAPMessage> rm, rlm_addr_t addr,
+                    raft::Term term)
+            : m(std::move(rm)), requestor_addr(addr), term(term)
         {
         }
     };

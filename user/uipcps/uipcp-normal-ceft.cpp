@@ -280,8 +280,8 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
                     rm->obj_class.c_str());
                 continue;
             }
-            pending[index] =
-                make_unique<PendingResp>(std::move(command.second), src_addr);
+            pending[index] = make_unique<PendingResp>(std::move(command.second),
+                                                      src_addr, curr_term());
         }
     }
 
