@@ -393,6 +393,8 @@ public:
     std::string local_name() const { return local_id; }
     std::string sm_name() const { return name; }
 
+    Term curr_term() const { return current_term; }
+
     int set_election_timeout(std::chrono::milliseconds tmin,
                              std::chrono::milliseconds tmax)
     {
