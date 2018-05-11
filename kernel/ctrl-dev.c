@@ -308,6 +308,10 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
     void *serbuf;
     int ret = 0;
 
+    if (rc == NULL) {
+        return 0; /* Nothing to do. */
+    }
+
     entry = rl_alloc(sizeof(*entry), gfp | __GFP_ZERO, RL_MT_UPQ);
     if (!entry) {
         RPV(1, "Out of memory\n");
