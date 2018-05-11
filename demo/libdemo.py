@@ -560,7 +560,7 @@ class Demo:
                     else:
                         nack_wait_secs = 5
                     ctrl_cmds.append(
-                        'dif-policy-param-mod %(dif)s.DIF addralloc nack-wait %(nws)d\n'
+                        'dif-policy-param-mod %(dif)s.DIF addralloc nack-wait %(nws)ds\n'
                         % {
                             'dif': dif,
                             'nws': nack_wait_secs
