@@ -67,8 +67,8 @@ for t in tests/integration/*.sh ; do
     done
     rmmod rlite || abort_cleanup
     if [ "$retcode" != "0" ]; then
-        echo -e "${RED}>>> TEST FAILED${NOC}"
+        echo -e "${RED}>>> TEST #${testcnt} FAILED${NOC}"
         exit 1
     fi
-    echo -e "${GREEN}>>> TEST PASSED${NOC}"
+    echo -e "${GREEN}>>> TEST #${testcnt} PASSED${NOC}"
 done
