@@ -198,6 +198,13 @@ static struct rl_dm *rl_dm_getref(struct rl_dm *dm);
 #define RALOCK(_p) spin_lock_bh(&(_p)->regapp_lock)
 #define RAUNLOCK(_p) spin_unlock_bh(&(_p)->regapp_lock)
 
+struct net *
+rl_ipcp_net(struct ipcp_entry *ipcp)
+{
+    return ipcp->dm->net;
+}
+EXPORT_SYMBOL(rl_ipcp_net);
+
 static struct ipcp_factory *
 ipcp_factories_find(const char *dif_type)
 {

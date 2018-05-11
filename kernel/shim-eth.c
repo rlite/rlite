@@ -878,11 +878,8 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
     int ret                  = -ENOSYS;
 
     if (strcmp(param_name, "netdev") == 0) {
-        void *ns                  = &init_net;
         struct net_device *netdev = NULL;
-#ifdef CONFIG_NET_NS
-        ns = current->nsproxy->net_ns;
-#endif
+
         if (priv->netdev) {
             /* We don't allow to dynamically change netdev to simplify
              * locking. If an user needs to use another netdev it can
@@ -891,7 +888,7 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
         }
 
         /* Try to attach the rx handler to the new device. */
-        netdev = dev_get_by_name(ns, param_value);
+        netdev = dev_get_by_name(rl_ipcp_net(ipcp), param_value);
         if (!netdev) {
             return -EINVAL;
         }

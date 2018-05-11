@@ -683,6 +683,8 @@ struct ipcp_entry *ipcp_nodm_get(rl_ipcp_id_t ipcp_id);
 int rl_ipcp_factory_register(struct ipcp_factory *factory);
 int rl_ipcp_factory_unregister(const char *dif_type);
 
+struct net *rl_ipcp_net(struct ipcp_entry *ipcp);
+
 int rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                       rl_port_t remote_port, uint32_t remote_cep,
                       rlm_addr_t remote_addr, const char *local_appl,

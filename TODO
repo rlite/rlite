@@ -27,3 +27,5 @@ Open tasks, in decreasing order of priority:
 
 * implement utility to graphically show dif-rib-show, using graphviz
   (DIF map with active links)
+
+* remove DIF argument from ipcp-enroll command
