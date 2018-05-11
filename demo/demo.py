@@ -377,14 +377,30 @@ if args.tree != None and args.tree > 0:
     fout.close()
     args.conf = 'tree.conf'
 
-# Generated files needed by access.sh
-fout = open('user', 'w')
-fout.write(args.user)
+# Generate access.sh script
+fout = open('access.sh', 'w')
+outs = '#!/bin/bash\n'\
+       'MACHINE_ID=$1\n'\
+       'if [ "$MACHINE_ID" == "" ]; then\n'\
+       '    echo "usage: $0 NODE_NAME"\n'\
+       '    exit 255\n'\
+       'fi\n\n'
+if args.namespaces:
+    outs += 'sudo ip netns exec ns${MACHINE_ID} bash\n'
+else:
+    outs += 'USER=%s\n' % args.user
+    outs += 'SSHOPTS=%s\n' % args.sshopts
+    outs += ''\
+            'SSH_PORT=$(grep "\\<${MACHINE_ID}\\>" demo.map | awk \'{print $2}\')\n'\
+            'if [ "$SSH_PORT" == "" ]; then\n'\
+            '    echo "Error: Node ${MACHINE_ID} unknown"\n'\
+            '    exit 255\n'\
+            'fi\n\n'\
+            'echo "Accessing buildroot VM ${MACHINE_ID}"\n'\
+            'ssh $SSHOPTS -p ${SSH_PORT} $USER@localhost\n'
+fout.write(outs)
 fout.close()
-
-fout = open('sshopts', 'w')
-fout.write(args.sshopts)
-fout.close()
+subprocess.call(['chmod', '+x', 'access.sh'])
 
 demo = Demo(flavour_suffix=flavour_suffix,
             addr_alloc_policy=args.addr_alloc_policy,
