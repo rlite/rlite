@@ -454,8 +454,10 @@ public:
             if (*addr != RL_ADDR_NULL) {
                 return 0;
             }
-            /* This happens if 'ipcp_name' is not a replica.
-             * Fallback on regular client allocation. */
+            /* This happens if 'ipcp_name' is not a replica. Fallback on
+             * regular client allocation. We also set the leader, since we
+             * know it. */
+            client->set_leader_id(raft->leader_name());
         }
         return client->allocate(ipcp_name, addr);
     }

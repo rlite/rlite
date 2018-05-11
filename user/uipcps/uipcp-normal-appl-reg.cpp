@@ -444,7 +444,6 @@ public:
     }
     int appl_register(const struct rl_kmsg_appl_register *req) override
     {
-        // TODO reuse this piece of code
         if (raft) {
             /* We may be the leader or a follower, but here we can behave as as
              * any client to improve code reuse. We also set the leader, since
