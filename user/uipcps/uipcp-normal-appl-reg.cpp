@@ -580,8 +580,8 @@ CentralizedFaultTolerantDFT::Client::appl_register(
     }
 
     if (req->reg) {
-        UPD(rib->uipcp, "Write request '%s <= %llu' issued\n",
-            appl_name.c_str(), (long long unsigned)rib->myaddr);
+        UPD(rib->uipcp, "Write request '%s <= %s' issued\n", appl_name.c_str(),
+            rib->myname.c_str());
     } else {
         UPD(rib->uipcp, "Write request 'delete %s' issued\n",
             appl_name.c_str());
