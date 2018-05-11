@@ -1014,14 +1014,24 @@ UipcpRib::enrollment_rsrc_get(std::shared_ptr<NeighFlow> const &nf,
     if (er == nullptr) {
         UPD(uipcp, "setup enrollment data for neigh %s [flow_fd=%d]\n",
             neigh->ipcp_name.c_str(), nf->flow_fd);
+        try {
+            enrollment_resources[nf->flow_fd] =
+                make_unique<EnrollmentResources>(nf, neigh, initiator);
+        } catch (std::system_error) {
+            UPW(uipcp,
+                "Failed to spawn enrollment thread for neigh '%s'"
+                "(resource temporarily unavailable)\n",
+                neigh->ipcp_name.c_str());
+            return nullptr;
+        }
         nf->enroll_state_set(EnrollState::NEIGH_ENROLLING);
-        enrollment_resources[nf->flow_fd] =
-            make_unique<EnrollmentResources>(nf, neigh, initiator);
     }
 
     return enrollment_resources[nf->flow_fd].get();
 }
 
+/* This constructor may throw std::system_error in case std::thread() fails
+ * to create the thread. */
 EnrollmentResources::EnrollmentResources(std::shared_ptr<NeighFlow> const &f,
                                          std::shared_ptr<Neighbor> const &ng,
                                          bool init)
@@ -1663,10 +1673,12 @@ UipcpRib::enroll(const char *neigh_name, const char *supp_dif_name,
 
     if (nf->enroll_state != EnrollState::NEIGH_ENROLLED) {
         er = enrollment_rsrc_get(nf, neigh, true);
-        if (wait_for_completion) {
+        if (er == nullptr) {
+            ret = -1;
+        } else if (wait_for_completion) {
             /* Wait for the enrollment procedure to stop, either because of
-             * successful completion (NEIGH_ENROLLED), or because of an abort
-             * (NEIGH_NONE).
+             * successful completion (NEIGH_ENROLLED), or because of an
+             * abort (NEIGH_NONE).
              */
 
             while (nf->enroll_state == EnrollState::NEIGH_ENROLLING) {

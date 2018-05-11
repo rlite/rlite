@@ -321,6 +321,9 @@ UipcpRib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
             /* Start the enrollment as a slave (enroller), if needed. */
             EnrollmentResources *er = enrollment_rsrc_get(nf, neigh, false);
 
+            if (er == nullptr) {
+                return -1;
+            }
             /* Enrollment is ongoing, we need to push this message to the
              * enrolling thread (also ownership is passed) and notify it. */
             er->msgs.push_back(std::move(m));
