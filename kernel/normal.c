@@ -1443,8 +1443,9 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         }
 
         if (!ipcp->mgmt_txrx) {
-            PE("Missing mgmt_txrx\n");
+            PW("Missing mgmt_txrx\n");
             rl_buf_free(rb);
+            stats->rmt.other_drop++;
             return NULL; /* -EINVAL */
         }
         RL_BUF_RX(rb).cons_seqnum = pci->seqnum;

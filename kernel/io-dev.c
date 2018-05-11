@@ -340,7 +340,7 @@ rl_io_write_iter(struct kiocb *iocb,
             struct flow_entry *lower_flow;
 
             if (!ipcp->ops.mgmt_sdu_build) {
-                RPD(1, "Missing mgmt_sdu_write() operation\n");
+                PE("Missing mgmt_sdu_write() operation\n");
                 rl_buf_free(rb);
                 ret = -ENXIO;
                 break;
