@@ -1278,6 +1278,7 @@ uipcp_rib::policy_param_mod(const std::string &component,
                             const std::string &param_name,
                             const std::string &param_value)
 {
+    std::string error_reason;
     int ret = 0;
 
     if (!params_map.count(component)) {
@@ -1299,41 +1300,19 @@ uipcp_rib::policy_param_mod(const std::string &component,
         return -1;
     }
 
-    if ((ret = params_map[component][param_name].set_value(param_value))) {
-        assert(params_map[component][param_name].type !=
-               PolicyParamType::UNDEFINED);
-        switch (params_map[component][param_name].type) {
-        case PolicyParamType::INT:
-            switch (ret) {
-            case -1:
-                UPE(uipcp, "Could not convert parameter value to a number.\n");
-                break;
-            case -2:
-                UPE(uipcp, "New value out of range: (%d,%d).\n",
-                    params_map[component][param_name].min,
-                    params_map[component][param_name].max);
-                break;
-            }
-            break;
-        case PolicyParamType::BOOL:
-            UPE(uipcp, "Invalid param value (not 'true' or 'false').\n");
-            break;
-        default:
-            UPE(uipcp, "Unknown parameter type.\n");
-            break;
-        }
-        return -1;
+    if ((ret = params_map[component][param_name].set_value(param_value,
+                                                           &error_reason))) {
+        UPE(uipcp, "%s\n", error_reason.c_str());
+        return ret;
     }
 
-    if (!ret) {
-        /* Parameter successfully set. */
-        UPD(uipcp, "set %s policy param %s <== '%s'\n", component.c_str(),
-            param_name.c_str(), param_value.c_str());
+    /* Parameter successfully set. */
+    UPD(uipcp, "set %s policy param %s <== '%s'\n", component.c_str(),
+        param_name.c_str(), param_value.c_str());
 
-        /* Invoke the reconfigure() method if available. */
-        if (component == DFT::Prefix) {
-            dft->reconfigure();
-        }
+    /* Invoke the reconfigure() method if available. */
+    if (component == DFT::Prefix) {
+        dft->reconfigure();
     }
 
     /* Fix-ups. */
@@ -1832,24 +1811,33 @@ PolicyParam::PolicyParam(const std::string &param_value)
 }
 
 int
-PolicyParam::set_value(const std::string &param_value)
+PolicyParam::set_value(const std::string &param_value,
+                       std::string *error_reason)
 {
-    assert(type != PolicyParamType::UNDEFINED);
     int val;
     bool enable;
+
+    assert(type != PolicyParamType::UNDEFINED);
+    assert(error_reason != NULL);
+
     switch (type) {
     case PolicyParamType::INT:
         if (string2int(param_value, val)) {
+            *error_reason = "Could not convert parameter value to a number";
             return -1;
         }
         if (!(min == 0 && max == 0) && (val < min || val > max)) {
-            return -2;
+            std::stringstream ss;
+            ss << "New value out of range [" << min << "," << max << "]";
+            *error_reason = ss.str();
+            return -1;
         }
         value.i = val;
         break;
     case PolicyParamType::BOOL:
         enable = (param_value == "true");
         if (!enable && param_value != "false") {
+            *error_reason = "Invalid param value (not 'true' or 'false')";
             return -1;
         }
         value.b = enable;
@@ -1858,6 +1846,7 @@ PolicyParam::set_value(const std::string &param_value)
         stringval = param_value;
         break;
     default:
+        *error_reason = "Unknown parameter type";
         return -1;
         break;
     }
