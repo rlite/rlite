@@ -23,6 +23,11 @@ target_link_libraries(rlite-uipcps rina-api rlite-conf uipcp-normal rlite-wifi)
 install(TARGETS rlite-uipcps DESTINATION usr/bin)
 install(FILES shim-tcp4-dir DESTINATION etc/rina)
 
+# Tests
+add_executable(lfdb-test lfdb-test.cpp)
+target_link_libraries(lfdb-test uipcp-normal)
+add_test(NAME lfdb COMMAND lfdb-test)
+
 if (USE_QOS_CUBES)
     install(FILES uipcp-qoscubes.qos DESTINATION etc/rina)
 endif()

@@ -25,6 +25,8 @@
 #include <list>
 #include <unordered_map>
 
+#include "BaseRIB.pb.h"
+
 namespace rlite {
 
 using NodeId = std::string;
