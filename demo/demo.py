@@ -229,6 +229,8 @@ argparser.add_argument('--ring', type = int,
                        help = "Use ring topology with variable number of nodes")
 argparser.add_argument('--tree', type = int,
                        help = "Use tree topology with variable number of nodes")
+argparser.add_argument('--resilient-tree', action='store_true',
+                       help = "Use resilient tree topology (connected siblings)")
 argparser.add_argument('--tree-cardinality', type = int, default = 3,
                        help = "Number of children per node for the tree topology")
 argparser.add_argument('--verbosity',
@@ -349,19 +351,22 @@ if args.tree != None and args.tree > 0:
     next_level = []
     cur_node_idx = 2
     n = args.tree - 1
-    lowers = dict()
+    neighs = dict()
     while n > 0:
         for p in prev_level:
             for j in range(args.tree_cardinality):
-                fout.write('eth b%(i)s 0Mbps m%(i)03d m%(parent)03d\n' \
-                                % {'i': cur_node_idx, 'parent': p})
                 next_level.append(cur_node_idx)
-                if p not in lowers:
-                    lowers[p] = []
-                lowers[p].append(cur_node_idx)
-                if cur_node_idx not in lowers:
-                    lowers[cur_node_idx] = []
-                lowers[cur_node_idx].append(cur_node_idx)
+                if p not in neighs:
+                    neighs[p] = []
+                neighs[p].append(cur_node_idx)
+                if cur_node_idx not in neighs:
+                    neighs[cur_node_idx] = []
+                neighs[cur_node_idx].append(p)
+                if args.resilient_tree:
+                    if j > 0:
+                        neighs[cur_node_idx].append(cur_node_idx-1)
+                    if j < args.tree_cardinality-1:
+                        neighs[cur_node_idx].append(cur_node_idx+1)
                 cur_node_idx += 1
                 n -= 1
                 if n == 0:
@@ -371,8 +376,20 @@ if args.tree != None and args.tree > 0:
         prev_level = next_level
         next_level = []
 
-    for p in lowers:
-        lstring = ' '.join([('b%d' % x) for x in lowers[p]])
+    bnames = dict()
+    bidx = 1
+    for p in neighs:
+        for x in neighs[p]:
+            if p < x:
+                fout.write('eth b%(br)s 0Mbps m%(p)03d m%(x)03d\n' \
+                           % {'p': p, 'x': x, 'br': bidx})
+                bnames[(p,x)] = bnames[(x,p)] = bidx
+                bidx += 1
+
+    for p in neighs:
+        lstring = ''
+        for x in neighs[p]:
+            lstring += 'b%s ' % bnames[(p,x)]
         fout.write('dif n m%03d %s\n' % (p, lstring))
     fout.close()
     args.conf = 'tree.conf'
@@ -464,8 +481,8 @@ if args.namespaces:
         assert(len(shim['vms']) == 2)
         vm0 = shim['vms'][0]
         vm1 = shim['vms'][1]
-        veth0 = '%s.%s' % (shim['name'][:7], vm0[:7])
-        veth1 = '%s.%s' % (shim['name'][:7], vm1[:7])
+        veth0 = '%s.%s' % (shim['name'][:8], vm0[:7])
+        veth1 = '%s.%s' % (shim['name'][:8], vm1[:7])
         outs += '(\n'\
                 'sudo ip link add %s type veth peer name %s\n'\
                 ') &\n'\
