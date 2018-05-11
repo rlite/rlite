@@ -450,6 +450,7 @@ CDAPMessage::copy(const CDAPMessage &o)
         obj_value.u.buf.len   = o.obj_value.u.buf.len;
         obj_value.u.buf.ptr   = new char[obj_value.u.buf.len];
         memcpy(obj_value.u.buf.ptr, o.obj_value.u.buf.ptr, obj_value.u.buf.len);
+        obj_value.ty = o.obj_value.ty;
         break;
 
     case ObjValType::NONE:
