@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Create two normal IPCPs and enroll one to the other,
 # using a third IPCP as a N-1 DIF.

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 rlite-ctl ipcp-create mio normal perks || exit 1
 # Positive tests

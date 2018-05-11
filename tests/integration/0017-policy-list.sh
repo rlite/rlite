@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Create a normal IPCP and test the dif-policy-param-list command
 rlite-ctl ipcp-create x normal dd || exit 1

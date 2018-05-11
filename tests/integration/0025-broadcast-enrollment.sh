@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 cleanup() {
     local ret=0

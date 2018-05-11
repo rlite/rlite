@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Multi-namespace test for the ceft-aa policy. This does not test behaviour
 # in case of failures.

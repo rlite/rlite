@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 abort() {
     exit 1
