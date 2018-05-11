@@ -64,8 +64,33 @@ operator==(const gpb::LowerFlow &a, const gpb::LowerFlow &o)
 /* Simple class that wraps a Lower Flow database. Used as a component within
  * the other classes. */
 struct LFDB {
+    struct Edge {
+        NodeId to;
+        unsigned int cost;
+
+        Edge(const NodeId &to_, unsigned int cost_) : to(to_), cost(cost_) {}
+        Edge(Edge &&) = default;
+    };
+
+    struct Info {
+        unsigned int dist;
+        NodeId nhop;
+        bool visited;
+    };
+
+    /* Is Loop Free Alternate algorithm enabled ? */
+    bool lfa_enabled;
+
+public:
+    LFDB(bool lfa_enabled) : lfa_enabled(lfa_enabled) {}
+
     /* Lower Flow Database. */
     std::unordered_map<NodeId, std::unordered_map<NodeId, gpb::LowerFlow>> db;
+
+    /* The routing table computed by compute_next_hops(), or statically
+     * updated. */
+    std::unordered_map<NodeId, std::list<NodeId>> next_hops;
+    NodeId dflt_nhop;
 
     const gpb::LowerFlow *find(const NodeId &local_node,
                                const NodeId &remote_node) const
@@ -75,7 +100,209 @@ struct LFDB {
     gpb::LowerFlow *find(const NodeId &local_node, const NodeId &remote_node);
     const gpb::LowerFlow *_find(const NodeId &local_node,
                                 const NodeId &remote_node) const;
+
+    void compute_shortest_paths(
+        const NodeId &source_node,
+        const std::unordered_map<NodeId, std::list<Edge>> &graph,
+        std::unordered_map<NodeId, Info> &info);
+
+    int compute_next_hops(const NodeId &local_node);
+
+    /* Dump the routing table. */
+    void dump(std::stringstream &ss, const NodeId &local_node) const;
 };
+
+void
+LFDB::dump(std::stringstream &ss, const NodeId &local_node) const
+{
+    ss << "Routing table for node " << local_node << ":" << endl;
+    for (const auto &kvr : next_hops) {
+        string dst_node = kvr.first;
+
+        if (dst_node.size() && kvr.second.size() == 1 &&
+            kvr.second.front() == dflt_nhop) {
+            /* Hide this entry, as it is covered by the default one. */
+            continue;
+        }
+
+        ss << "    Remote: " << node_id_pretty(dst_node) << ", Next hops: ";
+        for (auto lfa = kvr.second.begin();;) {
+            ss << *lfa;
+            if (++lfa == kvr.second.end()) {
+                break;
+            }
+            ss << " ";
+        }
+        ss << endl;
+    }
+}
+
+void
+LFDB::compute_shortest_paths(
+    const NodeId &source_addr,
+    const std::unordered_map<NodeId, std::list<Edge>> &graph,
+    std::unordered_map<NodeId, Info> &info)
+{
+    /* Initialize the per-node info map. */
+    for (const auto &kvg : graph) {
+        struct Info inf;
+
+        inf.dist    = UINT_MAX;
+        inf.visited = false;
+
+        info[kvg.first] = inf;
+    }
+    info[source_addr].dist = 0;
+
+    for (;;) {
+        NodeId min_addr;
+        unsigned int min_dist = UINT_MAX;
+
+        /* Select the closest node from the ones in the frontier. */
+        for (auto &kvi : info) {
+            if (!kvi.second.visited && kvi.second.dist < min_dist) {
+                min_addr = kvi.first;
+                min_dist = kvi.second.dist;
+            }
+        }
+
+        if (min_dist == UINT_MAX) {
+            break;
+        }
+
+        assert(min_addr.size() > 0);
+
+        PV_S("Selecting node %s\n", min_addr.c_str());
+
+        if (!graph.count(min_addr)) {
+            continue; /* nothing to do */
+        }
+
+        const list<Edge> &edges = graph.at(min_addr);
+        Info &info_min          = info[min_addr];
+
+        info_min.visited = true;
+
+        for (const Edge &edge : edges) {
+            Info &info_to = info[edge.to];
+
+            if (info_to.dist > info_min.dist + edge.cost) {
+                info_to.dist = info_min.dist + edge.cost;
+                info_to.nhop =
+                    (min_addr == source_addr) ? edge.to : info_min.nhop;
+            }
+        }
+    }
+
+    PV_S("Dijkstra result:\n");
+    for (const auto &kvi : info) {
+        PV_S("    Node: %s, Dist: %u, Visited %u\n", kvi.first.c_str(),
+             kvi.second.dist, (kvi.second.visited));
+    }
+}
+
+int
+LFDB::compute_next_hops(const NodeId &local_node)
+{
+    std::unordered_map<NodeId, std::unordered_map<NodeId, Info>> neigh_infos;
+    std::unordered_map<NodeId, std::list<Edge>> graph;
+    std::unordered_map<NodeId, Info> info;
+
+    /* Clean up state left from the previous run. */
+    next_hops.clear();
+
+    /* Build the graph from the Lower Flow Database. */
+    graph[local_node] = list<Edge>();
+    for (const auto &kvi : db) {
+        for (const auto &kvj : kvi.second) {
+            const gpb::LowerFlow *revlf;
+
+            revlf = find(kvj.second.local_node(), kvj.second.remote_node());
+
+            if (revlf == nullptr || revlf->cost() != kvj.second.cost()) {
+                /* Something is wrong, this could be malicious or erroneous. */
+                continue;
+            }
+
+            graph[kvj.second.local_node()].emplace_back(
+                kvj.second.remote_node(), kvj.second.cost());
+            if (!graph.count(kvj.second.remote_node())) {
+                /* Make sure graph contains all the nodes, even if with
+                 * empty lists. */
+                graph[kvj.second.remote_node()] = list<Edge>();
+            }
+        }
+    }
+
+    PV_S("Graph [%lu nodes]:\n", (long unsigned)db.size());
+    for (const auto &kvg : graph) {
+        PV_S("%s: {", kvg.first.c_str());
+        for (const Edge &edge : kvg.second) {
+            PV_S("(%s, %u), ", edge.to.c_str(), edge.cost);
+        }
+        PV_S("}\n");
+    }
+
+    /* Compute shortest paths rooted at the local node, and use the
+     * result to fill in the next_hops routing table. */
+    compute_shortest_paths(local_node, graph, info);
+    for (const auto &kvi : info) {
+        if (kvi.first == local_node || !kvi.second.visited) {
+            /* I don't need a next hop for myself. */
+            continue;
+        }
+        next_hops[kvi.first].push_back(kvi.second.nhop);
+    }
+
+    if (lfa_enabled) {
+        /* Compute the shortest paths rooted at each neighbor of the local
+         * node, storing the results into neigh_infos. */
+        for (const Edge &edge : graph[local_node]) {
+            compute_shortest_paths(edge.to, graph, neigh_infos[edge.to]);
+        }
+
+        /* For each node V other than the local node ... */
+        for (const auto &kvv : graph) {
+            if (kvv.first == local_node) {
+                continue;
+            }
+
+            /* For each neighbor U of the local node, excluding U ... */
+            for (const auto &kvu : neigh_infos) {
+                if (kvu.first == kvv.first) {
+                    continue;
+                }
+
+                /* dist(U, V) < dist(U, local) + dist(local, V) */
+                if (neigh_infos[kvu.first][kvv.first].dist <
+                    neigh_infos[kvu.first][local_node].dist +
+                        info[kvv.first].dist) {
+                    bool dupl = false;
+
+                    for (const NodeId &lfa : next_hops[kvv.first]) {
+                        if (lfa == kvu.first) {
+                            dupl = true;
+                            break;
+                        }
+                    }
+
+                    if (!dupl) {
+                        next_hops[kvv.first].push_back(kvu.first);
+                    }
+                }
+            }
+        }
+    }
+
+    if (rl_verbosity >= RL_VERB_VERY) {
+        stringstream ss;
+
+        dump(ss, local_node);
+        cout << ss.str();
+    }
+
+    return 0;
+}
 
 gpb::LowerFlow *
 LFDB::find(const NodeId &local_node, const NodeId &remote_node)
@@ -102,13 +329,12 @@ LFDB::_find(const NodeId &local_node, const NodeId &remote_node) const
 /* Routing engine able to run the Dijkstra algorithm and compute kernel
  * forwarding tables, using the information contained into an LFDB instance.
  * This class is used as a component for the main Routing classes. */
-class RoutingEngine {
+class RoutingEngine : public LFDB {
 public:
     RL_NODEFAULT_NONCOPIABLE(RoutingEngine);
-    RoutingEngine(UipcpRib *rib, LFDB *lfdb, bool lfa)
-        : rib(rib),
-          lfdb(lfdb),
-          lfa_enabled(lfa),
+    RoutingEngine(UipcpRib *rib, bool lfa_enabled)
+        : LFDB(/*lfa_enabled=*/lfa_enabled),
+          rib(rib),
           last_run(std::chrono::system_clock::now())
     {
     }
@@ -119,43 +345,12 @@ public:
 
     void flow_state_update(struct rl_kmsg_flow_state *upd);
 
-    /* Dump the routing table. */
-    void dump(std::stringstream &ss) const;
-
     /* Used by the routing class to ask the RoutingEngine to actually recompute
      * the routing table. */
     void schedule_recomputation() { recompute = true; }
 
-private:
-    struct Edge {
-        NodeId to;
-        unsigned int cost;
-
-        Edge(const NodeId &to_, unsigned int cost_) : to(to_), cost(cost_) {}
-        Edge(Edge &&) = default;
-    };
-
-    struct Info {
-        unsigned int dist;
-        NodeId nhop;
-        bool visited;
-    };
-
-    /* Step 1. Shortest Path algorithm. */
-    void compute_shortest_paths(
-        const NodeId &source_node,
-        const std::unordered_map<NodeId, std::list<Edge>> &graph,
-        std::unordered_map<NodeId, Info> &info);
-    int compute_next_hops(const NodeId &);
-
-public:
     /* Step 3. Forwarding table computation and kernel update. */
     int compute_fwd_table();
-
-    /* The routing table computed by compute_next_hops(), or statically
-     * updated. */
-    std::unordered_map<NodeId, std::list<NodeId>> next_hops;
-    NodeId dflt_nhop;
 
 private:
     /* The forwarding table computed by compute_fwd_table().
@@ -171,12 +366,6 @@ private:
 
     /* Backpointer. */
     UipcpRib *rib;
-
-    /* The Lower Flows database. */
-    LFDB *lfdb;
-
-    /* Is Loop Free Alternate algorithm enabled ? */
-    bool lfa_enabled;
 
     /* Last time we ran the routing algorithm. */
     std::chrono::system_clock::time_point last_run;
@@ -194,22 +383,22 @@ private:
 };
 
 class FullyReplicatedLFDB : public Routing {
-    /* Lower Flow Database. */
-    LFDB lfdb;
-
     /* Routing engine. */
     RoutingEngine re;
 
 public:
     RL_NODEFAULT_NONCOPIABLE(FullyReplicatedLFDB);
     FullyReplicatedLFDB(UipcpRib *rib, bool lfa)
-        : Routing(rib), re(rib, &lfdb, lfa)
+        : Routing(rib), re(rib, /*lfa_enabled=*/lfa)
     {
     }
     ~FullyReplicatedLFDB() {}
 
     void dump(std::stringstream &ss) const override;
-    void dump_routing(std::stringstream &ss) const override { re.dump(ss); }
+    void dump_routing(std::stringstream &ss) const override
+    {
+        re.dump(ss, rib->myname);
+    }
 
     bool add(const gpb::LowerFlow &lf);
     bool del(const NodeId &local_node, const NodeId &remote_node);
@@ -238,13 +427,13 @@ public:
 bool
 FullyReplicatedLFDB::add(const gpb::LowerFlow &lf)
 {
-    auto it            = lfdb.db.find(lf.local_node());
+    auto it            = re.db.find(lf.local_node());
     string repr        = to_string(lf);
     gpb::LowerFlow lfz = lf;
 
     lfz.set_age(0);
 
-    if (it == lfdb.db.end() || it->second.count(lf.remote_node()) == 0) {
+    if (it == re.db.end() || it->second.count(lf.remote_node()) == 0) {
         /* Not there, we should add the entry. */
         if (lf.local_node() == rib->myname &&
             rib->get_neighbor(lf.remote_node(), /*create=*/false) == nullptr) {
@@ -254,7 +443,7 @@ FullyReplicatedLFDB::add(const gpb::LowerFlow &lf)
                 repr.c_str());
             return false;
         }
-        lfdb.db[lf.local_node()][lf.remote_node()] = lfz;
+        re.db[lf.local_node()][lf.remote_node()] = lfz;
         re.schedule_recomputation();
         UPD(rib->uipcp, "Lower flow %s added\n", repr.c_str());
         return true;
@@ -288,11 +477,11 @@ FullyReplicatedLFDB::add(const gpb::LowerFlow &lf)
 bool
 FullyReplicatedLFDB::del(const NodeId &local_node, const NodeId &remote_node)
 {
-    auto it = lfdb.db.find(local_node);
+    auto it = re.db.find(local_node);
     unordered_map<NodeId, gpb::LowerFlow>::iterator jt;
     string repr;
 
-    if (it == lfdb.db.end()) {
+    if (it == re.db.end()) {
         return false;
     }
 
@@ -412,7 +601,7 @@ void
 FullyReplicatedLFDB::dump(std::stringstream &ss) const
 {
     ss << "Lower Flow Database:" << endl;
-    for (const auto &kvi : lfdb.db) {
+    for (const auto &kvi : re.db) {
         for (const auto &kvj : kvi.second) {
             const gpb::LowerFlow &flow = kvj.second;
 
@@ -436,7 +625,7 @@ FullyReplicatedLFDB::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
         std::bind(&NeighFlow::sync_obj, nf, true, ObjClass, TableName, &lfl);
     int ret = 0;
 
-    for (const auto &kvi : lfdb.db) {
+    for (const auto &kvi : re.db) {
         for (const auto &kvj : kvi.second) {
             const gpb::LowerFlow &flow = kvj.second;
 
@@ -461,15 +650,15 @@ FullyReplicatedLFDB::neighs_refresh(size_t limit)
     unordered_map<NodeId, gpb::LowerFlow>::iterator jt;
     int ret = 0;
 
-    if (lfdb.db.size() == 0) {
+    if (re.db.size() == 0) {
         /* Still not enrolled to anyone, nothing to do. */
         return 0;
     }
 
     /* Fetch the map containing all the LFDB entries with the local
      * address corresponding to me. */
-    auto it = lfdb.db.find(rib->myname);
-    assert(it != lfdb.db.end());
+    auto it = re.db.find(rib->myname);
+    assert(it != re.db.end());
 
     auto age_thresh = rib->get_param_value<Msecs>(Routing::Prefix, "age-max");
     age_thresh      = age_thresh * 30 / 100;
@@ -496,6 +685,7 @@ FullyReplicatedLFDB::neighs_refresh(size_t limit)
     return ret;
 }
 
+// TODO move to FullyReplicated
 void
 UipcpRib::age_incr_tmr_restart()
 {
@@ -518,7 +708,7 @@ FullyReplicatedLFDB::age_incr()
     auto age_max = rib->get_param_value<Msecs>(Routing::Prefix, "age-max");
     gpb::LowerFlowList prop_lfl;
 
-    for (auto &kvi : lfdb.db) {
+    for (auto &kvi : re.db) {
         list<unordered_map<NodeId, gpb::LowerFlow>::iterator> discard_list;
 
         for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
@@ -558,7 +748,7 @@ FullyReplicatedLFDB::neigh_disconnected(const std::string &neigh_name)
 {
     gpb::LowerFlowList prop_lfl;
 
-    for (auto &kvi : lfdb.db) {
+    for (auto &kvi : re.db) {
         list<unordered_map<NodeId, gpb::LowerFlow>::iterator> discard_list;
 
         for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
@@ -583,176 +773,6 @@ FullyReplicatedLFDB::neigh_disconnected(const std::string &neigh_name)
         /* Update the routing table. */
         update_kernel();
     }
-}
-
-void
-RoutingEngine::compute_shortest_paths(
-    const NodeId &source_addr,
-    const std::unordered_map<NodeId, std::list<Edge>> &graph,
-    std::unordered_map<NodeId, Info> &info)
-{
-    /* Initialize the per-node info map. */
-    for (const auto &kvg : graph) {
-        struct Info inf;
-
-        inf.dist    = UINT_MAX;
-        inf.visited = false;
-
-        info[kvg.first] = inf;
-    }
-    info[source_addr].dist = 0;
-
-    for (;;) {
-        NodeId min_addr;
-        unsigned int min_dist = UINT_MAX;
-
-        /* Select the closest node from the ones in the frontier. */
-        for (auto &kvi : info) {
-            if (!kvi.second.visited && kvi.second.dist < min_dist) {
-                min_addr = kvi.first;
-                min_dist = kvi.second.dist;
-            }
-        }
-
-        if (min_dist == UINT_MAX) {
-            break;
-        }
-
-        assert(min_addr.size() > 0);
-
-        PV_S("Selecting node %s\n", min_addr.c_str());
-
-        if (!graph.count(min_addr)) {
-            continue; /* nothing to do */
-        }
-
-        const list<Edge> &edges = graph.at(min_addr);
-        Info &info_min          = info[min_addr];
-
-        info_min.visited = true;
-
-        for (const Edge &edge : edges) {
-            Info &info_to = info[edge.to];
-
-            if (info_to.dist > info_min.dist + edge.cost) {
-                info_to.dist = info_min.dist + edge.cost;
-                info_to.nhop =
-                    (min_addr == source_addr) ? edge.to : info_min.nhop;
-            }
-        }
-    }
-
-    PV_S("Dijkstra result:\n");
-    for (const auto &kvi : info) {
-        PV_S("    Node: %s, Dist: %u, Visited %u\n", kvi.first.c_str(),
-             kvi.second.dist, (kvi.second.visited));
-    }
-}
-
-int
-RoutingEngine::compute_next_hops(const NodeId &local_node)
-{
-    std::unordered_map<NodeId, std::unordered_map<NodeId, Info>> neigh_infos;
-    std::unordered_map<NodeId, std::list<Edge>> graph;
-    std::unordered_map<NodeId, Info> info;
-
-    /* Clean up state left from the previous run. */
-    next_hops.clear();
-
-    /* Build the graph from the Lower Flow Database. */
-    graph[local_node] = list<Edge>();
-    for (const auto &kvi : lfdb->db) {
-        for (const auto &kvj : kvi.second) {
-            const gpb::LowerFlow *revlf;
-
-            revlf =
-                lfdb->find(kvj.second.local_node(), kvj.second.remote_node());
-
-            if (revlf == nullptr || revlf->cost() != kvj.second.cost()) {
-                /* Something is wrong, this could be malicious or erroneous. */
-                continue;
-            }
-
-            graph[kvj.second.local_node()].emplace_back(
-                kvj.second.remote_node(), kvj.second.cost());
-            if (!graph.count(kvj.second.remote_node())) {
-                /* Make sure graph contains all the nodes, even if with
-                 * empty lists. */
-                graph[kvj.second.remote_node()] = list<Edge>();
-            }
-        }
-    }
-
-    PV_S("Graph [%lu nodes]:\n", (long unsigned)lfdb->db.size());
-    for (const auto &kvg : graph) {
-        PV_S("%s: {", kvg.first.c_str());
-        for (const Edge &edge : kvg.second) {
-            PV_S("(%s, %u), ", edge.to.c_str(), edge.cost);
-        }
-        PV_S("}\n");
-    }
-
-    /* Compute shortest paths rooted at the local node, and use the
-     * result to fill in the next_hops routing table. */
-    compute_shortest_paths(local_node, graph, info);
-    for (const auto &kvi : info) {
-        if (kvi.first == local_node || !kvi.second.visited) {
-            /* I don't need a next hop for myself. */
-            continue;
-        }
-        next_hops[kvi.first].push_back(kvi.second.nhop);
-    }
-
-    if (lfa_enabled) {
-        /* Compute the shortest paths rooted at each neighbor of the local
-         * node, storing the results into neigh_infos. */
-        for (const Edge &edge : graph[local_node]) {
-            compute_shortest_paths(edge.to, graph, neigh_infos[edge.to]);
-        }
-
-        /* For each node V other than the local node ... */
-        for (const auto &kvv : graph) {
-            if (kvv.first == local_node) {
-                continue;
-            }
-
-            /* For each neighbor U of the local node, excluding U ... */
-            for (const auto &kvu : neigh_infos) {
-                if (kvu.first == kvv.first) {
-                    continue;
-                }
-
-                /* dist(U, V) < dist(U, local) + dist(local, V) */
-                if (neigh_infos[kvu.first][kvv.first].dist <
-                    neigh_infos[kvu.first][local_node].dist +
-                        info[kvv.first].dist) {
-                    bool dupl = false;
-
-                    for (const NodeId &lfa : next_hops[kvv.first]) {
-                        if (lfa == kvu.first) {
-                            dupl = true;
-                            break;
-                        }
-                    }
-
-                    if (!dupl) {
-                        next_hops[kvv.first].push_back(kvu.first);
-                    }
-                }
-            }
-        }
-    }
-
-    if (rl_verbosity >= RL_VERB_VERY) {
-        stringstream ss;
-
-        dump(ss);
-        cout << ss.str();
-    }
-
-    rib->stats.routing_table_compute++;
-
-    return 0;
 }
 
 void
@@ -933,7 +953,7 @@ RoutingEngine::update_kernel_routing(const NodeId &addr)
 
     auto now = std::chrono::system_clock::now();
 
-    if (lfdb->db.size() > coalesce_size_threshold &&
+    if (db.size() > coalesce_size_threshold &&
         (now - last_run) < coalesce_period) {
         /* Postpone this computation, possibly starting the coalesce timer. */
         if (!coalesce_timer) {
@@ -960,51 +980,29 @@ RoutingEngine::update_kernel_routing(const NodeId &addr)
     /* Step 1: Run a shortest path algorithm. This phase produces the
      * 'next_hops' routing table. */
     compute_next_hops(addr);
+    rib->stats.routing_table_compute++;
 
     /* Step 2: Using the 'next_hops' routing table, compute forwarding table
      * (in userspace) and update the corresponding kernel data structure. */
     compute_fwd_table();
 }
 
-void
-RoutingEngine::dump(std::stringstream &ss) const
-{
-    ss << "Routing table for node " << rib->myname << ":" << endl;
-    for (const auto &kvr : next_hops) {
-        string dst_node = kvr.first;
-
-        if (dst_node.size() && kvr.second.size() == 1 &&
-            kvr.second.front() == dflt_nhop) {
-            /* Hide this entry, as it is covered by the default one. */
-            continue;
-        }
-
-        ss << "    Remote: " << node_id_pretty(dst_node) << ", Next hops: ";
-        for (auto lfa = kvr.second.begin();;) {
-            ss << *lfa;
-            if (++lfa == kvr.second.end()) {
-                break;
-            }
-            ss << " ";
-        }
-        ss << endl;
-    }
-}
-
 class StaticRouting : public Routing {
-    /* Lower Flow Database. */
-    LFDB lfdb;
-
     /* Routing engine, only used to compute kernel fowarding tables. */
     RoutingEngine re;
 
 public:
     RL_NODEFAULT_NONCOPIABLE(StaticRouting);
-    StaticRouting(UipcpRib *_ur) : Routing(_ur), re(_ur, &lfdb, true) {}
+    StaticRouting(UipcpRib *_ur) : Routing(_ur), re(_ur, /*lfa_enabled=*/true)
+    {
+    }
     ~StaticRouting() {}
 
     void dump(std::stringstream &ss) const override { dump_routing(ss); }
-    void dump_routing(std::stringstream &ss) const override { re.dump(ss); }
+    void dump_routing(std::stringstream &ss) const override
+    {
+        re.dump(ss, rib->myname);
+    }
     int route_mod(const struct rl_cmsg_ipcp_route_mod *req) override;
 };
 
