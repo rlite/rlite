@@ -684,17 +684,16 @@ FlowAllocator::rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
 void
 LocalFlowAllocator::dump(std::stringstream &ss) const
 {
-    ss << "Supported flows:" << endl;
+    ss << "Supported flows (Src/Dst <Appl,IPCP,port>):" << endl;
     for (const auto &kvf : flow_reqs) {
         const auto &freq = kvf.second;
 
         ss << "    [" << ((freq->flags & RL_FLOWREQ_INITIATOR) ? "L" : "R")
            << "]"
-           << ", Src=" << apname2string(freq->src_app())
-           << ", Dst=" << apname2string(freq->dst_app())
-           << ", SrcIPCP:SrcPort=" << freq->src_ipcp() << ":"
-           << freq->src_port() << ", DstIPCP:SrcPort=" << freq->dst_ipcp()
-           << ":" << freq->dst_port() << ", Connections: [";
+           << ", Src=<" << apname2string(freq->src_app()) << ","
+           << freq->src_ipcp() << "," << freq->src_port() << "> Dst=<"
+           << apname2string(freq->dst_app()) << "," << freq->dst_ipcp() << ","
+           << freq->dst_port() << "> Connections: [";
         for (int i = 0; i < freq->connections_size(); i++) {
             ss << "<SrcCep=" << freq->connections(i).src_cep()
                << ", DstCep=" << freq->connections(i).dst_cep()
