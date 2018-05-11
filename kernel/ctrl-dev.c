@@ -2109,7 +2109,7 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     ipcp_put(entry);
 
     if (ret == 0) {
-        PI("Configured IPC process %u: %s <= %s\n", req->ipcp_id, req->name,
+        PD("Configured IPC process %u: %s <= %s\n", req->ipcp_id, req->name,
            req->value);
 
         if (notify) {
