@@ -5,6 +5,7 @@
 #include <sstream>
 #include <memory>
 #include <list>
+#include <functional>
 
 static inline std::list<std::string>
 strsplit(const std::string &s, char delim)
@@ -92,5 +93,24 @@ make_unique(Args &&... args)
 #define RL_COPIABLE_MOVABLE(_CLA)                                              \
     RL_COPIABLE(_CLA);                                                         \
     RL_MOVABLE(_CLA)
+
+class ScopedCleanup {
+    bool active;
+    std::function<void()> function;
+
+public:
+    ScopedCleanup() : active(false), function() {}
+    explicit ScopedCleanup(std::function<void()> fun)
+        : active(true), function(std::move(fun))
+    {
+    }
+    void deactivate() { active = false; }
+    ~ScopedCleanup()
+    {
+        if (active) {
+            function();
+        }
+    }
+};
 
 #endif /* __RL_CPP_UTILS_H__ */

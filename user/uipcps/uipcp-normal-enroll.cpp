@@ -580,6 +580,9 @@ EnrollmentResources::enrollee_thread()
     UipcpRib *rib = neigh->rib;
     std::unique_ptr<const CDAPMessage> rm;
     std::unique_lock<std::mutex> lk(rib->mutex);
+    /* Cleanup must be created after the lock guard, so that its
+     * destructor is called before the lock guard destructor. */
+    auto cleanup = ScopedCleanup([this]() { this->enrollment_abort(); });
 
     {
         /* (1) I --> S: M_CONNECT */
@@ -596,14 +599,14 @@ EnrollmentResources::enrollee_thread()
         ret = nf->send_to_port_id(&m);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
-            goto err;
+            return;
         }
         UPD(rib->uipcp, "I --> S M_CONNECT\n");
     }
 
     rm = next_enroll_msg(lk);
     if (!rm) {
-        goto err;
+        return;
     }
 
     {
@@ -612,13 +615,13 @@ EnrollmentResources::enrollee_thread()
         if (rm->op_code != gpb::M_CONNECT_R) {
             UPE(rib->uipcp, "Unexpected opcode %s\n",
                 CDAPMessage::opcode_repr(rm->op_code).c_str());
-            goto err;
+            return;
         }
 
         if (rm->result) {
             UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
                 rm->result, rm->result_reason.c_str());
-            goto err;
+            return;
         }
 
         if (rm->src_appl != neigh->ipcp_name) {
@@ -647,18 +650,18 @@ EnrollmentResources::enrollee_thread()
             if (ret) {
                 UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
                     strerror(errno));
-                goto err;
+                return;
             }
             UPD(rib->uipcp, "I --> S M_START(lowerflow)\n");
 
             rm = next_enroll_msg(lk);
             if (!rm) {
-                goto err;
+                return;
             }
 
             if (rm->op_code != gpb::M_START_R) {
                 UPE(rib->uipcp, "M_START_R expected\n");
-                goto err;
+                return;
             }
 
             if (rm->obj_class != UipcpRib::LowerFlowObjClass ||
@@ -666,7 +669,7 @@ EnrollmentResources::enrollee_thread()
                 UPE(rib->uipcp, "%s:%s object expected\n",
                     UipcpRib::LowerFlowObjName.c_str(),
                     UipcpRib::LowerFlowObjClass.c_str());
-                goto err;
+                return;
             }
 
             UPD(rib->uipcp, "I <-- S M_START_R(lowerflow)\n");
@@ -675,7 +678,7 @@ EnrollmentResources::enrollee_thread()
                 UPE(rib->uipcp,
                     "Neighbor returned negative response [%d], '%s'\n",
                     rm->result, rm->result_reason.c_str());
-                goto err;
+                return;
             }
 
             goto finish;
@@ -686,11 +689,12 @@ EnrollmentResources::enrollee_thread()
         int ret = enrollee_default(lk);
 
         if (ret) {
-            goto err;
+            return;
         }
     }
 
 finish:
+    cleanup.deactivate();
     enrollment_commit();
     lk.unlock();
     rib->enroller_enable(true);
@@ -705,11 +709,6 @@ finish:
      * UipcpRib::~UipcpRib(). */
     set_terminated();
     lk.unlock();
-
-    return;
-
-err:
-    enrollment_abort();
 }
 
 /* Default policy for the enrollment slave (enroller). */
@@ -883,10 +882,13 @@ EnrollmentResources::enroller_thread()
     UipcpRib *rib = neigh->rib;
     std::unique_ptr<const CDAPMessage> rm;
     std::unique_lock<std::mutex> lk(rib->mutex);
+    /* Cleanup must be created after the lock guard, so that its
+     * destructor is called before the lock guard destructor. */
+    auto cleanup = ScopedCleanup([this]() { this->enrollment_abort(); });
 
     rm = next_enroll_msg(lk);
     if (!rm) {
-        goto err;
+        return;
     }
 
     {
@@ -899,13 +901,13 @@ EnrollmentResources::enroller_thread()
         if (rm->op_code != gpb::M_CONNECT) {
             UPE(rib->uipcp, "Unexpected opcode %s\n",
                 CDAPMessage::opcode_repr(rm->op_code).c_str());
-            goto err;
+            return;
         }
 
         ret = m.m_connect_r(rm.get(), 0, string());
         if (ret) {
             UPE(rib->uipcp, "M_CONNECT_R creation failed\n");
-            goto err;
+            return;
         }
 
         UPD(rib->uipcp, "S <-- I M_CONNECT\n");
@@ -923,20 +925,20 @@ EnrollmentResources::enroller_thread()
                 "M_CONNECT::dst_appl (%s) is not consistent with "
                 "neighbor name (%s)\n",
                 m.dst_appl.c_str(), neigh->ipcp_name.c_str());
-            goto err;
+            return;
         }
 
         ret = nf->send_to_port_id(&m, rm->invoke_id);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
-            goto err;
+            return;
         }
         UPD(rib->uipcp, "S --> I M_CONNECT_R\n");
     }
 
     rm = next_enroll_msg(lk);
     if (!rm) {
-        goto err;
+        return;
     }
 
     if (rm->obj_class == UipcpRib::LowerFlowObjClass &&
@@ -950,7 +952,7 @@ EnrollmentResources::enroller_thread()
 
         if (rm->op_code != gpb::M_START) {
             UPE(rib->uipcp, "M_START expected\n");
-            goto err;
+            return;
         }
 
         UPD(rib->uipcp, "S <-- I M_START(lowerflow)\n");
@@ -962,7 +964,7 @@ EnrollmentResources::enroller_thread()
         ret = nf->send_to_port_id(&m, rm->invoke_id);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
-            goto err;
+            return;
         }
         UPD(rib->uipcp, "S --> I M_START_R(lowerflow)\n");
 
@@ -975,11 +977,12 @@ EnrollmentResources::enroller_thread()
         int ret = enroller_default(lk);
 
         if (ret) {
-            goto err;
+            return;
         }
     }
 
 finish:
+    cleanup.deactivate();
     enrollment_commit();
     lk.unlock();
     rib->enroller_enable(true);
@@ -991,11 +994,6 @@ finish:
      * UipcpRib::~UipcpRib(). */
     set_terminated();
     lk.unlock();
-
-    return;
-
-err:
-    enrollment_abort();
 }
 
 EnrollmentResources *
