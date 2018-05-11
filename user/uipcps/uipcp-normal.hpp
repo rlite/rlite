@@ -577,7 +577,7 @@ struct uipcp_rib {
 
     /* Time interval (in seconds) between two consecutive periodic
      * RIB synchronizations. */
-    static constexpr int kRIBRefreshIntval = 30;
+    static constexpr int kRIBRefreshIntvalSecs = 30;
 
     /* Default value for keepalive parameters. */
     static constexpr int kKeepaliveTimeoutSecs = 10;

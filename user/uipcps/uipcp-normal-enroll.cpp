@@ -1120,8 +1120,8 @@ void
 uipcp_rib::neighs_refresh_tmr_restart()
 {
     sync_timer = make_unique<TimeoutEvent>(
-        std::chrono::seconds(
-            get_param_value<int>(uipcp_rib::RibDaemonPrefix, "refresh-intval")),
+        get_param_value<std::chrono::milliseconds>(uipcp_rib::RibDaemonPrefix,
+                                                   "refresh-intval"),
         uipcp, this, [](struct uipcp *uipcp, void *arg) {
             uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
             rib->sync_timer->fired();

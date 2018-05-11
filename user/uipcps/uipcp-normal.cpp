@@ -500,7 +500,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map[uipcp_rib::ResourceAllocPrefix]["broadcast-enroller"] =
         PolicyParam(true);
     params_map[uipcp_rib::RibDaemonPrefix]["refresh-intval"] =
-        PolicyParam(kRIBRefreshIntval);
+        PolicyParam(std::chrono::seconds(int(kRIBRefreshIntvalSecs)));
     params_map[Routing::Prefix]["age-incr-intval"] =
         PolicyParam(kAgeIncrIntval);
     params_map[Routing::Prefix]["age-max"] = PolicyParam(kAgeMax);
