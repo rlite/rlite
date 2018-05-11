@@ -770,6 +770,7 @@ struct rl_normal {
     int sched_qlen;
     spinlock_t sched_qlock;
     struct work_struct sched_deq_work;
+    wait_queue_head_t sched_wqh;
 };
 
 void dtp_init(struct dtp *dtp);
