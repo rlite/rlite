@@ -937,7 +937,7 @@ if args.register:
 
         # Select a pivot node
         pivot = sorted(demo.difs[dif])[0]
-        outs += 'echo "Use \"%(pivot)s\" as a pivot for DIF %(dif)s"\n'\
+        outs += 'echo "Use %(pivot)s as a pivot for DIF %(dif)s"\n'\
                     % {'pivot': pivot, 'dif': dif}
         outs, token = access_prologue(args, demo.vms[pivot], outs)
 
