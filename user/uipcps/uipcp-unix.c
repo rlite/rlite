@@ -621,19 +621,21 @@ socket_server(struct uipcps *uipcps)
 
         for (;;) {
             /* Try to clean up previously terminated worker threads. */
-            list_for_each_entry_safe (wi, tmp, &threads, node) {
-                ret = pthread_tryjoin_np(wi->th, NULL);
-                if (ret == EBUSY) {
-                    /* Skip this since it has not finished yet. */
-                    continue;
-                } else if (ret) {
-                    PE("pthread_tryjoin_np() failed: %d\n", ret);
-                }
+            if (!list_empty(&threads)) {
+                list_for_each_entry_safe (wi, tmp, &threads, node) {
+                    ret = pthread_tryjoin_np(wi->th, NULL);
+                    if (ret == EBUSY) {
+                        /* Skip this since it has not finished yet. */
+                        continue;
+                    } else if (ret) {
+                        PE("pthread_tryjoin_np() failed: %d\n", ret);
+                    }
 
-                PV("Worker %p cleaned-up\n", wi);
-                list_del(&wi->node);
-                rl_free(wi, RL_MT_MISC);
-                threads_cnt--;
+                    PV("Worker %p cleaned-up\n", wi);
+                    list_del(&wi->node);
+                    rl_free(wi, RL_MT_MISC);
+                    threads_cnt--;
+                }
             }
 
             if (threads_cnt < RL_MAX_THREADS) {
@@ -838,11 +840,13 @@ uipcps_loop(void *opaque)
 
             /* Invoke the expired tasks out of the lock, dropping the
              * uipcp reference counter. */
-            list_for_each_entry_safe (task, tmp, &expired, node) {
-                task->func(task->uipcp);
-                list_del(&task->node);
-                uipcp_put(task->uipcp);
-                rl_free(task, RL_MT_EVLOOP);
+            if (!list_empty(&expired)) {
+                list_for_each_entry_safe (task, tmp, &expired, node) {
+                    task->func(task->uipcp);
+                    list_del(&task->node);
+                    uipcp_put(task->uipcp);
+                    rl_free(task, RL_MT_EVLOOP);
+                }
             }
 
             continue;
