@@ -530,7 +530,10 @@ CentralizedFaultTolerantAddrAllocator::Client::allocate(
     UPI(rib->uipcp, "Issued address allocation request for IPCP '%s'\n",
         ipcp_name.c_str());
 
-    /* Wait for the address allocation to complete. */
+    /* Wait for the address allocation to complete. We need to drop
+     * the RIB lock before waiting. */
+    rib->unlock();
+
     std::unique_lock<std::mutex> lk(synchro->mutex);
     // TODO use timeout parameter
     if (synchro->allocated.wait_for(lk, Secs(4)) == std::cv_status::timeout) {
@@ -541,6 +544,8 @@ CentralizedFaultTolerantAddrAllocator::Client::allocate(
     UPD(rib->uipcp, "Address %lu successfully allocated for IPCP '%s'\n",
         (long unsigned)synchro->address, ipcp_name.c_str());
     *addr = synchro->address;
+
+    rib->lock();
 
     return 0;
 }
