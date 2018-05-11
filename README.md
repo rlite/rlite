@@ -1040,7 +1040,7 @@ of a normal IPCP process:
 
 | Component           | Policy            | Parameter          | Description     |
 | --------------------| ------------------|--------------------|-----------------|
-| addralloc           | distributed       | nack-wait-secs     | Time to wait for a NACK before deciding that the address is good. |
+| addralloc           | distributed       | nack-wait     | Time to wait for a NACK before deciding that the address is good. |
 | dft                 | centralized-fault-tolerant | replicas  | Name of the IPCPs that constitute the fault-tolerant cluster. |
 | enrollment          | *                 | timeout            | Enrollment timeout in milliseconds. |
 | enrollment          | *                 | keepalive          | Neighbor keepalive timeout in seconds (0 to disable). |
@@ -1059,10 +1059,10 @@ of a normal IPCP process:
 | routing             | *                 | age-incr-intval    | Time interval (in seconds) between two consecutive increments of the age of LFDB entries. |
 | routing             | *                 | age-incr-max       | Maximum age (in seconds) allowed for an LFDB entry before being discarded. |
 
-This is an example of how to change the nack-wait-secs parameter of the
+This is an example of how to change the nack-wait parameter of the
 distributed address allocation policy of a normal IPCP process
 
-    # rlite-ctl dif-policy-param-mod n.DIF addralloc nack-wait-secs 4
+    # rlite-ctl dif-policy-param-mod n.DIF addralloc nack-wait 4
 
 This is an example how to enable reliable flows in the resource allocator
 

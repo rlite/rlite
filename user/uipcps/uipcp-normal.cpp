@@ -470,9 +470,8 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     dt_constants.set_max_ack_delay(200 /* ms */);
     dt_constants.set_ctrl_seq_num_width(dt_constants.seq_num_width());
 
-    params_map[AddrAllocator::Prefix]["nack-wait-secs"] =
-        PolicyParam(kAddrAllocDistrNackWaitSecs, kAddrAllocDistrNackWaitSecsMin,
-                    kAddrAllocDistrNackWaitSecsMax);
+    params_map[AddrAllocator::Prefix]["nack-wait"] =
+        PolicyParam(std::chrono::seconds(int(kAddrAllocDistrNackWaitSecs)));
     params_map[DFT::Prefix]["replicas"] = PolicyParam(string());
     params_map[uipcp_rib::EnrollmentPrefix]["timeout"] =
         PolicyParam(std::chrono::milliseconds(int(kEnrollTimeoutMsecs)));
@@ -1321,16 +1320,14 @@ uipcp_rib::policy_param_mod(const std::string &component,
     {
         auto eto = get_param_value<std::chrono::milliseconds>(
             uipcp_rib::EnrollmentPrefix, "timeout");
-        int ato =
-            get_param_value<int>(AddrAllocator::Prefix, "nack-wait-secs") *
-            1000;
-        int minval = ato * 150 / 100;
+        auto ato = get_param_value<std::chrono::milliseconds>(
+            AddrAllocator::Prefix, "nack-wait");
+        auto minval = ato * 150 / 100;
 
-        if (eto.count() < minval) {
-            params_map[EnrollmentPrefix]["timeout"].durval =
-                std::chrono::milliseconds(minval);
-            UPD(uipcp, "%s.timeout fixed up to %d\n", EnrollmentPrefix.c_str(),
-                minval);
+        if (eto < minval) {
+            params_map[EnrollmentPrefix]["timeout"].durval = minval;
+            UPD(uipcp, "%s.timeout fixed up to %ldms\n",
+                EnrollmentPrefix.c_str(), minval.count());
         }
     }
 
@@ -1866,11 +1863,14 @@ PolicyParam::set_value(const std::string &param_value,
         stringval = param_value;
         break;
     case PolicyParamType::Duration: {
-        std::regex exp("([0-9]+)ms");
+        std::regex exp("([0-9]+)(m?s)");
         std::smatch m;
-        if (std::regex_match(param_value, m, exp) && m.size() == 2) {
+        if (std::regex_match(param_value, m, exp) && m.size() == 3) {
             int x;
             string2int(m[1].str(), x);
+            if (m[2].str() == "s") {
+                x *= 1000;
+            }
             durval = std::chrono::milliseconds(x);
         } else {
             *error_reason = "Invalid duration value (ex. 100ms)";

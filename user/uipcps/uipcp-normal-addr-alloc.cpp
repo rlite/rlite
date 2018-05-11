@@ -73,8 +73,8 @@ DistributedAddrAllocator::allocate(rlm_addr_t *result)
     rlm_addr_t modulo = addr_alloc_table.size() + 1;
     const int inflate = 2;
     rlm_addr_t addr   = RL_ADDR_NULL;
-    int nack_wait_secs =
-        rib->get_param_value<int>(AddrAllocator::Prefix, "nack-wait-secs");
+    auto nack_wait    = rib->get_param_value<std::chrono::milliseconds>(
+        AddrAllocator::Prefix, "nack-wait");
 
     if ((modulo << inflate) <= modulo) { /* overflow */
         modulo = ~((rlm_addr_t)0);
@@ -131,7 +131,8 @@ DistributedAddrAllocator::allocate(rlm_addr_t *result)
 
         rib->unlock();
         /* Wait a bit for possible negative responses. */
-        sleep(nack_wait_secs);
+        sleep(std::chrono::duration_cast<std::chrono::seconds>(nack_wait)
+                  .count());
         rib->lock();
 
         /* If the request is still there, then we consider the allocation

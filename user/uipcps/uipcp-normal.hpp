@@ -608,12 +608,6 @@ struct uipcp_rib {
      * allocation successful. */
     static constexpr int kAddrAllocDistrNackWaitSecs = 4;
 
-    /* Lower bound for the AddrAllocator NACK timer. */
-    static constexpr int kAddrAllocDistrNackWaitSecsMin = 1;
-
-    /* Upper bound for the AddrAllocator NACK timer. */
-    static constexpr int kAddrAllocDistrNackWaitSecsMax = 99;
-
     /* Time window to compute statistics about management traffic (in seconds).
      */
     static constexpr int kNeighFlowStatsPeriod = 20;
