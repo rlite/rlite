@@ -785,8 +785,8 @@ struct rl_normal {
     struct flow_entry *pduft_dflt;
     rwlock_t pduft_lock;
 
-    /* Support for PDU scheduling. May be NULL if no PDU scheduler is installed.
-     */
+    /* Support for PDU scheduling. May be NULL if no PDU scheduler is
+     * actually installed. */
     struct rl_sched *sched;
     struct work_struct sched_deq_work;
 };

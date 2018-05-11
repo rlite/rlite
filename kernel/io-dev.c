@@ -39,8 +39,8 @@
 #include <linux/uio.h>
 #include <asm/compat.h>
 
-LIST_HEAD(rl_iodevs);
-DEFINE_MUTEX(rl_iodevs_lock);
+static LIST_HEAD(rl_iodevs);
+static DEFINE_MUTEX(rl_iodevs_lock);
 
 #define IODEVS_LOCK() mutex_lock(&rl_iodevs_lock)
 #define IODEVS_UNLOCK() mutex_unlock(&rl_iodevs_lock)
