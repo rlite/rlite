@@ -336,6 +336,13 @@ FullyReplicatedDFT::neighs_refresh(size_t limit)
     return ret;
 }
 
+/* The CeftReplica class extends the Raft state machine by providing
+ * generic glue functionalities to (i) send and receive messages to DIF members
+ * through CDAP; (ii) keep track of pending client requests; (iii) implement
+ * the timers needed by Raft.
+ * Specific centralized-fault-tolerant components should extend this class
+ * implementing the access to the specific resource and reacting to CDAP
+ * input messages. */
 class CeftReplica : public raft::RaftSM {
     /* Size of a command in the replicated state machine log. */
     const size_t CommandSize;
