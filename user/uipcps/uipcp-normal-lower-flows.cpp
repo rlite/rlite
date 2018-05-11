@@ -64,7 +64,10 @@ operator==(const gpb::LowerFlow &a, const gpb::LowerFlow &o)
 class RoutingEngine {
 public:
     RL_NODEFAULT_NONCOPIABLE(RoutingEngine);
-    RoutingEngine(uipcp_rib *r, bool lfa) : rib(r), lfa_enabled(lfa) {}
+    RoutingEngine(uipcp_rib *r, bool lfa)
+        : rib(r), lfa_enabled(lfa), last_run(std::chrono::system_clock::now())
+    {
+    }
 
     /* Recompute routing and forwarding table and possibly
      * update kernel forwarding data structures. */
@@ -127,6 +130,20 @@ private:
 
     /* Is Loop Free Alternate algorithm enabled ? */
     bool lfa_enabled;
+
+    /* Last time we ran the routing algorithm. */
+    std::chrono::system_clock::time_point last_run;
+
+    /* Minimum size of the LFDB after which we start to rate limit routing
+     * computations. */
+    size_t coalesce_size_threshold = 50;
+
+    /* Minimum number of seconds that must elapse between two consecutive
+     * routing table computations, if rate limiting is active. */
+    Secs coalesce_period = Secs(5);
+
+    /* Timer to provide an upper bound for the coalescing period. */
+    std::unique_ptr<TimeoutEvent> coalesce_timer;
 };
 
 class FullyReplicatedLFDB : public Routing {
@@ -892,7 +909,32 @@ RoutingEngine::update_kernel_routing(const NodeId &addr)
     if (!recompute) {
         return; /* Nothing to do. */
     }
+
+    FullyReplicatedLFDB *routing =
+        dynamic_cast<FullyReplicatedLFDB *>(rib->routing.get());
+    auto now = std::chrono::system_clock::now();
+
+    if (routing->db.size() > coalesce_size_threshold &&
+        (now - last_run) < coalesce_period) {
+        /* Postpone this computation, possibly starting the coalesce timer. */
+        if (!coalesce_timer) {
+            coalesce_timer = make_unique<TimeoutEvent>(
+                coalesce_period, rib->uipcp, this,
+                [](struct uipcp *uipcp, void *arg) {
+                    RoutingEngine *re = (RoutingEngine *)arg;
+                    re->coalesce_timer->fired();
+                    re->update_kernel_routing(re->rib->myname);
+                });
+        }
+        return;
+    }
+
+    if (coalesce_timer) {
+        coalesce_timer->clear();
+        coalesce_timer = nullptr;
+    }
     recompute = false;
+    last_run  = now;
 
     UPD(rib->uipcp, "Recomputing routing and forwarding tables\n");
 
