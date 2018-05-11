@@ -115,6 +115,10 @@ static struct rl_global {
     /* Lock for ipcp_factories. */
     struct mutex lock;
     struct list_head ipcp_factories;
+#ifdef CONFIG_NET_NS
+    /* This hash table maps network namespaces to rl_dm instances. */
+    DECLARE_HASHTABLE(netns_table, 5);
+#endif /* CONFIG_NET_NS */
 } rl_global;
 
 /* The rlite data model.
@@ -172,15 +176,6 @@ struct rl_dm {
 /* Instance of rl_dm for the default network namespace. */
 static struct rl_dm rl_dm;
 
-#define FLOCK() write_lock_bh(&rl_dm.flows_lock)
-#define FUNLOCK() write_unlock_bh(&rl_dm.flows_lock)
-#define FRLOCK() read_lock_bh(&rl_dm.flows_lock)
-#define FRUNLOCK() read_unlock_bh(&rl_dm.flows_lock)
-#define PLOCK() spin_lock_bh(&rl_dm.ipcps_lock)
-#define PUNLOCK() spin_unlock_bh(&rl_dm.ipcps_lock)
-#define RALOCK(_p) spin_lock_bh(&(_p)->regapp_lock)
-#define RAUNLOCK(_p) spin_unlock_bh(&(_p)->regapp_lock)
-
 /* We want to know if a rl_dm instance is empty so that we can remove
  * it and release its network namespace (if it is not the default one). */
 static bool
@@ -194,6 +189,26 @@ rl_dm_empty(struct rl_dm *dm)
            list_empty(&dm->flows_removeq) && list_empty(&dm->flows_putq) &&
            !work_pending(&dm->flows_removew);
 }
+
+static struct rl_dm *
+rl_dm_get(void)
+{
+    return &rl_dm;
+}
+
+static void
+rl_dm_put(struct rl_dm *dm)
+{
+}
+
+#define FLOCK() write_lock_bh(&rl_dm.flows_lock)
+#define FUNLOCK() write_unlock_bh(&rl_dm.flows_lock)
+#define FRLOCK() read_lock_bh(&rl_dm.flows_lock)
+#define FRUNLOCK() read_unlock_bh(&rl_dm.flows_lock)
+#define PLOCK() spin_lock_bh(&rl_dm.ipcps_lock)
+#define PUNLOCK() spin_unlock_bh(&rl_dm.ipcps_lock)
+#define RALOCK(_p) spin_lock_bh(&(_p)->regapp_lock)
+#define RAUNLOCK(_p) spin_unlock_bh(&(_p)->regapp_lock)
 
 static struct ipcp_factory *
 ipcp_factories_find(const char *dif_type)
@@ -3284,12 +3299,15 @@ initial_ipcp_update(struct rl_ctrl *rc)
 static int
 rl_ctrl_open(struct inode *inode, struct file *f)
 {
+    struct rl_dm *dm;
     struct rl_ctrl *rc;
 
     rc = rl_alloc(sizeof(*rc), GFP_KERNEL | __GFP_ZERO, RL_MT_CTLDEV);
     if (!rc) {
         return -ENOMEM;
     }
+
+    dm = rl_dm_get();
 
     f->private_data = rc;
     rc->file        = f;
@@ -3303,9 +3321,11 @@ rl_ctrl_open(struct inode *inode, struct file *f)
 
     rc->handlers = rl_ctrl_handlers;
 
-    mutex_lock(&rl_dm.general_lock);
-    list_add_tail(&rc->node, &rl_dm.ctrl_devs);
-    mutex_unlock(&rl_dm.general_lock);
+    mutex_lock(&dm->general_lock);
+    list_add_tail(&rc->node, &dm->ctrl_devs);
+    mutex_unlock(&dm->general_lock);
+
+    rl_dm_put(dm);
 
     return 0;
 }
@@ -3314,10 +3334,11 @@ static int
 rl_ctrl_release(struct inode *inode, struct file *f)
 {
     struct rl_ctrl *rc = (struct rl_ctrl *)f->private_data;
+    struct rl_dm *dm   = rl_dm_get();
 
-    mutex_lock(&rl_dm.general_lock);
+    mutex_lock(&dm->general_lock);
     list_del_init(&rc->node);
-    mutex_unlock(&rl_dm.general_lock);
+    mutex_unlock(&dm->general_lock);
 
     /* We must invalidate (e.g. unregister) all the
      * application names registered with this ctrl device. */
@@ -3361,6 +3382,8 @@ rl_ctrl_release(struct inode *inode, struct file *f)
 
     rl_free(rc, RL_MT_CTLDEV);
     f->private_data = NULL;
+
+    rl_dm_put(dm);
 
     return 0;
 }
@@ -3427,6 +3450,7 @@ rlite_init(void)
 
     mutex_init(&rl_global.lock);
     INIT_LIST_HEAD(&rl_global.ipcp_factories);
+    hash_init(rl_global.netns_table);
 
     bitmap_zero(rl_dm.ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
     hash_init(rl_dm.ipcp_table);
