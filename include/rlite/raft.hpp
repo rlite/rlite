@@ -328,6 +328,7 @@ class RaftSM {
     std::chrono::milliseconds ElectionTimeoutMax =
         std::chrono::milliseconds(500);
     std::chrono::milliseconds HeartbeatTimeout = std::chrono::milliseconds(100);
+    std::chrono::milliseconds RtxTimeout = std::chrono::milliseconds(2000);
 
     unsigned int verbosity = kVerboseVery;
 
@@ -408,10 +409,9 @@ public:
         return ElectionTimeoutMax;
     }
 
-    int set_heartbeat_timeout(std::chrono::milliseconds t)
+    void set_heartbeat_timeout(std::chrono::milliseconds t)
     {
         HeartbeatTimeout = t;
-        return 0;
     }
 
     std::chrono::milliseconds get_heartbeat_timeout() const
@@ -434,7 +434,10 @@ public:
      * message. */
     static constexpr size_t kMaxLogChunkBytes = 1000;
 
-    static constexpr unsigned int kRetransmissionMsecs = 0;
+    void set_retransmission_timeout(std::chrono::milliseconds t)
+    {
+        RtxTimeout = t;
+    }
 };
 
 } /* namespace raft */

@@ -484,8 +484,7 @@ RaftSM::prepare_append_entries(LogReplicateStrategy strategy, RaftSMOutput *out)
 
     for (auto &kv : servers) {
         if (strategy == LogReplicateStrategy::Unacked &&
-            now >= kv.second.last_ae_time +
-                       std::chrono::milliseconds(int(kRetransmissionMsecs))) {
+            now >= kv.second.last_ae_time + RtxTimeout) {
             kv.second.next_index_unacked = kv.second.next_index_acked;
         }
 

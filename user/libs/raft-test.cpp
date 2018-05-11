@@ -255,6 +255,9 @@ run_simulation(const list<TestEvent> &external_events)
         if (sm->respawn(&output)) {
             return -1;
         }
+        /* Zero the retransmission timeout, because this would make
+         * the test fail, as time is emulated. */
+        sm->set_retransmission_timeout(std::chrono::seconds::zero());
         replicas[local] = std::move(sm);
     }
 
