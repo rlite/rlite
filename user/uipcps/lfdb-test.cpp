@@ -32,6 +32,8 @@
 #include "uipcp-normal-lfdb.hpp"
 
 using NextHops = std::unordered_map<rlite::NodeId, std::list<rlite::NodeId>>;
+using RoutingTables =
+    std::unordered_map<rlite::NodeId, std::pair<NextHops, rlite::NodeId>>;
 
 struct TestLFDB : public rlite::LFDB {
     using LinksList = std::vector<std::pair<int, int>>;
@@ -60,18 +62,28 @@ struct TestLFDB : public rlite::LFDB {
             db[lf2.local_node()][lf2.remote_node()] = lf2;
         }
     }
-
-    bool reachable(int src_node, int dst_node, int n)
-    {
-        std::string src = std::to_string(src_node);
-        std::string dst = std::to_string(dst_node);
-        std::string cur = src;
-
-        for (; n >= 0; n--) {
-        }
-        return true;
-    }
 };
+
+static bool
+reachable(const RoutingTables &rtables, int src_node, int dst_node, int n)
+{
+    rlite::NodeId dst = std::to_string(dst_node);
+    rlite::NodeId cur = std::to_string(src_node);
+
+    for (; n >= 0 && cur != dst; n--) {
+        const auto &rt                 = rtables.at(cur);
+        NextHops::const_iterator nhops = rt.first.find(dst);
+
+        if (nhops != rt.first.end()) {
+            /* Entry find in the routing table. */
+            cur = nhops->second.front();
+        } else {
+            /* Not found, use default next hop. */
+            cur = rt.second;
+        }
+    }
+    return cur == dst && n == 0;
+}
 
 static void
 usage()
@@ -111,7 +123,7 @@ main(int argc, char **argv)
     }
 
     std::list<TestLFDB::LinksList> test_vectors = {
-        {{0, 2}, {0, 3}, {0, 4}, {2, 4}, {3, 4}}};
+        {{0, 1}, {0, 2}, {0, 3}, {1, 3}, {2, 3}}};
 
     {
         /* Grid-shaped network of size NxN. */
@@ -147,7 +159,7 @@ main(int argc, char **argv)
         }
         assert(!links.empty());
 
-        std::unordered_map<rlite::NodeId, NextHops> rtables;
+        RoutingTables rtables;
 
         auto start = std::chrono::system_clock::now();
         for (const auto &kv : lfdb.db) {
@@ -159,10 +171,15 @@ main(int argc, char **argv)
                 lfdb.dump_routing(ss, source);
                 std::cout << ss.str();
             }
-            rtables[source] = std::move(lfdb.next_hops);
+            rtables[source] =
+                make_pair(std::move(lfdb.next_hops), std::move(lfdb.dflt_nhop));
         }
         auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now() - start);
+
+        if (reachable(rtables, 0, 1, 1)) {
+            std::cout << "Reachable!" << std::endl;
+        }
 
         std::cout << "Completed in " << delta.count() << " ms" << std::endl;
     }
