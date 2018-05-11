@@ -984,7 +984,30 @@ rl_normal_config(struct ipcp_entry *ipcp, const char *param_name,
         } else if (strcmp(param_value, "inet") == 0) {
             priv->csum = true;
             ret        = 0;
+        } else {
+            ret = -EINVAL;
         }
+    }
+
+    return ret;
+}
+
+static int
+rl_normal_config_get(struct ipcp_entry *ipcp, const char *param_name, char *buf,
+                     int buflen)
+{
+    struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
+    int ret                = 0;
+
+    if (strcmp(param_name, "address") == 0) {
+        snprintf(buf, buflen, "%llu", (long long unsigned)ipcp->addr);
+    } else if (strcmp(param_name, "ttl") == 0) {
+        snprintf(buf, buflen, "%u", priv->ttl);
+    } else if (strcmp(param_name, "csum") == 0) {
+        const char *value = priv->csum ? "inet" : "none";
+        snprintf(buf, buflen, "%s", value);
+    } else {
+        ret = -ENOSYS; /* don't know how to manage this parameter */
     }
 
     return ret;
@@ -1743,6 +1766,7 @@ static struct ipcp_factory normal_factory = {
     .ops.flow_init          = rl_normal_flow_init,
     .ops.sdu_write          = rl_normal_sdu_write,
     .ops.config             = rl_normal_config,
+    .ops.config_get         = rl_normal_config_get,
     .ops.pduft_set          = rl_pduft_set,
     .ops.pduft_flush        = rl_pduft_flush,
     .ops.pduft_del          = rl_pduft_del,
