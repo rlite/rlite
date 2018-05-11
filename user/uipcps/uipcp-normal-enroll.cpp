@@ -395,7 +395,7 @@ EnrollmentResources::next_enroll_msg(std::unique_lock<std::mutex> &lk)
             return nullptr;
         }
         if (!nf->conn->connected()) {
-            UPW(neigh->rib->uipcp, "Enrollment stopped by remote peer %s\n",
+            UPW(neigh->rib->uipcp, "Enrollment aborted by remote peer %s\n",
                 neigh->ipcp_name.c_str());
             return nullptr;
         }
@@ -759,7 +759,8 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
         /* Return address. */
         enr_info.ParseFromArray(objbuf, objlen);
         if (rib->addra->allocate(neigh->ipcp_name, &addr)) {
-            UPE(rib->uipcp, "Address allocation failed\n");
+            UPE(rib->uipcp, "Failed to allocate and address for IPCP %s\n",
+                neigh->ipcp_name.c_str());
             return -1;
         }
         enr_info.set_address(addr);
