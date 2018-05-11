@@ -179,7 +179,7 @@ def access_epilogue(args, vm, outs, token):
         outs += 'EOI\n'\
                 'chmod +x %(script)s\n'\
                 'sudo ip netns exec %(nsname)s bash %(script)s\n'\
-                '#rm %(script)s\n'\
+                'rm %(script)s\n'\
                     % {'script': scriptname, 'nsname': vm['nsname']}
     else:
         outs +=     ''\
