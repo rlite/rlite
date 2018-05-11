@@ -440,7 +440,7 @@ fout = open('up.sh', 'w')
 outs =  '#!/bin/bash\n'             \
         '\n'                        \
         'set -x\n'                  \
-        '\n';
+        '\n./clean.sh\n\n';
 
 if args.backend == 'tap':
     for shim in sorted(demo.shims):
