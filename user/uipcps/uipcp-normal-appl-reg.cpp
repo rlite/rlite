@@ -566,7 +566,6 @@ CentralizedFaultTolerantDFT::reconfigure()
                 return -1;
             }
             UPI(rib->uipcp, "Raft replica initialized\n");
-            assert(raft != nullptr && client == nullptr);
             return raft->process_sm_output(std::move(out));
         }
     }
