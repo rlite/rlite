@@ -56,6 +56,8 @@ enum {
     RLITE_U_IPCP_RIB_PATHS_SHOW_RESP,    /* 22 */
     RLITE_U_IPCP_ROUTE_ADD,              /* 23 */
     RLITE_U_IPCP_ROUTE_DEL,              /* 24 */
+    RLITE_U_IPCP_STATS_SHOW_REQ,         /* 25 */
+    RLITE_U_IPCP_STATS_SHOW_RESP,        /* 26 */
 
     RLITE_U_MSG_MAX,
 };
@@ -189,5 +191,8 @@ struct rl_cmsg_ipcp_route_mod {
     char *dest_name; /* destination IPCP */
     char *next_hops; /* next hops */
 } __attribute__((packed));
+
+#define rl_cmsg_ipcp_stats_req rl_cmsg_ipcp_rib_show_req
+#define rl_cmsg_ipcp_stats_resp rl_cmsg_ipcp_rib_show_resp
 
 #endif /* __RLITE_U_MSG_H__ */

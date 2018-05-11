@@ -178,6 +178,9 @@ struct uipcp_ops {
     /* User wants to add or remove a static route to/from an IPCP. */
     int (*route_mod)(struct uipcp *uipcp,
                      const struct rl_cmsg_ipcp_route_mod *req);
+
+    /* User asks for a dump of the RIB stats. */
+    char *(*stats_show)(struct uipcp *);
 };
 
 typedef int (*periodic_task_func_t)(struct uipcp *const uipcp);

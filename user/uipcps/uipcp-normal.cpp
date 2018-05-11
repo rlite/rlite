@@ -795,6 +795,18 @@ UipcpRib::dump_rib_paths(std::stringstream &ss) const
 };
 
 void
+UipcpRib::dump_stats(std::stringstream &ss) const
+{
+    ss << "Uipcp stats:" << std::endl;
+    ss << "    "
+       << "routing_table_compute"
+       << " : " << stats.routing_table_compute << std::endl;
+    ss << "    "
+       << "fwd_table_compute"
+       << " : " << stats.fwd_table_compute << std::endl;
+};
+
+void
 UipcpRib::update_address(rlm_addr_t new_addr)
 {
     if (myaddr == new_addr) {
@@ -2235,6 +2247,18 @@ normal_route_mod(struct uipcp *uipcp, const struct rl_cmsg_ipcp_route_mod *req)
     return rib->routing->route_mod(req);
 }
 
+static char *
+normal_stats_show(struct uipcp *uipcp)
+{
+    UipcpRib *rib = UIPCP_RIB(uipcp);
+    std::lock_guard<std::mutex> guard(rib->mutex);
+    stringstream ss;
+
+    rib->dump_stats(ss);
+
+    return rl_strdup(ss.str().c_str(), RL_MT_UTILS);
+}
+
 extern "C" void
 normal_lib_init(void)
 {
@@ -2275,4 +2299,5 @@ struct uipcp_ops normal_ops = {
     .neigh_disconnect     = normal_neigh_disconnect,
     .lower_dif_detach     = normal_lower_dif_detach,
     .route_mod            = normal_route_mod,
+    .stats_show           = normal_stats_show,
 };

@@ -202,6 +202,10 @@ rl_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
     case RLITE_U_IPCP_RIB_PATHS_SHOW_REQ:
         show = uipcp->ops.rib_paths_show;
         break;
+
+    case RLITE_U_IPCP_STATS_SHOW_REQ:
+        show = uipcp->ops.stats_show;
+        break;
     }
 
     if (show) {
@@ -518,6 +522,7 @@ static rl_req_handler_t rl_config_handlers[] = {
     [RLITE_U_IPCP_RIB_PATHS_SHOW_REQ]    = rl_u_ipcp_rib_show,
     [RLITE_U_IPCP_ROUTE_ADD]             = rl_u_ipcp_route_mod,
     [RLITE_U_IPCP_ROUTE_DEL]             = rl_u_ipcp_route_mod,
+    [RLITE_U_IPCP_STATS_SHOW_REQ]        = rl_u_ipcp_rib_show,
 #ifdef RL_MEMTRACK
     [RLITE_U_MEMTRACK_DUMP] = rl_u_memtrack_dump,
 #endif /* RL_MEMTRACK */

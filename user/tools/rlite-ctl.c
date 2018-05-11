@@ -1083,6 +1083,9 @@ ipcp_rib_show(int argc, char **argv, struct cmd_descriptor *cd)
     } else if (strcmp(cd->name, "dif-rib-paths-show") == 0 ||
                strcmp(cd->name, "ipcp-rib-paths-show") == 0) {
         req.hdr.msg_type = RLITE_U_IPCP_RIB_PATHS_SHOW_REQ;
+    } else if (strcmp(cd->name, "dif-stats-show") == 0 ||
+               strcmp(cd->name, "uipcp-stats-show") == 0) {
+        req.hdr.msg_type = RLITE_U_IPCP_STATS_SHOW_REQ;
     } else {
         return -1;
     }
@@ -1379,6 +1382,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage    = "[IPCP_NAME]",
         .num_args = 0,
         .func     = ipcp_stats,
+    },
+    {
+        .name     = "uipcp-stats-show",
+        .usage    = "[IPCP_NAME]",
+        .num_args = 0,
+        .func     = ipcp_rib_show,
     },
     {
         .name     = "dif-rib-show",
