@@ -423,7 +423,9 @@ class CentralizedFaultTolerantDFT : public DFT {
 public:
     RL_NODEFAULT_NONCOPIABLE(CentralizedFaultTolerantDFT);
     CentralizedFaultTolerantDFT(UipcpRib *_ur) : DFT(_ur) {}
+
     int reconfigure() override;
+
     void dump(std::stringstream &ss) const override
     {
         if (raft) {
@@ -442,6 +444,7 @@ public:
         }
         return client->lookup_req(appl_name, dst_node, preferred, cookie);
     }
+
     int appl_register(const struct rl_kmsg_appl_register *req) override
     {
         if (raft) {
@@ -453,11 +456,11 @@ public:
         }
         return client->appl_register(req);
     }
+
     int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
                     std::shared_ptr<Neighbor> const &neigh,
                     rlm_addr_t src_addr) override
     {
-        // TODO reuse this piece of code
         if (!raft || (rm->obj_class == ObjClass && rm->is_response())) {
             /* We may be a replica (raft != nullptr), but if this is a response
              * to a request done by us with the role of simple clients we
