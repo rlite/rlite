@@ -417,6 +417,6 @@ struct rl_kmsg_ipcp_stats_resp {
     struct rl_msg_hdr hdr;
 
     struct rl_ipcp_stats stats;
-} __attribute__((packed));
+};
 
 #endif /* __RLITE_KER_H__ */

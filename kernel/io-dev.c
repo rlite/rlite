@@ -155,7 +155,7 @@ EXPORT_SYMBOL(rl_sdu_rx_flow);
 int
 rl_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb, rl_port_t local_port)
 {
-    struct flow_entry *flow = flow_get(local_port);
+    struct flow_entry *flow = flow_get(ipcp->dm, local_port);
     int ret;
 
     if (!flow) {
@@ -217,19 +217,6 @@ rl_write_restart_flows(struct ipcp_entry *ipcp)
     rl_write_restart_wqh(ipcp, &ipcp->tx_wqh);
 }
 EXPORT_SYMBOL(rl_write_restart_flows);
-
-void
-rl_write_restart_port(rl_port_t local_port)
-{
-    struct flow_entry *flow;
-
-    flow = flow_get(local_port);
-    if (flow) {
-        rl_write_restart_flow(flow);
-        flow_put(flow);
-    }
-}
-EXPORT_SYMBOL(rl_write_restart_port);
 
 struct rl_io {
     uint8_t mode;
@@ -607,7 +594,7 @@ rl_io_ioctl_bind(struct rl_io *rio, struct rl_ioctl_info *info)
 {
     struct flow_entry *flow = NULL;
 
-    flow = flow_get(info->port_id); /* take the reference and store it */
+    flow = flow_nodm_get(info->port_id); /* take the reference and store it */
     if (!flow) {
         PE("No such flow %u\n", info->port_id);
         return -ENXIO;
@@ -647,7 +634,7 @@ rl_io_ioctl_mgmt(struct rl_io *rio, struct rl_ioctl_info *info)
     struct ipcp_entry *ipcp;
 
     /* Lookup the IPCP to manage. */
-    ipcp = ipcp_get(info->ipcp_id);
+    ipcp = ipcp_nodm_get(info->ipcp_id);
     if (!ipcp) {
         PE("Error: No such ipcp\n");
         return -ENXIO;

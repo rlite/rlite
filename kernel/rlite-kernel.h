@@ -492,7 +492,8 @@ struct dif {
 };
 
 struct ipcp_entry {
-    rl_ipcp_id_t id; /* Key */
+    rl_ipcp_id_t id;  /* Key */
+    struct rl_dm *dm; /* parent rl_dm */
     char *name;
     struct dif *dif;
     struct pci_sizes pcisizes;
@@ -652,7 +653,7 @@ struct pduft_entry {
 };
 
 int __ipcp_put(struct ipcp_entry *entry);
-struct ipcp_entry *__ipcp_get(rl_ipcp_id_t ipcp_id);
+struct ipcp_entry *__ipcp_get(struct rl_dm *dm, rl_ipcp_id_t ipcp_id);
 
 #define ipcp_put(_ie)                                                          \
     ({                                                                         \
@@ -662,14 +663,16 @@ struct ipcp_entry *__ipcp_get(rl_ipcp_id_t ipcp_id);
         __ipcp_put(_ie);                                                       \
     })
 
-#define ipcp_get(_id)                                                          \
+#define ipcp_get(_dm, _id)                                                     \
     ({                                                                         \
-        struct ipcp_entry *tmp = __ipcp_get(_id);                              \
+        struct ipcp_entry *tmp = __ipcp_get(_dm, _id);                         \
         if (tmp) {                                                             \
             PV("REFCNT++ %u: %u\n", tmp->id, tmp->refcnt);                     \
         }                                                                      \
         tmp;                                                                   \
     })
+
+struct ipcp_entry *ipcp_nodm_get(rl_ipcp_id_t ipcp_id);
 
 int rl_ipcp_factory_register(struct ipcp_factory *factory);
 int rl_ipcp_factory_unregister(const char *dif_type);
@@ -696,8 +699,6 @@ int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
 struct rl_buf *rl_sdu_rx_shortcut(struct ipcp_entry *ipcp, struct rl_buf *rb);
 
-void rl_write_restart_port(rl_port_t local_port);
-
 void rl_write_restart_flow(struct flow_entry *flow);
 
 void rl_write_restart_flows(struct ipcp_entry *ipcp);
@@ -714,11 +715,13 @@ void __flow_put(struct flow_entry *flow, bool lock);
         __flow_put(_f, true);                                                  \
     } while (0)
 
-struct flow_entry *flow_lookup(rl_port_t port_id);
+struct flow_entry *flow_lookup(struct rl_dm *dm, rl_port_t port_id);
 
-struct flow_entry *flow_get(rl_port_t port_id);
+struct flow_entry *flow_get(struct rl_dm *dm, rl_port_t port_id);
 
-struct flow_entry *flow_get_by_cep(unsigned int cep_id);
+struct flow_entry *flow_nodm_get(rl_port_t port_id);
+
+struct flow_entry *flow_get_by_cep(struct rl_dm *dm, unsigned int cep_id);
 
 void flow_get_ref(struct flow_entry *flow);
 

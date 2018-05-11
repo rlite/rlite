@@ -261,7 +261,7 @@ static int
 rl_shim_loopback_flow_deallocated(struct ipcp_entry *ipcp,
                                   struct flow_entry *flow)
 {
-    struct flow_entry *remote_flow = flow_lookup(flow->remote_port);
+    struct flow_entry *remote_flow = flow_lookup(ipcp->dm, flow->remote_port);
 
     if (remote_flow) {
         rl_flow_shutdown(remote_flow);
@@ -310,7 +310,7 @@ rl_shim_loopback_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *tx_flow,
         }
     }
 
-    rx_flow = flow_get(tx_flow->remote_port);
+    rx_flow = flow_get(ipcp->dm, tx_flow->remote_port);
     if (!rx_flow) {
         rl_buf_free(rb);
         return -ENXIO;

@@ -924,7 +924,7 @@ rl_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
         dst_addr = mhdr->remote_addr;
 
     } else if (mhdr->type == RLITE_MGMT_HDR_T_OUT_LOCAL_PORT) {
-        *lower_flow = flow_get(mhdr->local_port);
+        *lower_flow = flow_get(ipcp->dm, mhdr->local_port);
         if (!(*lower_flow) || (*lower_flow)->upper.ipcp != ipcp) {
             RPD(1,
                 "Invalid mgmt header local port %u, "
@@ -1512,7 +1512,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         return NULL;
     }
 
-    flow = flow_get_by_cep(pci->dst_cep);
+    flow = flow_get_by_cep(ipcp->dm, pci->dst_cep);
     if (!flow) {
         RPD(1, "No flow for cep-id %u: dropping PDU\n", pci->dst_cep);
         stats->rmt.noflow_drop++;

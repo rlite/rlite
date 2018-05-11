@@ -45,6 +45,7 @@ EXPORT_SYMBOL(verbosity);
 module_param(verbosity, int, 0644);
 
 struct rl_ctrl;
+struct rl_dm;
 
 /* The signature of a message handler. */
 typedef int (*rl_msg_handler_t)(struct rl_ctrl *rc, struct rl_msg_base *bmsg);
@@ -55,6 +56,9 @@ struct rl_ctrl {
     rl_msg_handler_t *handlers;
 
     struct file *file; /* backpointer */
+
+    /* Pointer to the parent data model. */
+    struct rl_dm *dm;
 
     /* Upqueue-related data structures. */
     struct list_head upqueue;
@@ -196,17 +200,23 @@ rl_dm_get(void)
     return &rl_dm;
 }
 
+static struct rl_dm *
+rl_dm_getref(struct rl_dm *dm)
+{
+    return dm;
+}
+
 static void
 rl_dm_put(struct rl_dm *dm)
 {
 }
 
-#define FLOCK() write_lock_bh(&rl_dm.flows_lock)
-#define FUNLOCK() write_unlock_bh(&rl_dm.flows_lock)
-#define FRLOCK() read_lock_bh(&rl_dm.flows_lock)
-#define FRUNLOCK() read_unlock_bh(&rl_dm.flows_lock)
-#define PLOCK() spin_lock_bh(&rl_dm.ipcps_lock)
-#define PUNLOCK() spin_unlock_bh(&rl_dm.ipcps_lock)
+#define FLOCK(dm) write_lock_bh(&dm->flows_lock)
+#define FUNLOCK(dm) write_unlock_bh(&dm->flows_lock)
+#define FRLOCK(dm) read_lock_bh(&dm->flows_lock)
+#define FRUNLOCK(dm) read_unlock_bh(&dm->flows_lock)
+#define PLOCK(dm) spin_lock_bh(&dm->ipcps_lock)
+#define PUNLOCK(dm) spin_unlock_bh(&dm->ipcps_lock)
 #define RALOCK(_p) spin_lock_bh(&(_p)->regapp_lock)
 #define RAUNLOCK(_p) spin_unlock_bh(&(_p)->regapp_lock)
 
@@ -376,15 +386,15 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
 EXPORT_SYMBOL(rl_upqueue_append);
 
 static struct dif *
-dif_get(const char *dif_name, const char *dif_type, int *err)
+dif_get(struct rl_dm *dm, const char *dif_name, const char *dif_type, int *err)
 {
     struct dif *cur;
 
     *err = 0;
 
-    spin_lock_bh(&rl_dm.difs_lock);
+    spin_lock_bh(&dm->difs_lock);
 
-    list_for_each_entry (cur, &rl_dm.difs, node) {
+    list_for_each_entry (cur, &dm->difs, node) {
         if (strcmp(cur->name, dif_name) == 0) {
             /* A DIF called 'dif_name' already exists. */
             if (strcmp(cur->ty, dif_type) == 0) {
@@ -425,24 +435,24 @@ dif_get(const char *dif_name, const char *dif_type, int *err)
     cur->max_pdu_size = 8000; /* Currently unused. */
     cur->max_pdu_life = RL_MPL_MSECS_DFLT;
     cur->refcnt       = 1;
-    list_add_tail(&cur->node, &rl_dm.difs);
+    list_add_tail(&cur->node, &dm->difs);
 
     PD("DIF %s [type '%s'] created\n", cur->name, cur->ty);
 
 out:
-    spin_unlock_bh(&rl_dm.difs_lock);
+    spin_unlock_bh(&dm->difs_lock);
 
     return cur;
 }
 
 static void
-dif_put(struct dif *dif)
+dif_put(struct rl_dm *dm, struct dif *dif)
 {
     if (!dif) {
         return;
     }
 
-    spin_lock_bh(&rl_dm.difs_lock);
+    spin_lock_bh(&dm->difs_lock);
     dif->refcnt--;
     if (dif->refcnt) {
         goto out;
@@ -456,42 +466,53 @@ dif_put(struct dif *dif)
     rl_free(dif, RL_MT_DIF);
 
 out:
-    spin_unlock_bh(&rl_dm.difs_lock);
+    spin_unlock_bh(&dm->difs_lock);
 }
 
 struct ipcp_entry *
-__ipcp_get(rl_ipcp_id_t ipcp_id)
+__ipcp_get(struct rl_dm *dm, rl_ipcp_id_t ipcp_id)
 {
     struct ipcp_entry *entry;
     struct hlist_head *head;
 
-    PLOCK();
+    PLOCK(dm);
 
-    head = &rl_dm.ipcp_table[hash_min(ipcp_id, HASH_BITS(rl_dm.ipcp_table))];
+    head = &dm->ipcp_table[hash_min(ipcp_id, HASH_BITS(dm->ipcp_table))];
     hlist_for_each_entry (entry, head, node) {
         if (entry->id == ipcp_id) {
             entry->refcnt++;
-            PUNLOCK();
+            PUNLOCK(dm);
             return entry;
         }
     }
 
-    PUNLOCK();
+    PUNLOCK(dm);
 
     return NULL;
 }
 
 struct ipcp_entry *
-ipcp_select_by_dif(const char *dif_name)
+ipcp_nodm_get(rl_ipcp_id_t ipcp_id)
+{
+    struct rl_dm *dm        = rl_dm_get();
+    struct ipcp_entry *ipcp = ipcp_get(dm, ipcp_id);
+
+    rl_dm_put(dm);
+
+    return ipcp;
+}
+
+struct ipcp_entry *
+ipcp_select_by_dif(struct rl_dm *dm, const char *dif_name)
 {
     struct ipcp_entry *selected = NULL;
     struct ipcp_entry *entry;
     int bucket;
 
-    PLOCK();
+    PLOCK(dm);
 
     /* Linear scan is not efficient, but let's stick to that for now. */
-    hash_for_each(rl_dm.ipcp_table, bucket, entry, node)
+    hash_for_each(dm->ipcp_table, bucket, entry, node)
     {
         if (entry->flags & RL_K_IPCP_ZOMBIE) {
             /* Zombie ipcps cannot be selected. */
@@ -517,7 +538,7 @@ ipcp_select_by_dif(const char *dif_name)
         PV("REFCNT++ %u: %u\n", selected->id, selected->refcnt);
     }
 
-    PUNLOCK();
+    PUNLOCK(dm);
 
     return selected;
 }
@@ -525,7 +546,8 @@ ipcp_select_by_dif(const char *dif_name)
 void tx_completion_func(unsigned long arg);
 
 static int
-ipcp_add_entry(struct rl_kmsg_ipcp_create *req, struct ipcp_entry **pentry)
+ipcp_add_entry(struct rl_dm *dm, struct rl_kmsg_ipcp_create *req,
+               struct ipcp_entry **pentry)
 {
     struct ipcp_entry *entry;
     struct ipcp_entry *cur;
@@ -551,14 +573,14 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req, struct ipcp_entry **pentry)
         memset(per_cpu_ptr(entry->stats, cpu), 0, sizeof(entry->stats[0]));
     }
 
-    PLOCK();
+    PLOCK(dm);
 
     /* Check if an IPC process with that name already exists.
      * This check is also performed by userspace. */
-    hash_for_each(rl_dm.ipcp_table, bucket, cur, node)
+    hash_for_each(dm->ipcp_table, bucket, cur, node)
     {
         if (strcmp(cur->name, req->name) == 0) {
-            PUNLOCK();
+            PUNLOCK(dm);
             free_percpu(entry->stats);
             rl_free(entry, RL_MT_IPCP);
             return -EINVAL;
@@ -566,19 +588,19 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req, struct ipcp_entry **pentry)
     }
 
     /* Create or take a reference to the specified DIF. */
-    dif = dif_get(req->dif_name, req->dif_type, &ret);
+    dif = dif_get(dm, req->dif_name, req->dif_type, &ret);
     if (!dif) {
-        PUNLOCK();
+        PUNLOCK(dm);
         free_percpu(entry->stats);
         rl_free(entry, RL_MT_IPCP);
         return ret;
     }
 
     /* Try to alloc an IPC process id from the bitmap. */
-    entry->id = bitmap_find_next_zero_area(rl_dm.ipcp_id_bitmap,
+    entry->id = bitmap_find_next_zero_area(dm->ipcp_id_bitmap,
                                            IPCP_ID_BITMAP_SIZE, 0, 1, 0);
     if (entry->id < IPCP_ID_BITMAP_SIZE) {
-        bitmap_set(rl_dm.ipcp_id_bitmap, entry->id, 1);
+        bitmap_set(dm->ipcp_id_bitmap, entry->id, 1);
         /* Build and insert an IPC process entry in the hash table. */
         entry->name         = req->name;
         req->name           = NULL; /* move */
@@ -593,7 +615,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req, struct ipcp_entry **pentry)
         spin_lock_init(&entry->regapp_lock);
         init_waitqueue_head(&entry->uipcp_wqh);
         mutex_init(&entry->lock);
-        hash_add(rl_dm.ipcp_table, &entry->node, entry->id);
+        hash_add(dm->ipcp_table, &entry->node, entry->id);
 #ifdef RL_RMT_QUEUES
         rb_list_init(&entry->rmtq);
         entry->rmtq_size = 0;
@@ -602,25 +624,27 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req, struct ipcp_entry **pentry)
                      (unsigned long)entry);
 #endif /* RL_RMT_QUEUES */
         init_waitqueue_head(&entry->tx_wqh);
-        *pentry = entry;
+        entry->dm = rl_dm_getref(dm);
+        *pentry   = entry;
     } else {
         ret = -ENOSPC;
-        dif_put(dif);
+        dif_put(dm, dif);
         free_percpu(entry->stats);
         rl_free(entry, RL_MT_IPCP);
     }
 
-    PUNLOCK();
+    PUNLOCK(dm);
 
     return ret;
 }
 
 static int
-ipcp_add(struct rl_kmsg_ipcp_create *req, rl_ipcp_id_t *ipcp_id)
+ipcp_add(struct rl_dm *dm, struct rl_kmsg_ipcp_create *req,
+         rl_ipcp_id_t *ipcp_id)
 {
     struct ipcp_factory *factory;
     struct ipcp_entry *entry = NULL;
-    int ret                  = ipcp_add_entry(req, &entry);
+    int ret                  = ipcp_add_entry(dm, req, &entry);
 
     if (ret) {
         return ret;
@@ -720,17 +744,18 @@ appl_del(struct registered_appl *app)
 static void
 appl_removew_func(struct work_struct *w)
 {
+    struct rl_dm *dm = container_of(w, struct rl_dm, appl_removew);
     struct registered_appl *app, *tmp;
     struct list_head removeq;
 
     INIT_LIST_HEAD(&removeq);
 
-    spin_lock_bh(&rl_dm.appl_removeq_lock);
-    list_for_each_entry_safe (app, tmp, &rl_dm.appl_removeq, node) {
+    spin_lock_bh(&dm->appl_removeq_lock);
+    list_for_each_entry_safe (app, tmp, &dm->appl_removeq, node) {
         list_del_init(&app->node);
         list_add_tail_safe(&app->node, &removeq);
     }
-    spin_unlock_bh(&rl_dm.appl_removeq_lock);
+    spin_unlock_bh(&dm->appl_removeq_lock);
 
     list_for_each_entry_safe (app, tmp, &removeq, node) {
         appl_del(app);
@@ -763,10 +788,10 @@ ipcp_application_put(struct registered_appl *app)
     if (ipcp->ops.appl_register) {
         /* Perform cleanup operation in process context, because we need
          * to take the per-ipcp mutex. */
-        spin_lock_bh(&rl_dm.appl_removeq_lock);
-        list_add_tail_safe(&app->node, &rl_dm.appl_removeq);
-        spin_unlock_bh(&rl_dm.appl_removeq_lock);
-        schedule_work(&rl_dm.appl_removew);
+        spin_lock_bh(&app->rc->dm->appl_removeq_lock);
+        list_add_tail_safe(&app->node, &app->rc->dm->appl_removeq);
+        spin_unlock_bh(&app->rc->dm->appl_removeq_lock);
+        schedule_work(&app->rc->dm->appl_removew);
     } else {
         /* No mutex required, perform the removal in current context. */
         appl_del(app);
@@ -819,10 +844,10 @@ ipcp_application_add(struct ipcp_entry *ipcp, char *appl_name,
 
     RAUNLOCK(ipcp);
 
-    PLOCK();
+    PLOCK(ipcp->dm);
     ipcp->refcnt++;
     PV("REFCNT++ %u: %u\n", ipcp->id, ipcp->refcnt);
-    PUNLOCK();
+    PUNLOCK(ipcp->dm);
 
     if (ipcp->ops.appl_register) {
         mutex_lock(&ipcp->lock);
@@ -878,10 +903,10 @@ application_del_by_rc(struct rl_ctrl *rc)
 
     INIT_LIST_HEAD(&remove_apps);
 
-    PLOCK();
+    PLOCK(rc->dm);
 
     /* For each IPC processes. */
-    hash_for_each(rl_dm.ipcp_table, bucket, ipcp, node)
+    hash_for_each(rc->dm->ipcp_table, bucket, ipcp, node)
     {
         RALOCK(ipcp);
         /* For each application registered to this IPC process. */
@@ -900,7 +925,7 @@ application_del_by_rc(struct rl_ctrl *rc)
         }
     }
 
-    PUNLOCK();
+    PUNLOCK(rc->dm);
 
     /* Remove the selected applications without holding locks (we are in
      * process context here). */
@@ -933,11 +958,11 @@ application_del_by_rc(struct rl_ctrl *rc)
 
 /* To be called under FLOCK or FRLOCK. */
 struct flow_entry *
-flow_lookup(rl_port_t port_id)
+flow_lookup(struct rl_dm *dm, rl_port_t port_id)
 {
     struct flow_entry *entry;
     struct hlist_head *head;
-    head = &rl_dm.flow_table[hash_min(port_id, HASH_BITS(rl_dm.flow_table))];
+    head = &dm->flow_table[hash_min(port_id, HASH_BITS(dm->flow_table))];
     hlist_for_each_entry (entry, head, node) {
         if (entry->local_port == port_id) {
             return entry;
@@ -949,44 +974,56 @@ flow_lookup(rl_port_t port_id)
 EXPORT_SYMBOL(flow_lookup);
 
 struct flow_entry *
-flow_get(rl_port_t port_id)
+flow_get(struct rl_dm *dm, rl_port_t port_id)
 {
     struct flow_entry *flow;
 
-    FRLOCK();
-    flow = flow_lookup(port_id);
+    FRLOCK(dm);
+    flow = flow_lookup(&rl_dm, port_id);
     if (flow) {
         atomic_inc(&flow->refcnt);
         PV("FLOWREFCNT %u ++: %u\n", flow->local_port,
            atomic_read(&flow->refcnt));
     }
-    FRUNLOCK();
+    FRUNLOCK(dm);
 
     return flow;
 }
 EXPORT_SYMBOL(flow_get);
 
 struct flow_entry *
-flow_get_by_cep(unsigned int cep_id)
+flow_nodm_get(rl_port_t port_id)
+{
+    struct rl_dm *dm = rl_dm_get();
+    struct flow_entry *flow;
+
+    flow = flow_get(dm, port_id);
+    rl_dm_put(dm);
+
+    return flow;
+}
+
+struct flow_entry *
+flow_get_by_cep(struct rl_dm *dm, unsigned int cep_id)
 {
     struct flow_entry *entry;
     struct hlist_head *head;
 
-    FRLOCK();
+    FRLOCK(dm);
 
-    head = &rl_dm.flow_table_by_cep[hash_min(
-        cep_id, HASH_BITS(rl_dm.flow_table_by_cep))];
+    head = &dm->flow_table_by_cep[hash_min(cep_id,
+                                           HASH_BITS(dm->flow_table_by_cep))];
     hlist_for_each_entry (entry, head, node_cep) {
         if (entry->local_cep == cep_id) {
             atomic_inc(&entry->refcnt);
             PV("FLOWREFCNT %u ++: %u\n", entry->local_port,
                atomic_read(&entry->refcnt));
-            FRUNLOCK();
+            FRUNLOCK(dm);
             return entry;
         }
     }
 
-    FRUNLOCK();
+    FRUNLOCK(dm);
 
     return NULL;
 }
@@ -1008,6 +1045,8 @@ EXPORT_SYMBOL(flow_get_ref);
 static void
 flows_putq_add(struct flow_entry *flow, unsigned jdelta)
 {
+    struct rl_dm *dm = flow->txrx.ipcp->dm;
+
     atomic_inc(&flow->refcnt);
     PV("FLOWREFCNT %u ++: %u\n", flow->local_port, atomic_read(&flow->refcnt));
 
@@ -1017,7 +1056,7 @@ flows_putq_add(struct flow_entry *flow, unsigned jdelta)
         flow->expires = jiffies + jdelta;
         /* Insert flow in the putq, keeping the putq sorted
          * by expiration time, in ascending order. */
-        list_for_each_entry (cur, &rl_dm.flows_putq, node_rm) {
+        list_for_each_entry (cur, &dm->flows_putq, node_rm) {
             if (time_after(cur->expires, flow->expires)) {
                 break;
             }
@@ -1025,18 +1064,20 @@ flows_putq_add(struct flow_entry *flow, unsigned jdelta)
         /* Insert 'flow' right before 'cur'. */
         list_add_tail_safe(&flow->node_rm, &cur->node_rm);
         /* Adjust timer expiration according to the new first entry. */
-        cur = list_first_entry(&rl_dm.flows_putq, struct flow_entry, node_rm);
-        mod_timer(&rl_dm.flows_putq_tmr, cur->expires);
+        cur = list_first_entry(&dm->flows_putq, struct flow_entry, node_rm);
+        mod_timer(&dm->flows_putq_tmr, cur->expires);
     }
 }
 
 static void
 flows_putq_del(struct flow_entry *flow)
 {
-    FLOCK();
+    struct rl_dm *dm = flow->txrx.ipcp->dm;
+
+    FLOCK(dm);
     flow->expires = ~0U;
     list_del_init(&flow->node_rm);
-    FUNLOCK();
+    FUNLOCK(dm);
 
     flow_put(flow);
 }
@@ -1050,12 +1091,17 @@ flows_putq_drain(
 #endif
 )
 {
+#ifdef RL_HAVE_TIMER_SETUP
+    struct rl_dm *dm = from_timer(dm, tmr, flows_putq_tmr);
+#else  /* !RL_HAVE_TIMER_SETUP */
+    struct rl_dm *dm = (struct rl_dm *)arg;
+#endif /* !RL_HAVE_TIMER_SETUP */
     struct flow_entry *flow, *tmp;
 
     /* Call flow_put on all the expired flows, which are sorted in
      * ascending expriration ordedr. */
-    FLOCK();
-    list_for_each_entry_safe (flow, tmp, &rl_dm.flows_putq, node_rm) {
+    FLOCK(dm);
+    list_for_each_entry_safe (flow, tmp, &dm->flows_putq, node_rm) {
         if (!time_before(jiffies, flow->expires)) {
             list_del_init(&flow->node_rm);
             flow->expires = ~0U;
@@ -1072,17 +1118,18 @@ flows_putq_drain(
     }
 
     /* Reschedule if needed. */
-    if (!list_empty(&rl_dm.flows_putq)) {
-        flow = list_first_entry(&rl_dm.flows_putq, struct flow_entry, node_rm);
-        mod_timer(&rl_dm.flows_putq_tmr, flow->expires);
+    if (!list_empty(&dm->flows_putq)) {
+        flow = list_first_entry(&dm->flows_putq, struct flow_entry, node_rm);
+        mod_timer(&dm->flows_putq_tmr, flow->expires);
     }
-    FUNLOCK();
+    FUNLOCK(dm);
 }
 
 void
 __flow_put(struct flow_entry *entry, bool lock)
 {
     struct ipcp_entry *ipcp;
+    struct rl_dm *dm;
     struct dtp *dtp;
 
     if (unlikely(!entry)) {
@@ -1094,12 +1141,14 @@ __flow_put(struct flow_entry *entry, bool lock)
         return;
     }
 
-    if (lock) {
-        FLOCK();
-    }
-
     dtp  = &entry->dtp;
     ipcp = entry->txrx.ipcp;
+    dm   = ipcp->dm;
+
+    if (lock) {
+        FLOCK(dm);
+    }
+
     entry->flags |= RL_FLOW_DEALLOCATED;
 
     /* We postpone flow removal, at least for MPL, and also allow
@@ -1130,25 +1179,25 @@ __flow_put(struct flow_entry *entry, bool lock)
            atomic_read(&entry->refcnt));
         flows_putq_add(entry, msecs_to_jiffies(5000) /* should be MPL */);
         if (lock) {
-            FUNLOCK();
+            FUNLOCK(dm);
         }
         return;
     }
 
     /* Detach from tables. */
     hash_del(&entry->node);
-    bitmap_clear(rl_dm.port_id_bitmap, entry->local_port, 1);
+    bitmap_clear(dm->port_id_bitmap, entry->local_port, 1);
     if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
         hash_del(&entry->node_cep);
-        bitmap_clear(rl_dm.cep_id_bitmap, entry->local_cep, 1);
+        bitmap_clear(dm->cep_id_bitmap, entry->local_cep, 1);
     }
 
     /* Enqueue into the remove list and schedule the work. */
-    list_add_tail_safe(&entry->node_rm, &rl_dm.flows_removeq);
-    schedule_work(&rl_dm.flows_removew);
+    list_add_tail_safe(&entry->node_rm, &dm->flows_removeq);
+    schedule_work(&dm->flows_removew);
 
     if (lock) {
-        FUNLOCK();
+        FUNLOCK(dm);
     }
 }
 EXPORT_SYMBOL(__flow_put);
@@ -1216,14 +1265,14 @@ flow_del(struct flow_entry *entry)
     {
         struct flow_entry *rflow;
 
-        FLOCK();
-        list_for_each_entry (rflow, &rl_dm.flows_removeq, node_rm) {
+        FLOCK(ipcp->dm);
+        list_for_each_entry (rflow, &ipcp->dm->flows_removeq, node_rm) {
             if (rflow == entry) {
                 PE("removeq has a dangling reference to flow %u\n",
                    entry->local_port);
             }
         }
-        FUNLOCK();
+        FUNLOCK(ipcp->dm);
     }
 
     if (!ipcp->ops.flow_deallocated) {
@@ -1285,18 +1334,19 @@ flow_del(struct flow_entry *entry)
 static void
 flows_removew_func(struct work_struct *w)
 {
+    struct rl_dm *dm = container_of(w, struct rl_dm, flows_removew);
     struct flow_entry *flow, *tmp;
     struct list_head removeq;
 
     INIT_LIST_HEAD(&removeq);
 
     /* Move the entries to a temporary queue while holding the lock. */
-    FLOCK();
-    list_for_each_entry_safe (flow, tmp, &rl_dm.flows_removeq, node_rm) {
+    FLOCK(dm);
+    list_for_each_entry_safe (flow, tmp, &dm->flows_removeq, node_rm) {
         list_del_init(&flow->node_rm);
         list_add_tail_safe(&flow->node_rm, &removeq);
     }
-    FUNLOCK();
+    FUNLOCK(dm);
 
     /* Destroy the entries without holding the lock. */
     list_for_each_entry_safe (flow, tmp, &removeq, node_rm) {
@@ -1312,6 +1362,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper, uint32_t event_id,
          const struct rina_flow_spec *flowspec, struct flow_entry **pentry,
          gfp_t gfp)
 {
+    struct rl_dm *dm = ipcp->dm;
     struct flow_entry *entry;
     int ret = 0;
 
@@ -1325,25 +1376,25 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper, uint32_t event_id,
         return -ENOMEM;
     }
 
-    FLOCK();
+    FLOCK(dm);
 
     /* Try to alloc a port id and a cep id from the bitmaps, cep
      * ids being allocated only if needed. */
     entry->local_port = bitmap_find_next_zero_area(
-        rl_dm.port_id_bitmap, PORT_ID_BITMAP_SIZE, 0, 1, 0);
+        dm->port_id_bitmap, PORT_ID_BITMAP_SIZE, 0, 1, 0);
     if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
         entry->local_cep = bitmap_find_next_zero_area(
-            rl_dm.cep_id_bitmap, CEP_ID_BITMAP_SIZE, 0, 1, 0);
+            dm->cep_id_bitmap, CEP_ID_BITMAP_SIZE, 0, 1, 0);
     } else {
         entry->local_cep = 0;
     }
 
     if (entry->local_port < PORT_ID_BITMAP_SIZE &&
         entry->local_cep < CEP_ID_BITMAP_SIZE) {
-        bitmap_set(rl_dm.port_id_bitmap, entry->local_port, 1);
+        bitmap_set(dm->port_id_bitmap, entry->local_port, 1);
 
         if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
-            bitmap_set(rl_dm.cep_id_bitmap, entry->local_cep, 1);
+            bitmap_set(dm->cep_id_bitmap, entry->local_cep, 1);
         }
 
         /* Build and insert a flow entry in the hash table. */
@@ -1362,12 +1413,11 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper, uint32_t event_id,
         memcpy(&entry->spec, flowspec, sizeof(*flowspec));
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp);
-        hash_add(rl_dm.flow_table, &entry->node, entry->local_port);
+        hash_add(dm->flow_table, &entry->node, entry->local_port);
         if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
-            hash_add(rl_dm.flow_table_by_cep, &entry->node_cep,
-                     entry->local_cep);
+            hash_add(dm->flow_table_by_cep, &entry->node_cep, entry->local_cep);
         }
-        entry->uid = rl_dm.uid_cnt++; /* generate an unique id */
+        entry->uid = dm->uid_cnt++; /* generate an unique id */
         INIT_LIST_HEAD(&entry->node_rm);
         entry->expires = ~0U;
         dtp_init(&entry->dtp);
@@ -1378,12 +1428,12 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper, uint32_t event_id,
 
         /* Start the unbound timer */
         flows_putq_add(entry, RL_UNBOUND_FLOW_TO);
-        FUNLOCK();
+        FUNLOCK(dm);
 
-        PLOCK();
+        PLOCK(dm);
         ipcp->refcnt++;
         PV("REFCNT++ %u: %u\n", ipcp->id, ipcp->refcnt);
-        PUNLOCK();
+        PUNLOCK(dm);
 
         if (flowcfg) {
             memcpy(&entry->cfg, flowcfg, sizeof(entry->cfg));
@@ -1394,7 +1444,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper, uint32_t event_id,
             }
         }
     } else {
-        FUNLOCK();
+        FUNLOCK(dm);
 
         rl_free(entry, RL_MT_FLOW);
         *pentry = NULL;
@@ -1411,26 +1461,29 @@ flow_rc_probe_references(struct rl_ctrl *rc)
     struct hlist_node *tmp;
     int bucket;
 
-    FLOCK();
-    hash_for_each_safe(rl_dm.flow_table, bucket, tmp, flow, node)
+    FLOCK(rc->dm);
+    hash_for_each_safe(rc->dm->flow_table, bucket, tmp, flow, node)
     {
         if (flow->upper.rc == rc) {
             PE("Flow %u has a dangling reference to rc %p\n", flow->local_port,
                rc);
         }
     }
-    FUNLOCK();
+    FUNLOCK(rc->dm);
 }
 
 void
 flow_make_mortal(struct flow_entry *flow)
 {
     bool never_bound = false;
+    struct rl_dm *dm;
+
     if (!flow) {
         return;
     }
 
-    FLOCK();
+    dm = flow->txrx.ipcp->dm;
+    FLOCK(dm);
 
     if (flow->flags & RL_FLOW_NEVER_BOUND) {
         never_bound = true;
@@ -1444,7 +1497,7 @@ flow_make_mortal(struct flow_entry *flow)
            atomic_read(&flow->refcnt));
     }
 
-    FUNLOCK();
+    FUNLOCK(dm);
 
     if (never_bound) {
         flows_putq_del(flow);
@@ -1458,8 +1511,8 @@ ipcp_probe_references(struct ipcp_entry *ipcp)
         struct flow_entry *flow;
         int bucket;
 
-        FLOCK();
-        hash_for_each(rl_dm.flow_table, bucket, flow, node)
+        FLOCK(ipcp->dm);
+        hash_for_each(ipcp->dm->flow_table, bucket, flow, node)
         {
             if (flow->txrx.ipcp == ipcp) {
                 PE("Flow %u has a horizontal dangling reference to ipcp %u\n",
@@ -1470,7 +1523,7 @@ ipcp_probe_references(struct ipcp_entry *ipcp)
                    flow->local_port, ipcp->id);
             }
         }
-        FUNLOCK();
+        FUNLOCK(ipcp->dm);
     }
 
     {
@@ -1491,22 +1544,26 @@ ipcp_probe_references(struct ipcp_entry *ipcp)
 int
 __ipcp_put(struct ipcp_entry *entry)
 {
+    struct rl_dm *dm;
+
     if (!entry) {
         return 0;
     }
 
-    PLOCK();
+    dm = entry->dm;
+
+    PLOCK(dm);
 
     entry->refcnt--;
     if (entry->refcnt) {
-        PUNLOCK();
+        PUNLOCK(dm);
         return 0;
     }
 
     hash_del(&entry->node);
-    bitmap_clear(rl_dm.ipcp_id_bitmap, entry->id, 1);
+    bitmap_clear(dm->ipcp_id_bitmap, entry->id, 1);
 
-    PUNLOCK();
+    PUNLOCK(dm);
 
     /* Inoke the destructor method, if the constructor
      * was called. */
@@ -1540,7 +1597,7 @@ __ipcp_put(struct ipcp_entry *entry)
 
     if (entry->name)
         rl_free(entry->name, RL_MT_UTILS /* moved */);
-    dif_put(entry->dif);
+    dif_put(entry->dm, entry->dif);
 
     ipcp_probe_references(entry);
 
@@ -1557,18 +1614,19 @@ __ipcp_put(struct ipcp_entry *entry)
         /* All the other fields are zeroed, since they are
          * not useful to userspace. */
 
-        mutex_lock(&rl_dm.general_lock);
-        list_for_each_entry (rcur, &rl_dm.ctrl_devs, node) {
+        mutex_lock(&dm->general_lock);
+        list_for_each_entry (rcur, &dm->ctrl_devs, node) {
             if (rcur->flags & RL_F_IPCPS) {
                 rl_upqueue_append(rcur, RLITE_MB(&upd), false);
             }
         }
-        mutex_unlock(&rl_dm.general_lock);
+        mutex_unlock(&dm->general_lock);
 
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&upd));
     }
 
     free_percpu(entry->stats);
+    rl_dm_put(entry->dm);
     rl_free(entry, RL_MT_IPCP);
 
     return 0;
@@ -1593,7 +1651,7 @@ ipcp_pduft_flush(struct ipcp_entry *ipcp)
 }
 
 static int
-ipcp_del(rl_ipcp_id_t ipcp_id)
+ipcp_del(struct rl_ctrl *rc, rl_ipcp_id_t ipcp_id)
 {
     struct ipcp_entry *entry;
     int ret = 0;
@@ -1605,7 +1663,7 @@ ipcp_del(rl_ipcp_id_t ipcp_id)
 
     /* Lookup and remove the IPC process entry in the hash table corresponding
      * to the given ipcp_id. */
-    entry = ipcp_get(ipcp_id);
+    entry = ipcp_get(rc->dm, ipcp_id);
     if (!entry) {
         return -ENXIO;
     }
@@ -1697,9 +1755,9 @@ ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd,
 }
 
 static int
-ipcp_update_all(rl_ipcp_id_t ipcp_id, int update_type)
+ipcp_update_all(struct rl_ctrl *rc, rl_ipcp_id_t ipcp_id, int update_type)
 {
-    struct ipcp_entry *ipcp = ipcp_get(ipcp_id);
+    struct ipcp_entry *ipcp = ipcp_get(rc->dm, ipcp_id);
     struct rl_kmsg_ipcp_update upd;
     struct rl_ctrl *rcur;
     int ret = 0;
@@ -1715,13 +1773,13 @@ ipcp_update_all(rl_ipcp_id_t ipcp_id, int update_type)
         goto out;
     }
 
-    mutex_lock(&rl_dm.general_lock);
-    list_for_each_entry (rcur, &rl_dm.ctrl_devs, node) {
+    mutex_lock(&rc->dm->general_lock);
+    list_for_each_entry (rcur, &rc->dm->ctrl_devs, node) {
         if (rcur->flags & RL_F_IPCPS) {
             rl_upqueue_append(rcur, RLITE_MB(&upd), false);
         }
     }
-    mutex_unlock(&rl_dm.general_lock);
+    mutex_unlock(&rc->dm->general_lock);
 
 out:
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&upd));
@@ -1738,7 +1796,7 @@ rl_ipcp_create(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     rl_ipcp_id_t ipcp_id;
     int ret;
 
-    ret = ipcp_add(req, &ipcp_id);
+    ret = ipcp_add(rc->dm, req, &ipcp_id);
     if (ret) {
         return ret;
     }
@@ -1759,12 +1817,12 @@ rl_ipcp_create(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
      * opened ctrl device. */
-    ipcp_update_all(ipcp_id, RL_IPCP_UPDATE_ADD);
+    ipcp_update_all(rc, ipcp_id, RL_IPCP_UPDATE_ADD);
 
     return 0;
 
 err:
-    ipcp_del(ipcp_id);
+    ipcp_del(rc, ipcp_id);
 
     return ret;
 }
@@ -1778,7 +1836,7 @@ rl_ipcp_destroy(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     int ret;
 
     /* Release the IPC process with the given ID. */
-    ret = ipcp_del(req->ipcp_id);
+    ret = ipcp_del(rc, req->ipcp_id);
     if (ret) {
         PE("Failed to remove IPC process %u\n", req->ipcp_id);
         return ret;
@@ -1795,13 +1853,13 @@ rl_ipcp_destroy(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     /* All the other fields are zeroed, since they are
      * not useful to userspace. */
 
-    mutex_lock(&rl_dm.general_lock);
-    list_for_each_entry (rcur, &rl_dm.ctrl_devs, node) {
+    mutex_lock(&rc->dm->general_lock);
+    list_for_each_entry (rcur, &rc->dm->ctrl_devs, node) {
         if (rcur->flags & RL_F_IPCPS) {
             rl_upqueue_append(rcur, RLITE_MB(&upd), false);
         }
     }
-    mutex_unlock(&rl_dm.general_lock);
+    mutex_unlock(&rc->dm->general_lock);
 
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&upd));
 
@@ -1824,7 +1882,7 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
 
     if (req->ipcp_id != 0xffff) {
         /* Validate req->ipcp_id. */
-        struct ipcp_entry *ipcp = ipcp_get(req->ipcp_id);
+        struct ipcp_entry *ipcp = ipcp_get(rc->dm, req->ipcp_id);
 
         if (!ipcp) {
             return -EINVAL;
@@ -1832,10 +1890,10 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
         ipcp_put(ipcp);
     }
 
-    FLOCK();
+    FLOCK(rc->dm);
 
     if (list_empty(&rc->flows_fetch_q)) {
-        hash_for_each(rl_dm.flow_table, bucket, entry, node)
+        hash_for_each(rc->dm->flow_table, bucket, entry, node)
         {
             if (req->ipcp_id != 0xffff &&
                 entry->txrx.ipcp->id != req->ipcp_id) {
@@ -1886,7 +1944,7 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
         rl_free(fqe, RL_MT_FFETCH);
     }
 
-    FUNLOCK();
+    FUNLOCK(rc->dm);
 
     return ret;
 }
@@ -1908,17 +1966,17 @@ rl_reg_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
 
     if (req->ipcp_id != 0xffff) {
         /* Validate req->ipcp_id. */
-        ipcp = ipcp_get(req->ipcp_id);
+        ipcp = ipcp_get(rc->dm, req->ipcp_id);
         if (!ipcp) {
             return -EINVAL;
         }
         ipcp_put(ipcp);
     }
 
-    PLOCK();
+    PLOCK(rc->dm);
 
     if (list_empty(&rc->regs_fetch_q)) {
-        hash_for_each(rl_dm.ipcp_table, bucket, ipcp, node)
+        hash_for_each(rc->dm->ipcp_table, bucket, ipcp, node)
         {
             if (req->ipcp_id != 0xffff && ipcp->id != req->ipcp_id) {
                 /* Filter out this ipcp as user asked only for application
@@ -1968,7 +2026,7 @@ rl_reg_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
         rl_free(fqe, RL_MT_FFETCH);
     }
 
-    PUNLOCK();
+    PUNLOCK(rc->dm);
 
     return ret;
 }
@@ -2035,7 +2093,7 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     /* Find the IPC process entry corresponding to req->ipcp_id and
      * fill the DIF name field. */
-    entry = ipcp_get(req->ipcp_id);
+    entry = ipcp_get(rc->dm, req->ipcp_id);
     if (!entry) {
         return -EINVAL;
     }
@@ -2072,7 +2130,7 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         if (notify) {
             /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
              * opened ctrl device. */
-            ipcp_update_all(req->ipcp_id, RL_IPCP_UPDATE_UPD);
+            ipcp_update_all(rc, req->ipcp_id, RL_IPCP_UPDATE_UPD);
         }
     }
 
@@ -2094,7 +2152,7 @@ rl_ipcp_config_get(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     /* Find the IPC process entry corresponding to req->ipcp_id and
      * fill the DIF name field. */
-    entry = ipcp_get(req->ipcp_id);
+    entry = ipcp_get(rc->dm, req->ipcp_id);
     if (!entry) {
         return -EINVAL;
     }
@@ -2147,8 +2205,8 @@ rl_ipcp_pduft_mod(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct flow_entry *flow;
     int ret = -EINVAL; /* Report failure by default. */
 
-    flow = flow_get(req->local_port);
-    ipcp = ipcp_get(req->ipcp_id);
+    flow = flow_get(rc->dm, req->local_port);
+    ipcp = ipcp_get(rc->dm, req->ipcp_id);
 
     if (ipcp && flow && flow->upper.ipcp == ipcp && ipcp->ops.pduft_set &&
         !(ipcp->flags & RL_K_IPCP_ZOMBIE)) {
@@ -2188,7 +2246,7 @@ rl_ipcp_pduft_flush(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct ipcp_entry *ipcp;
     int ret;
 
-    ipcp = ipcp_get(req->ipcp_id);
+    ipcp = ipcp_get(rc->dm, req->ipcp_id);
     ret  = ipcp_pduft_flush(ipcp);
     ipcp_put(ipcp);
 
@@ -2207,7 +2265,7 @@ rl_ipcp_qos_supported(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct ipcp_entry *ipcp;
     int ret = -EINVAL;
 
-    ipcp = ipcp_get(req->ipcp_id);
+    ipcp = ipcp_get(rc->dm, req->ipcp_id);
     if (ipcp) {
         if (ipcp->ops.qos_supported) {
             /* IPCP is able to validate QoS. */
@@ -2231,7 +2289,7 @@ rl_ipcp_uipcp_set(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     /* Find the IPC process entry corresponding to req->ipcp_id and
      * fill the entry->uipcp field. */
-    entry = ipcp_get(req->ipcp_id);
+    entry = ipcp_get(rc->dm, req->ipcp_id);
     if (entry) {
         mutex_lock(&entry->lock);
         if (entry->uipcp) {
@@ -2263,7 +2321,7 @@ rl_ipcp_uipcp_wait(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     /* Find the IPC process entry corresponding to req->ipcp_id and wait
      * for the entry->uipcp field to be filled. */
-    entry = ipcp_get(req->ipcp_id);
+    entry = ipcp_get(rc->dm, req->ipcp_id);
     if (!entry) {
         return -EINVAL;
     }
@@ -2307,7 +2365,7 @@ rl_ipcp_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct ipcp_entry *ipcp;
     int ret = -EINVAL; /* Report failure by default. */
 
-    ipcp = ipcp_get(req->ipcp_id);
+    ipcp = ipcp_get(rc->dm, req->ipcp_id);
     if (ipcp) {
         int cpu;
 
@@ -2343,7 +2401,7 @@ rl_uipcp_fa_req_arrived(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct ipcp_entry *ipcp;
     int ret = -EINVAL; /* Report failure by default. */
 
-    ipcp = ipcp_get(req->ipcp_id);
+    ipcp = ipcp_get(rc->dm, req->ipcp_id);
     if (ipcp) {
         ret = rl_fa_req_arrived(ipcp, req->kevent_id, req->remote_port,
                                 req->remote_cep, req->remote_addr,
@@ -2364,7 +2422,7 @@ rl_uipcp_fa_resp_arrived(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct ipcp_entry *ipcp;
     int ret = -EINVAL; /* Report failure by default. */
 
-    ipcp = ipcp_get(req->ipcp_id);
+    ipcp = ipcp_get(rc->dm, req->ipcp_id);
     if (ipcp) {
         ret = rl_fa_resp_arrived(ipcp, req->local_port, req->remote_port,
                                  req->remote_cep, req->remote_addr,
@@ -2415,7 +2473,7 @@ rl_flow_dealloc(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
      * deallocated and another flow has been allocated with the same
      * port-id. If we didn't check, the new flow would be incorrectly
      * shut down. */
-    flow = flow_get(req->port_id);
+    flow = flow_get(rc->dm, req->port_id);
     if (flow && flow->uid == req->uid) {
         rl_flow_shutdown(flow);
         ret = 0;
@@ -2434,7 +2492,7 @@ rl_flow_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct dtp *dtp;
     int ret = 0;
 
-    flow = flow_get(req->port_id);
+    flow = flow_get(rc->dm, req->port_id);
     if (!flow) {
         return -EINVAL;
     }
@@ -2491,7 +2549,7 @@ rl_flow_cfg_update(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct flow_entry *flow;
     int ret = 0;
 
-    flow = flow_get(req->port_id);
+    flow = flow_get(rc->dm, req->port_id);
     if (!flow) {
         return -EINVAL;
     }
@@ -2514,7 +2572,7 @@ upper_ipcp_flow_bind(struct rl_ctrl *rc, rl_ipcp_id_t upper_ipcp_id,
     struct ipcp_entry *upper_ipcp;
 
     /* Lookup the IPCP user of 'flow'. */
-    upper_ipcp = ipcp_get(upper_ipcp_id);
+    upper_ipcp = ipcp_get(rc->dm, upper_ipcp_id);
     if (!upper_ipcp) {
         PE("No such upper ipcp %u\n", upper_ipcp_id);
 
@@ -2558,7 +2616,7 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     int ret = 0;
 
     /* Find an IPC Process entry corresponding to req->dif_name. */
-    ipcp = ipcp_select_by_dif(req->dif_name);
+    ipcp = ipcp_select_by_dif(rc->dm, req->dif_name);
     if (!ipcp) {
         return -ENXIO;
     }
@@ -2633,7 +2691,7 @@ rl_appl_register_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct ipcp_entry *ipcp;
     int ret = -EINVAL; /* Report failure by default. */
 
-    ipcp = ipcp_get(resp->ipcp_id);
+    ipcp = ipcp_get(rc->dm, resp->ipcp_id);
 
     if (!ipcp || (!ipcp->ops.appl_register && !ipcp->uipcp) || !resp->reg) {
         PE("Spurious/malicious application register response to "
@@ -2688,7 +2746,7 @@ rl_appl_move(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     }
     dst_rc = dst_file->private_data;
 
-    ipcp = ipcp_get(req->ipcp_id);
+    ipcp = ipcp_get(rc->dm, req->ipcp_id);
     if (!ipcp) {
         ret = -ENXIO;
         goto out;
@@ -2744,7 +2802,7 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     int ret              = -ENXIO;
 
     /* Look up an IPC process entry for the specified DIF. */
-    ipcp_entry = ipcp_select_by_dif(req->dif_name);
+    ipcp_entry = ipcp_select_by_dif(rc->dm, req->dif_name);
     if (!ipcp_entry) {
         goto out;
     }
@@ -2834,7 +2892,7 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     /* Lookup the flow corresponding to the port-id specified
      * by the request. */
-    flow_entry = flow_get(resp->port_id);
+    flow_entry = flow_get(rc->dm, resp->port_id);
     if (!flow_entry) {
         PE("no pending flow corresponding to port-id %u\n", resp->port_id);
         return ret;
@@ -3000,7 +3058,7 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp, rl_port_t local_port,
     int ret                       = -EINVAL;
     struct rl_ctrl *rc;
 
-    flow_entry = flow_get(local_port);
+    flow_entry = flow_get(ipcp->dm, local_port);
     if (!flow_entry) {
         return ret;
     }
@@ -3274,9 +3332,9 @@ initial_ipcp_update(struct rl_ctrl *rc)
     int bucket;
     int ret = 0;
 
-    PLOCK();
+    PLOCK(rc->dm);
 
-    hash_for_each(rl_dm.ipcp_table, bucket, entry, node)
+    hash_for_each(rc->dm->ipcp_table, bucket, entry, node)
     {
         struct rl_kmsg_ipcp_update upd;
 
@@ -3287,7 +3345,7 @@ initial_ipcp_update(struct rl_ctrl *rc)
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&upd));
     }
 
-    PUNLOCK();
+    PUNLOCK(rc->dm);
 
     if (ret) {
         RPV(1, "Out of memory\n");
@@ -3299,7 +3357,6 @@ initial_ipcp_update(struct rl_ctrl *rc)
 static int
 rl_ctrl_open(struct inode *inode, struct file *f)
 {
-    struct rl_dm *dm;
     struct rl_ctrl *rc;
 
     rc = rl_alloc(sizeof(*rc), GFP_KERNEL | __GFP_ZERO, RL_MT_CTLDEV);
@@ -3307,7 +3364,7 @@ rl_ctrl_open(struct inode *inode, struct file *f)
         return -ENOMEM;
     }
 
-    dm = rl_dm_get();
+    rc->dm = rl_dm_get();
 
     f->private_data = rc;
     rc->file        = f;
@@ -3321,11 +3378,11 @@ rl_ctrl_open(struct inode *inode, struct file *f)
 
     rc->handlers = rl_ctrl_handlers;
 
-    mutex_lock(&dm->general_lock);
-    list_add_tail(&rc->node, &dm->ctrl_devs);
-    mutex_unlock(&dm->general_lock);
+    mutex_lock(&rc->dm->general_lock);
+    list_add_tail(&rc->node, &rc->dm->ctrl_devs);
+    mutex_unlock(&rc->dm->general_lock);
 
-    rl_dm_put(dm);
+    rl_dm_put(rc->dm);
 
     return 0;
 }
@@ -3473,7 +3530,7 @@ rlite_init(void)
 #ifdef RL_HAVE_TIMER_SETUP
     timer_setup(&rl_dm.flows_putq_tmr, flows_putq_drain, 0);
 #else  /* !RL_HAVE_TIMER_SETUP */
-    setup_timer(&rl_dm.flows_putq_tmr, flows_putq_drain, /* no arg */ 0);
+    setup_timer(&rl_dm.flows_putq_tmr, flows_putq_drain, (unsigned long)&rl_dm);
 #endif /* !RL_HAVE_TIMER_SETUP */
 
     ret = misc_register(&rl_ctrl_misc);
