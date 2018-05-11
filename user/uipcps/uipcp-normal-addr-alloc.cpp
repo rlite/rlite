@@ -338,21 +338,24 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
     /* In case of state machine replica, a pointer to a Raft state
      * machine. */
     class Replica : public CeftReplica {
-        /* The structure of a DFT command (i.e. a log entry for the Raft SM). */
+        /* The structure of an address allocation command (i.e. a log entry
+         * for the Raft SM). The command contains the name of the IPCP for
+         * which we want to allocate or deallocate an address. Raft is only
+         * needed to achieve consensus on the order of allocation and
+         * deallocation operations. */
         struct Command {
-            rlm_addr_t address;
             char ipcp_name[31];
             uint8_t opcode;
             static constexpr uint8_t OpcodeSet = 1;
             static constexpr uint8_t OpcodeDel = 2;
         } __attribute__((packed));
-        static_assert(sizeof(Command) == sizeof(Command::address) +
-                                             sizeof(Command::ipcp_name) +
-                                             sizeof(Command::opcode),
+        static_assert(sizeof(Command) ==
+                          sizeof(Command::ipcp_name) + sizeof(Command::opcode),
                       "Invalid memory layout for class Replica::Command");
 
         /* State machine implementation: a simple table mapping IPCP names
-         * into addresses. */
+         * into addresses, plus a simple counter to keep the next address
+         * to allocate. */
         std::map<string, rlm_addr_t> table;
         rlm_addr_t next_unused_address = 1;
 
@@ -636,11 +639,14 @@ CentralizedFaultTolerantAddrAllocator::Replica::apply(const char *const serbuf,
 
     assert(c->opcode == Command::OpcodeSet || c->opcode == Command::OpcodeDel);
     if (c->opcode == Command::OpcodeSet) {
-        table[c->ipcp_name] = c->address;
-        /* Make sure next_unused_address is consistent with the table. This
-         * is necessary because we could become leader anytime. Note that we
-         * should handle 64-bit wraparound here. */
-        next_unused_address = std::max(next_unused_address, c->address + 1);
+        /* Allocate an address (for now we use a trivial sequential strategy)
+         * and update our table. */
+        table[c->ipcp_name] = next_unused_address;
+        if (rm) {
+            /* Update the response if we have one. */
+            rm->set_obj_value((static_cast<int64_t>(next_unused_address)));
+        }
+        next_unused_address++;
     } else {
         table.erase(c->ipcp_name);
     }
@@ -691,18 +697,14 @@ CentralizedFaultTolerantAddrAllocator::Replica::replica_process_rib_msg(
             m->set_obj_value((static_cast<int64_t>(mit->second)));
             rib->send_to_dst_addr(std::move(m), src_addr);
         } else {
-            /* Let's allocate an address and submit the request to the Raft
-             * state machine. Note that this code is only executed by the
-             * leader. */
+            /* We are the leader here. Create a command and submit it to the
+             * Raft state machine. */
             auto cbuf  = std::unique_ptr<char[]>(new char[sizeof(Command)]);
             Command *c = reinterpret_cast<Command *>(cbuf.get());
 
             /* Fill in the command struct (already serialized). */
             strncpy(c->ipcp_name, ipcp_name.c_str(), sizeof(c->ipcp_name));
-            c->address = next_unused_address++;
-            c->opcode  = Command::OpcodeSet;
-
-            m->set_obj_value((static_cast<int64_t>(c->address)));
+            c->opcode = Command::OpcodeSet;
 
             /* Return the command to the caller. */
             commands->push_back(make_pair(std::move(cbuf), std::move(m)));
