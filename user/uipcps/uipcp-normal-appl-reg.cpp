@@ -392,9 +392,9 @@ class CentralizedFaultTolerantDFT : public DFT {
             std::string appl_name;
             uint32_t kevent_id;
             PendingReq() = default;
-            PendingReq(gpb::OpCode op_code, const std::string &appl_name,
-                       uint32_t kevent_id)
-                : CeftClient::PendingReq(op_code),
+            PendingReq(gpb::OpCode op_code, Msecs timeout,
+                       const std::string &appl_name, uint32_t kevent_id)
+                : CeftClient::PendingReq(op_code, timeout),
                   appl_name(appl_name),
                   kevent_id(kevent_id)
             {
@@ -514,7 +514,8 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
 
     m->m_read(ObjClass, TableName + "/" + appl_name);
 
-    auto pr = make_unique<PendingReq>(m->op_code, appl_name, 0);
+    auto timeout = rib->get_param_value<Msecs>(DFT::Prefix, "cli-timeout");
+    auto pr      = make_unique<PendingReq>(m->op_code, timeout, appl_name, 0);
     int ret = send_to_replicas(std::move(m), std::move(pr), OpSemantics::Get);
     if (ret) {
         return ret;
@@ -544,7 +545,9 @@ CentralizedFaultTolerantDFT::Client::appl_register(
         m->m_delete(ObjClass, TableName);
     }
 
-    auto pr = make_unique<PendingReq>(m->op_code, appl_name, req->hdr.event_id);
+    auto timeout = rib->get_param_value<Msecs>(DFT::Prefix, "cli-timeout");
+    auto pr      = make_unique<PendingReq>(m->op_code, timeout, appl_name,
+                                      req->hdr.event_id);
     gpb::DFTEntry dft_entry;
 
     dft_entry.set_ipcp_name(rib->myname);

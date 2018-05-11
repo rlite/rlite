@@ -117,9 +117,9 @@ protected:
         gpb::OpCode op_code;
         std::chrono::system_clock::time_point t;
         PendingReq() = default;
-        PendingReq(gpb::OpCode op_code) : op_code(op_code)
+        PendingReq(gpb::OpCode op_code, Msecs timeout) : op_code(op_code)
         {
-            t = std::chrono::system_clock::now() + Secs(int(kTimeoutSecs));
+            t = std::chrono::system_clock::now() + timeout;
         }
         virtual ~PendingReq() {}
         virtual std::unique_ptr<PendingReq> clone() const = 0;

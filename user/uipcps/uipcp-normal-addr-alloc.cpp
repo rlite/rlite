@@ -404,9 +404,10 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
              * the enroller thread about the allocated address. */
             std::shared_ptr<Synchronizer> synchro;
             PendingReq() = default;
-            PendingReq(gpb::OpCode op_code, const std::string &ipcp_name,
+            PendingReq(gpb::OpCode op_code, Msecs timeout,
+                       const std::string &ipcp_name,
                        const std::shared_ptr<Synchronizer> &synchro)
-                : CeftClient::PendingReq(op_code),
+                : CeftClient::PendingReq(op_code, timeout),
                   ipcp_name(ipcp_name),
                   synchro(synchro)
             {
@@ -523,7 +524,9 @@ CentralizedFaultTolerantAddrAllocator::Client::allocate(
     *addr = RL_ADDR_NULL;
     m->m_create(ObjClass, TableName + "/" + ipcp_name);
 
-    auto pr = make_unique<PendingReq>(m->op_code, ipcp_name, synchro);
+    auto timeout =
+        rib->get_param_value<Msecs>(AddrAllocator::Prefix, "cli-timeout");
+    auto pr = make_unique<PendingReq>(m->op_code, timeout, ipcp_name, synchro);
     int ret = send_to_replicas(std::move(m), std::move(pr), OpSemantics::Put);
     if (ret) {
         return ret;
@@ -537,8 +540,6 @@ CentralizedFaultTolerantAddrAllocator::Client::allocate(
     rib->unlock();
 
     std::unique_lock<std::mutex> lk(synchro->mutex);
-    auto timeout =
-        rib->get_param_value<Msecs>(AddrAllocator::Prefix, "cli-timeout");
 
     if (synchro->allocated.wait_for(lk, timeout) == std::cv_status::timeout) {
         UPE(rib->uipcp, "Address allocation for IPCP '%s' timed out\n",
