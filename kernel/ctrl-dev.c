@@ -130,7 +130,7 @@ struct rl_dm {
     struct list_head difs;
 
     /* Lock for flows table. */
-    spinlock_t flows_lock;
+    rwlock_t flows_lock;
 
     /* Lock for IPCPs table. */
     spinlock_t ipcps_lock;
@@ -159,8 +159,10 @@ struct rl_dm {
 
 static struct rl_dm rl_dm;
 
-#define FLOCK() spin_lock_bh(&rl_dm.flows_lock)
-#define FUNLOCK() spin_unlock_bh(&rl_dm.flows_lock)
+#define FLOCK() write_lock_bh(&rl_dm.flows_lock)
+#define FUNLOCK() write_unlock_bh(&rl_dm.flows_lock)
+#define FRLOCK() read_lock_bh(&rl_dm.flows_lock)
+#define FRUNLOCK() read_unlock_bh(&rl_dm.flows_lock)
 #define PLOCK() spin_lock_bh(&rl_dm.ipcps_lock)
 #define PUNLOCK() spin_unlock_bh(&rl_dm.ipcps_lock)
 #define RALOCK(_p) spin_lock_bh(&(_p)->regapp_lock)
@@ -871,7 +873,7 @@ application_del_by_rc(struct rl_ctrl *rc)
     }
 }
 
-/* To be called under FLOCK. */
+/* To be called under FLOCK or FRLOCK. */
 struct flow_entry *
 flow_lookup(rl_port_t port_id)
 {
@@ -893,13 +895,13 @@ flow_get(rl_port_t port_id)
 {
     struct flow_entry *flow;
 
-    FLOCK();
+    FRLOCK();
     flow = flow_lookup(port_id);
     if (flow) {
-        flow->refcnt++;
-        PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
+        atomic_inc(&flow->refcnt);
+        PV("FLOWREFCNT %u ++: %u\n", flow->local_port, atomic_read(&flow->refcnt));
     }
-    FUNLOCK();
+    FRUNLOCK();
 
     return flow;
 }
@@ -911,20 +913,20 @@ flow_get_by_cep(unsigned int cep_id)
     struct flow_entry *entry;
     struct hlist_head *head;
 
-    FLOCK();
+    FRLOCK();
 
     head = &rl_dm.flow_table_by_cep[hash_min(
         cep_id, HASH_BITS(rl_dm.flow_table_by_cep))];
     hlist_for_each_entry (entry, head, node_cep) {
         if (entry->local_cep == cep_id) {
-            entry->refcnt++;
-            PV("FLOWREFCNT %u ++: %u\n", entry->local_port, entry->refcnt);
-            FUNLOCK();
+            atomic_inc(&entry->refcnt);
+            PV("FLOWREFCNT %u ++: %u\n", entry->local_port, atomic_read(&entry->refcnt));
+            FRUNLOCK();
             return entry;
         }
     }
 
-    FUNLOCK();
+    FRUNLOCK();
 
     return NULL;
 }
@@ -937,10 +939,8 @@ flow_get_ref(struct flow_entry *flow)
         return;
     }
 
-    FLOCK();
-    flow->refcnt++;
-    PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
-    FUNLOCK();
+    atomic_inc(&flow->refcnt);
+    PV("FLOWREFCNT %u ++: %u\n", flow->local_port, atomic_read(&flow->refcnt));
 }
 EXPORT_SYMBOL(flow_get_ref);
 
@@ -948,8 +948,8 @@ EXPORT_SYMBOL(flow_get_ref);
 static void
 flows_putq_add(struct flow_entry *flow, unsigned jdelta)
 {
-    flow->refcnt++;
-    PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
+    atomic_inc(&flow->refcnt);
+    PV("FLOWREFCNT %u ++: %u\n", flow->local_port, atomic_read(&flow->refcnt));
 
     if (flow->expires == ~0U) { /* don't insert twice */
         struct flow_entry *cur;
@@ -1029,21 +1029,16 @@ __flow_put(struct flow_entry *entry, bool lock)
         return;
     }
 
+    if (!atomic_dec_and_test(&entry->refcnt)) {
+        /* Flow is still being used by someone. */
+        return;
+    }
+
     if (lock) {
         FLOCK();
     }
 
     dtp = &entry->dtp;
-
-    entry->refcnt--;
-    if (entry->refcnt) {
-        /* Flow is still being used by someone. */
-        if (lock) {
-            FUNLOCK();
-        }
-        return;
-    }
-
     ipcp = entry->txrx.ipcp;
     entry->flags |= RL_FLOW_DEALLOCATED;
 
@@ -1070,8 +1065,8 @@ __flow_put(struct flow_entry *entry, bool lock)
 
         /* Reference counter is zero here, we need to reset it
          * to 1 and let the delayed remove function do its job. */
-        entry->refcnt++;
-        PV("FLOWREFCNT %u ++: %u\n", entry->local_port, entry->refcnt);
+        atomic_inc(&entry->refcnt);
+        PV("FLOWREFCNT %u ++: %u\n", entry->local_port, atomic_read(&entry->refcnt));
         flows_putq_add(entry, msecs_to_jiffies(5000) /* should be MPL */);
         if (lock) {
             FUNLOCK();
@@ -1301,7 +1296,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper, uint32_t event_id,
             get_file(upper.rc->file);
         }
         entry->event_id = event_id;
-        entry->refcnt   = 1; /* Cogito, ergo sum. */
+        atomic_set(&entry->refcnt, 1); /* Cogito, ergo sum. */
         entry->flags    = RL_FLOW_PENDING | RL_FLOW_NEVER_BOUND;
         memcpy(&entry->spec, flowspec, sizeof(*flowspec));
         INIT_LIST_HEAD(&entry->pduft_entries);
@@ -1317,8 +1312,8 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper, uint32_t event_id,
         rl_flow_stats_init(&entry->stats);
         dtp_init(&entry->dtp);
 
-        entry->refcnt++; /* on behalf of the caller */
-        PV("FLOWREFCNT %u = %u\n", entry->local_port, entry->refcnt);
+        atomic_inc(&entry->refcnt); /* on behalf of the caller */
+        PV("FLOWREFCNT %u = %u\n", entry->local_port, atomic_read(&entry->refcnt));
 
         /* Start the unbound timer */
         flows_putq_add(entry, RL_UNBOUND_FLOW_TO);
@@ -1383,8 +1378,8 @@ flow_make_mortal(struct flow_entry *flow)
          * didn't do it, the flow would live forever with its refcount
          * set to 1. */
         flow->flags &= ~RL_FLOW_NEVER_BOUND;
-        flow->refcnt--;
-        PV("FLOWREFCNT %u --: %u\n", flow->local_port, flow->refcnt);
+        atomic_dec(&flow->refcnt);
+        PV("FLOWREFCNT %u --: %u\n", flow->local_port, atomic_read(&flow->refcnt));
     }
 
     FUNLOCK();
@@ -3369,7 +3364,7 @@ rlite_init(void)
     bitmap_zero(rl_dm.cep_id_bitmap, CEP_ID_BITMAP_SIZE);
     hash_init(rl_dm.flow_table_by_cep);
     mutex_init(&rl_dm.general_lock);
-    spin_lock_init(&rl_dm.flows_lock);
+    rwlock_init(&rl_dm.flows_lock);
     spin_lock_init(&rl_dm.ipcps_lock);
     spin_lock_init(&rl_dm.difs_lock);
     spin_lock_init(&rl_dm.appl_removeq_lock);
