@@ -205,11 +205,13 @@ struct rl_kmsg_fa_req {
     struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t upper_ipcp_id;
+    char pad1[2];
     struct rina_flow_spec flowspec;
 
     /* The local port, local CEP and unique id are filled by kernel before
      * reflection to userspace. */
     rl_port_t local_port;
+    char pad2[2];
     uint32_t local_cep;
     uint32_t uid;
 
@@ -220,7 +222,7 @@ struct rl_kmsg_fa_req {
     char *local_appl;
     char *remote_appl;
     char *dif_name;
-} __attribute__((packed));
+};
 
 /* application <-- kernel to notify about an incoming flow response. */
 struct rl_kmsg_fa_resp_arrived {
@@ -241,7 +243,7 @@ struct rl_kmsg_fa_req_arrived {
     char *local_appl;
     char *remote_appl;
     char *dif_name;
-} __attribute__((packed));
+};
 
 /* application --> kernel to respond to an incoming flow request. */
 struct rl_kmsg_fa_resp {
@@ -327,7 +329,7 @@ struct rl_kmsg_uipcp_fa_req_arrived {
     char *local_appl;
     /* Requesting application. */
     char *remote_appl;
-} __attribute__((packed));
+};
 
 /* uipcp (application) --> kernel to tell the kernel that a flow
  * allocation response has arrived. */
@@ -337,11 +339,13 @@ struct rl_kmsg_uipcp_fa_resp_arrived {
     rl_ipcp_id_t ipcp_id;
     rl_port_t local_port;
     rl_port_t remote_port;
+    char pad1[2];
     uint32_t remote_cep;
     rlm_addr_t remote_addr;
     uint8_t response;
+    char pad2[3];
     struct rl_flow_config flowcfg;
-} __attribute__((packed));
+};
 
 /* uipcp (application) --> kernel to update the configuration
  * of a flow */

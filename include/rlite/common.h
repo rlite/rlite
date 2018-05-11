@@ -59,7 +59,7 @@ struct rina_name {
     char *api;
     char *aen;
     char *aei;
-} __attribute__((packed));
+};
 
 typedef uint16_t rl_port_t;
 typedef uint16_t rl_ipcp_id_t;
@@ -108,14 +108,14 @@ struct pci_sizes {
 #define RLITE_ERR 1
 
 /* Expected control API version. */
-#define RL_API_VERSION 3
+#define RL_API_VERSION 4
 
 /* All the possible messages begin like this. */
 struct rl_msg_hdr {
     uint16_t version;
     rl_msg_t msg_type;
     uint32_t event_id;
-} __attribute__((packed));
+};
 
 /* Base message, when no arguments are needed. */
 struct rl_msg_base {
@@ -194,6 +194,7 @@ struct dtcp_config {
     /* Flow control. */
     struct {
         uint8_t fc_type;
+        char pad1[3];
 #define RLITE_FC_T_NONE 0
 #define RLITE_FC_T_WIN 1
 #define RLITE_FC_T_RATE 2
@@ -219,12 +220,13 @@ struct dtcp_config {
 
     uint32_t initial_a; /* A */
     uint32_t bandwidth; /* in bps */
-} __attribute__((packed));
+};
 
 struct rl_flow_config {
     /* Used by normal IPCP. */
     uint8_t msg_boundaries;
     uint8_t in_order_delivery;
+    char pad1[2];
     rlm_seq_t max_sdu_gap;
     struct dtcp_config dtcp;
 
@@ -232,7 +234,8 @@ struct rl_flow_config {
     int32_t fd;
     uint32_t inet_ip;
     uint16_t inet_port;
-} __attribute__((packed));
+    char pad2[2];
+};
 
 #define RL_MPL_MSECS_DFLT 1000
 #define RL_DATA_RXMS_MAX_DFLT 10
