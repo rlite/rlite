@@ -1256,7 +1256,8 @@ UipcpRib::policy_mod(const std::string &component,
 
         for (const auto &pp : prev_builder->params) {
             params_map[component].erase(pp.first);
-            UPD(uipcp, "policy param '%s' unregistered\n", pp.first.c_str());
+            UPD(uipcp, "policy param '%s.%s' unregistered\n", component.c_str(),
+                pp.first.c_str());
         }
     }
 
@@ -1284,7 +1285,8 @@ UipcpRib::policy_mod(const std::string &component,
     /* Register the new policy parameters. */
     for (const auto &pp : policy_builder->params) {
         params_map[component][pp.first] = pp.second;
-        UPD(uipcp, "policy param '%s' registered\n", pp.first.c_str());
+        UPD(uipcp, "policy param '%s.%s' registered\n", component.c_str(),
+            pp.first.c_str());
     }
     /* Reconfigure the new component, if necessary. */
     if (component == DFT::Prefix) {
