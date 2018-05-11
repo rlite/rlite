@@ -12,7 +12,7 @@
 
 using namespace std;
 
-namespace Uipcps {
+namespace rlite {
 
 class DistributedAddrAllocator : public AddrAllocator {
     /* Table used to carry on distributed address allocation.
@@ -769,4 +769,4 @@ UipcpRib::addra_lib_init()
           PolicyParam(Msecs(int(CeftReplica::kRtxTimeoutMsecs)))}}));
 }
 
-} // namespace Uipcps
+} // namespace rlite

@@ -23,7 +23,7 @@
 
 #include "uipcp-normal.hpp"
 
-namespace Uipcps {
+namespace rlite {
 
 /* The CeftReplica class extends the Raft state machine by providing
  * generic glue functionalities to (i) send and receive messages to DIF members
@@ -164,4 +164,4 @@ public:
     static constexpr int kTimeoutSecs = 5;
 };
 
-} // namespace Uipcps
+} // namespace rlite

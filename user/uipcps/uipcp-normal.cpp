@@ -47,7 +47,7 @@
 
 using namespace std;
 
-namespace Uipcps {
+namespace rlite {
 
 #if 0
 string address      = "/daf/mgmt/naming/address";
@@ -2286,9 +2286,9 @@ normal_lib_init(void)
     UipcpRib::ra_lib_init();      /* enrollment and resource allocator */
 }
 
-} // namespace Uipcps
+} // namespace rlite
 
-using namespace Uipcps;
+using namespace rlite;
 
 struct uipcp_ops normal_ops = {
     .init                 = normal_init,

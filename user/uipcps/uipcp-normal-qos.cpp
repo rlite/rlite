@@ -28,7 +28,7 @@
 
 using namespace std;
 
-namespace Uipcps {
+namespace rlite {
 
 #ifdef RL_USE_QOS_CUBES
 
@@ -245,4 +245,4 @@ UipcpRib::load_qos_cubes(const char *filename)
 
 #endif /* RL_USE_QOS_CUBES */
 
-} // namespace Uipcps
+} // namespace rlite

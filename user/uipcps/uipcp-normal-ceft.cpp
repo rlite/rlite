@@ -27,7 +27,7 @@
 #include "uipcp-normal-ceft.hpp"
 #include "Raft.pb.h"
 
-namespace Uipcps {
+namespace rlite {
 
 std::string CeftReplica::ReqVoteObjClass           = "raft_rv";
 std::string CeftReplica::ReqVoteRespObjClass       = "raft_rv_r";
@@ -443,4 +443,4 @@ CeftClient::rib_handler(const CDAPMessage *rm,
     return ret;
 }
 
-} // namespace Uipcps
+} // namespace rlite

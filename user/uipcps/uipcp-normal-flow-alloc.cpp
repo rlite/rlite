@@ -27,7 +27,7 @@
 
 using namespace std;
 
-namespace Uipcps {
+namespace rlite {
 
 struct FlowRequest : public gpb::FlowRequest {
     FlowRequest() = default;
@@ -747,4 +747,4 @@ UipcpRib::fa_lib_init()
          {"max-rtxq-len", PolicyParam(LocalFlowAllocator::kRtxQueueMaxLen)}}));
 }
 
-} // namespace Uipcps
+} // namespace rlite

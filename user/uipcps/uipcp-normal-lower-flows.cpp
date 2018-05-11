@@ -31,7 +31,7 @@
 
 using namespace std;
 
-namespace Uipcps {
+namespace rlite {
 
 using NodeId = std::string;
 
@@ -1076,4 +1076,4 @@ UipcpRib::routing_lib_init()
         }));
 }
 
-} // namespace Uipcps
+} // namespace rlite

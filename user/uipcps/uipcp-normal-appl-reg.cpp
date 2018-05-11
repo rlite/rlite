@@ -33,7 +33,7 @@
 
 using namespace std;
 
-namespace Uipcps {
+namespace rlite {
 
 class FullyReplicatedDFT : public DFT {
     /* Directory Forwarding Table, mapping application name (std::string)
@@ -763,4 +763,4 @@ UipcpRib::dft_lib_init()
           PolicyParam(Msecs(int(CeftReplica::kRtxTimeoutMsecs)))}}));
 }
 
-} // namespace Uipcps
+} // namespace rlite

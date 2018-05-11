@@ -32,7 +32,7 @@
 
 using namespace std;
 
-namespace Uipcps {
+namespace rlite {
 
 NeighFlow::NeighFlow(UipcpRib *parent, const string &ipcp_name,
                      const string &supdif, rl_port_t pid, int ffd,
@@ -1989,4 +1989,4 @@ UipcpRib::ra_lib_init()
         PolicyBuilder("default"));
 }
 
-} // namespace Uipcps
+} // namespace rlite
