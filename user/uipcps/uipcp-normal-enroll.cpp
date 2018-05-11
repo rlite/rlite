@@ -166,7 +166,8 @@ NeighFlow::sync_obj(bool create, const string &obj_class,
 void
 EnrollmentResources::enrollment_abort()
 {
-    UPW(neigh->rib->uipcp, "Aborting enrollment\n");
+    UPW(neigh->rib->uipcp, "Aborting enrollment with neighbor %s\n",
+        neigh->ipcp_name.c_str());
 
     if (nf->enroll_state == EnrollState::NEIGH_NONE) {
         return;
