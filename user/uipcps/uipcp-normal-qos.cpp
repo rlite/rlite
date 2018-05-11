@@ -193,7 +193,7 @@ update_qos_cube(struct rl_flow_config &flowcfg, const string &param,
 }
 
 int
-uipcp_rib::load_qos_cubes(const char *filename)
+UipcpRib::load_qos_cubes(const char *filename)
 {
     ifstream fin(filename);
     unsigned int cnt = 1;

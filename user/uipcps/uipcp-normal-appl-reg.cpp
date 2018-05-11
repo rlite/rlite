@@ -42,7 +42,7 @@ class FullyReplicatedDFT : public DFT {
 
 public:
     RL_NODEFAULT_NONCOPIABLE(FullyReplicatedDFT);
-    FullyReplicatedDFT(uipcp_rib *_ur) : DFT(_ur) {}
+    FullyReplicatedDFT(UipcpRib *_ur) : DFT(_ur) {}
     ~FullyReplicatedDFT() {}
 
     void dump(std::stringstream &ss) const override;
@@ -475,7 +475,7 @@ class CentralizedFaultTolerantDFT : public DFT {
 
 public:
     RL_NODEFAULT_NONCOPIABLE(CentralizedFaultTolerantDFT);
-    CentralizedFaultTolerantDFT(uipcp_rib *_ur) : DFT(_ur) {}
+    CentralizedFaultTolerantDFT(UipcpRib *_ur) : DFT(_ur) {}
     int reconfigure() override;
     void dump(std::stringstream &ss) const override
     {
@@ -1127,15 +1127,15 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
 }
 
 void
-uipcp_rib::dft_lib_init()
+UipcpRib::dft_lib_init()
 {
     available_policies[DFT::Prefix].insert(PolicyBuilder(
         "fully-replicated",
-        [](uipcp_rib *rib) { rib->dft = make_unique<FullyReplicatedDFT>(rib); },
+        [](UipcpRib *rib) { rib->dft = make_unique<FullyReplicatedDFT>(rib); },
         {DFT::TableName}));
     available_policies[DFT::Prefix].insert(PolicyBuilder(
         "centralized-fault-tolerant",
-        [](uipcp_rib *rib) {
+        [](UipcpRib *rib) {
             rib->dft = make_unique<CentralizedFaultTolerantDFT>(rib);
         },
         {DFT::TableName}));

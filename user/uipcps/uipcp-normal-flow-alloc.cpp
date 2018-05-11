@@ -43,7 +43,7 @@ struct FlowRequest : public gpb::FlowRequest {
 };
 
 int
-uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
+UipcpRib::fa_req(struct rl_kmsg_fa_req *req)
 {
     std::string remote_node;
     std::string appl_name;
@@ -90,8 +90,8 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
 }
 
 void
-uipcp_rib::dft_lookup_resolved(const std::string &appl_name,
-                               const std::string &remote_node)
+UipcpRib::dft_lookup_resolved(const std::string &appl_name,
+                              const std::string &remote_node)
 {
     auto mit = pending_fa_reqs.find(appl_name);
 
@@ -124,7 +124,7 @@ uipcp_rib::dft_lookup_resolved(const std::string &appl_name,
 class LocalFlowAllocator : public FlowAllocator {
 public:
     RL_NODEFAULT_NONCOPIABLE(LocalFlowAllocator);
-    LocalFlowAllocator(uipcp_rib *_ur) : FlowAllocator(_ur) {}
+    LocalFlowAllocator(UipcpRib *_ur) : FlowAllocator(_ur) {}
     ~LocalFlowAllocator() {}
 
     void dump(std::stringstream &ss) const override;
@@ -702,11 +702,11 @@ LocalFlowAllocator::dump_memtrack(std::stringstream &ss) const
 }
 
 void
-uipcp_rib::fa_lib_init()
+UipcpRib::fa_lib_init()
 {
     available_policies[FlowAllocator::Prefix].insert(PolicyBuilder(
         "local",
-        [](uipcp_rib *rib) { rib->fa = make_unique<LocalFlowAllocator>(rib); },
+        [](UipcpRib *rib) { rib->fa = make_unique<LocalFlowAllocator>(rib); },
         {FlowAllocator::TableName}));
 }
 

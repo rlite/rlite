@@ -16,7 +16,7 @@ class DistributedAddrAllocator : public AddrAllocator {
 
 public:
     RL_NODEFAULT_NONCOPIABLE(DistributedAddrAllocator);
-    DistributedAddrAllocator(uipcp_rib *_ur) : AddrAllocator(_ur) {}
+    DistributedAddrAllocator(UipcpRib *_ur) : AddrAllocator(_ur) {}
     ~DistributedAddrAllocator() {}
 
     void dump(std::stringstream &ss) const override;
@@ -312,7 +312,7 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
 class StaticAddrAllocator : public DistributedAddrAllocator {
 public:
     RL_NODEFAULT_NONCOPIABLE(StaticAddrAllocator);
-    StaticAddrAllocator(uipcp_rib *_ur) : DistributedAddrAllocator(_ur) {}
+    StaticAddrAllocator(UipcpRib *_ur) : DistributedAddrAllocator(_ur) {}
     int allocate(rlm_addr_t *addr) override
     {
         *addr = RL_ADDR_NULL;
@@ -321,15 +321,15 @@ public:
 };
 
 void
-uipcp_rib::addra_lib_init()
+UipcpRib::addra_lib_init()
 {
     available_policies[AddrAllocator::Prefix].insert(
-        PolicyBuilder("static", [](uipcp_rib *rib) {
+        PolicyBuilder("static", [](UipcpRib *rib) {
             rib->addra = make_unique<StaticAddrAllocator>(rib);
         }));
     available_policies[AddrAllocator::Prefix].insert(PolicyBuilder(
         "distributed",
-        [](uipcp_rib *rib) {
+        [](UipcpRib *rib) {
             rib->addra = make_unique<DistributedAddrAllocator>(rib);
         },
         {AddrAllocator::TableName}));

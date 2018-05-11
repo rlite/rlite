@@ -107,7 +107,7 @@ struct PolicyParam {
 
 struct Neighbor;
 struct NeighFlow;
-struct uipcp_rib;
+struct UipcpRib;
 
 struct TimeoutEvent {
     Msecs delta;
@@ -137,7 +137,7 @@ enum class EnrollState {
 /* Holds the information about an N-1 flow towards a neighbor IPCP. */
 struct NeighFlow {
     /* Backpointer to the parent data structure. */
-    uipcp_rib *rib;
+    UipcpRib *rib;
 
     /* Name of the neighbor IPCP (same as Neighbor::ipcp_name of
      * the parent Neighbor object). */
@@ -180,7 +180,7 @@ struct NeighFlow {
     } stats;
 
     RL_NODEFAULT_NONCOPIABLE(NeighFlow);
-    NeighFlow(uipcp_rib *parent, const std::string &ipcp_name,
+    NeighFlow(UipcpRib *parent, const std::string &ipcp_name,
               const std::string &supp_dif, rl_port_t pid, int ffd,
               rl_ipcp_id_t lid);
     ~NeighFlow();
@@ -203,7 +203,7 @@ struct NeighFlow {
 /* Holds the information about a neighbor IPCP. */
 struct Neighbor {
     /* Backpointer to the RIB. */
-    uipcp_rib *rib;
+    UipcpRib *rib;
 
     /* Name of the neighbor. */
     std::string ipcp_name;
@@ -233,7 +233,7 @@ struct Neighbor {
     std::chrono::system_clock::time_point unheard_since;
 
     RL_NODEFAULT_NONCOPIABLE(Neighbor);
-    Neighbor(uipcp_rib *rib, const std::string &name);
+    Neighbor(UipcpRib *rib, const std::string &name);
     bool operator==(const Neighbor &other) const
     {
         return ipcp_name == other.ipcp_name;
@@ -271,10 +271,10 @@ struct Neighbor {
 /* Naming service, to translate names to addresses. */
 struct DFT {
     /* Backpointer to parent data structure. */
-    uipcp_rib *rib;
+    UipcpRib *rib;
 
     RL_NODEFAULT_NONCOPIABLE(DFT);
-    DFT(uipcp_rib *_ur) : rib(_ur) {}
+    DFT(UipcpRib *_ur) : rib(_ur) {}
     virtual ~DFT() {}
 
     virtual int reconfigure() { return 0; }
@@ -301,13 +301,13 @@ struct DFT {
 /* Allocation and deallocation of N-flows used applications. */
 struct FlowAllocator {
     /* Backpointer to parent data structure. */
-    uipcp_rib *rib;
+    UipcpRib *rib;
 
     /* Id to be used with incoming flow allocation request. */
     uint32_t kevent_id_cnt;
 
     RL_NODEFAULT_NONCOPIABLE(FlowAllocator);
-    FlowAllocator(uipcp_rib *_ur) : rib(_ur), kevent_id_cnt(1) {}
+    FlowAllocator(UipcpRib *_ur) : rib(_ur), kevent_id_cnt(1) {}
     virtual ~FlowAllocator() {}
 
     virtual void dump(std::stringstream &ss) const          = 0;
@@ -337,10 +337,10 @@ struct FlowAllocator {
  * related to (N-1)-flows. */
 struct Routing {
     /* Backpointer to parent data structure. */
-    uipcp_rib *rib;
+    UipcpRib *rib;
 
     RL_NODEFAULT_NONCOPIABLE(Routing);
-    Routing(uipcp_rib *_ur) : rib(_ur) {}
+    Routing(UipcpRib *_ur) : rib(_ur) {}
     virtual ~Routing() {}
 
     virtual void dump(std::stringstream &ss) const         = 0;
@@ -381,10 +381,10 @@ struct Routing {
 /* Address allocation for the members of the N-DIF. */
 struct AddrAllocator {
     /* Backpointer to parent data structure. */
-    uipcp_rib *rib;
+    UipcpRib *rib;
 
     RL_NODEFAULT_NONCOPIABLE(AddrAllocator);
-    AddrAllocator(uipcp_rib *_ur) : rib(_ur) {}
+    AddrAllocator(UipcpRib *_ur) : rib(_ur) {}
     virtual ~AddrAllocator() {}
 
     virtual void dump(std::stringstream &ss) const   = 0;
@@ -404,12 +404,12 @@ struct AddrAllocator {
 /* Object used to store policy names and allocate/switch policies. */
 struct PolicyBuilder {
     std::string name;
-    std::function<void(uipcp_rib *)> builder = [](uipcp_rib *) {};
+    std::function<void(UipcpRib *)> builder = [](UipcpRib *) {};
     std::list<std::string> paths;
 
     PolicyBuilder(const std::string &policy_name) : name(policy_name) {}
     PolicyBuilder(const std::string &policy_name,
-                  std::function<void(uipcp_rib *)> fun,
+                  std::function<void(UipcpRib *)> fun,
                   std::list<std::string> ps = {})
         : PolicyBuilder(policy_name)
     {
@@ -454,7 +454,7 @@ struct EnrollmentResources {
 };
 
 /* Main class representing an IPCP. */
-struct uipcp_rib {
+struct UipcpRib {
     /* Backpointer to parent data structure. */
     struct uipcp *uipcp = nullptr;
 
@@ -470,10 +470,9 @@ struct uipcp_rib {
 
     struct periodic_task *tasks = nullptr;
 
-    using RibHandler = std::function<int(uipcp_rib &, const CDAPMessage *rm,
-                                         std::shared_ptr<NeighFlow> const &nf,
-                                         std::shared_ptr<Neighbor> const &neigh,
-                                         rlm_addr_t src_addr)>;
+    using RibHandler = std::function<int(
+        UipcpRib &, const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+        std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)>;
     struct RibHandlerInfo {
         RibHandler handler;
     };
@@ -538,7 +537,7 @@ struct uipcp_rib {
         std::shared_ptr<Neighbor> const &neigh, bool initiator);
 
     /* Table of flow allocation requests that are pending because they are
-     * waiting for DFT resolution. See uipcp_rib::fa_req(). */
+     * waiting for DFT resolution. See UipcpRib::fa_req(). */
     std::unordered_map<std::string,
                        std::list<std::unique_ptr<struct rl_kmsg_fa_req>>>
         pending_fa_reqs;
@@ -630,9 +629,9 @@ struct uipcp_rib {
     static std::string ResourceAllocPrefix;
     static std::string RibDaemonPrefix;
 
-    RL_NODEFAULT_NONCOPIABLE(uipcp_rib);
-    uipcp_rib(struct uipcp *_u);
-    ~uipcp_rib();
+    RL_NODEFAULT_NONCOPIABLE(UipcpRib);
+    UipcpRib(struct uipcp *_u);
+    ~UipcpRib();
 
     void dump(std::stringstream &ss) const;
     void dump_rib_paths(std::stringstream &ss) const;
@@ -811,16 +810,16 @@ private:
 };
 
 template <>
-bool uipcp_rib::get_param_value<bool>(const std::string &component,
-                                      const std::string &param_name);
+bool UipcpRib::get_param_value<bool>(const std::string &component,
+                                     const std::string &param_name);
 
 template <>
-int uipcp_rib::get_param_value<int>(const std::string &component,
-                                    const std::string &param_name);
+int UipcpRib::get_param_value<int>(const std::string &component,
+                                   const std::string &param_name);
 
 template <>
-Msecs uipcp_rib::get_param_value<Msecs>(const std::string &component,
-                                        const std::string &param_name);
+Msecs UipcpRib::get_param_value<Msecs>(const std::string &component,
+                                       const std::string &param_name);
 
 gpb::APName *apname2gpb(const std::string &name);
 std::string apname2string(const gpb::APName &gname);
@@ -844,7 +843,7 @@ int uipcp_do_register(struct uipcp *uipcp, const char *dif_name,
 
 void normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque);
 
-#define UIPCP_RIB(_u) (static_cast<uipcp_rib *>((_u)->priv))
+#define UIPCP_RIB(_u) (static_cast<UipcpRib *>((_u)->priv))
 
 } // namespace Uipcps
 

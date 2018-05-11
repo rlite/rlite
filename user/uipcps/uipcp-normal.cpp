@@ -71,25 +71,24 @@ std::string Neighbor::TableName          = "/mgmt/neighbors/entries";
 std::string NeighFlow::KeepaliveObjClass = "keepalive";
 std::string NeighFlow::KeepaliveObjName =
     "/mgmt/" + NeighFlow::KeepaliveObjClass;
-std::string uipcp_rib::StatusObjClass = "operational_status";
-std::string uipcp_rib::StatusObjName  = "/mgmt/" + uipcp_rib::StatusObjClass;
-std::string uipcp_rib::DTConstantsObjClass = "dtconstants";
-std::string uipcp_rib::DTConstantsObjName =
-    "/mgmt/" + uipcp_rib::DTConstantsObjClass;
-std::string uipcp_rib::ADataObjClass      = "a_data";
-std::string uipcp_rib::ADataObjName       = "/a_data";
-std::string uipcp_rib::EnrollmentObjClass = "enrollment";
-std::string uipcp_rib::EnrollmentObjName =
-    "/mgmt/" + uipcp_rib::EnrollmentObjClass;
-std::string uipcp_rib::LowerFlowObjClass = "lowerflow";
-std::string uipcp_rib::LowerFlowObjName =
-    "/mgmt/" + uipcp_rib::LowerFlowObjClass;
-std::string uipcp_rib::EnrollmentPrefix    = "/mgmt/enrollment";
-std::string uipcp_rib::ResourceAllocPrefix = "/mgmt/resalloc";
-std::string uipcp_rib::RibDaemonPrefix     = "/mgmt/ribd";
+std::string UipcpRib::StatusObjClass      = "operational_status";
+std::string UipcpRib::StatusObjName       = "/mgmt/" + UipcpRib::StatusObjClass;
+std::string UipcpRib::DTConstantsObjClass = "dtconstants";
+std::string UipcpRib::DTConstantsObjName =
+    "/mgmt/" + UipcpRib::DTConstantsObjClass;
+std::string UipcpRib::ADataObjClass      = "a_data";
+std::string UipcpRib::ADataObjName       = "/a_data";
+std::string UipcpRib::EnrollmentObjClass = "enrollment";
+std::string UipcpRib::EnrollmentObjName =
+    "/mgmt/" + UipcpRib::EnrollmentObjClass;
+std::string UipcpRib::LowerFlowObjClass = "lowerflow";
+std::string UipcpRib::LowerFlowObjName = "/mgmt/" + UipcpRib::LowerFlowObjClass;
+std::string UipcpRib::EnrollmentPrefix = "/mgmt/enrollment";
+std::string UipcpRib::ResourceAllocPrefix = "/mgmt/resalloc";
+std::string UipcpRib::RibDaemonPrefix     = "/mgmt/ribd";
 
 std::unordered_map<std::string, std::set<PolicyBuilder>>
-    uipcp_rib::available_policies;
+    UipcpRib::available_policies;
 
 TimeoutEvent::TimeoutEvent(Msecs d, struct uipcp *u, void *a,
                            uipcp_tmr_cb_t _cb)
@@ -139,8 +138,8 @@ apname2string(const gpb::APName &gname)
 #define MGMTBUF_SIZE_MAX 8092
 
 int
-uipcp_rib::mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
-                                 size_t buflen)
+UipcpRib::mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
+                                size_t buflen)
 {
     struct pollfd pfd;
     char *mgmtbuf;
@@ -183,8 +182,8 @@ uipcp_rib::mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
 }
 
 int
-uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
-                    std::shared_ptr<Neighbor> neigh, rl_port_t port_id)
+UipcpRib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
+                   std::shared_ptr<Neighbor> neigh, rl_port_t port_id)
 {
     std::unique_ptr<CDAPMessage> m;
     int ret = 1;
@@ -303,8 +302,8 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
 
         if (neigh->enrollment_complete() && nf != neigh->mgmt_conn() &&
             !neigh->mgmt_conn()->initiator && m->op_code == gpb::M_START &&
-            m->obj_name == uipcp_rib::EnrollmentObjName &&
-            m->obj_class == uipcp_rib::EnrollmentObjClass) {
+            m->obj_name == UipcpRib::EnrollmentObjName &&
+            m->obj_class == UipcpRib::EnrollmentObjClass) {
             /* We thought we were already enrolled to this neighbor, but
              * he is trying to start again the enrollment procedure on a
              * different flow. We therefore assume that the neighbor
@@ -346,7 +345,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
 static void
 mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
     char mgmtbuf[MGMTBUF_SIZE_MAX];
     struct rl_mgmt_hdr *mhdr;
     std::shared_ptr<NeighFlow> nf;
@@ -386,7 +385,7 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 void
 normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 {
-    uipcp_rib *rib = (uipcp_rib *)opaque;
+    UipcpRib *rib = (UipcpRib *)opaque;
     char mgmtbuf[MGMTBUF_SIZE_MAX];
     int n;
 
@@ -411,7 +410,7 @@ normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 static int
 normal_periodic_tasks(struct uipcp *const uipcp)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
 
     rib->enrollment_resources_cleanup();
     rib->trigger_re_enrollments();
@@ -421,7 +420,7 @@ normal_periodic_tasks(struct uipcp *const uipcp)
     return 0;
 }
 
-uipcp_rib::uipcp_rib(struct uipcp *_u)
+UipcpRib::UipcpRib(struct uipcp *_u)
     : uipcp(_u),
       myname(_u->name),
       enrolled(0),
@@ -478,13 +477,13 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map[AddrAllocator::Prefix]["nack-wait"] =
         PolicyParam(Secs(int(kAddrAllocDistrNackWaitSecs)));
     params_map[DFT::Prefix]["replicas"] = PolicyParam(string());
-    params_map[uipcp_rib::EnrollmentPrefix]["timeout"] =
+    params_map[UipcpRib::EnrollmentPrefix]["timeout"] =
         PolicyParam(Msecs(int(kEnrollTimeoutMsecs)));
-    params_map[uipcp_rib::EnrollmentPrefix]["keepalive"] =
+    params_map[UipcpRib::EnrollmentPrefix]["keepalive"] =
         PolicyParam(Secs(int(kKeepaliveTimeoutSecs)));
-    params_map[uipcp_rib::EnrollmentPrefix]["keepalive-thresh"] =
+    params_map[UipcpRib::EnrollmentPrefix]["keepalive-thresh"] =
         PolicyParam(kKeepaliveThresh);
-    params_map[uipcp_rib::EnrollmentPrefix]["auto-reconnect"] =
+    params_map[UipcpRib::EnrollmentPrefix]["auto-reconnect"] =
         PolicyParam(true);
     params_map[FlowAllocator::Prefix]["force-flow-control"] =
         PolicyParam(false);
@@ -498,13 +497,13 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
         PolicyParam(Msecs(int(kRtxTimerMsecsDflt)));
     params_map[FlowAllocator::Prefix]["max-rtxq-len"] =
         PolicyParam(kRtxQueueMaxLen);
-    params_map[uipcp_rib::ResourceAllocPrefix]["reliable-flows"] =
+    params_map[UipcpRib::ResourceAllocPrefix]["reliable-flows"] =
         PolicyParam(false);
-    params_map[uipcp_rib::ResourceAllocPrefix]["reliable-n-flows"] =
+    params_map[UipcpRib::ResourceAllocPrefix]["reliable-n-flows"] =
         PolicyParam(false);
-    params_map[uipcp_rib::ResourceAllocPrefix]["broadcast-enroller"] =
+    params_map[UipcpRib::ResourceAllocPrefix]["broadcast-enroller"] =
         PolicyParam(true);
-    params_map[uipcp_rib::RibDaemonPrefix]["refresh-intval"] =
+    params_map[UipcpRib::RibDaemonPrefix]["refresh-intval"] =
         PolicyParam(Secs(int(kRIBRefreshIntvalSecs)));
     params_map[Routing::Prefix]["age-incr-intval"] =
         PolicyParam(Secs(int(kAgeIncrIntvalSecs)));
@@ -517,17 +516,17 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     policy_mod(Routing::Prefix, "link-state");
 
     /* Insert handlers for common RIB objects. */
-    rib_handler_register(Neighbor::TableName, &uipcp_rib::neighbors_handler);
+    rib_handler_register(Neighbor::TableName, &UipcpRib::neighbors_handler);
     rib_handler_register(NeighFlow::KeepaliveObjName,
-                         &uipcp_rib::keepalive_handler);
-    rib_handler_register(StatusObjName, &uipcp_rib::status_handler);
+                         &UipcpRib::keepalive_handler);
+    rib_handler_register(StatusObjName, &UipcpRib::status_handler);
     for (const auto &component :
          {DFT::Prefix, Routing::Prefix, AddrAllocator::Prefix}) {
-        rib_handler_register(component + "/policy", &uipcp_rib::policy_handler);
+        rib_handler_register(component + "/policy", &UipcpRib::policy_handler);
     }
     for (const auto &component : {DFT::Prefix, AddrAllocator::Prefix}) {
         rib_handler_register(component + "/params",
-                             &uipcp_rib::policy_param_handler);
+                             &UipcpRib::policy_param_handler);
     }
 
     /* Start timers for periodic tasks. */
@@ -549,7 +548,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     update_ttl();
 }
 
-uipcp_rib::~uipcp_rib()
+UipcpRib::~UipcpRib()
 {
     /* The caller guarantees that the per-uipcp event loop is already
      * terminated and that nobody can invoke this class again. However, we
@@ -620,7 +619,7 @@ uipcp_rib::~uipcp_rib()
 }
 
 void
-uipcp_rib::rib_handler_register(std::string rib_path, RibHandler h)
+UipcpRib::rib_handler_register(std::string rib_path, RibHandler h)
 {
     RibHandlerInfo info;
 
@@ -631,7 +630,7 @@ uipcp_rib::rib_handler_register(std::string rib_path, RibHandler h)
 }
 
 void
-uipcp_rib::rib_handler_unregister(std::string rib_path)
+UipcpRib::rib_handler_unregister(std::string rib_path)
 {
     assert(handlers.count(rib_path) > 0);
     handlers.erase(rib_path);
@@ -646,7 +645,7 @@ u82boolstr(uint8_t v)
 #endif
 
 void
-uipcp_rib::dump(std::stringstream &ss) const
+UipcpRib::dump(std::stringstream &ss) const
 {
 #ifdef RL_USE_QOS_CUBES
     ss << "QoS cubes" << endl;
@@ -780,7 +779,7 @@ uipcp_rib::dump(std::stringstream &ss) const
 }
 
 void
-uipcp_rib::dump_rib_paths(std::stringstream &ss) const
+UipcpRib::dump_rib_paths(std::stringstream &ss) const
 {
     /* Dump the available RIB paths (alphabetically sorted). */
     std::list<std::string> paths;
@@ -796,7 +795,7 @@ uipcp_rib::dump_rib_paths(std::stringstream &ss) const
 };
 
 void
-uipcp_rib::update_address(rlm_addr_t new_addr)
+UipcpRib::update_address(rlm_addr_t new_addr)
 {
     if (myaddr == new_addr) {
         return;
@@ -808,7 +807,7 @@ uipcp_rib::update_address(rlm_addr_t new_addr)
 }
 
 int
-uipcp_rib::set_address(rlm_addr_t new_addr)
+UipcpRib::set_address(rlm_addr_t new_addr)
 {
     stringstream addr_ss;
     int ret;
@@ -827,7 +826,7 @@ uipcp_rib::set_address(rlm_addr_t new_addr)
 }
 
 int
-uipcp_rib::update_lower_difs(int reg, string lower_dif)
+UipcpRib::update_lower_difs(int reg, string lower_dif)
 {
     list<string>::iterator lit;
 
@@ -855,7 +854,7 @@ uipcp_rib::update_lower_difs(int reg, string lower_dif)
         lower_difs.erase(lit);
     }
 
-    if (get_param_value<bool>(uipcp_rib::ResourceAllocPrefix,
+    if (get_param_value<bool>(UipcpRib::ResourceAllocPrefix,
                               "reliable-n-flows")) {
         /* Check whether we need to do or undo self-registration. */
         struct rina_flow_spec relspec;
@@ -892,7 +891,7 @@ uipcp_rib::update_lower_difs(int reg, string lower_dif)
 
 /* This function must not take the RIB lock. */
 int
-uipcp_rib::register_to_lower_one(const char *lower_dif, bool reg)
+UipcpRib::register_to_lower_one(const char *lower_dif, bool reg)
 {
     int ret;
 
@@ -906,7 +905,7 @@ uipcp_rib::register_to_lower_one(const char *lower_dif, bool reg)
     UPD(uipcp, "IPCP name %s %s DIF %s\n", uipcp->name,
         reg ? "registered into" : "unregistered from", lower_dif);
 
-    if (get_param_value<bool>(uipcp_rib::ResourceAllocPrefix,
+    if (get_param_value<bool>(UipcpRib::ResourceAllocPrefix,
                               "broadcast-enroller")) {
         /* Also register the N-DIF name, i.e. the name of the DIF that
          * this IPCP is part of. If this fails broadcast enrollment won't work.
@@ -929,7 +928,7 @@ uipcp_rib::register_to_lower_one(const char *lower_dif, bool reg)
 
 /* To be called out of RIB lock */
 int
-uipcp_rib::realize_registrations(bool reg)
+UipcpRib::realize_registrations(bool reg)
 {
     list<string> snapshot;
 
@@ -946,8 +945,8 @@ uipcp_rib::realize_registrations(bool reg)
 }
 
 int
-uipcp_rib::obj_serialize(CDAPMessage *m,
-                         const ::google::protobuf::MessageLite *obj)
+UipcpRib::obj_serialize(CDAPMessage *m,
+                        const ::google::protobuf::MessageLite *obj)
 {
     if (obj) {
         auto objbuf = std::unique_ptr<char[]>(new char[obj->ByteSize()]);
@@ -961,9 +960,9 @@ uipcp_rib::obj_serialize(CDAPMessage *m,
 
 /* Takes ownership of 'm'. */
 int
-uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
-                            const ::google::protobuf::MessageLite *obj,
-                            int *invoke_id)
+UipcpRib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
+                           const ::google::protobuf::MessageLite *obj,
+                           int *invoke_id)
 {
     struct rl_mgmt_hdr mhdr;
     gpb::AData adata;
@@ -1046,10 +1045,10 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
 }
 
 int
-uipcp_rib::send_to_dst_node(std::unique_ptr<CDAPMessage> m,
-                            std::string node_name,
-                            const ::google::protobuf::MessageLite *obj,
-                            int *invoke_id)
+UipcpRib::send_to_dst_node(std::unique_ptr<CDAPMessage> m,
+                           std::string node_name,
+                           const ::google::protobuf::MessageLite *obj,
+                           int *invoke_id)
 {
     rlm_addr_t dst_addr = lookup_node_address(node_name);
 
@@ -1062,8 +1061,8 @@ uipcp_rib::send_to_dst_node(std::unique_ptr<CDAPMessage> m,
 }
 
 int
-uipcp_rib::send_to_myself(std::unique_ptr<CDAPMessage> m,
-                          const ::google::protobuf::MessageLite *obj)
+UipcpRib::send_to_myself(std::unique_ptr<CDAPMessage> m,
+                         const ::google::protobuf::MessageLite *obj)
 {
     return send_to_dst_addr(std::move(m), myaddr, obj);
 }
@@ -1071,10 +1070,10 @@ uipcp_rib::send_to_myself(std::unique_ptr<CDAPMessage> m,
 /* To be called under RIB lock. This function does not take ownership
  * of 'rm'. */
 int
-uipcp_rib::cdap_dispatch(const CDAPMessage *rm,
-                         std::shared_ptr<NeighFlow> const &nf,
-                         std::shared_ptr<Neighbor> const &neigh,
-                         rlm_addr_t src_addr)
+UipcpRib::cdap_dispatch(const CDAPMessage *rm,
+                        std::shared_ptr<NeighFlow> const &nf,
+                        std::shared_ptr<Neighbor> const &neigh,
+                        rlm_addr_t src_addr)
 {
     /* Dispatch depending on the obj_name specified in the request. */
     auto hi = handlers.find(rm->obj_name);
@@ -1110,10 +1109,10 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm,
 }
 
 int
-uipcp_rib::status_handler(const CDAPMessage *rm,
-                          std::shared_ptr<NeighFlow> const &nf,
-                          std::shared_ptr<Neighbor> const &neigh,
-                          rlm_addr_t src_addr)
+UipcpRib::status_handler(const CDAPMessage *rm,
+                         std::shared_ptr<NeighFlow> const &nf,
+                         std::shared_ptr<Neighbor> const &neigh,
+                         rlm_addr_t src_addr)
 {
     if (rm->op_code != gpb::M_START) {
         UPE(uipcp, "M_START expected\n");
@@ -1140,7 +1139,7 @@ string2int(const string &s, int &ret)
 }
 
 int
-uipcp_rib::neighs_sync_obj_excluding(
+UipcpRib::neighs_sync_obj_excluding(
     const std::shared_ptr<Neighbor> &exclude, bool create,
     const string &obj_class, const string &obj_name,
     const ::google::protobuf::MessageLite *obj) const
@@ -1165,15 +1164,15 @@ uipcp_rib::neighs_sync_obj_excluding(
 }
 
 int
-uipcp_rib::neighs_sync_obj_all(bool create, const string &obj_class,
-                               const string &obj_name,
-                               const ::google::protobuf::MessageLite *obj) const
+UipcpRib::neighs_sync_obj_all(bool create, const string &obj_class,
+                              const string &obj_name,
+                              const ::google::protobuf::MessageLite *obj) const
 {
     return neighs_sync_obj_excluding(nullptr, create, obj_class, obj_name, obj);
 }
 
 void
-uipcp_rib::neigh_flow_prune(const std::shared_ptr<NeighFlow> &nf)
+UipcpRib::neigh_flow_prune(const std::shared_ptr<NeighFlow> &nf)
 {
     std::shared_ptr<Neighbor> neigh =
         get_neighbor(nf->neigh_name, /*create=*/false);
@@ -1220,8 +1219,8 @@ uipcp_rib::neigh_flow_prune(const std::shared_ptr<NeighFlow> &nf)
 }
 
 int
-uipcp_rib::policy_mod(const std::string &component,
-                      const std::string &policy_name)
+UipcpRib::policy_mod(const std::string &component,
+                     const std::string &policy_name)
 {
     int ret = 0;
 
@@ -1261,13 +1260,13 @@ uipcp_rib::policy_mod(const std::string &component,
     for (const std::string &path : policy_builder->paths) {
         RibHandler h;
         if (component == DFT::Prefix) {
-            h = &uipcp_rib::dft_handler;
+            h = &UipcpRib::dft_handler;
         } else if (component == Routing::Prefix) {
-            h = &uipcp_rib::routing_handler;
+            h = &UipcpRib::routing_handler;
         } else if (component == FlowAllocator::Prefix) {
-            h = &uipcp_rib::flows_handler;
+            h = &UipcpRib::flows_handler;
         } else if (component == AddrAllocator::Prefix) {
-            h = &uipcp_rib::addr_alloc_handler;
+            h = &UipcpRib::addr_alloc_handler;
         } else {
             assert(false);
         }
@@ -1282,9 +1281,9 @@ uipcp_rib::policy_mod(const std::string &component,
 }
 
 int
-uipcp_rib::policy_param_mod(const std::string &component,
-                            const std::string &param_name,
-                            const std::string &param_value)
+UipcpRib::policy_param_mod(const std::string &component,
+                           const std::string &param_name,
+                           const std::string &param_value)
 {
     std::string error_reason;
     int ret = 0;
@@ -1299,9 +1298,9 @@ uipcp_rib::policy_param_mod(const std::string &component,
         return -1;
     }
 
-    if (component == uipcp_rib::ResourceAllocPrefix &&
+    if (component == UipcpRib::ResourceAllocPrefix &&
         param_name == "reliable-n-flows" && param_value == "true" &&
-        !get_param_value<bool>(uipcp_rib::ResourceAllocPrefix,
+        !get_param_value<bool>(UipcpRib::ResourceAllocPrefix,
                                "reliable-flows")) {
         UPE(uipcp, "Cannot enable reliable N-flows as reliable "
                    "flows are disabled.\n");
@@ -1326,7 +1325,7 @@ uipcp_rib::policy_param_mod(const std::string &component,
     /* Fix-ups. */
     {
         auto eto =
-            get_param_value<Msecs>(uipcp_rib::EnrollmentPrefix, "timeout");
+            get_param_value<Msecs>(UipcpRib::EnrollmentPrefix, "timeout");
         auto ato = get_param_value<Msecs>(AddrAllocator::Prefix, "nack-wait");
         auto minval = ato * 150 / 100;
 
@@ -1358,7 +1357,7 @@ uipcp_fa_resp(struct uipcp *uipcp, uint32_t kevent_id, rl_ipcp_id_t ipcp_id,
 }
 
 int
-uipcp_rib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
+UipcpRib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
 {
     uint8_t response = RLITE_ERR;
     std::lock_guard<std::mutex> guard(mutex);
@@ -1424,7 +1423,7 @@ uipcp_rib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
 }
 
 int
-uipcp_rib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
+UipcpRib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
 {
     rl_port_t neigh_port_id    = req->port_id;
     const char *supp_dif       = req->dif_name;
@@ -1513,7 +1512,7 @@ err:
 }
 
 int
-uipcp_rib::register_to_lower(const char *dif_name, bool reg)
+UipcpRib::register_to_lower(const char *dif_name, bool reg)
 {
     bool self_reg_pending;
     int self_reg;
@@ -1539,7 +1538,7 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
             uipcp->name, dif_name);
     }
 
-    if (!get_param_value<bool>(uipcp_rib::ResourceAllocPrefix,
+    if (!get_param_value<bool>(UipcpRib::ResourceAllocPrefix,
                                "reliable-n-flows")) {
         return 0;
     }
@@ -1564,7 +1563,7 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
 }
 
 int
-uipcp_rib::update_ttl()
+UipcpRib::update_ttl()
 {
     unsigned int ttl = RL_TTL_DFLT;
     std::stringstream ss;
@@ -1585,8 +1584,8 @@ uipcp_rib::update_ttl()
 }
 
 int
-uipcp_rib::policy_list(const struct rl_cmsg_ipcp_policy_list_req *req,
-                       stringstream &msg)
+UipcpRib::policy_list(const struct rl_cmsg_ipcp_policy_list_req *req,
+                      stringstream &msg)
 {
     int ret = 0;
 
@@ -1632,7 +1631,7 @@ uipcp_rib::policy_list(const struct rl_cmsg_ipcp_policy_list_req *req,
 }
 
 int
-uipcp_rib::policy_param_list(
+UipcpRib::policy_param_list(
     const struct rl_cmsg_ipcp_policy_param_list_req *req, stringstream &msg)
 {
     int ret            = 0;
@@ -1702,10 +1701,10 @@ uipcp_rib::policy_param_list(
 }
 
 int
-uipcp_rib::policy_handler(const CDAPMessage *rm,
-                          std::shared_ptr<NeighFlow> const &nf,
-                          std::shared_ptr<Neighbor> const &neigh,
-                          rlm_addr_t src_addr)
+UipcpRib::policy_handler(const CDAPMessage *rm,
+                         std::shared_ptr<NeighFlow> const &nf,
+                         std::shared_ptr<Neighbor> const &neigh,
+                         rlm_addr_t src_addr)
 {
     std::string prefix = rm->obj_name.substr(0, rm->obj_name.rfind("/"));
     std::string policy_name;
@@ -1727,10 +1726,10 @@ uipcp_rib::policy_handler(const CDAPMessage *rm,
 }
 
 int
-uipcp_rib::policy_param_handler(const CDAPMessage *rm,
-                                std::shared_ptr<NeighFlow> const &nf,
-                                std::shared_ptr<Neighbor> const &neigh,
-                                rlm_addr_t src_addr)
+UipcpRib::policy_param_handler(const CDAPMessage *rm,
+                               std::shared_ptr<NeighFlow> const &nf,
+                               std::shared_ptr<Neighbor> const &neigh,
+                               rlm_addr_t src_addr)
 {
     std::string prefix = rm->obj_name.substr(0, rm->obj_name.rfind("/"));
     std::string obj_value;
@@ -1751,16 +1750,16 @@ uipcp_rib::policy_param_handler(const CDAPMessage *rm,
 
 template <class T>
 T
-uipcp_rib::get_param_value(const std::string &component,
-                           const std::string &param_name)
+UipcpRib::get_param_value(const std::string &component,
+                          const std::string &param_name)
 {
     assert(0);
 }
 
 template <>
 bool
-uipcp_rib::get_param_value<bool>(const std::string &component,
-                                 const std::string &param_name)
+UipcpRib::get_param_value<bool>(const std::string &component,
+                                const std::string &param_name)
 {
     assert(params_map.count(component) &&
            params_map[component].count(param_name));
@@ -1769,8 +1768,8 @@ uipcp_rib::get_param_value<bool>(const std::string &component,
 
 template <>
 int
-uipcp_rib::get_param_value<int>(const std::string &component,
-                                const std::string &param_name)
+UipcpRib::get_param_value<int>(const std::string &component,
+                               const std::string &param_name)
 {
     assert(params_map.count(component) &&
            params_map[component].count(param_name));
@@ -1779,8 +1778,8 @@ uipcp_rib::get_param_value<int>(const std::string &component,
 
 template <>
 string
-uipcp_rib::get_param_value<string>(const std::string &component,
-                                   const std::string &param_name)
+UipcpRib::get_param_value<string>(const std::string &component,
+                                  const std::string &param_name)
 {
     assert(params_map.count(component) &&
            params_map[component].count(param_name));
@@ -1789,8 +1788,8 @@ uipcp_rib::get_param_value<string>(const std::string &component,
 
 template <>
 Msecs
-uipcp_rib::get_param_value<Msecs>(const std::string &component,
-                                  const std::string &param_name)
+UipcpRib::get_param_value<Msecs>(const std::string &component,
+                                 const std::string &param_name)
 {
     assert(params_map.count(component) &&
            params_map[component].count(param_name));
@@ -1798,8 +1797,8 @@ uipcp_rib::get_param_value<Msecs>(const std::string &component,
 }
 
 PolicyParamType
-uipcp_rib::get_param_type(const std::string &component,
-                          const std::string &param_name)
+UipcpRib::get_param_type(const std::string &component,
+                         const std::string &param_name)
 {
     assert(params_map.count(component) &&
            params_map[component].count(param_name));
@@ -1954,7 +1953,7 @@ static int
 normal_init(struct uipcp *uipcp)
 {
     try {
-        uipcp->priv = rl_new(uipcp_rib(uipcp), RL_MT_SHIM);
+        uipcp->priv = rl_new(UipcpRib(uipcp), RL_MT_SHIM);
     } catch (std::bad_alloc &e) {
         UPE(uipcp, "Out of memory\n");
         return -1;
@@ -1978,7 +1977,7 @@ static int
 normal_appl_register(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     struct rl_kmsg_appl_register *req = (struct rl_kmsg_appl_register *)msg;
-    uipcp_rib *rib                    = UIPCP_RIB(uipcp);
+    UipcpRib *rib                     = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(rib->mutex);
 
     rib->dft->appl_register(req);
@@ -1990,7 +1989,7 @@ static int
 normal_fa_req(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)msg;
-    uipcp_rib *rib             = UIPCP_RIB(uipcp);
+    UipcpRib *rib              = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(mutex);
 
     UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
@@ -2002,7 +2001,7 @@ static int
 normal_neigh_fa_req_arrived(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     struct rl_kmsg_fa_req_arrived *req = (struct rl_kmsg_fa_req_arrived *)msg;
-    uipcp_rib *rib                     = UIPCP_RIB(uipcp);
+    UipcpRib *rib                      = UIPCP_RIB(uipcp);
 
     return rib->neigh_fa_req_arrived(req);
 }
@@ -2011,7 +2010,7 @@ static int
 normal_fa_resp(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)msg;
-    uipcp_rib *rib               = UIPCP_RIB(uipcp);
+    UipcpRib *rib                = UIPCP_RIB(uipcp);
 
     UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
@@ -2025,7 +2024,7 @@ normal_flow_deallocated(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     struct rl_kmsg_flow_deallocated *req =
         (struct rl_kmsg_flow_deallocated *)msg;
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(rib->mutex);
 
     rib->fa->flow_deallocated(req);
@@ -2036,7 +2035,7 @@ normal_flow_deallocated(struct uipcp *uipcp, const struct rl_msg_base *msg)
 static void
 normal_update_address(struct uipcp *uipcp, rlm_addr_t new_addr)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(rib->mutex);
 
     rib->update_address(new_addr);
@@ -2045,7 +2044,7 @@ normal_update_address(struct uipcp *uipcp, rlm_addr_t new_addr)
 static int
 normal_flow_state_update(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
-    uipcp_rib *rib                 = UIPCP_RIB(uipcp);
+    UipcpRib *rib                  = UIPCP_RIB(uipcp);
     struct rl_kmsg_flow_state *upd = (struct rl_kmsg_flow_state *)msg;
     std::lock_guard<std::mutex> guard(rib->mutex);
 
@@ -2056,7 +2055,7 @@ static int
 normal_register_to_lower(struct uipcp *uipcp,
                          const struct rl_cmsg_ipcp_register *req)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
 
     if (!req->dif_name) {
         UPE(uipcp, "lower DIF name is not specified\n");
@@ -2071,7 +2070,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
                    int wait_for_completion)
 {
     const char *dst_name = req->neigh_name;
-    uipcp_rib *rib       = UIPCP_RIB(uipcp);
+    UipcpRib *rib        = UIPCP_RIB(uipcp);
 
     if (!dst_name) {
         /* If no neighbor name is specified, try to use the DIF name
@@ -2098,7 +2097,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
 static char *
 normal_ipcp_rib_show(struct uipcp *uipcp)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(rib->mutex);
     stringstream ss;
 
@@ -2110,7 +2109,7 @@ normal_ipcp_rib_show(struct uipcp *uipcp)
 static char *
 normal_ipcp_routing_show(struct uipcp *uipcp)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(rib->mutex);
     stringstream ss;
 
@@ -2122,7 +2121,7 @@ normal_ipcp_routing_show(struct uipcp *uipcp)
 static char *
 normal_ipcp_rib_paths_show(struct uipcp *uipcp)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(rib->mutex);
     stringstream ss;
 
@@ -2135,7 +2134,7 @@ static int
 normal_policy_mod(struct uipcp *uipcp,
                   const struct rl_cmsg_ipcp_policy_mod *req)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(rib->mutex);
     const string comp_name   = req->comp_name;
     const string policy_name = req->policy_name;
@@ -2148,7 +2147,7 @@ normal_policy_list(struct uipcp *uipcp,
                    const struct rl_cmsg_ipcp_policy_list_req *req,
                    char **resp_msg)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(rib->mutex);
     stringstream msg;
     int ret = rib->policy_list(req, msg);
@@ -2166,7 +2165,7 @@ static int
 normal_policy_param_mod(struct uipcp *uipcp,
                         const struct rl_cmsg_ipcp_policy_param_mod *req)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(rib->mutex);
     const string comp_name   = req->comp_name;
     const string param_name  = req->param_name;
@@ -2180,7 +2179,7 @@ normal_policy_param_list(struct uipcp *uipcp,
                          const struct rl_cmsg_ipcp_policy_param_list_req *req,
                          char **resp_msg)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(rib->mutex);
     stringstream msg;
     int ret = rib->policy_param_list(req, msg);
@@ -2198,7 +2197,7 @@ static int
 normal_enroller_enable(struct uipcp *uipcp,
                        const struct rl_cmsg_ipcp_enroller_enable *req)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
 
     return rib->enroller_enable(!!req->enable);
 }
@@ -2207,7 +2206,7 @@ static int
 normal_neigh_disconnect(struct uipcp *uipcp,
                         const struct rl_cmsg_ipcp_neigh_disconnect *req)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(rib->mutex);
 
     if (!req->neigh_name) {
@@ -2221,7 +2220,7 @@ normal_neigh_disconnect(struct uipcp *uipcp,
 static int
 normal_lower_dif_detach(struct uipcp *uipcp, const char *lower_dif)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(rib->mutex);
 
     return rib->lower_dif_detach(string(lower_dif));
@@ -2230,7 +2229,7 @@ normal_lower_dif_detach(struct uipcp *uipcp, const char *lower_dif)
 static int
 normal_route_mod(struct uipcp *uipcp, const struct rl_cmsg_ipcp_route_mod *req)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    UipcpRib *rib = UIPCP_RIB(uipcp);
     std::lock_guard<std::mutex> guard(rib->mutex);
 
     return rib->routing->route_mod(req);
@@ -2240,11 +2239,11 @@ extern "C" void
 normal_lib_init(void)
 {
     /* We need to register the available policies for all the components. */
-    uipcp_rib::addra_lib_init();   /* address allocation */
-    uipcp_rib::dft_lib_init();     /* DFT policies */
-    uipcp_rib::fa_lib_init();      /* flow allocation */
-    uipcp_rib::routing_lib_init(); /* routing */
-    uipcp_rib::ra_lib_init();      /* enrollment and resource allocator */
+    UipcpRib::addra_lib_init();   /* address allocation */
+    UipcpRib::dft_lib_init();     /* DFT policies */
+    UipcpRib::fa_lib_init();      /* flow allocation */
+    UipcpRib::routing_lib_init(); /* routing */
+    UipcpRib::ra_lib_init();      /* enrollment and resource allocator */
 }
 
 } // namespace Uipcps

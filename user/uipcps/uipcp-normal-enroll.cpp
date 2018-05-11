@@ -34,7 +34,7 @@ using namespace std;
 
 namespace Uipcps {
 
-NeighFlow::NeighFlow(uipcp_rib *parent, const string &ipcp_name,
+NeighFlow::NeighFlow(UipcpRib *parent, const string &ipcp_name,
                      const string &supdif, rl_port_t pid, int ffd,
                      rl_ipcp_id_t lid)
     : rib(parent),
@@ -126,7 +126,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
     }
 
     if (ret >= 0) {
-        const int neighFlowStatsPeriod = uipcp_rib::kNeighFlowStatsPeriod;
+        const int neighFlowStatsPeriod = UipcpRib::kNeighFlowStatsPeriod;
 
         last_activity = std::chrono::system_clock::now();
         stats.win[0].bytes_sent += ret;
@@ -208,7 +208,7 @@ NeighFlow::keepalive_tmr_start()
 {
     /* Keepalive timeout is expressed in seconds. */
     auto keepalive =
-        rib->get_param_value<Msecs>(uipcp_rib::EnrollmentPrefix, "keepalive");
+        rib->get_param_value<Msecs>(UipcpRib::EnrollmentPrefix, "keepalive");
 
     if (keepalive == Msecs::zero()) {
         /* no keepalive */
@@ -219,8 +219,8 @@ NeighFlow::keepalive_tmr_start()
         keepalive, rib->uipcp,
         reinterpret_cast<void *>(static_cast<uintptr_t>(flow_fd)),
         [](struct uipcp *uipcp, void *arg) {
-            int flow_fd    = reinterpret_cast<uintptr_t>(arg);
-            uipcp_rib *rib = UIPCP_RIB(uipcp);
+            int flow_fd   = reinterpret_cast<uintptr_t>(arg);
+            UipcpRib *rib = UIPCP_RIB(uipcp);
             std::lock_guard<std::mutex> guard(rib->mutex);
             std::shared_ptr<Neighbor> neigh;
             std::shared_ptr<NeighFlow> nf;
@@ -238,7 +238,7 @@ NeighFlow::keepalive_tmr_stop()
     rib->keepalive_timers[flow_fd].reset();
 }
 
-Neighbor::Neighbor(uipcp_rib *rib_, const string &name)
+Neighbor::Neighbor(UipcpRib *rib_, const string &name)
 {
     rib                = rib_;
     ipcp_name          = name;
@@ -349,7 +349,7 @@ Neighbor::mgmt_conn()
 void
 EnrollmentResources::enrollment_commit()
 {
-    uipcp_rib *rib = neigh->rib;
+    UipcpRib *rib = neigh->rib;
 
     nf->keepalive_tmr_start();
     nf->enroll_state_set(EnrollState::NEIGH_ENROLLED);
@@ -384,8 +384,8 @@ EnrollmentResources::next_enroll_msg(std::unique_lock<std::mutex> &lk)
     std::unique_ptr<const CDAPMessage> msg;
 
     while (msgs.empty()) {
-        auto to = neigh->rib->get_param_value<Msecs>(
-            uipcp_rib::EnrollmentPrefix, "timeout");
+        auto to = neigh->rib->get_param_value<Msecs>(UipcpRib::EnrollmentPrefix,
+                                                     "timeout");
         std::cv_status cvst;
 
         cvst = msgs_avail.wait_for(lk, to);
@@ -405,7 +405,7 @@ EnrollmentResources::next_enroll_msg(std::unique_lock<std::mutex> &lk)
 int
 EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
 {
-    uipcp_rib *rib      = neigh->rib;
+    UipcpRib *rib       = neigh->rib;
     struct uipcp *uipcp = rib->uipcp;
     std::unique_ptr<const CDAPMessage> rm;
 
@@ -422,7 +422,7 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
             enr_info.add_lower_difs(dif);
         }
 
-        m.m_start(uipcp_rib::EnrollmentObjClass, uipcp_rib::EnrollmentObjName);
+        m.m_start(UipcpRib::EnrollmentObjClass, UipcpRib::EnrollmentObjName);
         ret = nf->send_to_port_id(&m, 0, &enr_info);
         if (ret) {
             UPE(uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
@@ -446,11 +446,11 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
             return -1;
         }
 
-        if (rm->obj_class != uipcp_rib::EnrollmentObjClass ||
-            rm->obj_name != uipcp_rib::EnrollmentObjName) {
+        if (rm->obj_class != UipcpRib::EnrollmentObjClass ||
+            rm->obj_name != UipcpRib::EnrollmentObjName) {
             UPE(uipcp, "%s:%s object expected\n",
-                uipcp_rib::EnrollmentObjName.c_str(),
-                uipcp_rib::EnrollmentObjClass.c_str());
+                UipcpRib::EnrollmentObjName.c_str(),
+                UipcpRib::EnrollmentObjClass.c_str());
             return -1;
         }
 
@@ -525,11 +525,11 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
             return -1;
         }
 
-        if (rm->obj_class != uipcp_rib::EnrollmentObjClass ||
-            rm->obj_name != uipcp_rib::EnrollmentObjName) {
+        if (rm->obj_class != UipcpRib::EnrollmentObjClass ||
+            rm->obj_name != UipcpRib::EnrollmentObjName) {
             UPE(uipcp, "%s:%s object expected\n",
-                uipcp_rib::EnrollmentObjName.c_str(),
-                uipcp_rib::EnrollmentObjClass.c_str());
+                UipcpRib::EnrollmentObjName.c_str(),
+                UipcpRib::EnrollmentObjClass.c_str());
             return -1;
         }
 
@@ -551,8 +551,8 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
         /* Here we may M_READ from the slave. */
 
         m.m_stop_r();
-        m.obj_class = uipcp_rib::EnrollmentObjClass;
-        m.obj_name  = uipcp_rib::EnrollmentObjName;
+        m.obj_class = UipcpRib::EnrollmentObjClass;
+        m.obj_name  = UipcpRib::EnrollmentObjName;
 
         ret = nf->send_to_port_id(&m, rm->invoke_id);
         if (ret) {
@@ -576,7 +576,7 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
 void
 EnrollmentResources::enrollee_thread()
 {
-    uipcp_rib *rib = neigh->rib;
+    UipcpRib *rib = neigh->rib;
     std::unique_ptr<const CDAPMessage> rm;
     std::unique_lock<std::mutex> lk(rib->mutex);
 
@@ -641,8 +641,7 @@ EnrollmentResources::enrollee_thread()
              *
              * This is not a complete enrollment, but only the allocation
              * of a lower flow. */
-            m.m_start(uipcp_rib::LowerFlowObjClass,
-                      uipcp_rib::LowerFlowObjName);
+            m.m_start(UipcpRib::LowerFlowObjClass, UipcpRib::LowerFlowObjName);
             ret = nf->send_to_port_id(&m);
             if (ret) {
                 UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
@@ -661,11 +660,11 @@ EnrollmentResources::enrollee_thread()
                 goto err;
             }
 
-            if (rm->obj_class != uipcp_rib::LowerFlowObjClass ||
-                rm->obj_name != uipcp_rib::LowerFlowObjName) {
+            if (rm->obj_class != UipcpRib::LowerFlowObjClass ||
+                rm->obj_name != UipcpRib::LowerFlowObjName) {
                 UPE(rib->uipcp, "%s:%s object expected\n",
-                    uipcp_rib::LowerFlowObjName.c_str(),
-                    uipcp_rib::LowerFlowObjClass.c_str());
+                    UipcpRib::LowerFlowObjName.c_str(),
+                    UipcpRib::LowerFlowObjClass.c_str());
                 goto err;
             }
 
@@ -702,7 +701,7 @@ finish:
     lk.lock();
     /* Afther this call, the thread must release the RIB lock and never
      * try to acquire it again. This is necessary to synchronize with
-     * uipcp_rib::~uipcp_rib(). */
+     * UipcpRib::~UipcpRib(). */
     set_terminated();
     lk.unlock();
 
@@ -716,7 +715,7 @@ err:
 int
 EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
 {
-    uipcp_rib *rib = neigh->rib;
+    UipcpRib *rib = neigh->rib;
     std::unique_ptr<const CDAPMessage> rm;
 
     rm = next_enroll_msg(lk);
@@ -738,11 +737,11 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
             return -1;
         }
 
-        if (rm->obj_class != uipcp_rib::EnrollmentObjClass ||
-            rm->obj_name != uipcp_rib::EnrollmentObjName) {
+        if (rm->obj_class != UipcpRib::EnrollmentObjClass ||
+            rm->obj_name != UipcpRib::EnrollmentObjName) {
             UPE(rib->uipcp, "%s:%s object expected\n",
-                uipcp_rib::EnrollmentObjName.c_str(),
-                uipcp_rib::EnrollmentObjClass.c_str());
+                UipcpRib::EnrollmentObjName.c_str(),
+                UipcpRib::EnrollmentObjClass.c_str());
             return -1;
         }
 
@@ -771,8 +770,8 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
             new gpb::DataTransferConstants(rib->dt_constants));
 
         m.m_start_r();
-        m.obj_class = uipcp_rib::EnrollmentObjClass;
-        m.obj_name  = uipcp_rib::EnrollmentObjName;
+        m.obj_class = UipcpRib::EnrollmentObjClass;
+        m.obj_name  = UipcpRib::EnrollmentObjName;
 
         ret = nf->send_to_port_id(&m, rm->invoke_id, &enr_info);
         if (ret) {
@@ -828,7 +827,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
         enr_info.set_start_early(true);
 
         m = CDAPMessage();
-        m.m_stop(uipcp_rib::EnrollmentObjClass, uipcp_rib::EnrollmentObjName);
+        m.m_stop(UipcpRib::EnrollmentObjClass, UipcpRib::EnrollmentObjName);
 
         ret = nf->send_to_port_id(&m, 0, &enr_info);
         if (ret) {
@@ -864,7 +863,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
 
         /* This is not required if the initiator is allowed to start
          * early. */
-        m.m_start(uipcp_rib::StatusObjClass, uipcp_rib::StatusObjName);
+        m.m_start(UipcpRib::StatusObjClass, UipcpRib::StatusObjName);
 
         ret = nf->send_to_port_id(&m);
         if (ret) {
@@ -880,7 +879,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
 void
 EnrollmentResources::enroller_thread()
 {
-    uipcp_rib *rib = neigh->rib;
+    UipcpRib *rib = neigh->rib;
     std::unique_ptr<const CDAPMessage> rm;
     std::unique_lock<std::mutex> lk(rib->mutex);
 
@@ -939,8 +938,8 @@ EnrollmentResources::enroller_thread()
         goto err;
     }
 
-    if (rm->obj_class == uipcp_rib::LowerFlowObjClass &&
-        rm->obj_name == uipcp_rib::LowerFlowObjName) {
+    if (rm->obj_class == UipcpRib::LowerFlowObjClass &&
+        rm->obj_name == UipcpRib::LowerFlowObjName) {
         /* (3LF) S <-- I: M_START
          * (4LF) S --> I: M_START_R
          * This is not a complete enrollment, but only a lower flow
@@ -956,8 +955,8 @@ EnrollmentResources::enroller_thread()
         UPD(rib->uipcp, "S <-- I M_START(lowerflow)\n");
 
         m.m_start_r();
-        m.obj_class = uipcp_rib::LowerFlowObjClass;
-        m.obj_name  = uipcp_rib::LowerFlowObjName;
+        m.obj_class = UipcpRib::LowerFlowObjClass;
+        m.obj_name  = UipcpRib::LowerFlowObjName;
 
         ret = nf->send_to_port_id(&m, rm->invoke_id);
         if (ret) {
@@ -988,7 +987,7 @@ finish:
     lk.lock();
     /* Afther this call, the thread must release the RIB lock and never
      * try to acquire it again. This is necessary to synchronize with
-     * uipcp_rib::~uipcp_rib(). */
+     * UipcpRib::~UipcpRib(). */
     set_terminated();
     lk.unlock();
 
@@ -999,9 +998,9 @@ err:
 }
 
 EnrollmentResources *
-uipcp_rib::enrollment_rsrc_get(std::shared_ptr<NeighFlow> const &nf,
-                               std::shared_ptr<Neighbor> const &neigh,
-                               bool initiator)
+UipcpRib::enrollment_rsrc_get(std::shared_ptr<NeighFlow> const &nf,
+                              std::shared_ptr<Neighbor> const &neigh,
+                              bool initiator)
 {
     EnrollmentResources *er = enrollment_resources[nf->flow_fd].get();
 
@@ -1076,7 +1075,7 @@ operator==(const gpb::NeighborCandidate &a, const gpb::NeighborCandidate &o)
 }
 
 int
-uipcp_rib::sync_rib(const std::shared_ptr<NeighFlow> &nf)
+UipcpRib::sync_rib(const std::shared_ptr<NeighFlow> &nf)
 {
     unsigned int limit = 10; /* Hardwired for now, but at least we limit. */
     int ret            = 0;
@@ -1127,19 +1126,19 @@ uipcp_rib::sync_rib(const std::shared_ptr<NeighFlow> &nf)
 }
 
 void
-uipcp_rib::neighs_refresh_tmr_restart()
+UipcpRib::neighs_refresh_tmr_restart()
 {
     sync_timer = make_unique<TimeoutEvent>(
-        get_param_value<Msecs>(uipcp_rib::RibDaemonPrefix, "refresh-intval"),
+        get_param_value<Msecs>(UipcpRib::RibDaemonPrefix, "refresh-intval"),
         uipcp, this, [](struct uipcp *uipcp, void *arg) {
-            uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
+            UipcpRib *rib = static_cast<UipcpRib *>(arg);
             rib->sync_timer->fired();
             rib->neighs_refresh();
         });
 }
 
 void
-uipcp_rib::neighs_refresh()
+UipcpRib::neighs_refresh()
 {
     std::lock_guard<std::mutex> guard(mutex);
     size_t limit = 10;
@@ -1159,7 +1158,7 @@ uipcp_rib::neighs_refresh()
 }
 
 void
-uipcp_rib::keepalive_timeout(const std::shared_ptr<NeighFlow> &nf)
+UipcpRib::keepalive_timeout(const std::shared_ptr<NeighFlow> &nf)
 {
     std::string neigh_name = nf->neigh_name;
     CDAPMessage m;
@@ -1177,7 +1176,7 @@ uipcp_rib::keepalive_timeout(const std::shared_ptr<NeighFlow> &nf)
     nf->pending_keepalive_reqs++;
 
     if (nf->pending_keepalive_reqs >
-        get_param_value<int>(uipcp_rib::EnrollmentPrefix, "keepalive-thresh")) {
+        get_param_value<int>(UipcpRib::EnrollmentPrefix, "keepalive-thresh")) {
         /* We assume the neighbor is not alive on this flow, so
          * we prune the flow. */
         UPI(uipcp,
@@ -1194,7 +1193,7 @@ uipcp_rib::keepalive_timeout(const std::shared_ptr<NeighFlow> &nf)
 }
 
 std::shared_ptr<Neighbor>
-uipcp_rib::get_neighbor(const string &neigh_name, bool create)
+UipcpRib::get_neighbor(const string &neigh_name, bool create)
 {
     string neigh_name_s(neigh_name);
 
@@ -1217,7 +1216,7 @@ uipcp_rib::get_neighbor(const string &neigh_name, bool create)
  * a reference, it wouldn't be valid anymore.
  */
 int
-uipcp_rib::del_neighbor(std::string neigh_name, bool reconnect)
+UipcpRib::del_neighbor(std::string neigh_name, bool reconnect)
 {
     auto mit = neighbors.find(neigh_name);
 
@@ -1237,7 +1236,7 @@ uipcp_rib::del_neighbor(std::string neigh_name, bool reconnect)
 }
 
 rlm_addr_t
-uipcp_rib::lookup_node_address(const std::string &node_name) const
+UipcpRib::lookup_node_address(const std::string &node_name) const
 {
     auto mit = neighbors_seen.find(node_name);
 
@@ -1253,7 +1252,7 @@ uipcp_rib::lookup_node_address(const std::string &node_name) const
 }
 
 std::string
-uipcp_rib::lookup_neighbor_by_address(rlm_addr_t address)
+UipcpRib::lookup_neighbor_by_address(rlm_addr_t address)
 {
     for (const auto &kvn : neighbors_seen) {
         if (kvn.second.address() == address) {
@@ -1281,10 +1280,10 @@ common_lower_dif(const gpb::NeighborCandidate &cand, const list<string> l2)
 }
 
 int
-uipcp_rib::neighbors_handler(const CDAPMessage *rm,
-                             std::shared_ptr<NeighFlow> const &nf,
-                             std::shared_ptr<Neighbor> const &neigh,
-                             rlm_addr_t src_addr)
+UipcpRib::neighbors_handler(const CDAPMessage *rm,
+                            std::shared_ptr<NeighFlow> const &nf,
+                            std::shared_ptr<Neighbor> const &neigh,
+                            rlm_addr_t src_addr)
 {
     const char *objbuf;
     size_t objlen;
@@ -1380,10 +1379,10 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm,
 }
 
 int
-uipcp_rib::keepalive_handler(const CDAPMessage *rm,
-                             std::shared_ptr<NeighFlow> const &nf,
-                             std::shared_ptr<Neighbor> const &neigh,
-                             rlm_addr_t src_addr)
+UipcpRib::keepalive_handler(const CDAPMessage *rm,
+                            std::shared_ptr<NeighFlow> const &nf,
+                            std::shared_ptr<Neighbor> const &neigh,
+                            rlm_addr_t src_addr)
 {
     CDAPMessage m;
     int ret;
@@ -1416,9 +1415,9 @@ uipcp_rib::keepalive_handler(const CDAPMessage *rm,
 }
 
 int
-uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id,
-                                        std::shared_ptr<NeighFlow> *pnf,
-                                        std::shared_ptr<Neighbor> *pneigh)
+UipcpRib::lookup_neigh_flow_by_port_id(rl_port_t port_id,
+                                       std::shared_ptr<NeighFlow> *pnf,
+                                       std::shared_ptr<Neighbor> *pneigh)
 {
     *pnf    = nullptr;
     *pneigh = nullptr;
@@ -1436,9 +1435,9 @@ uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id,
 }
 
 int
-uipcp_rib::lookup_neigh_flow_by_flow_fd(int flow_fd,
-                                        std::shared_ptr<NeighFlow> *pnf,
-                                        std::shared_ptr<Neighbor> *pneigh)
+UipcpRib::lookup_neigh_flow_by_flow_fd(int flow_fd,
+                                       std::shared_ptr<NeighFlow> *pnf,
+                                       std::shared_ptr<Neighbor> *pneigh)
 {
     *pnf    = nullptr;
     *pneigh = nullptr;
@@ -1466,7 +1465,7 @@ uipcp_rib::lookup_neigh_flow_by_flow_fd(int flow_fd,
 }
 
 gpb::NeighborCandidate
-uipcp_rib::neighbor_cand_get() const
+UipcpRib::neighbor_cand_get() const
 {
     gpb::NeighborCandidate cand;
     string u1, u2;
@@ -1580,7 +1579,7 @@ Neighbor::flow_alloc(const char *supp_dif)
         (rl_conf_ipcp_qos_supported(lower_ipcp_id_, &relspec) == 0);
     UPD(rib->uipcp, "N-1 DIF %s has%s reliable flows\n", supp_dif,
         (alloc_reliable_flow ? "" : " no"));
-    if (!rib->get_param_value<bool>(uipcp_rib::ResourceAllocPrefix,
+    if (!rib->get_param_value<bool>(UipcpRib::ResourceAllocPrefix,
                                     "reliable-flows")) {
         /* Force unreliable flows even if we have reliable ones. */
         alloc_reliable_flow = false;
@@ -1617,8 +1616,8 @@ Neighbor::flow_alloc(const char *supp_dif)
 }
 
 int
-uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
-                  int wait_for_completion)
+UipcpRib::enroll(const char *neigh_name, const char *supp_dif_name,
+                 int wait_for_completion)
 {
     EnrollmentResources *er;
     std::shared_ptr<Neighbor> neigh;
@@ -1684,7 +1683,7 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
 
 /* To be called out of RIB lock. */
 int
-uipcp_rib::enroller_enable(bool enable)
+UipcpRib::enroller_enable(bool enable)
 {
     {
         std::lock_guard<std::mutex> guard(this->mutex);
@@ -1707,7 +1706,7 @@ uipcp_rib::enroller_enable(bool enable)
 }
 
 int
-uipcp_rib::neigh_disconnect(const std::string &neigh_name)
+UipcpRib::neigh_disconnect(const std::string &neigh_name)
 {
     auto neigh = get_neighbor(neigh_name, /*create=*/false);
 
@@ -1732,7 +1731,7 @@ uipcp_rib::neigh_disconnect(const std::string &neigh_name)
 }
 
 int
-uipcp_rib::lower_dif_detach(const std::string &lower_dif)
+UipcpRib::lower_dif_detach(const std::string &lower_dif)
 {
     std::list<std::shared_ptr<NeighFlow>> to_prune;
 
@@ -1752,7 +1751,7 @@ uipcp_rib::lower_dif_detach(const std::string &lower_dif)
 }
 
 void
-uipcp_rib::enrollment_resources_cleanup()
+UipcpRib::enrollment_resources_cleanup()
 {
     std::lock_guard<std::mutex> guard(mutex);
 
@@ -1767,13 +1766,13 @@ uipcp_rib::enrollment_resources_cleanup()
 }
 
 void
-uipcp_rib::trigger_re_enrollments()
+UipcpRib::trigger_re_enrollments()
 {
     list<pair<string, string>> re_enrollments;
 
-    if (!get_param_value<bool>(uipcp_rib::EnrollmentPrefix, "auto-reconnect")) {
+    if (!get_param_value<bool>(UipcpRib::EnrollmentPrefix, "auto-reconnect")) {
         /* Don't try to re-enroll automatically to neighbors
-         * listed in uipcp_rib::neighbors_deleted. */
+         * listed in UipcpRib::neighbors_deleted. */
         return;
     }
 
@@ -1845,11 +1844,11 @@ uipcp_rib::trigger_re_enrollments()
 }
 
 void
-uipcp_rib::allocate_n_flows()
+UipcpRib::allocate_n_flows()
 {
     list<string> n_flow_allocations;
 
-    if (!get_param_value<bool>(uipcp_rib::ResourceAllocPrefix,
+    if (!get_param_value<bool>(UipcpRib::ResourceAllocPrefix,
                                "reliable-n-flows")) {
         /* Reliable N-flows feature disabled. */
         return;
@@ -1940,7 +1939,7 @@ uipcp_rib::allocate_n_flows()
 }
 
 void
-uipcp_rib::check_for_address_conflicts()
+UipcpRib::check_for_address_conflicts()
 {
     std::lock_guard<std::mutex> guard(mutex);
     gpb::NeighborCandidate cand = neighbor_cand_get();
@@ -1981,11 +1980,11 @@ uipcp_rib::check_for_address_conflicts()
 }
 
 void
-uipcp_rib::ra_lib_init()
+UipcpRib::ra_lib_init()
 {
-    available_policies[uipcp_rib::EnrollmentPrefix].insert(
+    available_policies[UipcpRib::EnrollmentPrefix].insert(
         PolicyBuilder("default"));
-    available_policies[uipcp_rib::ResourceAllocPrefix].insert(
+    available_policies[UipcpRib::ResourceAllocPrefix].insert(
         PolicyBuilder("default"));
 }
 
