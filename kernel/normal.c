@@ -592,39 +592,14 @@ inet_wrapsum(uint32_t sum)
 #define RMTQ_MAX_SIZE (1 << 17)
 
 static int
-rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
-       unsigned flags)
+rmt_tx_to_lower(struct ipcp_entry *ipcp, struct flow_entry *lower_flow,
+                struct rl_buf *rb, unsigned flags)
 {
+    struct ipcp_entry *lower_ipcp = lower_flow->txrx.ipcp;
+    bool maysleep                 = flags & RL_RMT_F_MAYSLEEP;
     DECLARE_WAITQUEUE(wait, current);
-    struct flow_entry *lower_flow;
-    struct ipcp_entry *lower_ipcp;
-    bool maysleep               = flags & RL_RMT_F_MAYSLEEP;
-    struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
     int ret;
 
-    lower_flow = rl_pduft_lookup((struct rl_normal *)ipcp->priv, remote_addr);
-    if (unlikely(!lower_flow && remote_addr != ipcp->addr)) {
-        RPD(1, "No route to IPCP %lu, dropping packet\n",
-            (long unsigned)remote_addr);
-        rl_buf_free(rb);
-        stats->rmt.noroute_drop++;
-        /* Do not return -EHOSTUNREACH, this would break applications.
-         * We assume the unreachability is temporary, and due to routing
-         * rearrangements. */
-        return 0;
-    }
-
-    if (!lower_flow) {
-        /* This SDU gets loopbacked to this IPCP, since this is a
-         * self flow (flow->remote_addr == ipcp->addr). */
-        rb = ipcp->ops.sdu_rx(ipcp, rb, NULL /* unused */);
-        BUG_ON(rb != NULL);
-        return 0;
-    }
-
-    /* This SDU will be sent to a remote IPCP, using an N-1 flow. */
-
-    lower_ipcp = lower_flow->txrx.ipcp;
     BUG_ON(!lower_ipcp);
 
     if (maysleep) {
@@ -655,6 +630,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
             }
 
             if (flags & RL_RMT_F_CONSUME) {
+                struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
 #ifdef RL_RMT_QUEUES
                 /* We must consume this buffer. We either push it to an RMT
                  * queue or drop it if there is no space. */
@@ -696,6 +672,38 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
     }
 
     return ret;
+}
+
+static int
+rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
+       unsigned flags)
+{
+    struct flow_entry *lower_flow;
+
+    lower_flow = rl_pduft_lookup((struct rl_normal *)ipcp->priv, remote_addr);
+    if (unlikely(!lower_flow && remote_addr != ipcp->addr)) {
+        struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
+
+        RPD(1, "No route to IPCP %lu, dropping packet\n",
+            (long unsigned)remote_addr);
+        rl_buf_free(rb);
+        stats->rmt.noroute_drop++;
+        /* Do not return -EHOSTUNREACH, this would break applications.
+         * We assume the unreachability is temporary, and due to routing
+         * rearrangements. */
+        return 0;
+    }
+
+    if (!lower_flow) {
+        /* This SDU gets loopbacked to this IPCP, since this is a
+         * self flow (flow->remote_addr == ipcp->addr). */
+        rb = ipcp->ops.sdu_rx(ipcp, rb, NULL /* unused */);
+        BUG_ON(rb != NULL);
+        return 0;
+    }
+
+    /* This SDU will be sent to a remote IPCP, using an N-1 flow. */
+    return rmt_tx_to_lower(ipcp, lower_flow, rb, flags);
 }
 
 /* Called under DTP lock */
