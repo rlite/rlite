@@ -1219,18 +1219,20 @@ topo_visit(struct uipcps *uipcps)
         ipn->marked = 1;
 
         list_for_each_entry (e, nexts, node) {
+            int msz;
+
             if (e->uipcp->topo.txhdroom <
                 ipn->txhdroom + e->uipcp->topo.hdrsize) {
                 e->uipcp->topo.txhdroom =
                     ipn->txhdroom + e->uipcp->topo.hdrsize;
             }
-            if (e->uipcp->topo.max_sdu_size >
-                ipn->max_sdu_size - e->uipcp->topo.hdrsize) {
-                e->uipcp->topo.max_sdu_size =
-                    ipn->max_sdu_size - e->uipcp->topo.hdrsize;
-                if (e->uipcp->topo.max_sdu_size < 0) {
-                    e->uipcp->topo.max_sdu_size = 0;
-                }
+
+            msz = (int)ipn->max_sdu_size - (int)e->uipcp->topo.hdrsize;
+            if (msz < 0) {
+                msz = 0;  /* just to be on the safe side */
+            }
+            if (e->uipcp->topo.max_sdu_size > msz) {
+                e->uipcp->topo.max_sdu_size = msz;
             }
         }
     }
