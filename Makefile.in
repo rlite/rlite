@@ -13,7 +13,7 @@ ker:
 			WITH_SHIM_TCP4=@WITH_SHIM_TCP4@ \
 			modules
 
-test:
+test: usr
 	cd build && $(MAKE) test
 
 usr_count:
