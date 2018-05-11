@@ -1311,30 +1311,47 @@ machine just receives the echo request and sends the echo response back to the c
 
 
 ## 8. Developer workflow
-The *rlite* project provides a few verfication tools that developers must follow after
-any code modification. These procedures minimize the risk of breaking functionality when
-implementing new features or refactoring existing code.
+The *rlite* project provides a few verification procedures that developers must follow
+after any code modification. These procedures minimize the risk of breaking
+functionality when implementing new features or refactoring existing code.
 
 The first and most important verification step consists in running the suite of unit tests
 and integration tests.
 There are only a few unit tests for the moment being, covering the CDAP library, the Raft
 consensus algorithm and the Dijkstra implementation.
-Tun run the unit tests, run the following from the root repository (assuming `./configure`
-has been run)
+To run the the unit tests, use the following commands from the repository root directory
+(assuming `./configure` has already been run)
 
     $ make test
     
 and the output will report about tests succeeding or failing, e.g.
 
     100% tests passed, 0 tests failed out of 3
-    
+
+Integration tests are more plentiful, and cover most of the *rlite* functionalities.
+To run them all, use the following command from the repository root directory:
+
+    $ sudo make intest
+
+The execution of the whole test suite should take between 1 and 2 minutes.
+The tests are available in the `tests/integration/` directory. Some of the integration
+tests are actually multi-node (e.g. to test enrollment, LFA routing policies,
+centralized fault tolerant policies, ...), although they don't use virtual machines.
+Each node is implemented as a separate network namespace; this is possible because
+*rlite* has support for the Linux network namespaces, and will provide an independent
+RINA network stack for each namespace.
+Integration tests have great code coverage, but they do not test the software at scale,
+because each test does not setup more than 4-5 RINA nodes. Large scale testing is
+however possible with the demonstrator, as explained in Section 8.1.
+
 ### 8.1 Demonstrator-driven verification
 ![Development and verification workflow](https://bitbucket.org/vmaffione/rina-images/downloads/verification-workflow-rlite.png)
 
 The demonstrator (`demo/demo.py`) and buildroot
-(https://github.com/vmaffione/buildroot) are the main tools that
-are used to quickly verify the correctness of any software modification,
-as explained in the following (and illustrated in the diagram above).
+(https://github.com/rlite/buildroot) can also be used to quickly verify
+the correctness of any software modification, as explained in the following
+(and illustrated in the diagram above). The demonstrator allows functional
+verification at scale, up to 1000 nodes.
 
 To prepare your verification environment, first step is to download a
 clone of buildroot, modified with rlite support, changing the last
@@ -1395,10 +1412,10 @@ behaviour (see `./demo.py -h`).
 To quickly carry out tests at scale, you can use the `--ring` option rather
 than specifying a demonstrator configuration file
 
-    $ ./demo.py --ring 200 -r -k 0
+    $ ./demo.py --tree 200 -r -k 0
 
 so that the demonstrator will automatically define a network of 200 nodes
-arranged in a ring, with a single normal DIF including them all. On a machine
+arranged in a tree, with a single normal DIF including them all. On a machine
 with 64 GB of RAM it is possible to deploy a ring of 350 nodes, when
 giving each node the default amount of memory.
 
