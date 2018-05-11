@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 ################################################
 # Usage to run all the tests:
@@ -39,7 +39,7 @@ modules="rlite-normal rlite-shim-loopback rlite-shim-eth rlite-shim-udp4 rlite-s
 # Start from a clean state
 pkill rlite-uipcps > /dev/null 2>&1
 for m in ${modules}; do
-    rmmod ${m} > /dev/null 2>&1
+    rmmod "${m}" > /dev/null 2>&1
 done
 pkill rinaperf
 pkill rina-echo-async
@@ -47,14 +47,14 @@ rmmod rlite > /dev/null 2>&1
 
 testcnt="0"
 for t in $(ls tests/integration/*.sh); do
-    testcnt=$((${testcnt} + 1))
-    if [ $TESTSEL -ne "0" -a $TESTSEL -ne $testcnt ]; then
+    testcnt=$((testcnt + 1))
+    if [ "$TESTSEL" -ne "0" -a "$TESTSEL" -ne "$testcnt" ]; then
         continue
     fi
     echo -e "${ORANGE}>>> Running integration test ${CYAN}\"${t}\"${NOC}"
     # Prepare test environment
     for m in ${modules}; do
-        modprobe ${m} || abort_prepare
+        modprobe "${m}" || abort_prepare
     done
     rlite-uipcps -d || abort_prepare
     ${t}
@@ -63,7 +63,7 @@ for t in $(ls tests/integration/*.sh); do
     rlite-ctl terminate || abort_cleanup
     rlite-ctl reset || abort_cleanup
     for m in ${modules}; do
-        rmmod ${m} || abort_cleanup
+        rmmod "${m}" || abort_cleanup
     done
     rmmod rlite || abort_cleanup
     if [ "$retcode" != "0" ]; then
