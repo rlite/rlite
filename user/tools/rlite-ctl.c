@@ -242,10 +242,12 @@ request_response(struct rl_msg_base *req, response_handler_t handler,
 
     fd = uipcps_connect();
     if (fd < 0) {
+        rl_msg_free(rl_uipcps_numtables, RLITE_U_MSG_MAX, req);
         return fd;
     }
 
     ret = rl_msg_write_fd(fd, req);
+    rl_msg_free(rl_uipcps_numtables, RLITE_U_MSG_MAX, req);
     if (ret) {
         return ret;
     }
