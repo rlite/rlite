@@ -972,25 +972,17 @@ rl_normal_config(struct ipcp_entry *ipcp, const char *param_name,
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
     int ret = -ENOSYS; /* don't know how to manage this parameter */
 
+    *notify = 0;
     if (strcmp(param_name, "address") == 0) {
         uint64_t address;
 
         ret = kstrtou64(param_value, 10, &address);
         if (ret == 0) {
-            PI("IPCP %u address set to %llu\n", ipcp->id,
-               (long long unsigned)address);
             *notify    = (ipcp->addr != address);
             ipcp->addr = address;
         }
     } else if (strcmp(param_name, "ttl") == 0) {
-        uint16_t ttl;
-
-        ret = kstrtou16(param_value, 10, &ttl);
-        if (ret == 0 && ttl != priv->ttl) {
-            *notify = 0;
-            PI("IPCP %u TTL set to %u\n", ipcp->id, (unsigned)ttl);
-            priv->ttl = ttl;
-        }
+        ret = rl_configstr_to_u16(param_value, &priv->ttl, NULL);
     } else if (strcmp(param_name, "csum") == 0) {
         if (strcmp(param_value, "none") == 0 || strcmp(param_value, "") == 0) {
             priv->csum = false;

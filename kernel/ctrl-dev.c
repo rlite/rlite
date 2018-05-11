@@ -1913,8 +1913,8 @@ rl_reg_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
     return ret;
 }
 
-static int
-configstr_to_u16(const char *src, uint16_t *dst, int *changed)
+int
+rl_configstr_to_u16(const char *src, uint16_t *dst, int *changed)
 {
     uint16_t v;
     int ret = kstrtou16(src, 10, &v);
@@ -1927,9 +1927,10 @@ configstr_to_u16(const char *src, uint16_t *dst, int *changed)
     }
     return ret;
 }
+EXPORT_SYMBOL(rl_configstr_to_u16);
 
-static int
-configstr_to_u32(const char *src, uint32_t *dst, int *changed)
+int
+rl_configstr_to_u32(const char *src, uint32_t *dst, int *changed)
 {
     uint32_t v;
     int ret = kstrtou32(src, 10, &v);
@@ -1942,6 +1943,7 @@ configstr_to_u32(const char *src, uint32_t *dst, int *changed)
     }
     return ret;
 }
+EXPORT_SYMBOL(rl_configstr_to_u32);
 
 static int
 rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
@@ -1974,11 +1976,12 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         /* This operation was not managed by ops.config, let's see if
          *  we can manage it here. */
         if (strcmp(req->name, "txhdroom") == 0) {
-            ret = configstr_to_u16(req->value, &entry->txhdroom, NULL);
+            ret = rl_configstr_to_u16(req->value, &entry->txhdroom, NULL);
         } else if (strcmp(req->name, "rxhdroom") == 0) {
-            ret = configstr_to_u16(req->value, &entry->rxhdroom, NULL);
+            ret = rl_configstr_to_u16(req->value, &entry->rxhdroom, NULL);
         } else if (strcmp(req->name, "mss") == 0) {
-            ret = configstr_to_u32(req->value, &entry->max_sdu_size, &notify);
+            ret =
+                rl_configstr_to_u32(req->value, &entry->max_sdu_size, &notify);
         } else {
             ret = -EINVAL; /* unknown request */
         }
