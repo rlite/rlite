@@ -24,10 +24,35 @@
 #include <string>
 #include <list>
 #include <unordered_map>
+#include <memory>
 
 #include "BaseRIB.pb.h"
+#include "rlite/cpputils.hpp"
 
 namespace rlite {
+
+using NameId = std::string *;
+
+class NameIdsManager {
+    std::unordered_map<std::string, std::unique_ptr<std::string>> m;
+
+    NameId GetId(const std::string &name)
+    {
+        const auto it = m.find(name);
+        if (it != m.end()) {
+            return it->second.get();
+        }
+
+        m[name] = utils::make_unique<std::string>(name);
+        return m[name].get();
+    }
+
+    std::string GetName(NameId nid)
+    {
+        assert(nid != nullptr);
+        return *nid;
+    }
+};
 
 using NodeId = std::string;
 
@@ -51,6 +76,7 @@ struct LFDB {
     /* Is Loop Free Alternate algorithm enabled ? */
     bool lfa_enabled;
 
+    /* Be verbose on routing computations. */
     bool verbose = false;
 
 public:
@@ -58,6 +84,10 @@ public:
         : lfa_enabled(lfa_enabled), verbose(verbose)
     {
     }
+
+    /* Keeps a mapping between neighbor names (std::string objects) and
+     * numerical ids (NameId). */
+    NameIdsManager nim;
 
     /* Lower Flow Database. */
     std::unordered_map<NodeId, std::unordered_map<NodeId, gpb::LowerFlow>> db;
