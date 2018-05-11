@@ -66,6 +66,7 @@ enum {
     RLITE_KER_IPCP_CONFIG_GET_REQ,   /* 34 */
     RLITE_KER_IPCP_CONFIG_GET_RESP,  /* 35 */
     RLITE_KER_IPCP_SCHED_WRR,        /* 36 */
+    RLITE_KER_IPCP_SCHED_PFIFO,      /* 37 */
 
     RLITE_KER_MSG_MAX,
 };
@@ -452,6 +453,14 @@ struct rl_kmsg_ipcp_sched_wrr {
     uint32_t quantum;
     /* WRR weights are dwords. */
     struct rl_msg_array_field weights;
+};
+
+/* application --> kernel message to configure a PFIFO PDU scheduler. */
+struct rl_kmsg_ipcp_sched_pfifo {
+    struct rl_msg_ipcp ipcp_hdr;
+
+    /* Number of priority levels. */
+    rlm_qosid_t prio_levels;
 };
 
 #endif /* __RLITE_KER_H__ */

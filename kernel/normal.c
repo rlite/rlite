@@ -123,75 +123,135 @@ rina_pci_dump(struct rina_pci *pci)
  * Support for PDU schedulers.
  */
 
-struct rl_sched_fifo {
-    struct rb_list q;
-    int qlen;
+struct rl_sched_pfifo {
+    /* Array indexed by qos_id. */
+    struct rl_sched_pfifo_queue {
+        struct rb_list q;
+        int qlen;
+    } * queues;
+    /* Number of queues (traffic classes). */
+    rl_qosid_t num_queues;
 };
 
 static int
-sched_fifo_init(struct rl_sched *sched)
+sched_pfifo_do_config(struct rl_sched *sched, rl_qosid_t num_queues)
 {
-    struct rl_sched_fifo *sched_priv = RL_SCHED_PRIV(sched);
+    struct rl_sched_pfifo *sched_priv = RL_SCHED_PRIV(sched);
+    int i;
 
-    rb_list_init(&sched_priv->q);
-    sched_priv->qlen = 0;
+    if (num_queues == 0) {
+        /* Invalid parameters. */
+        return -1;
+    }
+
+    /* Clean up the old queues (if any). */
+    sched->ops.fini(sched);
+
+    /* Build the new queues. */
+    sched_priv->num_queues = num_queues;
+    sched_priv->queues = rl_alloc(num_queues * sizeof(sched_priv->queues[0]),
+                                  GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
+    if (!sched_priv->queues) {
+        return -ENOMEM;
+    }
+
+    for (i = 0; i < num_queues; i++) {
+        struct rl_sched_pfifo_queue *pq = sched_priv->queues + i;
+
+        rb_list_init(&pq->q);
+        pq->qlen = 0;
+    }
 
     return 0;
 }
 
-static void
-sched_fifo_fini(struct rl_sched *sched)
+static int
+sched_pfifo_config(struct rl_sched *sched, const struct rl_msg_base *bmsg)
 {
-    struct rl_sched_fifo *sched_priv = RL_SCHED_PRIV(sched);
-    struct rl_buf *rb, *tmp;
+    struct rl_kmsg_ipcp_sched_pfifo *req =
+        (struct rl_kmsg_ipcp_sched_pfifo *)bmsg;
 
-    rb_list_foreach_safe (rb, tmp, &sched_priv->q) {
-        rb_list_del(rb);
-        rl_buf_free(rb);
-    }
-    sched_priv->qlen = 0;
+    return sched_pfifo_do_config(sched, req->prio_levels);
 }
 
 static int
-sched_fifo_enq(struct rl_sched *sched, struct rl_buf *rb)
+sched_pfifo_init(struct rl_sched *sched)
 {
-    struct rl_sched_fifo *sched_priv = RL_SCHED_PRIV(sched);
+    return sched_pfifo_do_config(sched, /*num_queues=*/1);
+}
 
-    if (sched_priv->qlen > RMTQ_MAX_SIZE) {
+static void
+sched_pfifo_fini(struct rl_sched *sched)
+{
+    struct rl_sched_pfifo *sched_priv = RL_SCHED_PRIV(sched);
+    rl_qosid_t i;
+
+    if (!sched_priv->queues) {
+        return;
+    }
+
+    for (i = 0; i < sched_priv->num_queues; i++) {
+        struct rl_sched_pfifo_queue *pq = sched_priv->queues + i;
+        struct rl_buf *rb, *tmp;
+
+        rb_list_foreach_safe (rb, tmp, &pq->q) {
+            rb_list_del(rb);
+            rl_buf_free(rb);
+        }
+        pq->qlen = 0;
+    }
+
+    rl_free(sched_priv->queues, RL_MT_SHIM);
+}
+
+static int
+sched_pfifo_enq(struct rl_sched *sched, struct rl_buf *rb)
+{
+    struct rl_sched_pfifo *sched_priv = RL_SCHED_PRIV(sched);
+    rl_qosid_t qos_class =
+        min((rl_qosid_t)(sched_priv->num_queues - 1), RL_BUF_PCI(rb)->qos_id);
+    struct rl_sched_pfifo_queue *pq = sched_priv->queues + qos_class;
+
+    if (pq->qlen > RMTQ_MAX_SIZE) {
         return -1;
     }
 
-    rb_list_enq(rb, &sched_priv->q);
-    sched_priv->qlen += rl_buf_truesize(rb);
+    rb_list_enq(rb, &pq->q);
+    pq->qlen += rl_buf_truesize(rb);
 
     return 0;
 }
 
 static struct rl_buf *
-sched_fifo_deq(struct rl_sched *sched)
+sched_pfifo_deq(struct rl_sched *sched)
 {
-    struct rl_sched_fifo *sched_priv = RL_SCHED_PRIV(sched);
-    struct rl_buf *rb;
+    struct rl_sched_pfifo *sched_priv = RL_SCHED_PRIV(sched);
+    rl_qosid_t qos_class;
 
-    if (rb_list_empty(&sched_priv->q)) {
-        return NULL;
+    for (qos_class = 0; qos_class < sched_priv->num_queues; qos_class++) {
+        struct rl_sched_pfifo_queue *pq = sched_priv->queues + qos_class;
+
+        if (!rb_list_empty(&pq->q)) {
+            struct rl_buf *rb = rb_list_front(&pq->q);
+
+            rb_list_del(rb);
+            pq->qlen -= rl_buf_truesize(rb);
+            BUG_ON(pq->qlen < 0);
+            return rb;
+        }
     }
-    rb = rb_list_front(&sched_priv->q);
-    rb_list_del(rb);
-    sched_priv->qlen -= rl_buf_truesize(rb);
-    BUG_ON(sched_priv->qlen < 0);
 
-    return rb;
+    return NULL;
 }
 
-static struct rl_sched_ops rl_sched_fifo_ops = {
-    .name      = "fifo",
-    .priv_size = sizeof(struct rl_sched_fifo),
-    .init      = sched_fifo_init,
-    .fini      = sched_fifo_fini,
-    .config    = NULL,
-    .enq       = sched_fifo_enq,
-    .deq       = sched_fifo_deq};
+static struct rl_sched_ops rl_sched_pfifo_ops = {
+    .name      = "pfifo",
+    .priv_size = sizeof(struct rl_sched_pfifo),
+    .init      = sched_pfifo_init,
+    .fini      = sched_pfifo_fini,
+    .config    = sched_pfifo_config,
+    .enq       = sched_pfifo_enq,
+    .deq       = sched_pfifo_deq};
 
 struct rl_sched_wrr {
     /* Array indexed by qos_id. */
@@ -1457,6 +1517,11 @@ rl_normal_sched_config(struct ipcp_entry *ipcp, struct rl_msg_base *bmsg)
             return -ENXIO;
         }
         break;
+    case RLITE_KER_IPCP_SCHED_PFIFO:
+        if (strcmp(rl_sched_pfifo_ops.name, priv->sched->ops.name)) {
+            return -ENXIO;
+        }
+        break;
     default:
         return -ENOSYS;
         break;
@@ -2311,7 +2376,7 @@ rl_normal_init(void)
        (unsigned)sizeof(struct rina_pci_ctrl));
 
     /* Build the (static) list of PDU schedulers. */
-    list_add_tail(&rl_sched_fifo_ops.node, &rl_pdu_schedulers);
+    list_add_tail(&rl_sched_pfifo_ops.node, &rl_pdu_schedulers);
     list_add_tail(&rl_sched_wrr_ops.node, &rl_pdu_schedulers);
 
     return rl_ipcp_factory_register(&normal_factory);

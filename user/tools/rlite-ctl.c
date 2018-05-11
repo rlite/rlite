@@ -640,6 +640,34 @@ ipcp_sched_config(int argc, char **argv, struct cmd_descriptor *cd)
         req.weights.slots.dwords  = arr;
 
         return kernel_control_write(RLITE_MB(&req));
+    } else if (!strcmp(sched_name, "pfifo")) {
+        /* Weighted Round Robin configuration. Example:
+         *   ipcp-sched-config x.IPCP pfifo levels 4
+         * */
+        struct rl_kmsg_ipcp_sched_pfifo req;
+
+        if (argc < 4) {
+            PE("Not enough arguments for pfifo. Example:\n"
+               "  ipcp-sched-config x.IPCP pfifo levels 4\n");
+            return -1;
+        }
+
+        if (strcmp(argv[2], "levels")) {
+            PE("Missing 'levels' argument\n");
+            return -1;
+        }
+        req.prio_levels = atoi(argv[3]);
+        if (req.prio_levels == 0 || req.prio_levels > 128) {
+            PE("Invalid number of levels '%s'\n", argv[3]);
+            return -1;
+        }
+
+        /* Build the request. */
+        req.ipcp_hdr.hdr.msg_type = RLITE_KER_IPCP_SCHED_PFIFO;
+        req.ipcp_hdr.hdr.event_id = 0;
+        req.ipcp_hdr.ipcp_id      = attrs->id;
+
+        return kernel_control_write(RLITE_MB(&req));
     }
 
     PE("Unknown scheduler '%s'\n", sched_name);

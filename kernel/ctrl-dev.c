@@ -3180,6 +3180,7 @@ static rl_msg_handler_t rl_ctrl_handlers[] = {
     [RLITE_KER_IPCP_STATS_REQ]        = rl_ipcp_get_stats,
     [RLITE_KER_IPCP_CONFIG_GET_REQ]   = rl_ipcp_config_get,
     [RLITE_KER_IPCP_SCHED_WRR]        = rl_ipcp_sched_config,
+    [RLITE_KER_IPCP_SCHED_PFIFO]      = rl_ipcp_sched_config,
 #ifdef RL_MEMTRACK
     [RLITE_KER_MEMTRACK_DUMP] = rl_memtrack_dump,
 #endif /* RL_MEMTRACK */

@@ -975,7 +975,7 @@ be modified using the `ipcp-config` command:
 | ttl             | Initial value for the TTL (Time To Live) field in the PDU header (default 64). |
 | csum            | Checksum to perform on each PDU: possible values are "none" (default, no checksum) or "inet" (Internet checksum). |
 | flow-del-wait-ms| How much to postpone flow removal, to allow for inflight packets to arrive (default 4000 ms). |
-| sched           | PDU scheduler to use for transmission: possible values are "none" (default) or "fifo". |
+| sched           | PDU scheduler to use for transmission: possible values are "none" (default) or "pfifo". |
 
 As an example, a normal IPC Process can be manually configured with an address unique in its
 DIF. This step is not usually necessary, since a simple default policy for
