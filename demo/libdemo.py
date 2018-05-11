@@ -103,6 +103,7 @@ class Demo:
         self.links = []
         self.difs = dict()
         self.enrollments = dict()
+        self.cluster5 = dict()
         self.lowerflowallocs = dict()
         self.dif_graphs = dict()
         self.dif_policies = dict()
@@ -430,8 +431,12 @@ class Demo:
         for dif in sorted(self.difs):
             self.enrollments[dif] = []
             # To generate the list of enrollments, we simulate one,
-            # using breadth-first trasversal.
+            # using breadth-first trasversal. We also pick the first
+            # 5 nodes, that form a connected subgraph and may be used
+            # as a cluster for a centralized-fault-tolerant component
+            # (e.g. for DFT or the address allocator).
             enrolled = set([dif_center[dif]])
+            self.cluster5[dif] = [self.vms[dif_center[dif]]['id']]
             frontier = FrontierSet([dif_center[dif]])
             edges_covered = set()
             while not frontier.empty():
@@ -447,6 +452,8 @@ class Demo:
                         })
                         self.vms[edge[0]]['enrolling'].append(dif)
                         frontier.add(edge[0])
+                        if len(self.cluster5[dif]) < 5:
+                            self.cluster5[dif].append(self.vms[edge[0]]['id'])
 
             self.lowerflowallocs[dif] = []
             if self.enrollment_strategy == 'full-mesh':
@@ -564,6 +571,16 @@ class Demo:
                         % {
                             'dif': dif,
                             'nws': nack_wait_secs
+                        })
+                elif self.addr_alloc_policy == "ceft":
+                    replicas = []
+                    for nname in self.cluster5[dif]:
+                        replicas.append('%(dif)s.%(id)s.IPCP' % {'dif': dif, 'id': nname})
+                    ctrl_cmds.append(
+                        'dif-policy-param-mod %(dif)s.DIF addralloc replicas %(replicas)s\n'
+                        % {
+                            'dif': dif,
+                            'replicas': ','.join(replicas)
                         })
                 if self.reliable_flows:
                     ctrl_cmds.append(
@@ -688,6 +705,6 @@ class Demo:
         return (ctrl_cmds, enroll_cmds, appl_cmds)
 
     def realize_config(self):
-        self.compute_order()
         self.assign_shim_ids()
         self.assign_vm_ids()
+        self.compute_order()
