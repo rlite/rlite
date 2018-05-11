@@ -805,7 +805,9 @@ UipcpRib::dump_stats(std::stringstream &ss) const
         {"fwd_table_compute", stats.fwd_table_compute},
         {"fa_name_lookup_failed", stats.fa_name_lookup_failed},
         {"fa_request_issued", stats.fa_request_issued},
-        {"fa_response_received", stats.fa_response_received}};
+        {"fa_response_received", stats.fa_response_received},
+        {"fa_request_received", stats.fa_request_received},
+        {"fa_response_issued", stats.fa_response_issued}};
 
     ss << "Uipcp stats:" << std::endl;
     for (const auto &p : pairs) {

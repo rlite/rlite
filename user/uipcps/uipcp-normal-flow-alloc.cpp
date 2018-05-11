@@ -449,7 +449,7 @@ LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
         flow_reqs[obj_name.str() + string("R")] = std::move(freq);
     }
     flow_reqs_tmp.erase(f); /* first std::move(), then erase. */
-    rib->stats.fa_response_received++;
+    rib->stats.fa_response_issued++;
 
     return ret;
 }
@@ -500,6 +500,7 @@ LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm)
         rib->uipcp, freq->uid, freq->src_port(), freq->connections(0).src_cep(),
         freq->src_addr(), local_appl.c_str(), remote_appl.c_str(), &flowcfg);
     flow_reqs_tmp[freq->uid] = std::move(freq);
+    rib->stats.fa_request_received++;
 
     return 0;
 }
@@ -534,6 +535,8 @@ LocalFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
     freq->set_dst_port(remote_freq.dst_port());
     freq->mutable_connections(0)->set_dst_cep(
         remote_freq.connections(0).dst_cep());
+
+    rib->stats.fa_response_received++;
 
     return uipcp_issue_fa_resp_arrived(
         rib->uipcp, freq->src_port(), freq->dst_port(),

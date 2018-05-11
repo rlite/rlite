@@ -577,6 +577,8 @@ struct UipcpRib {
         uint64_t fa_name_lookup_failed;
         uint64_t fa_request_issued;
         uint64_t fa_response_received;
+        uint64_t fa_request_received;
+        uint64_t fa_response_issued;
     } stats;
 
     /* Time interval (in seconds) between two consecutive increments
