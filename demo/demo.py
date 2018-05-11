@@ -271,7 +271,7 @@ subprocess.call(['chmod', '0400', 'buildroot/buildroot_rsa'])
 sshopts = '-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
 if not args.image:
     sshopts += '-o IdentityFile=buildroot/buildroot_rsa '
-sudo = 'sudo' if args.image != '' or args.namespaces else ''
+sudo = 'sudo' if args.image != '' and not args.namespaces else ''
 vmimgpath = 'buildroot/rootfs.cpio'
 
 flavour_suffix = ''
