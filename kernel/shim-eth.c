@@ -76,7 +76,6 @@ struct eth_tx_queue {
 
 struct rl_shim_eth {
     struct ipcp_entry *ipcp;
-    /* TODO Protect access to this field with an RCU lock. */
     struct net_device *netdev;
 
     struct eth_tx_queue *txq;
@@ -879,26 +878,16 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
     int ret                  = -ENOSYS;
 
     if (strcmp(param_name, "netdev") == 0) {
-        struct net_device *netdev = NULL;
         void *ns                  = &init_net;
+        struct net_device *netdev = NULL;
 #ifdef CONFIG_NET_NS
         ns = current->nsproxy->net_ns;
 #endif
-        /* Detach from the current netdev, if any. */
         if (priv->netdev) {
-            netdev       = priv->netdev;
-            priv->netdev = NULL;
-        }
-        if (priv->txq) {
-            rl_free(priv->txq, RL_MT_SHIMDATA);
-        }
-
-        if (netdev) {
-            rtnl_lock();
-            netdev_rx_handler_unregister(netdev);
-            rtnl_unlock();
-            dev_put(netdev);
-            PD("detached from netdev %p\n", netdev);
+            /* We don't allow to dynamically change netdev to simplify
+             * locking. If an user needs to use another netdev it can
+             * just create another shim IPCP (and maybe distroy this one). */
+            return -EBUSY;
         }
 
         /* Try to attach the rx handler to the new device. */
@@ -909,6 +898,7 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
         priv->txq = rl_alloc(netdev->num_tx_queues * sizeof(priv->txq[0]),
                              GFP_ATOMIC | __GFP_ZERO, RL_MT_SHIMDATA);
         if (!priv->txq) {
+            dev_put(netdev);
             return -ENOMEM;
         }
 
@@ -944,6 +934,9 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
            ipcp->tailroom);
 
     } else if (strcmp(param_name, "mss") == 0) {
+        if (!priv->netdev) {
+            return -ENXIO;
+        }
         /* Deny changes to max_sdu_size (and update). */
         *notify            = (ipcp->max_sdu_size != priv->netdev->mtu);
         ipcp->max_sdu_size = priv->netdev->mtu;
