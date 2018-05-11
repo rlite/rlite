@@ -356,15 +356,15 @@ class CeftReplica : public raft::RaftSM {
 
     /* Support for client commands that are pending, waiting for
      * being applied to the replicated state machine. */
-    struct PendingReq {
+    struct PendingResp {
         gpb::OpCode op_code;
         std::string obj_name;
         std::string obj_class;
         int invoke_id;
         rlm_addr_t requestor_addr;
-        PendingReq() = default;
-        PendingReq(gpb::OpCode op, const std::string &oname,
-                   const std::string &oclass, int iid, rlm_addr_t addr)
+        PendingResp() = default;
+        PendingResp(gpb::OpCode op, const std::string &oname,
+                    const std::string &oclass, int iid, rlm_addr_t addr)
             : op_code(op),
               obj_name(oname),
               obj_class(oclass),
@@ -374,7 +374,7 @@ class CeftReplica : public raft::RaftSM {
         }
     };
 
-    std::unordered_map<raft::LogIndex, std::unique_ptr<PendingReq>> pending;
+    std::unordered_map<raft::LogIndex, std::unique_ptr<PendingResp>> pending;
 
     static std::string ReqVoteObjClass;
     static std::string ReqVoteRespObjClass;
@@ -658,9 +658,9 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
                     rm->obj_class.c_str());
                 continue;
             }
-            pending[index] =
-                make_unique<PendingReq>(rm->op_code, rm->obj_name,
-                                        rm->obj_class, rm->invoke_id, src_addr);
+            pending[index] = make_unique<PendingResp>(rm->op_code, rm->obj_name,
+                                                      rm->obj_class,
+                                                      rm->invoke_id, src_addr);
         }
     }
 
