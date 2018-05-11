@@ -43,6 +43,7 @@ for cont in a b c d; do
     ip netns exec ${cont} ip link set lo up || abort
     ip netns exec ${cont} rlite-uipcps -d || abort
     ip netns exec ${cont} rlite-ctl ipcp-create ${cont}.n normal normdif || abort
+    ip netns exec ${cont} rlite-ctl ipcp-config ${cont}.n flow-del-wait-ms 100 || abort
 done
 for li in ab ac ad bd cd; do
     ip link add veth.${li}l type veth peer name veth.${li}r || abort
@@ -59,6 +60,8 @@ for li in ab ac ad bd cd; do
     ip netns exec $right rlite-ctl ipcp-create ${li}r.eth shim-eth ${li}dif || abort
     ip netns exec ${left} rlite-ctl ipcp-config ${li}l.eth netdev veth.${li}l || abort
     ip netns exec ${right} rlite-ctl ipcp-config ${li}r.eth netdev veth.${li}r || abort
+    ip netns exec ${left} rlite-ctl ipcp-config ${li}l.eth flow-del-wait-ms 100 || abort
+    ip netns exec ${right} rlite-ctl ipcp-config ${li}r.eth flow-del-wait-ms 100 || abort
     ip netns exec ${left} rlite-ctl ipcp-register ${left}.n ${li}dif || abort
     ip netns exec ${right} rlite-ctl ipcp-register ${right}.n ${li}dif || abort
 done

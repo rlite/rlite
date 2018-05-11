@@ -1,17 +1,18 @@
 #!/bin/bash
 
 cleanup() {
-	pkill rinaperf
-	return 0
+    pkill rinaperf
+    return 0
 }
 
 abort() {
-	cleanup
-	exit 1
+    cleanup
+    exit 1
 }
 
 rlite-ctl ipcp-create sl shim-loopback dd || abort
 rlite-ctl ipcp-config sl queued 1 || abort
+rlite-ctl ipcp-config sl flow-del-wait-ms 100 || abort
 rinaperf -lw -z rpinstance7 || abort
 rinaperf -z rpinstance7 -p2 -c 4 -i 0 || abort
 rinaperf -lw -z rpinstance8 || abort

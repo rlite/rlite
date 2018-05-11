@@ -29,6 +29,8 @@ echo "10.11.12.13 rpinstance5" > /etc/hosts
 # the same, but we'll cheat only for the purpose of testing.
 rlite-ctl ipcp-create us0 shim-udp4 d0 || abort
 rlite-ctl ipcp-create us1 shim-udp4 d1 || abort
+rlite-ctl ipcp-config us0 flow-del-wait-ms 100 || abort
+rlite-ctl ipcp-config us1 flow-del-wait-ms 100 || abort
 
 # Register an application on the first shim-udp4 and run a client
 # from the other shim.

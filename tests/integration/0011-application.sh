@@ -2,6 +2,7 @@
 
 # Create an IPCP and register three applications
 rlite-ctl ipcp-create x normal dd || exit 1
+rlite-ctl ipcp-config x flow-del-wait-ms 100 || exit 1
 rinaperf -lw -z rpinstance1 || exit 1
 rinaperf -lw -z rpinstance2 || exit 1
 rinaperf -lw -z rpinstance3 || exit 1

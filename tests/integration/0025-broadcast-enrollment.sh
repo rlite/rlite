@@ -34,7 +34,9 @@ ip netns exec green rlite-uipcps -d || abort
 ip netns exec green ip link set veth.green up || abort
 ip netns exec green rlite-ctl ipcp-create green.eth shim-eth edif || abort
 ip netns exec green rlite-ctl ipcp-config green.eth netdev veth.green || abort
+ip netns exec green rlite-ctl ipcp-config green.eth flow-del-wait-ms 100 || abort
 ip netns exec green rlite-ctl ipcp-create green.n normal mydif || abort
+ip netns exec green rlite-ctl ipcp-config green.n flow-del-wait-ms 100 || abort
 ip netns exec green rlite-ctl dif-policy-mod mydif addralloc static || abort
 ip netns exec green rlite-ctl ipcp-config green.n address 8172 || abort
 ip netns exec green rlite-ctl ipcp-enroller-enable green.n || abort
@@ -47,7 +49,9 @@ ip netns exec red rlite-uipcps -d || abort
 ip netns exec red ip link set veth.red up || abort
 ip netns exec red rlite-ctl ipcp-create red.eth shim-eth edif || abort
 ip netns exec red rlite-ctl ipcp-config red.eth netdev veth.red || abort
+ip netns exec red rlite-ctl ipcp-config red.eth flow-del-wait-ms 100 || abort
 ip netns exec red rlite-ctl ipcp-create red.n normal mydif || abort
+ip netns exec red rlite-ctl ipcp-config red.n flow-del-wait-ms 100 || abort
 ip netns exec red rlite-ctl dif-policy-mod mydif addralloc static || abort
 ip netns exec green rlite-ctl ipcp-config green.n address 2718 || abort
 ip netns exec red rlite-ctl ipcp-register red.n edif || abort

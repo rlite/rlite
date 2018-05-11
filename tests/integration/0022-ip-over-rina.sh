@@ -14,6 +14,7 @@ abort() {
 }
 
 rlite-ctl ipcp-create xyz.IPCP normal dd.DIF || exit 1
+rlite-ctl ipcp-config xyz.IPCP flow-del-wait-ms 100 || exit 1
 cat > iporinad1.conf << EOF
 local       ipor1        dd.DIF
 remote      ipor2        dd.DIF       192.168.203.0/30

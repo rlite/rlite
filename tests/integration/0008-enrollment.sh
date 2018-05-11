@@ -12,4 +12,5 @@ rlite-ctl ipcp-register y zz || exit 1
 rlite-ctl dif-policy-param-mod dd addralloc nack-wait 1s || exit 1
 rlite-ctl ipcp-enroll y dd zz x || exit 1
 # Reset to wait for all the flows to go away
+rlite-ctl ipcp-config z flow-del-wait-ms 100 || exit 1
 rlite-ctl reset

@@ -50,7 +50,9 @@ for cont in s1 s2 s3 c1 c2; do
     ip netns exec ${cont} ip link set veth.${cont}c up || abort
     ip netns exec ${cont} rlite-ctl ipcp-create ${cont}.eth shim-eth ethdif || abort
     ip netns exec ${cont} rlite-ctl ipcp-config ${cont}.eth netdev veth.${cont}c || abort
+    ip netns exec ${cont} rlite-ctl ipcp-config ${cont}.eth flow-del-wait-ms 100 || abort
     ip netns exec ${cont} rlite-ctl ipcp-create ${cont}.n normal ceftdif || abort
+    ip netns exec ${cont} rlite-ctl ipcp-config ${cont}.n flow-del-wait-ms 100 || abort
     ip netns exec ${cont} rlite-ctl ipcp-register ${cont}.n ethdif || abort
 done
 

@@ -29,6 +29,8 @@ rlite-ctl ipcp-config s1 netdev rina.veth1 || abort
 rlite-ctl ipcp-config s1 netdev rina.veth0 && abort
 rlite-ctl ipcp-config-get s0 netdev | grep "\<rina.veth0\>" || abort
 rlite-ctl ipcp-config-get s0 wrongy && abort
+rlite-ctl ipcp-config s0 flow-del-wait-ms 100 || abort
+rlite-ctl ipcp-config s1 flow-del-wait-ms 100 || abort
 
 # Register an application on the first shim-eth
 rina-echo-async -lw -z rpinstance4 -d d0 || abort
