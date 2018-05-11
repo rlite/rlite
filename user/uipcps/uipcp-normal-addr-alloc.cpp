@@ -429,12 +429,6 @@ public:
 
         return raft->rib_handler(rm, nf, neigh, src_addr);
     }
-    // TODO: remove the need of this
-    int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
-                   unsigned int limit) const override
-    {
-        return -1;
-    }
 };
 
 int

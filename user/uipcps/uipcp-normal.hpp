@@ -394,7 +394,10 @@ struct AddrAllocator {
                             std::shared_ptr<Neighbor> const &neigh,
                             rlm_addr_t src_addr)                         = 0;
     virtual int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
-                           unsigned int limit) const                     = 0;
+                           unsigned int limit) const
+    {
+        return 0;
+    }
 
     static std::string TableName;
     static std::string ObjClass;
