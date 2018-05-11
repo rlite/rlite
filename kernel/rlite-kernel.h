@@ -761,6 +761,7 @@ struct rl_sched_ops {
     size_t priv_size;
     int (*init)(struct rl_sched *);
     void (*fini)(struct rl_sched *);
+    int (*config)(struct rl_sched *, const struct rl_msg_base *bmsg);
     int (*enq)(struct rl_sched *, struct rl_buf *);
     struct rl_buf *(*deq)(struct rl_sched *);
     struct list_head node;

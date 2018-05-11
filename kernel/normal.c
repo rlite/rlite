@@ -185,6 +185,7 @@ static struct rl_sched_ops rl_sched_fifo_ops = {
     .priv_size = sizeof(struct rl_sched_fifo),
     .init      = sched_fifo_init,
     .fini      = sched_fifo_fini,
+    .config    = NULL,
     .enq       = sched_fifo_enq,
     .deq       = sched_fifo_deq};
 
@@ -204,26 +205,46 @@ struct rl_sched_wrr {
 };
 
 static int
-sched_wrr_init(struct rl_sched *sched)
+sched_wrr_do_config(struct rl_sched *sched, unsigned int quantum,
+                    unsigned int num_queues, unsigned int weights[])
 {
     struct rl_sched_wrr *sched_priv = RL_SCHED_PRIV(sched);
     int i;
 
-    sched_priv->num_queues = 2;
-    sched_priv->quantum    = 1500;
-    sched_priv->queues =
-        rl_alloc(sched_priv->num_queues * sizeof(sched_priv->queues[0]),
-                 GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
+    sched->ops.fini(sched);
+
+    sched_priv->num_queues = num_queues;
+    sched_priv->quantum    = quantum;
+    sched_priv->queues = rl_alloc(num_queues * sizeof(sched_priv->queues[0]),
+                                  GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
     if (!sched_priv->queues) {
         return -ENOMEM;
     }
-    for (i = 0; i < sched_priv->num_queues; i++) {
+    for (i = 0; i < num_queues; i++) {
         rb_list_init(&sched_priv->queues[i].q);
         sched_priv->queues[i].qlen   = 0;
-        sched_priv->queues[i].weight = i + 1;
+        sched_priv->queues[i].weight = weights[i];
     }
 
     return 0;
+}
+
+static int
+sched_wrr_config(struct rl_sched *sched, const struct rl_msg_base *bmsg)
+{
+    struct rl_kmsg_ipcp_sched_wrr *req = (struct rl_kmsg_ipcp_sched_wrr *)bmsg;
+
+    return sched_wrr_do_config(sched, req->quantum, req->weights.num_elements,
+                               req->weights.slots.dwords);
+}
+
+static int
+sched_wrr_init(struct rl_sched *sched)
+{
+    unsigned int weights[2] = {1, 4};
+
+    return sched_wrr_do_config(sched, /*quantum=*/1500, /*num_queues=*/2,
+                               /*weights=*/weights);
 }
 
 static void
@@ -231,6 +252,10 @@ sched_wrr_fini(struct rl_sched *sched)
 {
     struct rl_sched_wrr *sched_priv = RL_SCHED_PRIV(sched);
     int i;
+
+    if (!sched_priv->queues) {
+        return;
+    }
 
     for (i = 0; i < sched_priv->num_queues; i++) {
         struct rl_buf *rb, *tmp;
@@ -261,6 +286,7 @@ static struct rl_sched_ops rl_sched_wrr_ops = {
     .priv_size = sizeof(struct rl_sched_wrr),
     .init      = sched_wrr_init,
     .fini      = sched_wrr_fini,
+    .config    = sched_wrr_config,
     .enq       = sched_wrr_enq,
     .deq       = sched_wrr_deq,
 };
@@ -1317,7 +1343,8 @@ rl_normal_config_get(struct ipcp_entry *ipcp, const char *param_name, char *buf,
 static int
 rl_normal_sched_config(struct ipcp_entry *ipcp, struct rl_msg_base *bmsg)
 {
-    int ret = -ENOSYS;
+    struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
+    int ret                = -ENOSYS;
 
     if (rl_ipcp_has_flows(ipcp, /*report_all=*/false)) {
         /* Do not allow scheduler changes if this IPCP is being
@@ -1326,17 +1353,26 @@ rl_normal_sched_config(struct ipcp_entry *ipcp, struct rl_msg_base *bmsg)
         return -EBUSY;
     }
 
-    switch (bmsg->hdr.msg_type) {
-    case RLITE_KER_IPCP_SCHED_WRR: {
-        struct rl_kmsg_ipcp_sched_wrr *req =
-            (struct rl_kmsg_ipcp_sched_wrr *)bmsg;
-        int i;
-        PD("QUANTUM %u\n", req->quantum);
-        for (i = 0; i < req->weights.num_elements; i++) {
-            PD("  WEIGHT %u\n", req->weights.slots.dwords[i]);
-        }
-        ret = 0;
+    if (!priv->sched) {
+        return -ENXIO;
     }
+
+    /* Check that the configuration message matches the current
+     * scheduler. */
+    switch (bmsg->hdr.msg_type) {
+    case RLITE_KER_IPCP_SCHED_WRR:
+        if (strcmp(rl_sched_wrr_ops.name, priv->sched->ops.name)) {
+            return -ENXIO;
+        }
+        break;
+    default:
+        return -ENOSYS;
+        break;
+    }
+
+    /* Call the configuration callback, if available. */
+    if (priv->sched->ops.config) {
+        ret = priv->sched->ops.config(priv->sched, bmsg);
     }
 
     return ret;
