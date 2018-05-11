@@ -293,7 +293,9 @@ Available commands:
 * `ipcp-route-del`: Remove a routing rule from a local IPCP; valid for the
                     static routing policy.
 * `ipcps-show`: Show the list of IPCPs that are currently running in the system.
-* `ipcp-stats`: Show statistics for an IPCP running in the system.
+* `ipcp-stats`: Show data transfer statistics for an IPCP running in the system.
+* `uipcp-stats-show`: Show management layer statistics for an IPCP running in
+                      the system.
 * `dif-rib-show`: Show the RIB of a DIF running in the system.
 * `dif-routing-show`: Show the routing table for an IPCP running in the system.
 * `dif-rib-paths-show`: Show the RIB paths exposed by a local IPCP.
