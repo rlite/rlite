@@ -326,7 +326,6 @@ public:
     }
 };
 
-// TODO add reconfigure
 class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
     /* An instance of this class can be a state machine replica or it can just
      * be a client that will redirect requests to one of the replicas. */
@@ -479,7 +478,7 @@ CentralizedFaultTolerantAddrAllocator::Client::allocate(
 {
     auto m = make_unique<CDAPMessage>();
 
-    m->m_write(ObjClass, TableName + "/" + ipcp_name);
+    m->m_create(ObjClass, TableName + "/" + ipcp_name);
 
     auto pr = make_unique<PendingReq>(m->op_code, ipcp_name);
     int ret = send_to_replicas(std::move(m), std::move(pr), OpSemantics::Put);
@@ -503,10 +502,10 @@ CentralizedFaultTolerantAddrAllocator::Client::process_rib_msg(
 
     switch (rm->op_code) {
     case gpb::M_READ_R:
-    case gpb::M_WRITE_R: {
+    case gpb::M_CREATE_R: {
         if (rm->result) {
             UPD(uipcp, "Address %s for IPCP '%s' failed remotely [%s]\n",
-                rm->op_code == gpb::M_WRITE_R ? "allocation" : "lookup",
+                rm->op_code == gpb::M_CREATE_R ? "allocation" : "lookup",
                 pr->ipcp_name.c_str(), rm->result_reason.c_str());
         } else {
             int64_t allocated_address;
@@ -514,7 +513,7 @@ CentralizedFaultTolerantAddrAllocator::Client::process_rib_msg(
             rm->get_obj_value(allocated_address);
             UPD(uipcp, "Address %llu %s for IPCP '%s'\n",
                 (long long unsigned)allocated_address,
-                rm->op_code == gpb::M_WRITE_R ? "allocated" : "looked up",
+                rm->op_code == gpb::M_CREATE_R ? "allocated" : "looked up",
                 pr->ipcp_name.c_str());
         }
         break;
@@ -571,12 +570,12 @@ CentralizedFaultTolerantAddrAllocator::Replica::process_rib_msg(
     string ipcp_name = rm->obj_name.substr(rm->obj_name.rfind("/") + 1);
     const auto mit   = table.find(ipcp_name);
 
-    if (rm->op_code == gpb::M_WRITE) {
-        /* We received an M_WRITE sent by Client::allocate() and we are the
+    if (rm->op_code == gpb::M_CREATE) {
+        /* We received an M_CREATE sent by Client::allocate() and we are the
          * leader. */
         auto m = make_unique<CDAPMessage>();
 
-        m->op_code   = gpb::M_WRITE_R;
+        m->op_code   = gpb::M_CREATE_R;
         m->obj_name  = rm->obj_name;
         m->obj_class = rm->obj_class;
         m->invoke_id = rm->invoke_id;
@@ -614,7 +613,7 @@ CentralizedFaultTolerantAddrAllocator::Replica::process_rib_msg(
         m->set_obj_value((static_cast<int64_t>(mit->second)));
         rib->send_to_dst_addr(std::move(m), src_addr);
     } else {
-        UPE(uipcp, "M_WRITE(aa), M_READ(aa) or M_DELETE(aa) expected\n");
+        UPE(uipcp, "M_CREATE(aa), M_READ(aa) or M_DELETE(aa) expected\n");
         return 0;
     }
 
