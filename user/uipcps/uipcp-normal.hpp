@@ -639,10 +639,6 @@ struct UipcpRib {
     int realize_registrations(bool reg);
     int enroller_enable(bool enable);
 
-    int addr_allocate(const std::string &ipcp_name, rlm_addr_t *addr)
-    {
-        return addra->allocate(ipcp_name, addr);
-    };
     int set_address(rlm_addr_t address);
     void update_address(rlm_addr_t new_addr);
     rlm_addr_t lookup_node_address(const std::string &node_name) const;
