@@ -948,8 +948,8 @@ It supports two configuration parameter:
     context to the destination flow; if different from 0, SDUs written are
     fowarded in a deferred context (a Linux workqueue in the current
     implementation).
- * **drop_fract**: if different from 0, an SDU packet is dropped every
-                    **drop_fract** SDUs.
+ * **drop-fract**: if different from 0, an SDU packet is dropped every
+                    **drop-fract** SDUs.
 
 
 ### 6.5. Normal IPC Process

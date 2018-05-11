@@ -374,7 +374,7 @@ rl_shim_loopback_config(struct ipcp_entry *ipcp, const char *param_name,
         ret = rl_configstr_to_u16(param_value, &priv->queued, NULL);
         spin_unlock_bh(&priv->lock);
 
-    } else if (strcmp(param_name, "drop_fract") == 0) {
+    } else if (strcmp(param_name, "drop-fract") == 0) {
         spin_lock_bh(&priv->lock);
         ret = rl_configstr_to_u32(param_value, &priv->drop_fract, NULL);
         priv->drop_cur = 0;

@@ -11,9 +11,14 @@ _rlite_ctl() {
     local prev=${COMP_WORDS[COMP_CWORD-1]}
     local pprev=${COMP_WORDS[COMP_CWORD-2]}
 
+    SCHEDS="pfifo wrr"
+
     case "$pprev" in
+        ipcp-config )
+            PARAMS="address ttl csum flow-del-wait-ms sched queued drop-fract"
+            COMPREPLY=( $(compgen -W "$PARAMS" -- $cur) )
+        ;;
         ipcp-sched-config )
-            SCHEDS="pfifo wrr"
             COMPREPLY=( $(compgen -W "$SCHEDS" -- $cur) )
         ;;
         quantum )
@@ -39,6 +44,9 @@ _rlite_ctl() {
         ;;
         pfifo )
             COMPREPLY=( $(compgen -W "levels" -- $cur) )
+        ;;
+        sched )
+            COMPREPLY=( $(compgen -W "$SCHEDS" -- $cur) )
         ;;
     esac
 }
