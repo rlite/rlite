@@ -844,12 +844,17 @@ if args.namespaces:
     # Remove all the namespaces (this also deletes the veths)
     for vmname in sorted(demo.vms):
         vm = demo.vms[vmname]
-        outs += 'sudo ip netns exec %(nsname)s rlite-ctl reset\n'\
-                'sudo ip netns del %(nsname)s\n' % {'nsname': vm['nsname']}
+        outs += '(\n'\
+                'sudo ip netns exec %(nsname)s rlite-ctl reset\n'\
+                'sudo ip netns del %(nsname)s\n'\
+                ') &\n' % {'nsname': vm['nsname']}
+    outs += 'wait\n'
 
     # Kill the daemons and unload the modules
-    outs += 'sudo pkill rlite-node-config\n'\
+    outs += 'sleep 1\n'\
+            'sudo pkill rlite-node-config\n'\
             'sudo pkill rlite-uipcps\n'\
+            'sleep 1\n'\
             'sudo rmmod rlite-normal%(flsuf)s\n'\
             'sudo rmmod rlite-shim-eth\n'\
             'sudo rmmod rlite-shim-udp4\n'\
