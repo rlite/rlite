@@ -507,17 +507,46 @@ UipcpRib::UipcpRib(struct uipcp *_u)
     assert(routing);
 
     /* Insert handlers for common RIB objects. */
-    rib_handler_register(Neighbor::TableName, &UipcpRib::neighbors_handler);
-    rib_handler_register(NeighFlow::KeepaliveObjName,
-                         &UipcpRib::keepalive_handler);
-    rib_handler_register(StatusObjName, &UipcpRib::status_handler);
+    rib_handler_register(
+        Neighbor::TableName,
+        [this](const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+               std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr) {
+            return neighbors_handler(rm, nf, neigh, src_addr);
+        });
+
+    rib_handler_register(
+        NeighFlow::KeepaliveObjName,
+        [this](const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+               std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr) {
+            return keepalive_handler(rm, nf, neigh, src_addr);
+        });
+
+    rib_handler_register(
+        StatusObjName,
+        [this](const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+               std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr) {
+            return status_handler(rm, nf, neigh, src_addr);
+        });
+
     for (const auto &component :
          {DFT::Prefix, Routing::Prefix, AddrAllocator::Prefix}) {
-        rib_handler_register(component + "/policy", &UipcpRib::policy_handler);
+        rib_handler_register(
+            component + "/policy",
+            [this](const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+                   std::shared_ptr<Neighbor> const &neigh,
+                   rlm_addr_t src_addr) {
+                return policy_handler(rm, nf, neigh, src_addr);
+            });
     }
+
     for (const auto &component : {DFT::Prefix, AddrAllocator::Prefix}) {
-        rib_handler_register(component + "/params",
-                             &UipcpRib::policy_param_handler);
+        rib_handler_register(
+            component + "/params",
+            [this](const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+                   std::shared_ptr<Neighbor> const &neigh,
+                   rlm_addr_t src_addr) {
+                return policy_param_handler(rm, nf, neigh, src_addr);
+            });
     }
 
     /* Start timers for periodic tasks. */
@@ -1111,7 +1140,7 @@ UipcpRib::cdap_dispatch(const CDAPMessage *rm,
             rm->obj_name.c_str());
         rm->dump();
     } else {
-        ret = (hi->second.handler)(*this, rm, nf, neigh, src_addr);
+        ret = hi->second.handler(rm, nf, neigh, src_addr);
     }
 
     return ret;
@@ -1231,8 +1260,7 @@ int
 UipcpRib::policy_mod(const std::string &component,
                      const std::string &policy_name)
 {
-    RibHandler h = nullptr;
-    int ret      = 0;
+    int ret = 0;
 
     if (!available_policies.count(component)) {
         UPE(uipcp, "Unknown component %s\n", component.c_str());
@@ -1274,20 +1302,22 @@ UipcpRib::policy_mod(const std::string &component,
     components[component] = std::move(policy_builder->builder(this));
     if (component == DFT::Prefix) {
         dft = dynamic_cast<DFT *>(components[component].get());
-        h   = &UipcpRib::dft_handler;
     } else if (component == Routing::Prefix) {
         routing = dynamic_cast<Routing *>(components[component].get());
-        h       = &UipcpRib::routing_handler;
     } else if (component == FlowAllocator::Prefix) {
         fa = dynamic_cast<FlowAllocator *>(components[component].get());
-        h  = &UipcpRib::flows_handler;
     } else if (component == AddrAllocator::Prefix) {
         addra = dynamic_cast<AddrAllocator *>(components[component].get());
-        h     = &UipcpRib::addr_alloc_handler;
     }
     /* Register the new RIB paths. */
     for (const std::string &path : policy_builder->paths) {
-        rib_handler_register(path, h);
+        rib_handler_register(path, [this, component](
+                                       const CDAPMessage *rm,
+                                       std::shared_ptr<NeighFlow> const &nf,
+                                       std::shared_ptr<Neighbor> const &neigh,
+                                       rlm_addr_t src_addr) {
+            return components[component]->rib_handler(rm, nf, neigh, src_addr);
+        });
     }
     /* Register the new policy parameters. */
     for (const auto &pp : policy_builder->params) {

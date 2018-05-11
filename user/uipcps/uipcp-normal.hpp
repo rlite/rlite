@@ -479,7 +479,7 @@ struct UipcpRib {
     struct periodic_task *tasks = nullptr;
 
     using RibHandler = std::function<int(
-        UipcpRib &, const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+        const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
         std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)>;
     struct RibHandlerInfo {
         RibHandler handler;
