@@ -394,7 +394,6 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
     class Client : public CeftClient {
         struct Synchronizer {
             std::condition_variable allocation_complete;
-            std::mutex mutex;
             bool allocated     = false;
             rlm_addr_t address = RL_ADDR_NULL;
         };
@@ -541,14 +540,13 @@ CentralizedFaultTolerantAddrAllocator::Client::allocate(
     rib->unlock();
 
     {
-        std::unique_lock<std::mutex> lk(synchro->mutex);
+        std::unique_lock<std::mutex> lk(rib->mutex);
 
         while (!synchro->allocated) {
             if (synchro->allocation_complete.wait_for(lk, timeout) ==
                 std::cv_status::timeout) {
                 UPE(rib->uipcp, "Address allocation for IPCP '%s' timed out\n",
                     ipcp_name.c_str());
-                rib->lock();
                 return -1;
             }
         }
@@ -556,8 +554,8 @@ CentralizedFaultTolerantAddrAllocator::Client::allocate(
         UPD(rib->uipcp, "Address %lu successfully allocated for IPCP '%s'\n",
             (long unsigned)synchro->address, ipcp_name.c_str());
         *addr = synchro->address;
-        /* We need to drop synchro->mutex before trying to acquire the RIB
-         * lock, in order to avoid AB/BA deadlock. */
+        /* The RIB lock gets released here, so we need to acquire it again
+         * below. */
     }
 
     rib->lock();
@@ -594,7 +592,6 @@ CentralizedFaultTolerantAddrAllocator::Client::client_process_rib_msg(
         }
 
         if (rm->op_code == gpb::M_CREATE_R) {
-            std::lock_guard<std::mutex> guard(pr->synchro->mutex);
             pr->synchro->address   = address;
             pr->synchro->allocated = true;
             pr->synchro->allocation_complete.notify_one();
