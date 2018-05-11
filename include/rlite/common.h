@@ -121,7 +121,7 @@ struct rl_msg_hdr {
 /* Base message, when no arguments are needed. */
 struct rl_msg_base {
     struct rl_msg_hdr hdr;
-} __attribute__((packed));
+};
 
 /* A simple response message layout that can be shared by many
  * different types. */
@@ -129,7 +129,8 @@ struct rl_msg_base_resp {
     struct rl_msg_hdr hdr;
 
     uint8_t result;
-} __attribute__((packed));
+    uint8_t pad1[7];
+};
 
 /* Some useful macros for casting. */
 #define RLITE_MB(m) (struct rl_msg_base *)(m)
@@ -154,9 +155,10 @@ struct rl_msg_base_resp {
 
 struct rl_ioctl_info {
     uint8_t mode;
+    uint8_t pad1[3];
     rl_port_t port_id;
     rl_ipcp_id_t ipcp_id;
-} __attribute__((packed));
+};
 
 #define RLITE_IOCTL_FLOW_BIND _IOW(0xAF, 0x00, struct rl_ioctl_info)
 #define RLITE_IOCTL_CHFLAGS _IOW(0xAF, 0x01, uint64_t)
@@ -180,9 +182,10 @@ struct rl_ioctl_info {
  */
 struct rl_mgmt_hdr {
     rl_port_t local_port;
-    rlm_addr_t remote_addr;
     uint8_t type;
-} __attribute__((packed));
+    uint8_t pad1[5];
+    rlm_addr_t remote_addr;
+};
 
 #define DTCP_PRESENT(_dc) ((_dc).flags != 0)
 
@@ -195,7 +198,7 @@ struct dtcp_config {
     /* Flow control. */
     struct {
         uint8_t fc_type;
-        char pad1[3];
+        uint8_t pad1[3];
 #define RLITE_FC_T_NONE 0
 #define RLITE_FC_T_WIN 1
 #define RLITE_FC_T_RATE 2
@@ -217,6 +220,7 @@ struct dtcp_config {
         uint16_t data_rxms_max;
         uint16_t max_rtxq_len;
         uint32_t initial_rtx_timeout;
+        uint32_t pad2;
     } rtx;
 
     uint32_t initial_a; /* A */
@@ -227,7 +231,7 @@ struct rl_flow_config {
     /* Used by normal IPCP. */
     uint8_t msg_boundaries;
     uint8_t in_order_delivery;
-    char pad1[2];
+    uint8_t pad1[6];
     rlm_seq_t max_sdu_gap;
     struct dtcp_config dtcp;
 
@@ -235,7 +239,7 @@ struct rl_flow_config {
     int32_t fd;
     uint32_t inet_ip;
     uint16_t inet_port;
-    char pad2[2];
+    uint16_t pad2[3];
 };
 
 #define RL_MPL_MSECS_DFLT 1000
@@ -298,13 +302,14 @@ struct rl_flow_dtp {
     rlm_seq_t next_seq_num_to_use;
     rlm_seq_t last_seq_num_sent;
     rlm_seq_t last_ctrl_seq_num_rcvd;
-    unsigned int cwq_len;
-    unsigned int max_cwq_len;
-    unsigned int rtxq_len;
-    unsigned int max_rtxq_len;
-    unsigned rtt;        /* estimated round trip time, in usecs. */
-    unsigned rtt_stddev; /* stddev in usecs */
-    unsigned cgwin;      /* congestion window size, in PDUs */
+    uint32_t cwq_len;
+    uint32_t max_cwq_len;
+    uint32_t rtxq_len;
+    uint32_t max_rtxq_len;
+    uint32_t rtt;        /* estimated round trip time, in usecs. */
+    uint32_t rtt_stddev; /* stddev in usecs */
+    uint32_t cgwin;      /* congestion window size, in PDUs */
+    uint32_t pad1;
 
     /* Receiver state. */
     rlm_seq_t rcv_lwe;
@@ -314,7 +319,8 @@ struct rl_flow_dtp {
     rlm_seq_t last_lwe_sent;
     rlm_seq_t last_seq_num_acked;
     rlm_seq_t next_snd_ctl_seq;
-    unsigned int seqq_len;
+    uint32_t seqq_len;
+    uint32_t pad2;
 };
 
 #define RL_SHIM_UDP_PORT 0x0d1f

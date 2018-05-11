@@ -93,7 +93,7 @@ struct rl_kmsg_ipcp_create {
     char *name;
     char *dif_type;
     char *dif_name;
-} __attribute__((packed));
+};
 
 /* application <-- kernel message to inform the application about the
  * ID of a new IPC process. */
@@ -185,9 +185,10 @@ struct rl_kmsg_appl_register {
     struct rl_msg_hdr hdr;
 
     uint8_t reg;
+    uint8_t pad1[7];
     char *appl_name;
     char *dif_name;
-} __attribute__((packed));
+};
 
 /* application <-- kernel report the result of (un)registration. */
 struct rl_kmsg_appl_register_resp {
@@ -334,6 +335,7 @@ struct rl_kmsg_uipcp_fa_req_arrived {
     rl_ipcp_id_t ipcp_id;
     rl_port_t remote_port;
     uint32_t remote_cep;
+    uint32_t pad1;
     rlm_addr_t remote_addr;
     struct rl_flow_config flowcfg;
     struct rina_flow_spec flowspec;
@@ -351,11 +353,11 @@ struct rl_kmsg_uipcp_fa_resp_arrived {
     rl_ipcp_id_t ipcp_id;
     rl_port_t local_port;
     rl_port_t remote_port;
-    char pad1[2];
-    uint32_t remote_cep;
-    rlm_addr_t remote_addr;
     uint8_t response;
-    char pad2[3];
+    uint8_t pad1;
+    uint32_t remote_cep;
+    uint32_t pad2;
+    rlm_addr_t remote_addr;
     struct rl_flow_config flowcfg;
 };
 
@@ -366,6 +368,7 @@ struct rl_kmsg_flow_cfg_update {
 
     rl_ipcp_id_t ipcp_id;
     rl_port_t port_id;
+    uint32_t pad1;
     struct rl_flow_config flowcfg;
 };
 
@@ -377,9 +380,10 @@ struct rl_kmsg_flow_deallocated {
     rl_ipcp_id_t ipcp_id;
     rl_port_t local_port_id;
     rl_port_t remote_port_id;
-    rlm_addr_t remote_addr;
     uint8_t initiator;
-} __attribute__((packed));
+    uint8_t pad1;
+    rlm_addr_t remote_addr;
+};
 
 /* uipcp (application) --> kernel message to ask
  * for a flow to be deallocated. */
@@ -391,7 +395,7 @@ struct rl_kmsg_flow_dealloc {
     uint32_t uid; /* unique id of the flow to deallocate, used to avoid
                    * accidental removal of different flows reusing the
                    * same port-id */
-} __attribute__((packed));
+};
 
 /* application --> kernel message to ask for
  * statistics of a given flow. */
@@ -399,7 +403,8 @@ struct rl_kmsg_flow_stats_req {
     struct rl_msg_hdr hdr;
 
     rl_port_t port_id;
-} __attribute__((packed));
+    uint16_t pad1[3];
+};
 
 /* application <-- kernel message to report statistics
  * about a given flow. */
@@ -408,7 +413,7 @@ struct rl_kmsg_flow_stats_resp {
 
     struct rl_flow_stats stats;
     struct rl_flow_dtp dtp;
-} __attribute__((packed));
+};
 
 /* application --> kernel message to ask an IPCP if a given
  * QoS can be supported. */
@@ -416,8 +421,9 @@ struct rl_kmsg_ipcp_qos_supported {
     struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
+    uint16_t pad1[3];
     struct rina_flow_spec flowspec;
-} __attribute__((packed));
+};
 
 /* application --> kernel message to ask for
  * statistics of a given IPCP RMT. */
@@ -425,7 +431,8 @@ struct rl_kmsg_ipcp_stats_req {
     struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
-} __attribute__((packed));
+    uint16_t pad1[3];
+};
 
 /* application <-- kernel message to report statistics
  * about a given IPCP RMT. */

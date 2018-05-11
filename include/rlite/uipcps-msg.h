@@ -75,9 +75,10 @@ struct rl_cmsg_ipcp_register {
     struct rl_msg_hdr hdr;
 
     uint8_t reg;
+    uint8_t pad1[7];
     char *ipcp_name;
     char *dif_name;
-} __attribute__((packed));
+};
 
 /* rlite-ctl --> uipcps message to enroll an IPC process
  * to another IPC process, or to only alloc a flow.
@@ -89,22 +90,23 @@ struct rl_cmsg_ipcp_enroll {
     char *neigh_name;
     char *dif_name;
     char *supp_dif_name;
-} __attribute__((packed));
+};
 
 /* rlite-ctl --> uipcps message to query the whole RIB */
 struct rl_cmsg_ipcp_rib_show_req {
     struct rl_msg_hdr hdr;
 
     char *ipcp_name;
-} __attribute__((packed));
+};
 
 /* rlite-ctl <-- uipcps message to report a RIB dump */
 struct rl_cmsg_ipcp_rib_show_resp {
     struct rl_msg_hdr hdr;
 
     uint8_t result;
+    uint8_t pad1[7];
     struct rl_buf_field dump;
-} __attribute__((packed));
+};
 
 /* rlite-ctl --> uipcps message to change a DIF policy */
 struct rl_cmsg_ipcp_policy_mod {
@@ -113,7 +115,7 @@ struct rl_cmsg_ipcp_policy_mod {
     char *ipcp_name;
     char *comp_name;
     char *policy_name;
-} __attribute__((packed));
+};
 
 /* rlite-ctl --> uipcps message to list DIF policies */
 struct rl_cmsg_ipcp_policy_list_req {
@@ -121,7 +123,7 @@ struct rl_cmsg_ipcp_policy_list_req {
 
     char *ipcp_name;
     char *comp_name;
-} __attribute__((packed));
+};
 
 /* rlite-ctl <-- uipcps message to list DIF policies */
 #define rl_cmsg_ipcp_policy_list_resp rl_cmsg_ipcp_rib_show_resp
@@ -134,7 +136,7 @@ struct rl_cmsg_ipcp_policy_param_mod {
     char *comp_name;
     char *param_name;
     char *param_value;
-} __attribute__((packed));
+};
 
 /* rlite-ctl --> uipcps message to list DIF policies */
 struct rl_cmsg_ipcp_policy_param_list_req {
@@ -143,7 +145,7 @@ struct rl_cmsg_ipcp_policy_param_list_req {
     char *ipcp_name;
     char *comp_name;
     char *param_name;
-} __attribute__((packed));
+};
 
 /* rlite-ctl <-- uipcps message to list DIF policy parameters */
 #define rl_cmsg_ipcp_policy_param_list_resp rl_cmsg_ipcp_rib_show_resp
@@ -155,8 +157,9 @@ struct rl_cmsg_ipcp_enroller_enable {
     struct rl_msg_hdr hdr;
 
     uint8_t enable;
+    uint8_t pad1[7];
     char *ipcp_name;
-} __attribute__((packed));
+};
 
 /* rlite-ctl --> uipcps message to ask for routing table dump */
 #define rl_cmsg_ipcp_routing_show_req rl_cmsg_ipcp_rib_show_req
@@ -169,9 +172,10 @@ struct rl_cmsg_ipcp_config {
     struct rl_msg_hdr hdr;
 
     rl_ipcp_id_t ipcp_id;
+    uint16_t pad1[3];
     char *name;
     char *value;
-} __attribute__((packed));
+};
 
 /* rlite-ctl --> uipcps message to enroll an IPC process
  * to another IPC process, or to only alloc a flow. */
@@ -180,7 +184,7 @@ struct rl_cmsg_ipcp_neigh_disconnect {
 
     char *ipcp_name;  /* local IPCP */
     char *neigh_name; /* neigh IPCP to disconnect from */
-} __attribute__((packed));
+};
 
 /* rlite-ctl --> uipcps message to add a static routing
  * rule for a local ipcp_process. */
@@ -190,7 +194,7 @@ struct rl_cmsg_ipcp_route_mod {
     char *ipcp_name; /* local IPCP */
     char *dest_name; /* destination IPCP */
     char *next_hops; /* next hops */
-} __attribute__((packed));
+};
 
 #define rl_cmsg_ipcp_stats_req rl_cmsg_ipcp_rib_show_req
 #define rl_cmsg_ipcp_stats_resp rl_cmsg_ipcp_rib_show_resp
