@@ -35,6 +35,7 @@
     73. rinaperf
     74. rina-echo-async
 8. Development workflow
+    81. Demonstrator-driven verification
 9. RINA API
     91. Server-side operations
     92. Client-side operations
@@ -1309,10 +1310,25 @@ machine just receives the echo request and sends the echo response back to the c
 ![Server state machine](https://bitbucket.org/vmaffione/rina-images/downloads/rina-echo-async-server.png)
 
 
-## 8. Development workflow
-The *rlite* project defines a verfication workflow that developers should follow
-after performing any modification to the software.
+## 8. Developer workflow
+The *rlite* project provides a few verfication tools that developers must follow after
+any code modification. These procedures minimize the risk of breaking functionality when
+implementing new features or refactoring existing code.
 
+The first and most important verification step consists in running the suite of unit tests
+and integration tests.
+There are only a few unit tests for the moment being, covering the CDAP library, the Raft
+consensus algorithm and the Dijkstra implementation.
+Tun run the unit tests, run the following from the root repository (assuming `./configure`
+has been run)
+
+    $ make test
+    
+and the output will report about tests succeeding or failing, e.g.
+
+    100% tests passed, 0 tests failed out of 3
+    
+### 8.1 Demonstrator-driven verification
 ![Development and verification workflow](https://bitbucket.org/vmaffione/rina-images/downloads/verification-workflow-rlite.png)
 
 The demonstrator (`demo/demo.py`) and buildroot
