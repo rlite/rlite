@@ -631,7 +631,7 @@ ipcp_stats(int argc, char **argv, struct cmd_descriptor *cd)
     int ret;
 
     if (argc >= 1) {
-        attrs = ipcp_by_dif(argv[0]);
+        attrs = lookup_ipcp_by_name(argv[0]);
         if (!attrs) {
             PE("Could not find any IPCP in DIF %s\n", argv[0]);
             return -1;
