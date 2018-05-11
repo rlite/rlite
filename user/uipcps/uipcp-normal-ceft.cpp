@@ -167,19 +167,13 @@ CeftReplica::apply(raft::LogIndex index, const char *const serbuf)
     /* Send a response to the client. */
     auto mit = pending.find(index);
     if (mit != pending.end()) {
-        auto m = make_unique<CDAPMessage>();
-
-        m->op_code = (mit->second->op_code == gpb::M_WRITE) ? gpb::M_WRITE_R
-                                                            : gpb::M_DELETE_R;
-        m->obj_name  = mit->second->obj_name;
-        m->obj_class = mit->second->obj_class;
-        m->invoke_id = mit->second->invoke_id;
-        rib->send_to_dst_addr(std::move(m), mit->second->requestor_addr);
+        int invoke_id = mit->second->m->invoke_id;
+        rib->send_to_dst_addr(std::move(mit->second->m),
+                              mit->second->requestor_addr);
         UPD(rib->uipcp,
             "Pending response for index %u sent to client %llu "
             "(invoke_id=%d)\n",
-            index, (long long unsigned)mit->second->requestor_addr,
-            mit->second->invoke_id);
+            index, (long long unsigned)mit->second->requestor_addr, invoke_id);
         pending.erase(index);
     }
 
@@ -269,7 +263,7 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
         process_rib_msg(rm, src_addr, &commands);
 
         /* Submit commands to the raft state machine, if any. */
-        for (const auto &command : commands) {
+        for (auto &command : commands) {
             raft::LogIndex index;
 
             ret =
@@ -280,9 +274,8 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
                     rm->obj_class.c_str());
                 continue;
             }
-            pending[index] = make_unique<PendingResp>(rm->op_code, rm->obj_name,
-                                                      rm->obj_class,
-                                                      rm->invoke_id, src_addr);
+            pending[index] =
+                make_unique<PendingResp>(std::move(command.second), src_addr);
         }
     }
 

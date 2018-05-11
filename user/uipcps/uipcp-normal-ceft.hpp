@@ -46,19 +46,11 @@ class CeftReplica : public raft::RaftSM {
     /* Support for client commands that are pending, waiting for
      * being applied to the replicated state machine. */
     struct PendingResp {
-        gpb::OpCode op_code;
-        std::string obj_name;
-        std::string obj_class;
-        int invoke_id;
+        std::unique_ptr<CDAPMessage> m;
         rlm_addr_t requestor_addr;
         PendingResp() = default;
-        PendingResp(gpb::OpCode op, const std::string &oname,
-                    const std::string &oclass, int iid, rlm_addr_t addr)
-            : op_code(op),
-              obj_name(oname),
-              obj_class(oclass),
-              invoke_id(iid),
-              requestor_addr(addr)
+        PendingResp(std::unique_ptr<CDAPMessage> rm, rlm_addr_t addr)
+            : m(std::move(rm)), requestor_addr(addr)
         {
         }
     };

@@ -666,8 +666,8 @@ CentralizedFaultTolerantDFT::Replica::process_rib_msg(
 
     if (rm->op_code == gpb::M_WRITE || rm->op_code == gpb::M_DELETE) {
         /* We received an M_WRITE or M_DELETE as sent by
-         * Client::appl_register(). We are the leader. Let's submit the
-         * request to the Raft state machine. */
+         * Client::appl_register() and we are the leader. Let's prepare a
+         * request to be submitted to the Raft state machine. */
         gpb::DFTEntry dft_entry;
         string appl_name;
         auto cbuf  = std::unique_ptr<char[]>(new char[sizeof(Command)]);
@@ -681,8 +681,14 @@ CentralizedFaultTolerantDFT::Replica::process_rib_msg(
         strncpy(c->appl_name, appl_name.c_str(), sizeof(c->appl_name));
         c->opcode = rm->op_code == gpb::M_WRITE ? Command::OpcodeSet
                                                 : Command::OpcodeDel;
-
-        commands->push_back(std::make_pair(std::move(cbuf), nullptr));
+        /* Prepare the response. */
+        auto m = make_unique<CDAPMessage>();
+        m->op_code =
+            (rm->op_code == gpb::M_WRITE) ? gpb::M_WRITE_R : gpb::M_DELETE_R;
+        m->obj_name  = rm->obj_name;
+        m->obj_class = rm->obj_class;
+        m->invoke_id = rm->invoke_id;
+        commands->push_back(std::make_pair(std::move(cbuf), std::move(m)));
     } else if (rm->op_code == gpb::M_READ) {
         /* We received an an M_READ sent by Client::lookup_req().
          * Recover the application name, look it up in the DFT and
