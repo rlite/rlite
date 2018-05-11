@@ -847,7 +847,15 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     /* Send the skb to the device for transmission. */
     ret = dev_queue_xmit(skb);
-    if (unlikely(ret != NET_XMIT_SUCCESS)) {
+    if (unlikely(ret != NET_XMIT_SUCCESS && netif_running(netdev) &&
+                 netif_carrier_ok(netdev))) {
+        /* If we did not get NET_XMIT_SUCCESS (and device is up and running),
+         * we assume that the qdisc had no space for this PDU, so we propagate
+         * the backpressure signal. Note that if device is down or with no
+         * carrier we don't get NET_XMIT_SUCCESS, but we cannot propagate
+         * backpressure (or we get stuck in rmt_tx() for ever). In the latter
+         * case we need to return success, with the packet being silently
+         * dropped. */
         int i;
 
         RPV(1, "dev_queue_xmit() failed [%d]\n", ret);
