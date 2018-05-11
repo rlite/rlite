@@ -1,2 +1,0 @@
-Command to create a VMPI release:
-    $ tar --exclude=".git" -zcvf  vmpi-M.m-yyyy-mm-dd.tar.gz vmpi/

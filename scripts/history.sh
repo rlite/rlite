@@ -19,7 +19,7 @@ for l in $(cat .shas); do
     git checkout $s &> /dev/null
 
     # count the number lines
-    c=$(find kernel user include -type f -and \( -name "*.c" -or -name "*.h" -or -name "*.cpp" -or -name "*.hpp" \) | grep -v vmpi | xargs wc -l | tail -n 1 | sed 's|^[ \t]\+||g' | cut -d' ' -f 1)
+    c=$(find kernel user include -type f -and \( -name "*.c" -or -name "*.h" -or -name "*.cpp" -or -name "*.hpp" \) | xargs wc -l | tail -n 1 | sed 's|^[ \t]\+||g' | cut -d' ' -f 1)
     echo "$t: $c"
     echo $t $c >> hist
 done
