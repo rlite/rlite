@@ -83,7 +83,7 @@ LFDB::compute_shortest_paths(
 {
     std::priority_queue<PQInfo> frontier;
 
-    frontier.push(PQInfo(source_node, 0));
+    frontier.push({source_node, 0});
 
     /* Initialize the per-node info map. */
     for (const auto &kvg : graph) {
@@ -111,12 +111,12 @@ LFDB::compute_shortest_paths(
             std::cout << "Selecting node " << closer.node << std::endl;
         }
 
-        // TODO use find()
-        if (!graph.count(closer.node)) {
+        auto graphit = graph.find(closer.node);
+        if (graphit == graph.end()) {
             continue; /* nothing to do */
         }
 
-        const std::list<Edge> &edges = graph.at(closer.node);
+        const std::list<Edge> &edges = graphit->second;
 
         for (const Edge &edge : edges) {
             DijkstraInfo &info_to = info[edge.to];
@@ -125,7 +125,7 @@ LFDB::compute_shortest_paths(
                 info_to.dist = info_min.dist + edge.cost;
                 info_to.nhop =
                     (closer.node == source_node) ? edge.to : info_min.nhop;
-                frontier.push(PQInfo(edge.to, info_to.dist));
+                frontier.push({edge.to, info_to.dist});
             }
         }
     }
