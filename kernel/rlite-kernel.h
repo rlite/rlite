@@ -516,9 +516,12 @@ struct ipcp_entry {
     struct rb_list rmtq;
     unsigned int rmtq_size;
     spinlock_t rmtq_lock;
-    struct rl_rmt_stats rmt_stats;
     struct tasklet_struct tx_completion;
     wait_queue_head_t tx_wqh;
+
+    /* Per-cpu lossy statistics, to avoid cacheline ping-pongs between more
+     * CPUs using the same IPCP. */
+    struct rl_ipcp_stats __percpu *stats;
 
     /* The module that owns this IPC process. */
     struct module *owner;

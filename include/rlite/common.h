@@ -269,15 +269,6 @@ struct rl_flow_stats {
     uint64_t rtx_byte;
 };
 
-static inline void
-rl_flow_stats_init(struct rl_flow_stats *stats)
-{
-    stats->tx_pkt = stats->tx_byte = stats->tx_err = 0;
-    stats->rx_pkt = stats->rx_byte = stats->rx_err = 0;
-    stats->rtx_pkt = stats->rtx_byte = 0;
-    stats->rx_overrun_pkt = stats->rx_overrun_byte = 0;
-}
-
 struct rl_rmt_stats {
     uint64_t fwd_pkt;
     uint64_t fwd_byte;
@@ -289,6 +280,28 @@ struct rl_rmt_stats {
     uint64_t noflow_drop;
     uint64_t other_drop;
 };
+
+/* IPCP statistics. */
+struct rl_ipcp_stats {
+    uint64_t tx_pkt;
+    uint64_t tx_byte;
+    uint64_t tx_err;
+
+    uint64_t rx_pkt;
+    uint64_t rx_byte;
+    uint64_t rx_err;
+
+    struct rl_rmt_stats rmt;
+} __attribute__((aligned(64)));
+
+static inline void
+rl_flow_stats_init(struct rl_flow_stats *stats)
+{
+    stats->tx_pkt = stats->tx_byte = stats->tx_err = 0;
+    stats->rx_pkt = stats->rx_byte = stats->rx_err = 0;
+    stats->rtx_pkt = stats->rtx_byte = 0;
+    stats->rx_overrun_pkt = stats->rx_overrun_byte = 0;
+}
 
 /* DTP state exported to userspace. */
 struct rl_flow_dtp {

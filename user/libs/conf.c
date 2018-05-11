@@ -259,7 +259,7 @@ out:
 /* Support for fetching flow information in kernel space. */
 
 int
-rl_conf_rmt_get_stats(rl_ipcp_id_t ipcp_id, struct rl_rmt_stats *stats)
+rl_conf_rmt_get_stats(rl_ipcp_id_t ipcp_id, struct rl_ipcp_stats *stats)
 {
     struct rl_kmsg_ipcp_rmt_stats_req msg;
     struct rl_kmsg_ipcp_rmt_stats_resp *resp;

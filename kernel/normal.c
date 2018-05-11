@@ -595,6 +595,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
     bool maysleep = flags & RL_RMT_F_MAYSLEEP;
+    struct rl_ipcp_stats *stats = this_cpu_ptr(ipcp->stats);
     int ret;
 
     lower_flow = rl_pduft_lookup((struct rl_normal *)ipcp->priv, remote_addr);
@@ -602,7 +603,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
         RPD(1, "No route to IPCP %lu, dropping packet\n",
             (long unsigned)remote_addr);
         rl_buf_free(rb);
-        ipcp->rmt_stats.noroute_drop++;
+        stats->rmt.noroute_drop++;
         /* Do not return -EHOSTUNREACH, this would break applications.
          * We assume the unreachability is temporary, and due to routing
          * rearrangements. */
@@ -657,11 +658,11 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                     RL_BUF_RMT(rb).compl_flow = lower_flow;
                     rb_list_enq(rb, &lower_ipcp->rmtq);
                     lower_ipcp->rmtq_size += rl_buf_truesize(rb);
-                    ipcp->rmt_stats.queued_pkt++;
+                    stats->rmt.queued_pkt++;
                 } else {
                     /* No room in the RMT queue, we are forced to drop. */
                     RPD(1, "rmtq overrun: dropping PDU\n");
-                    ipcp->rmt_stats.queue_drop++;
+                    stats->rmt.queue_drop++;
                     rl_buf_free(rb);
                     rb = NULL;
                 }
@@ -1384,6 +1385,7 @@ static struct rl_buf *
 rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
                  struct flow_entry *lower_flow)
 {
+    struct rl_ipcp_stats *stats = this_cpu_ptr(ipcp->stats);
     struct rl_normal *priv = ipcp->priv;
     struct rina_pci *pci   = RL_BUF_PCI(rb);
     struct flow_entry *flow;
@@ -1405,7 +1407,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
     if (unlikely(rb->len < sizeof(struct rina_pci))) {
         RPD(1, "Dropping PDU shorter [%u] than PCI\n", (unsigned int)rb->len);
         rl_buf_free(rb);
-        ipcp->rmt_stats.other_drop++;
+        stats->rmt.other_drop++;
         return NULL; /* -EINVAL */
     }
 
@@ -1413,7 +1415,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         if (unlikely(inet_csum(pci, rb->len, 0) != 0xFFFF)) {
             RPD(1, "Dropping PDU on wrong checksum\n");
             rl_buf_free(rb);
-            ipcp->rmt_stats.csum_drop++;
+            stats->rmt.csum_drop++;
             return NULL;
         }
     }
@@ -1480,7 +1482,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         /* Check TTL. */
         if (unlikely(pci->pdu_ttl-- == 0)) {
             RPD(1, "Dropping PDU on zero TTL\n");
-            ipcp->rmt_stats.ttl_drop++;
+            stats->rmt.ttl_drop++;
             rl_buf_free(rb);
             return NULL; /* -EINVAL */
         }
@@ -1497,8 +1499,8 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         }
 
         rmt_tx(ipcp, pci->dst_addr, rb, RL_RMT_F_CONSUME);
-        ipcp->rmt_stats.fwd_pkt++;
-        ipcp->rmt_stats.fwd_byte += len;
+        stats->rmt.fwd_pkt++;
+        stats->rmt.fwd_byte += len;
 
         return NULL;
     }
@@ -1506,7 +1508,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
     flow = flow_get_by_cep(pci->dst_cep);
     if (!flow) {
         RPD(1, "No flow for cep-id %u: dropping PDU\n", pci->dst_cep);
-        ipcp->rmt_stats.noflow_drop++;
+        stats->rmt.noflow_drop++;
         rl_buf_free(rb);
         return NULL;
     }

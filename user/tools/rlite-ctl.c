@@ -625,7 +625,7 @@ static int
 ipcp_stats(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct ipcp_attrs *attrs;
-    struct rl_rmt_stats rmt;
+    struct rl_ipcp_stats stats;
     unsigned long ipcp_id;
     char sbuf[32];
     int ret;
@@ -646,13 +646,13 @@ ipcp_stats(int argc, char **argv, struct cmd_descriptor *cd)
         ipcp_id = attrs->id;
     }
 
-    ret = rl_conf_rmt_get_stats(ipcp_id, &rmt);
+    ret = rl_conf_rmt_get_stats(ipcp_id, &stats);
     if (ret) {
         PE("Could not find ipcp with id %lu\n", ipcp_id);
         return ret;
     }
 
-    byteprint(sbuf, sizeof(sbuf), rmt.fwd_byte);
+    byteprint(sbuf, sizeof(sbuf), stats.rmt.fwd_byte);
     printf(
         "Statistcs for IPCP %lu:\n"
         "    fwd_pkt        = %llu\n"
@@ -664,11 +664,11 @@ ipcp_stats(int argc, char **argv, struct cmd_descriptor *cd)
         "    ttl_drop       = %llu\n"
         "    noflow_drop    = %llu\n"
         "    other_drop     = %llu\n",
-        (unsigned long)ipcp_id, (unsigned long long)rmt.fwd_pkt, sbuf,
-        (unsigned long long)rmt.queued_pkt, (unsigned long long)rmt.queue_drop,
-        (unsigned long long)rmt.noroute_drop, (unsigned long long)rmt.csum_drop,
-        (unsigned long long)rmt.ttl_drop, (unsigned long long)rmt.noflow_drop,
-        (unsigned long long)rmt.other_drop);
+        (unsigned long)ipcp_id, (unsigned long long)stats.rmt.fwd_pkt, sbuf,
+        (unsigned long long)stats.rmt.queued_pkt, (unsigned long long)stats.rmt.queue_drop,
+        (unsigned long long)stats.rmt.noroute_drop, (unsigned long long)stats.rmt.csum_drop,
+        (unsigned long long)stats.rmt.ttl_drop, (unsigned long long)stats.rmt.noflow_drop,
+        (unsigned long long)stats.rmt.other_drop);
 
     return 0;
 }

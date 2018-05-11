@@ -487,15 +487,26 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req, struct ipcp_entry **pentry)
 {
     struct ipcp_entry *entry;
     struct ipcp_entry *cur;
-    int bucket;
     struct dif *dif;
+    int bucket;
     int ret = 0;
+    int cpu;
 
     *pentry = NULL;
 
     entry = rl_alloc(sizeof(*entry), GFP_KERNEL | __GFP_ZERO, RL_MT_IPCP);
     if (!entry) {
         return -ENOMEM;
+    }
+
+    entry->stats = alloc_percpu(*(entry->stats));
+    if (!entry->stats) {
+        rl_free(entry, RL_MT_SHIM);
+        return -ENOMEM;
+    }
+    for_each_possible_cpu(cpu)
+    {
+        memset(per_cpu_ptr(entry->stats, cpu), 0, sizeof(entry->stats[0]));
     }
 
     PLOCK();
@@ -506,6 +517,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req, struct ipcp_entry **pentry)
     {
         if (strcmp(cur->name, req->name) == 0) {
             PUNLOCK();
+            free_percpu(entry->stats);
             rl_free(entry, RL_MT_IPCP);
             return -EINVAL;
         }
@@ -515,6 +527,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req, struct ipcp_entry **pentry)
     dif = dif_get(req->dif_name, req->dif_type, &ret);
     if (!dif) {
         PUNLOCK();
+        free_percpu(entry->stats);
         rl_free(entry, RL_MT_IPCP);
         return ret;
     }
@@ -549,6 +562,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req, struct ipcp_entry **pentry)
     } else {
         ret = -ENOSPC;
         dif_put(dif);
+        free_percpu(entry->stats);
         rl_free(entry, RL_MT_IPCP);
     }
 
@@ -1504,6 +1518,7 @@ __ipcp_put(struct ipcp_entry *entry)
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&upd));
     }
 
+    free_percpu(entry->stats);
     rl_free(entry, RL_MT_IPCP);
 
     return 0;
@@ -2245,10 +2260,32 @@ rl_rmt_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     ipcp = ipcp_get(req->ipcp_id);
     if (ipcp) {
+        int cpu;
+
         memset(&resp, 0, sizeof(resp));
         resp.hdr.msg_type = RLITE_KER_IPCP_RMT_STATS_RESP;
         resp.hdr.event_id = req->hdr.event_id;
-        memcpy(&resp.stats, &ipcp->rmt_stats, sizeof(ipcp->rmt_stats));
+        /* Collect stats from all the CPUs. */
+        for_each_possible_cpu(cpu) {
+            struct rl_ipcp_stats *cpustats = this_cpu_ptr(ipcp->stats);
+
+            resp.stats.tx_pkt += cpustats->tx_pkt;
+            resp.stats.tx_byte += cpustats->tx_byte;
+            resp.stats.tx_err += cpustats->tx_err;
+            resp.stats.rx_pkt += cpustats->rx_pkt;
+            resp.stats.rx_byte += cpustats->rx_byte;
+            resp.stats.rx_err += cpustats->rx_err;
+
+            resp.stats.rmt.fwd_pkt += cpustats->rmt.fwd_pkt;
+            resp.stats.rmt.fwd_byte += cpustats->rmt.fwd_byte;
+            resp.stats.rmt.queued_pkt += cpustats->rmt.queued_pkt;
+            resp.stats.rmt.queue_drop += cpustats->rmt.queue_drop;
+            resp.stats.rmt.noroute_drop += cpustats->rmt.noroute_drop;
+            resp.stats.rmt.csum_drop += cpustats->rmt.csum_drop;
+            resp.stats.rmt.ttl_drop += cpustats->rmt.ttl_drop;
+            resp.stats.rmt.noflow_drop += cpustats->rmt.noflow_drop;
+            resp.stats.rmt.other_drop += cpustats->rmt.other_drop;
+        }
         ret = rl_upqueue_append(rc, (const struct rl_msg_base *)&resp, false);
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));
     }

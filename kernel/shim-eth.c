@@ -63,12 +63,11 @@ struct arpt_entry {
     unsigned int rx_tmpq_len;
     bool fa_req_arrived;
 
-    /* Statistics. */
-    struct rl_flow_stats stats;
-
     struct list_head node;
 };
 
+/* Per TX-queue structure, padded to the cacheline boundary to avoid false
+ * sharing. */
 struct eth_tx_queue {
 #define RL_TXQ_XMIT_BUSY 0
     unsigned long xmit_busy;
@@ -364,7 +363,6 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
     rb_list_init(&entry->rx_tmpq);
     entry->rx_tmpq_len = 0;
     arpt_flow_bind(entry, flow);
-    rl_flow_stats_init(&entry->stats);
     list_add_tail(&entry->node, &priv->arp_table);
 
     write_unlock_bh(&priv->arpt_lock);
@@ -598,6 +596,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     struct rl_buf *rb;
     struct ethhdr *hh = eth_hdr(skb);
     struct arpt_entry *entry;
+    struct rl_ipcp_stats *stats = this_cpu_ptr(ipcp->stats);
 
     NPD("SHIM ETH PDU from %02X:%02X:%02X:%02X:%02X:%02X [%d]\n",
         hh->h_source[0], hh->h_source[1], hh->h_source[2], hh->h_source[3],
@@ -617,8 +616,8 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
 
     /* Try to shortcut the packet to the upper IPCP. */
     if ((rb = rl_sdu_rx_shortcut(ipcp, rb)) == NULL) {
-        entry->stats.rx_pkt++;
-        entry->stats.rx_byte += rb->len;
+        stats->rx_pkt++;
+        stats->rx_byte += rb->len;
         return;
     }
 
@@ -631,8 +630,8 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     if (likely(entry && entry->flow)) {
         struct flow_entry *flow = entry->flow;
 
-        entry->stats.rx_pkt++;
-        entry->stats.rx_byte += rb->len;
+        stats->rx_pkt++;
+        stats->rx_byte += rb->len;
         read_unlock_bh(&priv->arpt_lock);
 
         rl_sdu_rx_flow(ipcp, flow, rb, true);
@@ -699,14 +698,14 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
         entry->rx_tmpq_len++;
     }
 
-    entry->stats.rx_pkt++;
-    entry->stats.rx_byte += rb->len;
+    stats->rx_pkt++;
+    stats->rx_byte += rb->len;
 
     write_unlock_bh(&priv->arpt_lock);
     return;
 
 drop:
-    entry->stats.rx_err++;
+    stats->rx_err++;
     write_unlock_bh(&priv->arpt_lock);
     rl_buf_free(rb);
 }
@@ -786,24 +785,25 @@ static int
 rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
                       struct rl_buf *rb, unsigned flags)
 {
-    struct rl_shim_eth *priv  = ipcp->priv;
-    struct net_device *netdev = priv->netdev;
-    struct sk_buff *skb       = NULL;
-    struct arpt_entry *entry  = flow->priv;
-    size_t len                = rb->len;
+    struct rl_shim_eth *priv    = ipcp->priv;
+    struct net_device *netdev   = priv->netdev;
+    struct sk_buff *skb         = NULL;
+    struct arpt_entry *entry    = flow->priv;
+    size_t len                  = rb->len;
+    struct rl_ipcp_stats *stats = this_cpu_ptr(ipcp->stats);
     int hhlen;
     int ret;
 
     if (unlikely(!entry)) {
         rl_buf_free(rb);
-        entry->stats.tx_err++;
+        stats->tx_err++;
         RPD(1, "called on deallocated entry\n");
         return -ENXIO;
     }
 
     if (unlikely(len > ETH_DATA_LEN)) {
         rl_buf_free(rb);
-        entry->stats.tx_err++;
+        stats->tx_err++;
         RPD(1, "Exceeding maximum ethernet payload (%d)\n", ETH_DATA_LEN);
         return -EMSGSIZE;
     }
@@ -813,7 +813,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     skb   = alloc_skb(hhlen + len + netdev->needed_tailroom, GFP_KERNEL);
     if (!skb) {
         rl_buf_free(rb);
-        entry->stats.tx_err++;
+        stats->tx_err++;
         return -ENOMEM;
     }
 
@@ -851,7 +851,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         int i;
 
         RPV(1, "dev_queue_xmit() failed [%d]\n", ret);
-        entry->stats.tx_err++;
+        stats->tx_err++;
         for (i = 0; i < priv->netdev->num_tx_queues; i++) {
             set_bit(RL_TXQ_XMIT_BUSY, &priv->txq[i].xmit_busy);
         }
@@ -860,8 +860,8 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
 #endif
     }
 
-    entry->stats.tx_pkt++;
-    entry->stats.tx_byte += len;
+    stats->tx_pkt++;
+    stats->tx_byte += len;
 
 #ifndef RL_SKB
     rl_buf_free(rb);
@@ -992,24 +992,6 @@ rl_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
     }
 
     write_unlock_bh(&priv->arpt_lock);
-
-    return 0;
-}
-
-static int
-rl_shim_eth_flow_get_stats(struct flow_entry *flow, struct rl_flow_stats *stats)
-{
-    struct arpt_entry *flow_priv = (struct arpt_entry *)flow->priv;
-    struct rl_shim_eth *priv     = (struct rl_shim_eth *)flow->txrx.ipcp->priv;
-
-    (void)priv;
-    stats->tx_pkt  = flow_priv->stats.tx_pkt;
-    stats->tx_byte = flow_priv->stats.tx_byte;
-    stats->tx_err  = flow_priv->stats.tx_err;
-
-    stats->rx_pkt  = flow_priv->stats.rx_pkt;
-    stats->rx_byte = flow_priv->stats.rx_byte;
-    stats->rx_err  = flow_priv->stats.rx_err;
 
     return 0;
 }
@@ -1183,7 +1165,6 @@ static struct ipcp_factory shim_eth_factory = {
     .ops.config_get         = rl_shim_eth_config_get,
     .ops.appl_register      = rl_shim_eth_register,
     .ops.flow_deallocated   = rl_shim_eth_flow_deallocated,
-    .ops.flow_get_stats     = rl_shim_eth_flow_get_stats,
     .ops.flow_writeable     = rl_shim_eth_flow_writeable,
 };
 
