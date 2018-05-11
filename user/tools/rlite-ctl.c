@@ -517,16 +517,17 @@ ipcp_config_get(int argc, char **argv, struct cmd_descriptor *cd)
 }
 
 /* Helper function that counts how many tokens are there in
- * a string. TODO use strtok_r */
+ * a string. */
 static int
 str_count_elems(const char *s)
 {
     char *copy = strdup_or_quit(s);
     char *ctmp = copy;
+    char *saveptr;
     int n;
 
     for (n = 0;; n++, ctmp = NULL) {
-        if (strtok(ctmp, ", ") == NULL) {
+        if (strtok_r(ctmp, ", ", &saveptr) == NULL) {
             break;
         }
     }
@@ -614,10 +615,11 @@ ipcp_sched_config(int argc, char **argv, struct cmd_descriptor *cd)
         {
             char *copy = strdup_or_quit(argv[5]);
             char *ctmp = copy;
+            char *saveptr;
             int i;
 
             for (i = 0;; i++, ctmp = NULL) {
-                char *token = strtok(ctmp, ", ");
+                char *token = strtok_r(ctmp, ", ", &saveptr);
                 if (token == NULL) {
                     break;
                 }
