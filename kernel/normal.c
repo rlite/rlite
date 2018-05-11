@@ -186,72 +186,6 @@ sched_fifo_deq(struct rl_sched *sched)
 
 #define RL_PCI_CTRL_LEN (RL_PCI_LEN + 6 * sizeof(rl_seq_t))
 
-static int rl_sched_replace(struct rl_normal *priv, struct rl_sched_ops *ops);
-static void sched_deq_worker(struct work_struct *w);
-
-static void *
-rl_normal_create(struct ipcp_entry *ipcp)
-{
-    struct rl_normal *priv;
-
-    priv = rl_alloc(sizeof(*priv), GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
-    if (!priv) {
-        return NULL;
-    }
-
-    /* Fill in data transfer constants */
-    ipcp->pcisizes.addr   = sizeof(rl_addr_t);
-    ipcp->pcisizes.seq    = sizeof(rl_seq_t);
-    ipcp->pcisizes.pdulen = sizeof(rl_pdulen_t);
-    ipcp->pcisizes.cepid  = sizeof(rl_cepid_t);
-    ipcp->pcisizes.qosid  = sizeof(rl_qosid_t);
-
-    /* Default hdroom and max sdu size. */
-    ipcp->txhdroom     = RL_PCI_LEN;
-    ipcp->rxhdroom     = 0;
-    ipcp->max_sdu_size = (1 << 16) - 1 - ipcp->txhdroom;
-
-    priv->ipcp = ipcp;
-    hash_init(priv->pdu_ft);
-    priv->pduft_dflt = NULL;
-    rwlock_init(&priv->pduft_lock);
-    priv->ttl  = RL_TTL_DFLT;
-    priv->csum = false;
-
-    INIT_WORK(&priv->sched_deq_work, sched_deq_worker);
-    if (false) {
-        struct rl_sched_ops fifo_ops = {
-            .name      = "fifo",
-            .priv_size = sizeof(struct rl_sched_fifo),
-            .init      = sched_fifo_init,
-            .fini      = sched_fifo_fini,
-            .enq       = sched_fifo_enq,
-            .deq       = sched_fifo_deq};
-
-        if (rl_sched_replace(priv, &fifo_ops)) {
-            PE("Failed to replace PDU scheduler with '%s'\n", fifo_ops.name);
-        }
-    }
-
-    PD("New IPC created [%p]\n", priv);
-
-    return priv;
-}
-
-static void
-rl_normal_destroy(struct ipcp_entry *ipcp)
-{
-    struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
-
-    cancel_work_sync(&priv->sched_deq_work);
-    rl_sched_replace(priv, NULL);
-
-    rl_pduft_flush(ipcp);
-    rl_free(priv, RL_MT_SHIM);
-
-    PD("IPC [%p] destroyed\n", priv);
-}
-
 /* Maximum and minimum values for the congestion control window. */
 #define RL_CGWIN_MIN 4
 #define RL_CGWIN_MAX (1U << 16)
@@ -1993,6 +1927,69 @@ rl_normal_sdu_rx_consumed(struct flow_entry *flow, rlm_seq_t seqnum)
     }
 
     return 0;
+}
+
+static void *
+rl_normal_create(struct ipcp_entry *ipcp)
+{
+    struct rl_normal *priv;
+
+    priv = rl_alloc(sizeof(*priv), GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
+    if (!priv) {
+        return NULL;
+    }
+
+    /* Fill in data transfer constants */
+    ipcp->pcisizes.addr   = sizeof(rl_addr_t);
+    ipcp->pcisizes.seq    = sizeof(rl_seq_t);
+    ipcp->pcisizes.pdulen = sizeof(rl_pdulen_t);
+    ipcp->pcisizes.cepid  = sizeof(rl_cepid_t);
+    ipcp->pcisizes.qosid  = sizeof(rl_qosid_t);
+
+    /* Default hdroom and max sdu size. */
+    ipcp->txhdroom     = RL_PCI_LEN;
+    ipcp->rxhdroom     = 0;
+    ipcp->max_sdu_size = (1 << 16) - 1 - ipcp->txhdroom;
+
+    priv->ipcp = ipcp;
+    hash_init(priv->pdu_ft);
+    priv->pduft_dflt = NULL;
+    rwlock_init(&priv->pduft_lock);
+    priv->ttl  = RL_TTL_DFLT;
+    priv->csum = false;
+
+    INIT_WORK(&priv->sched_deq_work, sched_deq_worker);
+    if (false) {
+        struct rl_sched_ops fifo_ops = {
+            .name      = "fifo",
+            .priv_size = sizeof(struct rl_sched_fifo),
+            .init      = sched_fifo_init,
+            .fini      = sched_fifo_fini,
+            .enq       = sched_fifo_enq,
+            .deq       = sched_fifo_deq};
+
+        if (rl_sched_replace(priv, &fifo_ops)) {
+            PE("Failed to replace PDU scheduler with '%s'\n", fifo_ops.name);
+        }
+    }
+
+    PD("New IPC created [%p]\n", priv);
+
+    return priv;
+}
+
+static void
+rl_normal_destroy(struct ipcp_entry *ipcp)
+{
+    struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
+
+    cancel_work_sync(&priv->sched_deq_work);
+    rl_sched_replace(priv, NULL);
+
+    rl_pduft_flush(ipcp);
+    rl_free(priv, RL_MT_SHIM);
+
+    PD("IPC [%p] destroyed\n", priv);
 }
 
 /* The name of this IPCP (factory) is obtained by concatenating
