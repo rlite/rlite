@@ -440,7 +440,6 @@ LocalFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
     }
 
     auto f = flow_reqs_out.find(rm->invoke_id);
-
     if (f == flow_reqs_out.end()) {
         UPE(rib->uipcp,
             "M_CREATE_R does not match any pending request (invoke_id=%d)\n",
@@ -448,11 +447,11 @@ LocalFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
         return 0;
     }
 
+    /* Move the FlowRequest object to the final data structure (flow_reqs). */
     FlowRequest remote_freq;
-    FlowRequest *freq = f->second.get();
-
+    FlowRequest *freq           = f->second.get();
     flow_reqs[freq->src_port()] = std::move(f->second);
-    flow_reqs_out.erase(rm->invoke_id);
+    flow_reqs_out.erase(f);
 
     remote_freq.ParseFromArray(objbuf, objlen);
     /* Update the local freq object with the remote one. */
@@ -550,7 +549,7 @@ LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
         return -1;
     }
 
-    std::unique_ptr<FlowRequest> &freq = f->second;
+    FlowRequest *freq = f->second.get();
 
     /* Update the freq object with the port-id and cep-id allocated by
      * the kernel. */
@@ -559,18 +558,17 @@ LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
 
     if (resp->response) {
         reason = "Application refused the accept the flow request";
+    } else {
+        /* Move the freq object from the temporary map to the right one. */
+        flow_reqs[resp->port_id] = std::move(f->second);
     }
 
     m = utils::make_unique<CDAPMessage>();
     m->m_create_r(FlowObjClass, TableName, 0, resp->response ? -1 : 0, reason);
     m->invoke_id = freq->invoke_id;
 
-    ret = rib->send_to_dst_addr(std::move(m), freq->src_addr(), freq.get());
-    if (!resp->response) {
-        /* Move the freq object from the temporary map to the right one. */
-        flow_reqs[resp->port_id] = std::move(freq);
-    }
-    flow_reqs_in.erase(f); /* first std::move(), then erase. */
+    ret = rib->send_to_dst_addr(std::move(m), freq->src_addr(), freq);
+    flow_reqs_in.erase(f); /* freq cannot be used after this instruction */
     rib->stats.fa_response_issued++;
 
     return ret;
@@ -638,7 +636,7 @@ LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm,
         return 0;
     }
 
-    std::unique_ptr<FlowRequest> &freq = f->second;
+    FlowRequest *freq = f->second.get();
 
     expected_src_addr = (freq->flags & RL_FLOWREQ_INITIATOR) ? freq->dst_addr()
                                                              : freq->src_addr();
