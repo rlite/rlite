@@ -46,7 +46,7 @@ pkill rina-echo-async
 rmmod rlite > /dev/null 2>&1
 
 testcnt="0"
-for t in $(ls tests/integration/*.sh); do
+for t in tests/integration/*.sh ; do
     testcnt=$((testcnt + 1))
     if [ "$TESTSEL" -ne "0" -a "$TESTSEL" -ne "$testcnt" ]; then
         continue
