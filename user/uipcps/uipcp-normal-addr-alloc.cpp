@@ -393,8 +393,9 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
     /* In case of client, a pointer to client-side data structures. */
     class Client : public CeftClient {
         struct Synchronizer {
-            std::condition_variable allocated;
+            std::condition_variable allocation_complete;
             std::mutex mutex;
+            bool allocated     = false;
             rlm_addr_t address = RL_ADDR_NULL;
         };
         struct PendingReq : public CeftClient::PendingReq {
@@ -541,20 +542,23 @@ CentralizedFaultTolerantAddrAllocator::Client::allocate(
 
     std::unique_lock<std::mutex> lk(synchro->mutex);
 
-    if (synchro->allocated.wait_for(lk, timeout) == std::cv_status::timeout) {
-        UPE(rib->uipcp, "Address allocation for IPCP '%s' timed out\n",
-            ipcp_name.c_str());
-        ret = -1;
-    } else {
-        UPD(rib->uipcp, "Address %lu successfully allocated for IPCP '%s'\n",
-            (long unsigned)synchro->address, ipcp_name.c_str());
-        *addr = synchro->address;
-        ret   = 0;
+    while (!synchro->allocated) {
+        if (synchro->allocation_complete.wait_for(lk, timeout) ==
+            std::cv_status::timeout) {
+            UPE(rib->uipcp, "Address allocation for IPCP '%s' timed out\n",
+                ipcp_name.c_str());
+            rib->lock();
+            return -1;
+        }
     }
+
+    UPD(rib->uipcp, "Address %lu successfully allocated for IPCP '%s'\n",
+        (long unsigned)synchro->address, ipcp_name.c_str());
+    *addr = synchro->address;
 
     rib->lock();
 
-    return ret;
+    return 0;
 }
 
 int
@@ -587,8 +591,9 @@ CentralizedFaultTolerantAddrAllocator::Client::client_process_rib_msg(
 
         if (rm->op_code == gpb::M_CREATE_R) {
             std::lock_guard<std::mutex> guard(pr->synchro->mutex);
-            pr->synchro->address = address;
-            pr->synchro->allocated.notify_one();
+            pr->synchro->address   = address;
+            pr->synchro->allocated = true;
+            pr->synchro->allocation_complete.notify_one();
         }
         break;
     }
