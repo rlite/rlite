@@ -13,6 +13,7 @@ cleanup() {
     done
     rm -f /tmp/ceft-dft-*
     # veths are autodeleted once the namespace is deleted
+    ip link del vethbr0 type bridge || ret=1
     [ "$ret" != 0 ] && return 1 || return 0
 }
 
