@@ -1537,22 +1537,19 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 
     uipcp->refcnt++;
 
-    if (uipcp->dif_type)
-        rl_free(uipcp->dif_type, RL_MT_UTILS);
-    if (uipcp->name)
-        rl_free(uipcp->name, RL_MT_UTILS);
+    /* Don't update uipcp->name and uipcp->dif_type. They are immutable and
+     * they may be accessed by other threads out of the uipcps->lock (causing
+     * use-after free bugs. We do update uipcp->dif_name for now (e.g. it may
+     * be handy with handovers...), but we could avoid to update that as well
+     * if ASAN finds more use-after-free bugs. */
     if (uipcp->dif_name)
         rl_free(uipcp->dif_name, RL_MT_UTILS);
 
     uipcp->id           = upd->ipcp_id;
-    uipcp->dif_type     = upd->dif_type;
-    upd->dif_type       = NULL;
     uipcp->txhdroom     = upd->txhdroom;
     uipcp->rxhdroom     = upd->rxhdroom;
     mss_changed         = (uipcp->max_sdu_size != upd->max_sdu_size);
     uipcp->max_sdu_size = upd->max_sdu_size;
-    uipcp->name         = upd->ipcp_name;
-    upd->ipcp_name      = NULL;
     uipcp->dif_name     = upd->dif_name;
     upd->dif_name       = NULL;
     uipcp->pcisizes     = upd->pcisizes;
