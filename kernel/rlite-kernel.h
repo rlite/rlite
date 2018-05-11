@@ -717,8 +717,9 @@ void rl_iodevs_probe_ipcp_references(struct ipcp_entry *ipcp);
 
 void rl_iodevs_probe_flow_references(struct flow_entry *flow);
 
-int rl_configstr_to_u32(const char *src, uint32_t *dst, int *changed);
 int rl_configstr_to_u16(const char *src, uint16_t *dst, int *changed);
+int rl_configstr_to_u32(const char *src, uint32_t *dst, int *changed);
+int rl_configstr_to_u64(const char *src, uint64_t *dst, int *changed);
 
 static inline void
 txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)

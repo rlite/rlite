@@ -974,13 +974,7 @@ rl_normal_config(struct ipcp_entry *ipcp, const char *param_name,
 
     *notify = 0;
     if (strcmp(param_name, "address") == 0) {
-        uint64_t address;
-
-        ret = kstrtou64(param_value, 10, &address);
-        if (ret == 0) {
-            *notify    = (ipcp->addr != address);
-            ipcp->addr = address;
-        }
+        ret = rl_configstr_to_u64(param_value, &ipcp->addr, notify);
     } else if (strcmp(param_name, "ttl") == 0) {
         ret = rl_configstr_to_u16(param_value, &priv->ttl, NULL);
     } else if (strcmp(param_name, "csum") == 0) {

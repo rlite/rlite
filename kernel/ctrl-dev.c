@@ -1945,6 +1945,22 @@ rl_configstr_to_u32(const char *src, uint32_t *dst, int *changed)
 }
 EXPORT_SYMBOL(rl_configstr_to_u32);
 
+int
+rl_configstr_to_u64(const char *src, uint64_t *dst, int *changed)
+{
+    uint64_t v;
+    int ret = kstrtou64(src, 10, &v);
+
+    if (ret == 0) {
+        if (changed) {
+            *changed = *dst != v;
+        }
+        *dst = v;
+    }
+    return ret;
+}
+EXPORT_SYMBOL(rl_configstr_to_u64);
+
 static int
 rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
