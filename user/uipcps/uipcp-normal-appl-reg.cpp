@@ -21,6 +21,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
+#include <algorithm>
 #include <ctime>
 #include <iterator>
 #include <cstdlib>
@@ -469,7 +470,6 @@ public:
     }
 };
 
-// TODO possibly reuse this code
 int
 CentralizedFaultTolerantDFT::reconfigure()
 {
@@ -488,17 +488,14 @@ CentralizedFaultTolerantDFT::reconfigure()
     client = make_unique<Client>(this, peers);
     UPI(rib->uipcp, "Client initialized\n");
 
-    /* See if I'm also one of the replicas. */
-    auto it = peers.begin();
-    for (; it != peers.end(); it++) {
-        if (*it == rib->myname) {
-            /* I'm one of the replicas. Create a Raft state machine and
-             * initialize it. */
-            raft = make_unique<Replica>(this);
-            peers.erase(it); /* remove myself */
+    /* I'm one of the replicas. Create a Raft state machine and
+     * initialize it. */
+    auto it = std::find(peers.begin(), peers.end(), rib->myname);
+    if (it != peers.end()) {
+        raft = make_unique<Replica>(this);
+        peers.erase(it); /* remove myself */
 
-            return raft->init(peers);
-        }
+        return raft->init(peers);
     }
 
     return 0;
