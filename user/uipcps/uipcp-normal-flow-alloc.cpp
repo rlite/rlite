@@ -145,7 +145,8 @@ public:
 
     int flows_handler_create(const CDAPMessage *rm) override;
     int flows_handler_create_r(const CDAPMessage *rm) override;
-    int flows_handler_delete(const CDAPMessage *rm) override;
+    int flows_handler_delete(const CDAPMessage *rm,
+                             rlm_addr_t src_addr) override;
 
     /* Default value for the A timer in milliseconds. */
     static constexpr int kATimerMsecsDflt = 20;
@@ -607,8 +608,10 @@ LocalFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 }
 
 int
-LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm)
+LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm,
+                                         rlm_addr_t src_addr)
 {
+    rlm_addr_t expected_src_addr;
     rl_port_t local_port;
     stringstream decode;
     string objname;
@@ -621,11 +624,20 @@ LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm)
     if (f == flow_reqs.end()) {
         UPV(rib->uipcp, "No flow port_id %u (may be already deleted locally)\n",
             local_port);
-        return -1;
+        return 0;
     }
 
     std::unique_ptr<FlowRequest> &freq = f->second;
-    // TODO make sure freq matches rm
+
+    expected_src_addr = (freq->flags & RL_FLOWREQ_INITIATOR) ? freq->dst_addr()
+                                                             : freq->src_addr();
+    if (src_addr != expected_src_addr) {
+        UPW(rib->uipcp,
+            "Remote flow deallocation from unmatching address "
+            "'%lu' (expected=%lu)\n",
+            (long unsigned)src_addr, (long unsigned)expected_src_addr);
+        return 0;
+    }
 
     /* We received a delete request from the peer, so we won't need to send
      * him a delete request. */
@@ -648,11 +660,10 @@ FlowAllocator::rib_handler(const CDAPMessage *rm,
         return flows_handler_create_r(rm);
 
     case gpb::M_DELETE:
-        return flows_handler_delete(rm);
+        return flows_handler_delete(rm, src_addr);
 
     case gpb::M_DELETE_R:
-        UPE(rib->uipcp, "NOT SUPPORTED YET");
-        assert(0);
+        UPE(rib->uipcp, "M_DELETE_R(flowalloc) not supported\n");
         break;
 
     default:

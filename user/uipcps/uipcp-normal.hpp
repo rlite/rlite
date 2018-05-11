@@ -339,7 +339,8 @@ struct FlowAllocator : public Component {
 
     virtual int flows_handler_create(const CDAPMessage *rm)   = 0;
     virtual int flows_handler_create_r(const CDAPMessage *rm) = 0;
-    virtual int flows_handler_delete(const CDAPMessage *rm)   = 0;
+    virtual int flows_handler_delete(const CDAPMessage *rm,
+                                     rlm_addr_t src_addr)     = 0;
 
     virtual int rib_handler(const CDAPMessage *rm,
                             std::shared_ptr<NeighFlow> const &nf,
