@@ -1000,7 +1000,7 @@ public:
 
     void dump(std::stringstream &ss) const override { dump_routing(ss); }
     void dump_routing(std::stringstream &ss) const override { re.dump(ss); }
-    int route_mod(const struct rl_cmsg_ipcp_route_mod *req);
+    int route_mod(const struct rl_cmsg_ipcp_route_mod *req) override;
 };
 
 int
