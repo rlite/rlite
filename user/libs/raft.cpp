@@ -836,7 +836,7 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
     if (verbosity >= kVerboseInfo) {
         IOS_INF() << "Received AppendEntriesResp(term=" << resp.term
                   << ", follower_id=" << resp.follower_id
-                  << ", last_log_index=" << resp.log_index
+                  << ", log_index=" << resp.log_index
                   << ", success=" << resp.success << ")" << endl;
     }
 

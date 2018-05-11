@@ -650,6 +650,8 @@ CentralizedFaultTolerantAddrAllocator::Replica::apply(const char *const serbuf,
             /* Update the response if we have one. */
             rm->set_obj_value((static_cast<int64_t>(next_unused_address)));
         }
+        UPD(rib->uipcp, "Commit %s <-- %lu\n", c->ipcp_name,
+            (long unsigned)next_unused_address);
         next_unused_address++;
     } else {
         table.erase(c->ipcp_name);
