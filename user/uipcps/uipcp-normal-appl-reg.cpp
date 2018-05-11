@@ -353,10 +353,12 @@ class CentralizedFaultTolerantDFT : public DFT {
             static constexpr uint8_t OpcodeSet = 1;
             static constexpr uint8_t OpcodeDel = 2;
         } __attribute__((packed));
-        static_assert(sizeof(struct Command) == sizeof(Command::ipcp_name) +
-                                                    sizeof(Command::appl_name) +
-                                                    sizeof(Command::opcode),
+        static_assert(sizeof(Command) == sizeof(Command::ipcp_name) +
+                                             sizeof(Command::appl_name) +
+                                             sizeof(Command::opcode),
                       "Invalid memory layout for class Replica::Command");
+
+        const size_t CommandSize;
 
         /* Timer needed by the Raft state machine. */
         std::unique_ptr<TimeoutEvent> timer;
@@ -397,6 +399,7 @@ class CentralizedFaultTolerantDFT : public DFT {
                                std::string("-") + dft->rib->myname,
                            sizeof(Command), std::cerr, std::cout),
               rib(dft->rib),
+              CommandSize(sizeof(Command)),
               impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
         int process_sm_output(raft::RaftSMOutput out);
         int process_timeout();
@@ -851,7 +854,7 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
             for (const auto &p : ae->entries) {
                 gpb::RaftLogEntry *ge = mm->add_entries();
                 ge->set_term(p.first);
-                ge->set_buffer(p.second.get(), sizeof(Command));
+                ge->set_buffer(p.second.get(), CommandSize);
             }
             obj       = std::move(mm);
             obj_class = AppendEntriesObjClass;
