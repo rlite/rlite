@@ -336,15 +336,323 @@ FullyReplicatedDFT::neighs_refresh(size_t limit)
     return ret;
 }
 
+class CeftReplica : public raft::RaftSM {
+    /* Size of a command in the replicated state machine log. */
+    const size_t CommandSize;
+
+    /* Name of the RIB object to use for Raft protocol communications. */
+    const std::string RibObjName;
+
+    /* Timer needed by the Raft state machine. */
+    std::unique_ptr<TimeoutEvent> timer;
+    raft::RaftTimerType timer_type;
+
+    /* Support for client commands that are pending, waiting for
+     * being applied to the replicated state machine. */
+    struct PendingReq {
+        gpb::OpCode op_code;
+        std::string obj_name;
+        std::string obj_class;
+        int invoke_id;
+        rlm_addr_t requestor_addr;
+        PendingReq() = default;
+        PendingReq(gpb::OpCode op, const std::string &oname,
+                   const std::string &oclass, int iid, rlm_addr_t addr)
+            : op_code(op),
+              obj_name(oname),
+              obj_class(oclass),
+              invoke_id(iid),
+              requestor_addr(addr)
+        {
+        }
+    };
+
+    std::unordered_map<raft::LogIndex, std::unique_ptr<PendingReq>> pending;
+
+    static std::string ReqVoteObjClass;
+    static std::string ReqVoteRespObjClass;
+    static std::string AppendEntriesObjClass;
+    static std::string AppendEntriesRespObjClass;
+
+protected:
+    UipcpRib *rib = nullptr;
+
+public:
+    CeftReplica(UipcpRib *rib, const std::string &smname,
+                const raft::ReplicaId &myname, std::string logname,
+                size_t cmd_size, const std::string rib_obj_name)
+        : raft::RaftSM(smname, myname, logname, cmd_size, std::cerr, std::cout),
+          CommandSize(cmd_size),
+          RibObjName(rib_obj_name),
+          rib(rib)
+    {
+    }
+
+    int process_sm_output(raft::RaftSMOutput out);
+    int process_timeout();
+    int apply(raft::LogIndex index, const char *const serbuf) override
+        /* final */;
+    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+                    std::shared_ptr<Neighbor> const &neigh,
+                    rlm_addr_t src_addr);
+    virtual int apply(const char *const serbuf) = 0;
+    virtual int process_rib_msg(
+        const CDAPMessage *rm, rlm_addr_t src_addr,
+        std::vector<std::unique_ptr<char[]>> *commands) = 0;
+};
+
+std::string CeftReplica::ReqVoteObjClass           = "raft_rv";
+std::string CeftReplica::ReqVoteRespObjClass       = "raft_rv_r";
+std::string CeftReplica::AppendEntriesObjClass     = "raft_ae";
+std::string CeftReplica::AppendEntriesRespObjClass = "raft_ae_r";
+
+int
+CeftReplica::process_sm_output(raft::RaftSMOutput out)
+{
+    int ret = 0;
+
+    /* Convert raft protocol messages from the library format to the
+     * gpb format. */
+    for (auto &pair : out.output_messages) {
+        raft::RaftMessage *msg = pair.second.get();
+        const auto *rv  = dynamic_cast<const raft::RaftRequestVote *>(msg);
+        const auto *rvr = dynamic_cast<const raft::RaftRequestVoteResp *>(msg);
+        auto *ae        = dynamic_cast<raft::RaftAppendEntries *>(msg);
+        const auto *aer =
+            dynamic_cast<const raft::RaftAppendEntriesResp *>(msg);
+        auto m = make_unique<CDAPMessage>();
+        std::unique_ptr<::google::protobuf::MessageLite> obj;
+        std::string obj_class;
+
+        if (rv) {
+            auto mm = make_unique<gpb::RaftRequestVote>();
+            mm->set_term(rv->term);
+            mm->set_candidate_id(rv->candidate_id);
+            mm->set_last_log_index(rv->last_log_index);
+            mm->set_last_log_term(rv->last_log_term);
+            obj       = std::move(mm);
+            obj_class = ReqVoteObjClass;
+        } else if (rvr) {
+            auto mm = make_unique<gpb::RaftRequestVoteResp>();
+            mm->set_term(rvr->term);
+            mm->set_vote_granted(rvr->vote_granted);
+            obj       = std::move(mm);
+            obj_class = ReqVoteRespObjClass;
+        } else if (ae) {
+            auto mm = make_unique<gpb::RaftAppendEntries>();
+            mm->set_term(ae->term);
+            mm->set_leader_id(ae->leader_id);
+            mm->set_leader_commit(ae->leader_commit);
+            mm->set_prev_log_index(ae->prev_log_index);
+            mm->set_prev_log_term(ae->prev_log_term);
+            for (const auto &p : ae->entries) {
+                gpb::RaftLogEntry *ge = mm->add_entries();
+                ge->set_term(p.first);
+                ge->set_buffer(p.second.get(), CommandSize);
+            }
+            obj       = std::move(mm);
+            obj_class = AppendEntriesObjClass;
+        } else if (aer) {
+            auto mm = make_unique<gpb::RaftAppendEntriesResp>();
+            mm->set_term(aer->term);
+            mm->set_follower_id(aer->follower_id);
+            mm->set_log_index(aer->log_index);
+            mm->set_success(aer->success);
+            obj       = std::move(mm);
+            obj_class = AppendEntriesRespObjClass;
+        } else {
+            assert(false);
+        }
+
+        m->m_write(obj_class, RibObjName);
+        ret |=
+            rib->send_to_dst_node(std::move(m), pair.first, obj.get(), nullptr);
+    }
+
+    /* Here we make an assumption about the raft library, that is one
+     * and only one timer is active at all times; so for example if the
+     * heartbeat timer is active, the leader election timer can't be active.
+     * As a result we have just one 'timer' class member (Replica::timer).
+     * We first look at Stop commands, and then at Restart commands; this is
+     * needed to prevent Stop commands to cancel the effect of Restart ones. */
+    for (const auto &cmd : out.timer_commands) {
+        if (cmd.action == raft::RaftTimerAction::Stop) {
+            timer      = nullptr;
+            timer_type = raft::RaftTimerType::Invalid;
+            /* We can break, as more Stop commands won't have any effect. */
+            break;
+        }
+    }
+    for (const auto &cmd : out.timer_commands) {
+        if (cmd.action == raft::RaftTimerAction::Restart) {
+            /* The following assertion will fail if our assumption about
+             * the unicity of the timer is not true. */
+            assert(timer == nullptr || timer_type == cmd.type);
+            timer = make_unique<TimeoutEvent>(
+                cmd.milliseconds, rib->uipcp, this,
+                [](struct uipcp *uipcp, void *arg) {
+                    auto replica = static_cast<CeftReplica *>(arg);
+                    replica->timer->fired();
+                    replica->process_timeout();
+                });
+            timer_type = cmd.type;
+        }
+    }
+
+    return ret;
+}
+
+int
+CeftReplica::process_timeout()
+{
+    std::lock_guard<std::mutex> guard(rib->mutex);
+    raft::RaftSMOutput out;
+
+    timer_expired(timer_type, &out);
+
+    return process_sm_output(std::move(out));
+}
+
+/* Apply a command to the replicated state machine. We just pass the command
+ * to the same multimap implementation used by the fully replicated DFT. */
+int
+CeftReplica::apply(raft::LogIndex index, const char *const serbuf)
+{
+    /* Invoke the actual implementation. */
+    apply(serbuf);
+
+    /* Send a response to the client. */
+    auto mit = pending.find(index);
+    if (mit != pending.end()) {
+        auto m = make_unique<CDAPMessage>();
+
+        m->op_code = (mit->second->op_code == gpb::M_WRITE) ? gpb::M_WRITE_R
+                                                            : gpb::M_DELETE_R;
+        m->obj_name  = mit->second->obj_name;
+        m->obj_class = mit->second->obj_class;
+        m->invoke_id = mit->second->invoke_id;
+        rib->send_to_dst_addr(std::move(m), mit->second->requestor_addr);
+        UPD(rib->uipcp,
+            "Pending response for index %u sent to client %llu "
+            "(invoke_id=%d)\n",
+            index, (long long unsigned)mit->second->requestor_addr,
+            mit->second->invoke_id);
+        pending.erase(index);
+    }
+
+    return 0;
+}
+
+int
+CeftReplica::rib_handler(const CDAPMessage *rm,
+                         std::shared_ptr<NeighFlow> const &nf,
+                         std::shared_ptr<Neighbor> const &neigh,
+                         rlm_addr_t src_addr)
+{
+    struct uipcp *uipcp = rib->uipcp;
+    const char *objbuf  = nullptr;
+    raft::RaftSMOutput out;
+    size_t objlen = 0;
+    int ret;
+
+    if (src_addr == RL_ADDR_NULL) {
+        UPE(uipcp, "Source address not set\n");
+        return 0;
+    }
+
+    rm->get_obj_value(objbuf, objlen);
+    if (!objbuf && (rm->obj_class == ReqVoteObjClass ||
+                    rm->obj_class == ReqVoteRespObjClass ||
+                    rm->obj_class == AppendEntriesObjClass ||
+                    rm->obj_class == AppendEntriesRespObjClass)) {
+        UPE(uipcp, "No object value found\n");
+        return 0;
+    }
+
+    if (rm->obj_class == ReqVoteObjClass) {
+        auto rv = make_unique<raft::RaftRequestVote>();
+
+        gpb::RaftRequestVote mm;
+        mm.ParseFromArray(objbuf, objlen);
+        rv->term           = mm.term();
+        rv->candidate_id   = mm.candidate_id();
+        rv->last_log_index = mm.last_log_index();
+        rv->last_log_term  = mm.last_log_term();
+        ret                = request_vote_input(*rv, &out);
+
+    } else if (rm->obj_class == ReqVoteRespObjClass) {
+        auto rvr = make_unique<raft::RaftRequestVoteResp>();
+
+        gpb::RaftRequestVoteResp mm;
+        mm.ParseFromArray(objbuf, objlen);
+        rvr->term         = mm.term();
+        rvr->vote_granted = mm.vote_granted();
+        ret               = request_vote_resp_input(*rvr, &out);
+
+    } else if (rm->obj_class == AppendEntriesObjClass) {
+        auto ae = make_unique<raft::RaftAppendEntries>();
+
+        gpb::RaftAppendEntries mm;
+        mm.ParseFromArray(objbuf, objlen);
+        ae->term           = mm.term();
+        ae->leader_id      = mm.leader_id();
+        ae->leader_commit  = mm.leader_commit();
+        ae->prev_log_index = mm.prev_log_index();
+        ae->prev_log_term  = mm.prev_log_term();
+        for (int i = 0; i < mm.entries_size(); i++) {
+            size_t bufsize = mm.entries(i).buffer().size();
+            auto bufcopy   = std::unique_ptr<char[]>(new char[bufsize]);
+            memcpy(bufcopy.get(), mm.entries(i).buffer().data(), bufsize);
+            ae->entries.push_back(
+                std::make_pair(mm.entries(i).term(), std::move(bufcopy)));
+        }
+        ret = append_entries_input(*ae, &out);
+
+    } else if (rm->obj_class == AppendEntriesRespObjClass) {
+        auto aer = make_unique<raft::RaftAppendEntriesResp>();
+
+        gpb::RaftAppendEntriesResp mm;
+        mm.ParseFromArray(objbuf, objlen);
+        aer->term        = mm.term();
+        aer->follower_id = mm.follower_id();
+        aer->log_index   = mm.log_index();
+        aer->success     = mm.success();
+        ret              = append_entries_resp_input(*aer, &out);
+    } else {
+        /* This is not a message belonging to the raft protocol. Forward it
+         * to the underlying implementation. */
+        vector<std::unique_ptr<char[]>> commands;
+
+        process_rib_msg(rm, src_addr, &commands);
+
+        /* Submit commands to the raft state machine, if any. */
+        for (const auto &command : commands) {
+            raft::LogIndex index;
+
+            ret = submit(reinterpret_cast<const char *const>(command.get()),
+                         &index, &out);
+            if (ret) {
+                UPE(uipcp, "Failed to submit command (%s) to the RaftSM\n",
+                    rm->obj_class.c_str());
+                continue;
+            }
+            pending[index] =
+                make_unique<PendingReq>(rm->op_code, rm->obj_name,
+                                        rm->obj_class, rm->invoke_id, src_addr);
+        }
+    }
+
+    /* Complete raft processing. */
+    return process_sm_output(std::move(out));
+}
+
 class CentralizedFaultTolerantDFT : public DFT {
     /* An instance of this class can be a state machine replica or it can just
      * be a client that will redirect requests to one of the replicas. */
 
     /* In case of state machine replica, a pointer to a Raft state
      * machine. */
-    class Replica : public raft::RaftSM {
-        UipcpRib *rib = nullptr;
-
+    class Replica : public CeftReplica {
         /* The structure of a DFT command (i.e. a log entry for the Raft SM). */
         struct Command {
             char appl_name[32];
@@ -358,67 +666,31 @@ class CentralizedFaultTolerantDFT : public DFT {
                                              sizeof(Command::opcode),
                       "Invalid memory layout for class Replica::Command");
 
-        const size_t CommandSize;
-
-        /* Timer needed by the Raft state machine. */
-        std::unique_ptr<TimeoutEvent> timer;
-        raft::RaftTimerType timer_type;
-
         /* State machine implementation. Just reuse the implementation of
          * a fully replicated DFT. */
         std::unique_ptr<FullyReplicatedDFT> impl;
 
-        /* Support for client commands that are pending, waiting for
-         * being applied to the replicated state machine. */
-        struct PendingReq {
-            gpb::OpCode op_code;
-            std::string obj_name;
-            std::string obj_class;
-            int invoke_id;
-            rlm_addr_t requestor_addr;
-            PendingReq() = default;
-            PendingReq(gpb::OpCode op, const std::string &oname,
-                       const std::string &oclass, int iid, rlm_addr_t addr)
-                : op_code(op),
-                  obj_name(oname),
-                  obj_class(oclass),
-                  invoke_id(iid),
-                  requestor_addr(addr)
-            {
-            }
-        };
-        std::unordered_map<raft::LogIndex, std::unique_ptr<PendingReq>> pending;
         uint64_t seqnum_next = 1;
 
     public:
         Replica(CentralizedFaultTolerantDFT *dft)
-            : raft::RaftSM(std::string("ceft-dft-") + dft->rib->myname,
-                           dft->rib->myname,
-                           std::string("/tmp/ceft-dft-") +
-                               std::to_string(dft->rib->uipcp->id) +
-                               std::string("-") + dft->rib->myname,
-                           sizeof(Command), std::cerr, std::cout),
-              rib(dft->rib),
-              CommandSize(sizeof(Command)),
+            : CeftReplica(dft->rib, std::string("ceft-dft-") + dft->rib->myname,
+                          dft->rib->myname,
+                          std::string("/tmp/ceft-dft-") +
+                              std::to_string(dft->rib->uipcp->id) +
+                              std::string("-") + dft->rib->myname,
+                          sizeof(Command), DFT::TableName),
               impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
-        int process_sm_output(raft::RaftSMOutput out);
-        int process_timeout();
-        int apply(raft::LogIndex index, const char *const serbuf) override;
+        int apply(const char *const serbuf) override;
+        int process_rib_msg(
+            const CDAPMessage *rm, rlm_addr_t src_addr,
+            std::vector<std::unique_ptr<char[]>> *commands) override;
         int lookup_req(const std::string &appl_name, std::string *dst_node,
                        const std::string &preferred, uint32_t cookie)
         {
             return impl->lookup_req(appl_name, dst_node, preferred, cookie);
         }
-        int rib_handler(const CDAPMessage *rm,
-                        std::shared_ptr<NeighFlow> const &nf,
-                        std::shared_ptr<Neighbor> const &neigh,
-                        rlm_addr_t src_addr);
         void dump(std::stringstream &ss) const { impl->dump(ss); };
-
-        static std::string ReqVoteObjClass;
-        static std::string ReqVoteRespObjClass;
-        static std::string AppendEntriesObjClass;
-        static std::string AppendEntriesRespObjClass;
     };
     std::unique_ptr<Replica> raft;
 
@@ -522,14 +794,6 @@ public:
         return raft->rib_handler(rm, nf, neigh, src_addr);
     }
 };
-
-std::string CentralizedFaultTolerantDFT::Replica::ReqVoteObjClass = "raft_rv";
-std::string CentralizedFaultTolerantDFT::Replica::ReqVoteRespObjClass =
-    "raft_rv_r";
-std::string CentralizedFaultTolerantDFT::Replica::AppendEntriesObjClass =
-    "raft_ae";
-std::string CentralizedFaultTolerantDFT::Replica::AppendEntriesRespObjClass =
-    "raft_ae_r";
 
 int
 CentralizedFaultTolerantDFT::reconfigure()
@@ -813,120 +1077,10 @@ CentralizedFaultTolerantDFT::Client::rib_handler(
     return 0;
 }
 
-int
-CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
-{
-    int ret = 0;
-
-    /* Convert raft protocol messages from the library format to the
-     * gpb format. */
-    for (auto &pair : out.output_messages) {
-        raft::RaftMessage *msg = pair.second.get();
-        const auto *rv  = dynamic_cast<const raft::RaftRequestVote *>(msg);
-        const auto *rvr = dynamic_cast<const raft::RaftRequestVoteResp *>(msg);
-        auto *ae        = dynamic_cast<raft::RaftAppendEntries *>(msg);
-        const auto *aer =
-            dynamic_cast<const raft::RaftAppendEntriesResp *>(msg);
-        auto m = make_unique<CDAPMessage>();
-        std::unique_ptr<::google::protobuf::MessageLite> obj;
-        std::string obj_class;
-
-        if (rv) {
-            auto mm = make_unique<gpb::RaftRequestVote>();
-            mm->set_term(rv->term);
-            mm->set_candidate_id(rv->candidate_id);
-            mm->set_last_log_index(rv->last_log_index);
-            mm->set_last_log_term(rv->last_log_term);
-            obj       = std::move(mm);
-            obj_class = ReqVoteObjClass;
-        } else if (rvr) {
-            auto mm = make_unique<gpb::RaftRequestVoteResp>();
-            mm->set_term(rvr->term);
-            mm->set_vote_granted(rvr->vote_granted);
-            obj       = std::move(mm);
-            obj_class = ReqVoteRespObjClass;
-        } else if (ae) {
-            auto mm = make_unique<gpb::RaftAppendEntries>();
-            mm->set_term(ae->term);
-            mm->set_leader_id(ae->leader_id);
-            mm->set_leader_commit(ae->leader_commit);
-            mm->set_prev_log_index(ae->prev_log_index);
-            mm->set_prev_log_term(ae->prev_log_term);
-            for (const auto &p : ae->entries) {
-                gpb::RaftLogEntry *ge = mm->add_entries();
-                ge->set_term(p.first);
-                ge->set_buffer(p.second.get(), CommandSize);
-            }
-            obj       = std::move(mm);
-            obj_class = AppendEntriesObjClass;
-        } else if (aer) {
-            auto mm = make_unique<gpb::RaftAppendEntriesResp>();
-            mm->set_term(aer->term);
-            mm->set_follower_id(aer->follower_id);
-            mm->set_log_index(aer->log_index);
-            mm->set_success(aer->success);
-            obj       = std::move(mm);
-            obj_class = AppendEntriesRespObjClass;
-        } else {
-            assert(false);
-        }
-
-        m->m_write(obj_class, TableName);
-        ret |=
-            rib->send_to_dst_node(std::move(m), pair.first, obj.get(), nullptr);
-    }
-
-    /* Here we make an assumption about the raft library, that is one
-     * and only one timer is active at all times; so for example if the
-     * heartbeat timer is active, the leader election timer can't be active.
-     * As a result we have just one 'timer' class member (Replica::timer).
-     * We first look at Stop commands, and then at Restart commands; this is
-     * needed to prevent Stop commands to cancel the effect of Restart ones. */
-    for (const auto &cmd : out.timer_commands) {
-        if (cmd.action == raft::RaftTimerAction::Stop) {
-            timer      = nullptr;
-            timer_type = raft::RaftTimerType::Invalid;
-            /* We can break, as more Stop commands won't have any effect. */
-            break;
-        }
-    }
-    for (const auto &cmd : out.timer_commands) {
-        if (cmd.action == raft::RaftTimerAction::Restart) {
-            /* The following assertion will fail if our assumption about
-             * the unicity of the timer is not true. */
-            assert(timer == nullptr || timer_type == cmd.type);
-            timer = make_unique<TimeoutEvent>(
-                cmd.milliseconds, rib->uipcp, this,
-                [](struct uipcp *uipcp, void *arg) {
-                    auto replica =
-                        static_cast<CentralizedFaultTolerantDFT::Replica *>(
-                            arg);
-                    replica->timer->fired();
-                    replica->process_timeout();
-                });
-            timer_type = cmd.type;
-        }
-    }
-
-    return ret;
-}
-
-int
-CentralizedFaultTolerantDFT::Replica::process_timeout()
-{
-    std::lock_guard<std::mutex> guard(rib->mutex);
-    raft::RaftSMOutput out;
-
-    timer_expired(timer_type, &out);
-
-    return process_sm_output(std::move(out));
-}
-
 /* Apply a command to the replicated state machine. We just pass the command
  * to the same multimap implementation used by the fully replicated DFT. */
 int
-CentralizedFaultTolerantDFT::Replica::apply(raft::LogIndex index,
-                                            const char *const serbuf)
+CentralizedFaultTolerantDFT::Replica::apply(const char *const serbuf)
 {
     auto c = reinterpret_cast<const Command *const>(serbuf);
     gpb::DFTEntry e;
@@ -937,46 +1091,25 @@ CentralizedFaultTolerantDFT::Replica::apply(raft::LogIndex index,
     assert(c->opcode == Command::OpcodeSet || c->opcode == Command::OpcodeDel);
     impl->mod_table(e, c->opcode == Command::OpcodeSet, nullptr, nullptr);
 
-    /* Send a response to the client. */
-    auto mit = pending.find(index);
-    if (mit != pending.end()) {
-        auto m = make_unique<CDAPMessage>();
-
-        m->op_code = (mit->second->op_code == gpb::M_WRITE) ? gpb::M_WRITE_R
-                                                            : gpb::M_DELETE_R;
-        m->obj_name  = mit->second->obj_name;
-        m->obj_class = mit->second->obj_class;
-        m->invoke_id = mit->second->invoke_id;
-        rib->send_to_dst_addr(std::move(m), mit->second->requestor_addr);
-        UPD(rib->uipcp,
-            "Pending response for index %u sent to client %llu "
-            "(invoke_id=%d)\n",
-            index, (long long unsigned)mit->second->requestor_addr,
-            mit->second->invoke_id);
-        pending.erase(index);
-    }
-
     return 0;
 }
 
 int
-CentralizedFaultTolerantDFT::Replica::rib_handler(
-    const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-    std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)
+CentralizedFaultTolerantDFT::Replica::process_rib_msg(
+    const CDAPMessage *rm, rlm_addr_t src_addr,
+    std::vector<std::unique_ptr<char[]>> *commands)
 {
     struct uipcp *uipcp = rib->uipcp;
     const char *objbuf  = nullptr;
-    raft::RaftSMOutput out;
-    size_t objlen = 0;
-    int ret;
+    size_t objlen       = 0;
 
-    if (src_addr == RL_ADDR_NULL) {
-        UPE(uipcp, "Source address not set\n");
+    if (rm->obj_class != ObjClass) {
+        UPE(uipcp, "Unexpected object class '%s'\n", rm->obj_class.c_str());
         return 0;
     }
 
-    /* We don't expect an obj_value if this is a DFT read request. */
-    if (!(rm->obj_class == ObjClass && rm->op_code == gpb::M_READ)) {
+    /* We expect an obj_value if this is not a DFT read request. */
+    if (rm->op_code != gpb::M_READ) {
         rm->get_obj_value(objbuf, objlen);
         if (!objbuf) {
             UPE(uipcp, "No object value found\n");
@@ -984,134 +1117,60 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
         }
     }
 
-    if (rm->obj_class == ObjClass) {
-        if (!leader() && rm->op_code != gpb::M_READ) {
-            /* We are not the leader and this is not a read request. We
-             * need to deny the request to preserve consistency. */
-            UPD(uipcp, "Ignoring request, let the leader answer\n");
-            return 0;
-        }
-
-        /* Either we are the leader (so we can go ahead and serve the request),
-         * or this is a read request that we can serve because it's ok to be
-         * eventually consistent. */
-
-        if (rm->op_code == gpb::M_WRITE || rm->op_code == gpb::M_DELETE) {
-            /* We received an M_WRITE or M_DELETE as sent by
-             * Client::appl_register(). We are the leader. Let's submit the
-             * request to the Raft state machine. */
-            gpb::DFTEntry dft_entry;
-            raft::LogIndex index;
-            string appl_name;
-            Command c;
-
-            dft_entry.ParseFromArray(objbuf, objlen);
-            appl_name = apname2string(dft_entry.appl_name());
-            /* Fill in the command struct (already serialized). */
-            strncpy(c.ipcp_name, dft_entry.ipcp_name().c_str(),
-                    sizeof(c.ipcp_name));
-            strncpy(c.appl_name, appl_name.c_str(), sizeof(c.appl_name));
-            c.opcode = rm->op_code == gpb::M_WRITE ? Command::OpcodeSet
-                                                   : Command::OpcodeDel;
-
-            /* Submit the command to the raft state machine. */
-            ret = submit(reinterpret_cast<const char *const>(&c), &index, &out);
-            if (ret) {
-                UPE(rib->uipcp,
-                    "Failed to submit application %sregistration for '%s' to "
-                    "the raft state machine\n",
-                    rm->op_code == gpb::M_WRITE ? "" : "un", appl_name.c_str());
-                return -1;
-            }
-            pending[index] =
-                make_unique<PendingReq>(rm->op_code, rm->obj_name,
-                                        rm->obj_class, rm->invoke_id, src_addr);
-        } else if (rm->op_code == gpb::M_READ) {
-            /* We received an an M_READ sent by Client::lookup_req().
-             * Recover the application name, look it up in the DFT and
-             * reply. */
-            auto m = make_unique<CDAPMessage>();
-            std::string remote_node;
-            string appl_name;
-            int ret;
-
-            appl_name = rm->obj_name.substr(rm->obj_name.rfind("/") + 1);
-            ret       = impl->lookup_req(appl_name, &remote_node,
-                                   /*preferred=*/std::string(), /*cookie=*/0);
-            m->m_read_r(rm->obj_class, rm->obj_name, /*obj_inst=*/0,
-                        /*result=*/ret ? -1 : 0,
-                        /*result_reason=*/ret ? "No match found" : string());
-            m->invoke_id = rm->invoke_id;
-            m->set_obj_value(remote_node);
-            rib->send_to_dst_addr(std::move(m), src_addr);
-        } else {
-            UPE(uipcp, "M_WRITE(dft) or M_DELETE(dft) expected\n");
-            return 0;
-        }
-
-    } else {
-        /* This is a message belonging to the raft protocol. */
-        if (rm->obj_class == ReqVoteObjClass) {
-            auto rv = make_unique<raft::RaftRequestVote>();
-
-            gpb::RaftRequestVote mm;
-            mm.ParseFromArray(objbuf, objlen);
-            rv->term           = mm.term();
-            rv->candidate_id   = mm.candidate_id();
-            rv->last_log_index = mm.last_log_index();
-            rv->last_log_term  = mm.last_log_term();
-            ret                = request_vote_input(*rv, &out);
-
-        } else if (rm->obj_class == ReqVoteRespObjClass) {
-            auto rvr = make_unique<raft::RaftRequestVoteResp>();
-
-            gpb::RaftRequestVoteResp mm;
-            mm.ParseFromArray(objbuf, objlen);
-            rvr->term         = mm.term();
-            rvr->vote_granted = mm.vote_granted();
-            ret               = request_vote_resp_input(*rvr, &out);
-
-        } else if (rm->obj_class == AppendEntriesObjClass) {
-            auto ae = make_unique<raft::RaftAppendEntries>();
-
-            gpb::RaftAppendEntries mm;
-            mm.ParseFromArray(objbuf, objlen);
-            ae->term           = mm.term();
-            ae->leader_id      = mm.leader_id();
-            ae->leader_commit  = mm.leader_commit();
-            ae->prev_log_index = mm.prev_log_index();
-            ae->prev_log_term  = mm.prev_log_term();
-            for (int i = 0; i < mm.entries_size(); i++) {
-                size_t bufsize = mm.entries(i).buffer().size();
-                auto bufcopy   = std::unique_ptr<char[]>(new char[bufsize]);
-                memcpy(bufcopy.get(), mm.entries(i).buffer().data(), bufsize);
-                ae->entries.push_back(
-                    std::make_pair(mm.entries(i).term(), std::move(bufcopy)));
-            }
-            ret = append_entries_input(*ae, &out);
-
-        } else if (rm->obj_class == AppendEntriesRespObjClass) {
-            auto aer = make_unique<raft::RaftAppendEntriesResp>();
-
-            gpb::RaftAppendEntriesResp mm;
-            mm.ParseFromArray(objbuf, objlen);
-            aer->term        = mm.term();
-            aer->follower_id = mm.follower_id();
-            aer->log_index   = mm.log_index();
-            aer->success     = mm.success();
-            ret              = append_entries_resp_input(*aer, &out);
-        } else {
-            UPE(uipcp, "Unexpected object class '%s'\n", rm->obj_class.c_str());
-            return 0;
-        }
-        if (ret) {
-            UPE(uipcp, "Failed to submit message %s to the RaftSM\n",
-                rm->obj_class.c_str());
-        }
+    if (!leader() && rm->op_code != gpb::M_READ) {
+        /* We are not the leader and this is not a read request. We
+         * need to deny the request to preserve consistency. */
+        UPD(uipcp, "Ignoring request, let the leader answer\n");
+        return 0;
     }
 
-    /* Complete raft processing. */
-    return process_sm_output(std::move(out));
+    /* Either we are the leader (so we can go ahead and serve the request),
+     * or this is a read request that we can serve because it's ok to be
+     * eventually consistent. */
+
+    if (rm->op_code == gpb::M_WRITE || rm->op_code == gpb::M_DELETE) {
+        /* We received an M_WRITE or M_DELETE as sent by
+         * Client::appl_register(). We are the leader. Let's submit the
+         * request to the Raft state machine. */
+        gpb::DFTEntry dft_entry;
+        string appl_name;
+        auto cbuf  = std::unique_ptr<char[]>(new char[sizeof(Command)]);
+        Command *c = reinterpret_cast<Command *>(cbuf.get());
+
+        dft_entry.ParseFromArray(objbuf, objlen);
+        appl_name = apname2string(dft_entry.appl_name());
+        /* Fill in the command struct (already serialized). */
+        strncpy(c->ipcp_name, dft_entry.ipcp_name().c_str(),
+                sizeof(c->ipcp_name));
+        strncpy(c->appl_name, appl_name.c_str(), sizeof(c->appl_name));
+        c->opcode = rm->op_code == gpb::M_WRITE ? Command::OpcodeSet
+                                                : Command::OpcodeDel;
+
+        commands->push_back(std::move(cbuf));
+    } else if (rm->op_code == gpb::M_READ) {
+        /* We received an an M_READ sent by Client::lookup_req().
+         * Recover the application name, look it up in the DFT and
+         * reply. */
+        auto m = make_unique<CDAPMessage>();
+        std::string remote_node;
+        string appl_name;
+        int ret;
+
+        appl_name = rm->obj_name.substr(rm->obj_name.rfind("/") + 1);
+        ret       = impl->lookup_req(appl_name, &remote_node,
+                               /*preferred=*/std::string(), /*cookie=*/0);
+        m->m_read_r(rm->obj_class, rm->obj_name, /*obj_inst=*/0,
+                    /*result=*/ret ? -1 : 0,
+                    /*result_reason=*/ret ? "No match found" : string());
+        m->invoke_id = rm->invoke_id;
+        m->set_obj_value(remote_node);
+        rib->send_to_dst_addr(std::move(m), src_addr);
+    } else {
+        UPE(uipcp, "M_WRITE(dft) or M_DELETE(dft) expected\n");
+        return 0;
+    }
+
+    return 0;
 }
 
 void
