@@ -270,8 +270,10 @@ UipcpRib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
         m.reset();
 
         if (!nf) {
-            UPE(uipcp, "Received message from unknown port_id %u\n", port_id);
-            return -1;
+            /* This may happen in case we just deleted the flow but the peer
+             * does not know it yet. */
+            UPW(uipcp, "Received message from unknown port_id %u\n", port_id);
+            return 0;
         }
 
         if (!nf->conn) {
