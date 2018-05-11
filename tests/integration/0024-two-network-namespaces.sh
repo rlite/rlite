@@ -2,7 +2,7 @@
 
 cleanup() {
     local ret=0
-    pkill rina-echo-async
+    pkill rinaperf
     ip netns exec green rlite-ctl reset || ret=1
     ip netns exec green rlite-ctl terminate || ret=1
     ip netns exec red rlite-ctl reset || ret=1
@@ -38,6 +38,7 @@ ip netns exec green rlite-ctl ipcp-create green.n normal mydif || abort
 ip netns exec green rlite-ctl ipcp-enroller-enable green.n || abort
 ip netns exec green rlite-ctl ipcp-register green.n edif || abort
 ip netns exec green rlite-ctl dif-policy-param-mod mydif addralloc nack-wait-secs 1 || abort
+ip netns exec green rinaperf -lw -z rpinst1 || abort
 
 # Normal over shim eth setup in the red namespace
 ip netns exec red ip link set lo up || abort
@@ -48,4 +49,5 @@ ip netns exec red rlite-ctl ipcp-config red.eth netdev veth.red || abort
 ip netns exec red rlite-ctl ipcp-create red.n normal mydif || abort
 ip netns exec red rlite-ctl ipcp-register red.n edif || abort
 ip netns exec red rlite-ctl ipcp-enroll red.n mydif edif green.n || abort
+ip netns exec red rinaperf -z rpinst1 -p 1 -c 7 -i 20 || abort
 cleanup
