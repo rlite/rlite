@@ -216,7 +216,7 @@ NeighFlow::keepalive_tmr_start()
         return;
     }
 
-    rib->keepalive_timers[flow_fd] = make_unique<TimeoutEvent>(
+    rib->keepalive_timers[flow_fd] = utils::make_unique<TimeoutEvent>(
         keepalive, rib->uipcp,
         reinterpret_cast<void *>(static_cast<uintptr_t>(flow_fd)),
         [](struct uipcp *uipcp, void *arg) {
@@ -296,7 +296,7 @@ Neighbor::n_flow_set(std::shared_ptr<NeighFlow> nf)
          * keepalive timer. */
         kbnf             = flows.begin()->second;
         nf->enroll_state = kbnf->enroll_state;
-        nf->conn         = make_unique<CDAPConn>(nf->flow_fd);
+        nf->conn         = utils::make_unique<CDAPConn>(nf->flow_fd);
         if (kbnf->conn) {
             nf->conn->state_set(kbnf->conn->state_get());
         }
@@ -582,7 +582,7 @@ EnrollmentResources::enrollee_thread()
     std::unique_lock<std::mutex> lk(rib->mutex);
     /* Cleanup must be created after the lock guard, so that its
      * destructor is called before the lock guard destructor. */
-    auto cleanup = ScopedCleanup([this]() { this->enrollment_abort(); });
+    auto cleanup = utils::ScopedCleanup([this]() { this->enrollment_abort(); });
 
     {
         /* (1) I --> S: M_CONNECT */
@@ -592,7 +592,7 @@ EnrollmentResources::enrollee_thread()
 
         /* We are the enrollment initiator, let's send an
          * M_CONNECT message. */
-        nf->conn = make_unique<CDAPConn>(nf->flow_fd);
+        nf->conn = utils::make_unique<CDAPConn>(nf->flow_fd);
 
         m.m_connect(gpb::AUTH_NONE, &av, rib->myname, neigh->ipcp_name);
 
@@ -878,7 +878,7 @@ EnrollmentResources::enroller_thread()
     std::unique_lock<std::mutex> lk(rib->mutex);
     /* Cleanup must be created after the lock guard, so that its
      * destructor is called before the lock guard destructor. */
-    auto cleanup = ScopedCleanup([this]() { this->enrollment_abort(); });
+    auto cleanup = utils::ScopedCleanup([this]() { this->enrollment_abort(); });
 
     rm = next_enroll_msg(lk);
     if (!rm) {
@@ -1004,7 +1004,7 @@ UipcpRib::enrollment_rsrc_get(std::shared_ptr<NeighFlow> const &nf,
             neigh->ipcp_name.c_str(), nf->flow_fd);
         try {
             enrollment_resources[nf->flow_fd] =
-                make_unique<EnrollmentResources>(nf, neigh, initiator);
+                utils::make_unique<EnrollmentResources>(nf, neigh, initiator);
         } catch (std::system_error) {
             UPW(uipcp,
                 "Failed to spawn enrollment thread for neigh '%s'"
@@ -1127,7 +1127,7 @@ UipcpRib::sync_rib(const std::shared_ptr<NeighFlow> &nf)
 void
 UipcpRib::neighs_refresh_tmr_restart()
 {
-    sync_timer = make_unique<TimeoutEvent>(
+    sync_timer = utils::make_unique<TimeoutEvent>(
         get_param_value<Msecs>(UipcpRib::RibDaemonPrefix, "refresh-intval"),
         uipcp, this, [](struct uipcp *uipcp, void *arg) {
             UipcpRib *rib = static_cast<UipcpRib *>(arg);
@@ -1255,9 +1255,9 @@ UipcpRib::lookup_neighbor_by_address(rlm_addr_t address)
 {
     for (const auto &kvn : neighbors_seen) {
         if (kvn.second.address() == address) {
-            return rina_string_from_components(kvn.second.ap_name(),
-                                               kvn.second.ap_instance(),
-                                               string(), string());
+            return utils::rina_string_from_components(kvn.second.ap_name(),
+                                                      kvn.second.ap_instance(),
+                                                      string(), string());
         }
     }
 
@@ -1310,7 +1310,7 @@ UipcpRib::neighbors_handler(const CDAPMessage *rm,
     ncl.ParseFromArray(objbuf, objlen);
 
     for (const gpb::NeighborCandidate &nc : ncl.candidates()) {
-        string neigh_name = rina_string_from_components(
+        string neigh_name = utils::rina_string_from_components(
             nc.ap_name(), nc.ap_instance(), string(), string());
         auto mit = neighbors_seen.find(neigh_name);
 
@@ -1469,8 +1469,8 @@ UipcpRib::neighbor_cand_get() const
     gpb::NeighborCandidate cand;
     string u1, u2;
 
-    rina_components_from_string(myname, *cand.mutable_ap_name(),
-                                *cand.mutable_ap_instance(), u1, u2);
+    utils::rina_components_from_string(myname, *cand.mutable_ap_name(),
+                                       *cand.mutable_ap_instance(), u1, u2);
     cand.set_address(myaddr);
     for (const auto &dif : lower_difs) {
         cand.add_lower_difs(dif);

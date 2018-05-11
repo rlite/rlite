@@ -7,6 +7,8 @@
 #include <list>
 #include <functional>
 
+namespace utils {
+
 static inline std::list<std::string>
 strsplit(const std::string &s, char delim)
 {
@@ -62,7 +64,7 @@ rina_components_from_string(const std::string &str, std::string &apn,
     }
 }
 
-/* This version of make_unique() does not handle arrays. */
+/* This version of utils::make_unique() does not handle arrays. */
 template <typename T, typename... Args>
 std::unique_ptr<T>
 make_unique(Args &&... args)
@@ -112,5 +114,7 @@ public:
         }
     }
 };
+
+} /* namespace utils */
 
 #endif /* __RL_CPP_UTILS_H__ */

@@ -845,7 +845,7 @@ IPoRINA::parse_conf(const char *path)
                 return -1;
             }
             remotes[tokens[1]] =
-                make_unique<Remote>(tokens[1], tokens[2], subnet);
+                utils::make_unique<Remote>(tokens[1], tokens[2], subnet);
 
         } else if (tokens[0] == "route") {
             IPAddr subnet;
@@ -1078,7 +1078,7 @@ IPoRINA::main_loop()
         hello = Hello(objbuf, objlen);
 
         if (remotes.count(remote_name) == 0) {
-            remotes[remote_name] = make_unique<Remote>();
+            remotes[remote_name] = utils::make_unique<Remote>();
 
             r           = remotes[remote_name].get();
             r->app_name = remote_name;

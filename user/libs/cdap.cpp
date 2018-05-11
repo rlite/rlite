@@ -721,13 +721,13 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage &gm)
     api      = gm.has_dest_ap_inst() ? gm.dest_ap_inst() : string();
     aen      = gm.has_dest_ae_name() ? gm.dest_ae_name() : string();
     aei      = gm.has_dest_ae_inst() ? gm.dest_ae_inst() : string();
-    dst_appl = rina_string_from_components(apn, api, aen, aei);
+    dst_appl = utils::rina_string_from_components(apn, api, aen, aei);
 
     apn      = gm.has_src_ap_name() ? gm.src_ap_name() : string();
     api      = gm.has_src_ap_inst() ? gm.src_ap_inst() : string();
     aen      = gm.has_src_ae_name() ? gm.src_ae_name() : string();
     aei      = gm.has_src_ae_inst() ? gm.src_ae_inst() : string();
-    src_appl = rina_string_from_components(apn, api, aen, aei);
+    src_appl = utils::rina_string_from_components(apn, api, aen, aei);
 
     if (gm.has_result_reason()) {
         result_reason = gm.result_reason();
@@ -812,7 +812,7 @@ CDAPMessage::operator gpb::CDAPMessage() const
     }
 
     if (!dst_appl.empty()) {
-        rina_components_from_string(dst_appl, apn, api, aen, aei);
+        utils::rina_components_from_string(dst_appl, apn, api, aen, aei);
         gm.set_dest_ap_name(apn);
         gm.set_dest_ap_inst(api);
         gm.set_dest_ae_name(aen);
@@ -820,7 +820,7 @@ CDAPMessage::operator gpb::CDAPMessage() const
     }
 
     if (!src_appl.empty()) {
-        rina_components_from_string(src_appl, apn, api, aen, aei);
+        utils::rina_components_from_string(src_appl, apn, api, aen, aei);
         gm.set_src_ap_name(apn);
         gm.set_src_ap_inst(api);
         gm.set_src_ae_name(aen);
@@ -1157,7 +1157,7 @@ msg_deser_stateless(const char *serbuf, size_t serlen)
 
     gm.ParseFromArray(serbuf, serlen);
 
-    m = make_unique<CDAPMessage>(gm);
+    m = utils::make_unique<CDAPMessage>(gm);
 
     if (!m->valid(true)) {
         return nullptr;

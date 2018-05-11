@@ -257,7 +257,7 @@ run_simulation(const list<TestEvent> &external_events,
             }
         }
 
-        sm = make_unique<TestReplica>(
+        sm = utils::make_unique<TestReplica>(
             /*smname=*/local + "-sm", /*myname=*/local, logfilename, peers);
         if (sm->respawn(&output)) {
             return -1;

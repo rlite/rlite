@@ -80,7 +80,7 @@ UipcpRib::fa_req(struct rl_kmsg_fa_req *req)
 
     /* Make a copy of the request, with some move semantic. */
     std::unique_ptr<struct rl_kmsg_fa_req> reqcopy =
-        make_unique<struct rl_kmsg_fa_req>();
+        utils::make_unique<struct rl_kmsg_fa_req>();
     *reqcopy         = *req;
     req->local_appl  = nullptr;
     req->remote_appl = nullptr;
@@ -337,7 +337,7 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
 {
     std::unique_ptr<CDAPMessage> m;
     rlm_addr_t remote_addr;
-    auto freq = make_unique<FlowRequest>();
+    auto freq = utils::make_unique<FlowRequest>();
     gpb::ConnId *conn_id;
     stringstream obj_name;
     string cubename;
@@ -407,7 +407,7 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
 
     obj_name << TableName << "/" << freq->src_addr() << "-" << req->local_port;
 
-    m = make_unique<CDAPMessage>();
+    m = utils::make_unique<CDAPMessage>();
     m->m_create(FlowObjClass, obj_name.str());
 
     freq->invoke_id = 0; /* invoke_id is actually set in send_to_dst_addr() */
@@ -456,7 +456,7 @@ LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
         reason = "Application refused the accept the flow request";
     }
 
-    m = make_unique<CDAPMessage>();
+    m = utils::make_unique<CDAPMessage>();
     m->m_create_r(FlowObjClass, obj_name.str(), 0, resp->response ? -1 : 0,
                   reason);
     m->invoke_id = freq->invoke_id;
@@ -485,7 +485,7 @@ LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm)
         return 0;
     }
 
-    auto freq = make_unique<FlowRequest>();
+    auto freq = utils::make_unique<FlowRequest>();
     std::string local_appl, remote_appl;
     struct rl_flow_config flowcfg;
 
@@ -495,7 +495,7 @@ LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm)
         std::unique_ptr<CDAPMessage> m;
 
         UPE(rib->uipcp, "No connections specified on this flow\n");
-        m = make_unique<CDAPMessage>();
+        m = utils::make_unique<CDAPMessage>();
         m->m_create_r(rm->obj_class, rm->obj_name, 0, -1,
                       "No connections specified");
         m->invoke_id = rm->invoke_id;
@@ -609,7 +609,7 @@ LocalFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     }
 
     /* We should wait 2 MPL here before notifying the peer. */
-    m = make_unique<CDAPMessage>();
+    m = utils::make_unique<CDAPMessage>();
     m->m_delete(FlowObjClass, obj_name);
 
     return rib->send_to_dst_addr(std::move(m), remote_addr);
@@ -731,7 +731,9 @@ UipcpRib::fa_lib_init()
 {
     available_policies[FlowAllocator::Prefix].insert(PolicyBuilder(
         "local",
-        [](UipcpRib *rib) { rib->fa = make_unique<LocalFlowAllocator>(rib); },
+        [](UipcpRib *rib) {
+            rib->fa = utils::make_unique<LocalFlowAllocator>(rib);
+        },
         {FlowAllocator::TableName},
         {{"force-flow-control", PolicyParam(false)},
          {"max-cwq-len",

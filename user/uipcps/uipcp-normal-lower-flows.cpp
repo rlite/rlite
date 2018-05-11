@@ -331,7 +331,7 @@ FullyReplicatedLFDB::update_local(const string &node_name)
     lf->set_state(true);
     lf->set_age(0);
 
-    sm = make_unique<CDAPMessage>();
+    sm = utils::make_unique<CDAPMessage>();
     sm->m_create(ObjClass, TableName);
     rib->send_to_myself(std::move(sm), &lfl);
 }
@@ -504,7 +504,7 @@ FullyReplicatedLFDB::neighs_refresh(size_t limit)
 void
 UipcpRib::age_incr_tmr_restart()
 {
-    age_incr_timer = make_unique<TimeoutEvent>(
+    age_incr_timer = utils::make_unique<TimeoutEvent>(
         get_param_value<Msecs>(Routing::Prefix, "age-incr-intval"), uipcp, this,
         [](struct uipcp *uipcp, void *arg) {
             UipcpRib *rib = (UipcpRib *)arg;
@@ -939,7 +939,7 @@ RoutingEngine::update_kernel_routing(const NodeId &addr)
         (now - last_run) < coalesce_period) {
         /* Postpone this computation, possibly starting the coalesce timer. */
         if (!coalesce_timer) {
-            coalesce_timer = make_unique<TimeoutEvent>(
+            coalesce_timer = utils::make_unique<TimeoutEvent>(
                 coalesce_period, rib->uipcp, this,
                 [](struct uipcp *uipcp, void *arg) {
                     RoutingEngine *re = (RoutingEngine *)arg;
@@ -1028,7 +1028,7 @@ StaticRouting::route_mod(const struct rl_cmsg_ipcp_route_mod *req)
             UPE(rib->uipcp, "No next hop specified\n");
             return -1;
         }
-        next_hops = strsplit(NodeId(req->next_hops), ',');
+        next_hops = utils::strsplit(NodeId(req->next_hops), ',');
         {
             set<NodeId> u(next_hops.begin(), next_hops.end());
             if (u.size() != next_hops.size()) {
@@ -1061,18 +1061,19 @@ UipcpRib::routing_lib_init()
     available_policies[Routing::Prefix].insert(PolicyBuilder(
         "link-state",
         [](UipcpRib *rib) {
-            rib->routing = make_unique<FullyReplicatedLFDB>(rib, false);
+            rib->routing = utils::make_unique<FullyReplicatedLFDB>(rib, false);
         },
         {Routing::TableName}, link_state_params));
     available_policies[Routing::Prefix].insert(PolicyBuilder(
         "link-state-lfa",
         [](UipcpRib *rib) {
-            rib->routing = make_unique<FullyReplicatedLFDB>(rib, true);
+            rib->routing = utils::make_unique<FullyReplicatedLFDB>(rib, true);
         },
         {Routing::TableName}, link_state_params));
-    available_policies[Routing::Prefix].insert(PolicyBuilder(
-        "static",
-        [](UipcpRib *rib) { rib->routing = make_unique<StaticRouting>(rib); }));
+    available_policies[Routing::Prefix].insert(
+        PolicyBuilder("static", [](UipcpRib *rib) {
+            rib->routing = utils::make_unique<StaticRouting>(rib);
+        }));
 }
 
 } // namespace Uipcps

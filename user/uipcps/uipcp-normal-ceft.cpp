@@ -61,12 +61,12 @@ CeftReplica::process_sm_output(raft::RaftSMOutput out)
         auto *ae        = dynamic_cast<raft::RaftAppendEntries *>(msg);
         const auto *aer =
             dynamic_cast<const raft::RaftAppendEntriesResp *>(msg);
-        auto m = make_unique<CDAPMessage>();
+        auto m = utils::make_unique<CDAPMessage>();
         std::unique_ptr<::google::protobuf::MessageLite> obj;
         std::string obj_class;
 
         if (rv) {
-            auto mm = make_unique<gpb::RaftRequestVote>();
+            auto mm = utils::make_unique<gpb::RaftRequestVote>();
             mm->set_term(rv->term);
             mm->set_candidate_id(rv->candidate_id);
             mm->set_last_log_index(rv->last_log_index);
@@ -74,13 +74,13 @@ CeftReplica::process_sm_output(raft::RaftSMOutput out)
             obj       = std::move(mm);
             obj_class = ReqVoteObjClass;
         } else if (rvr) {
-            auto mm = make_unique<gpb::RaftRequestVoteResp>();
+            auto mm = utils::make_unique<gpb::RaftRequestVoteResp>();
             mm->set_term(rvr->term);
             mm->set_vote_granted(rvr->vote_granted);
             obj       = std::move(mm);
             obj_class = ReqVoteRespObjClass;
         } else if (ae) {
-            auto mm = make_unique<gpb::RaftAppendEntries>();
+            auto mm = utils::make_unique<gpb::RaftAppendEntries>();
             mm->set_term(ae->term);
             mm->set_leader_id(ae->leader_id);
             mm->set_leader_commit(ae->leader_commit);
@@ -94,7 +94,7 @@ CeftReplica::process_sm_output(raft::RaftSMOutput out)
             obj       = std::move(mm);
             obj_class = AppendEntriesObjClass;
         } else if (aer) {
-            auto mm = make_unique<gpb::RaftAppendEntriesResp>();
+            auto mm = utils::make_unique<gpb::RaftAppendEntriesResp>();
             mm->set_term(aer->term);
             mm->set_follower_id(aer->follower_id);
             mm->set_log_index(aer->log_index);
@@ -129,7 +129,7 @@ CeftReplica::process_sm_output(raft::RaftSMOutput out)
             /* The following assertion will fail if our assumption about
              * the unicity of the timer is not true. */
             assert(timer == nullptr || timer_type == cmd.type);
-            timer = make_unique<TimeoutEvent>(
+            timer = utils::make_unique<TimeoutEvent>(
                 cmd.milliseconds, rib->uipcp, this,
                 [](struct uipcp *uipcp, void *arg) {
                     auto replica = static_cast<CeftReplica *>(arg);
@@ -223,7 +223,7 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
     }
 
     if (rm->obj_class == ReqVoteObjClass) {
-        auto rv = make_unique<raft::RaftRequestVote>();
+        auto rv = utils::make_unique<raft::RaftRequestVote>();
 
         gpb::RaftRequestVote mm;
         mm.ParseFromArray(objbuf, objlen);
@@ -234,7 +234,7 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
         ret                = request_vote_input(*rv, &out);
 
     } else if (rm->obj_class == ReqVoteRespObjClass) {
-        auto rvr = make_unique<raft::RaftRequestVoteResp>();
+        auto rvr = utils::make_unique<raft::RaftRequestVoteResp>();
 
         gpb::RaftRequestVoteResp mm;
         mm.ParseFromArray(objbuf, objlen);
@@ -243,7 +243,7 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
         ret               = request_vote_resp_input(*rvr, &out);
 
     } else if (rm->obj_class == AppendEntriesObjClass) {
-        auto ae = make_unique<raft::RaftAppendEntries>();
+        auto ae = utils::make_unique<raft::RaftAppendEntries>();
 
         gpb::RaftAppendEntries mm;
         mm.ParseFromArray(objbuf, objlen);
@@ -262,7 +262,7 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
         ret = append_entries_input(*ae, &out);
 
     } else if (rm->obj_class == AppendEntriesRespObjClass) {
-        auto aer = make_unique<raft::RaftAppendEntriesResp>();
+        auto aer = utils::make_unique<raft::RaftAppendEntriesResp>();
 
         gpb::RaftAppendEntriesResp mm;
         mm.ParseFromArray(objbuf, objlen);
@@ -290,8 +290,8 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
                     rm->obj_class.c_str());
                 continue;
             }
-            pending[index] = make_unique<PendingResp>(std::move(command.second),
-                                                      src_addr, curr_term());
+            pending[index] = utils::make_unique<PendingResp>(
+                std::move(command.second), src_addr, curr_term());
         }
     }
 
@@ -350,7 +350,7 @@ CeftClient::mod_pending_timer()
     if (t_min == std::chrono::system_clock::time_point::max()) {
         timer = nullptr;
     } else {
-        timer = make_unique<TimeoutEvent>(
+        timer = utils::make_unique<TimeoutEvent>(
             std::chrono::duration_cast<Msecs>(t_min - now), rib->uipcp, this,
             [](struct uipcp *uipcp, void *arg) {
                 auto cli = static_cast<CeftClient *>(arg);
@@ -372,7 +372,7 @@ CeftClient::send_to_replicas(std::unique_ptr<CDAPMessage> m,
      */
     for (const auto &r : replicas) {
         if (selected_id.empty() || r == selected_id) {
-            auto mc  = make_unique<CDAPMessage>(*m);
+            auto mc  = utils::make_unique<CDAPMessage>(*m);
             auto prc = pr->clone();
             int invoke_id;
             int ret;

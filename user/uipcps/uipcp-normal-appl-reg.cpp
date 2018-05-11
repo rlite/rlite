@@ -111,7 +111,7 @@ FullyReplicatedDFT::lookup_req(const std::string &appl_name,
 int
 FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
 {
-    auto dft_entry = make_unique<gpb::DFTEntry>();
+    auto dft_entry = utils::make_unique<gpb::DFTEntry>();
     multimap<string, std::unique_ptr<gpb::DFTEntry>>::iterator mit;
     string appl_name(req->appl_name);
     struct uipcp *uipcp = rib->uipcp;
@@ -202,7 +202,8 @@ FullyReplicatedDFT::mod_table(const gpb::DFTEntry &e, bool add,
                 }
                 dft_table.erase(mit);
             }
-            dft_table.insert(make_pair(key, make_unique<gpb::DFTEntry>(e)));
+            dft_table.insert(
+                make_pair(key, utils::make_unique<gpb::DFTEntry>(e)));
             if (added) {
                 *added->add_entries() = e;
             }
@@ -371,7 +372,7 @@ class CentralizedFaultTolerantDFT : public DFT {
                               std::to_string(dft->rib->uipcp->id) +
                               std::string("-") + dft->rib->myname,
                           sizeof(Command), DFT::TableName),
-              impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
+              impl(utils::make_unique<FullyReplicatedDFT>(dft->rib)){};
         int apply(const char *const serbuf, CDAPMessage *const rm) override;
         int replica_process_rib_msg(
             const CDAPMessage *rm, rlm_addr_t src_addr,
@@ -402,7 +403,7 @@ class CentralizedFaultTolerantDFT : public DFT {
             }
             std::unique_ptr<CeftClient::PendingReq> clone() const override
             {
-                return make_unique<PendingReq>(*this);
+                return utils::make_unique<PendingReq>(*this);
             }
         };
 
@@ -489,17 +490,17 @@ CentralizedFaultTolerantDFT::reconfigure()
         return 0;
     }
     UPD(rib->uipcp, "replicas = %s\n", replicas.c_str());
-    peers = strsplit(replicas, ',');
+    peers = utils::strsplit(replicas, ',');
 
     /* Create the client anyway. */
-    client = make_unique<Client>(this, peers);
+    client = utils::make_unique<Client>(this, peers);
     UPI(rib->uipcp, "Client initialized\n");
 
     /* I'm one of the replicas. Create a Raft state machine and
      * initialize it. */
     auto it = std::find(peers.begin(), peers.end(), rib->myname);
     if (it != peers.end()) {
-        raft = make_unique<Replica>(this);
+        raft = utils::make_unique<Replica>(this);
         peers.erase(it); /* remove myself */
 
         auto election_timeout =
@@ -525,12 +526,12 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
                                                 uint32_t cookie)
 {
     /* Prepare an M_READ for a read operation. */
-    auto m = make_unique<CDAPMessage>();
+    auto m = utils::make_unique<CDAPMessage>();
 
     m->m_read(ObjClass, TableName + "/" + appl_name);
 
     auto timeout = rib->get_param_value<Msecs>(DFT::Prefix, "cli-timeout");
-    auto pr      = make_unique<PendingReq>(m->op_code, timeout, appl_name, 0);
+    auto pr = utils::make_unique<PendingReq>(m->op_code, timeout, appl_name, 0);
     int ret = send_to_replicas(std::move(m), std::move(pr), OpSemantics::Get);
     if (ret) {
         return ret;
@@ -551,7 +552,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
 {
     /* Prepare an M_WRITE or M_DELETE message for a write/delete operation. */
     string appl_name(req->appl_name);
-    auto m = make_unique<CDAPMessage>();
+    auto m = utils::make_unique<CDAPMessage>();
     int ret;
 
     if (req->reg) {
@@ -561,8 +562,8 @@ CentralizedFaultTolerantDFT::Client::appl_register(
     }
 
     auto timeout = rib->get_param_value<Msecs>(DFT::Prefix, "cli-timeout");
-    auto pr      = make_unique<PendingReq>(m->op_code, timeout, appl_name,
-                                      req->hdr.event_id);
+    auto pr = utils::make_unique<PendingReq>(m->op_code, timeout, appl_name,
+                                             req->hdr.event_id);
     gpb::DFTEntry dft_entry;
 
     dft_entry.set_ipcp_name(rib->myname);
@@ -703,7 +704,7 @@ CentralizedFaultTolerantDFT::Replica::replica_process_rib_msg(
         c->opcode = rm->op_code == gpb::M_WRITE ? Command::OpcodeSet
                                                 : Command::OpcodeDel;
         /* Prepare the response. */
-        auto m = make_unique<CDAPMessage>();
+        auto m = utils::make_unique<CDAPMessage>();
         m->op_code =
             (rm->op_code == gpb::M_WRITE) ? gpb::M_WRITE_R : gpb::M_DELETE_R;
         m->obj_name  = rm->obj_name;
@@ -716,7 +717,7 @@ CentralizedFaultTolerantDFT::Replica::replica_process_rib_msg(
         /* We received an an M_READ sent by Client::lookup_req().
          * Recover the application name, look it up in the DFT and
          * reply. */
-        auto m = make_unique<CDAPMessage>();
+        auto m = utils::make_unique<CDAPMessage>();
         std::string remote_node;
         string appl_name;
         int ret;
@@ -743,12 +744,14 @@ UipcpRib::dft_lib_init()
 {
     available_policies[DFT::Prefix].insert(PolicyBuilder(
         "fully-replicated",
-        [](UipcpRib *rib) { rib->dft = make_unique<FullyReplicatedDFT>(rib); },
+        [](UipcpRib *rib) {
+            rib->dft = utils::make_unique<FullyReplicatedDFT>(rib);
+        },
         {DFT::TableName}));
     available_policies[DFT::Prefix].insert(PolicyBuilder(
         "centralized-fault-tolerant",
         [](UipcpRib *rib) {
-            rib->dft = make_unique<CentralizedFaultTolerantDFT>(rib);
+            rib->dft = utils::make_unique<CentralizedFaultTolerantDFT>(rib);
         },
         {DFT::TableName},
         {{"replicas", PolicyParam(string())},

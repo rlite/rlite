@@ -221,7 +221,8 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
             } else if (cand_neigh_conflict ||
                        mit->second.requestor() != aar.requestor()) {
                 /* New address allocation request, but there is a conflict. */
-                std::unique_ptr<CDAPMessage> m = make_unique<CDAPMessage>();
+                std::unique_ptr<CDAPMessage> m =
+                    utils::make_unique<CDAPMessage>();
                 int ret;
 
                 UPI(rib->uipcp,
@@ -417,7 +418,7 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
             }
             std::unique_ptr<CeftClient::PendingReq> clone() const override
             {
-                return make_unique<PendingReq>(*this);
+                return utils::make_unique<PendingReq>(*this);
             }
         };
 
@@ -498,17 +499,17 @@ CentralizedFaultTolerantAddrAllocator::reconfigure()
         return 0;
     }
     UPD(rib->uipcp, "replicas = %s\n", replicas.c_str());
-    peers = strsplit(replicas, ',');
+    peers = utils::strsplit(replicas, ',');
 
     /* Create the client anyway. */
-    client = make_unique<Client>(this, peers);
+    client = utils::make_unique<Client>(this, peers);
     UPI(rib->uipcp, "Client initialized\n");
 
     /* I'm one of the replicas. Create a Raft state machine and
      * initialize it. */
     auto it = std::find(peers.begin(), peers.end(), rib->myname);
     if (it != peers.end()) {
-        raft = make_unique<Replica>(this, peers);
+        raft = utils::make_unique<Replica>(this, peers);
         peers.erase(it); /* remove myself */
 
         rlm_addr_t myaddress = raft->lookup(rib->myname);
@@ -535,7 +536,7 @@ int
 CentralizedFaultTolerantAddrAllocator::Client::allocate(
     const std::string &ipcp_name, rlm_addr_t *addr)
 {
-    auto m       = make_unique<CDAPMessage>();
+    auto m       = utils::make_unique<CDAPMessage>();
     auto synchro = std::make_shared<Synchronizer>();
 
     *addr = RL_ADDR_NULL;
@@ -543,7 +544,8 @@ CentralizedFaultTolerantAddrAllocator::Client::allocate(
 
     auto timeout =
         rib->get_param_value<Msecs>(AddrAllocator::Prefix, "cli-timeout");
-    auto pr = make_unique<PendingReq>(m->op_code, timeout, ipcp_name, synchro);
+    auto pr =
+        utils::make_unique<PendingReq>(m->op_code, timeout, ipcp_name, synchro);
     int ret = send_to_replicas(std::move(m), std::move(pr), OpSemantics::Put);
     if (ret) {
         return ret;
@@ -690,7 +692,7 @@ CentralizedFaultTolerantAddrAllocator::Replica::replica_process_rib_msg(
     if (rm->op_code == gpb::M_CREATE) {
         /* We received an M_CREATE sent by Client::allocate() and we are the
          * leader. */
-        auto m = make_unique<CDAPMessage>();
+        auto m = utils::make_unique<CDAPMessage>();
 
         m->op_code   = gpb::M_CREATE_R;
         m->obj_name  = rm->obj_name;
@@ -717,7 +719,7 @@ CentralizedFaultTolerantAddrAllocator::Replica::replica_process_rib_msg(
         }
     } else if (rm->op_code == gpb::M_READ) {
         /* We received an an M_READ. Look up the IPCP in the map. */
-        auto m = make_unique<CDAPMessage>();
+        auto m = utils::make_unique<CDAPMessage>();
 
         m->m_read_r(rm->obj_class, rm->obj_name, /*obj_inst=*/0,
                     /*result=*/mit == table.end() ? -1 : 0,
@@ -739,12 +741,12 @@ UipcpRib::addra_lib_init()
 {
     available_policies[AddrAllocator::Prefix].insert(
         PolicyBuilder("static", [](UipcpRib *rib) {
-            rib->addra = make_unique<StaticAddrAllocator>(rib);
+            rib->addra = utils::make_unique<StaticAddrAllocator>(rib);
         }));
     available_policies[AddrAllocator::Prefix].insert(PolicyBuilder(
         "distributed",
         [](UipcpRib *rib) {
-            rib->addra = make_unique<DistributedAddrAllocator>(rib);
+            rib->addra = utils::make_unique<DistributedAddrAllocator>(rib);
         },
         {AddrAllocator::TableName},
         {{"nack-wait",
@@ -754,7 +756,7 @@ UipcpRib::addra_lib_init()
         "centralized-fault-tolerant",
         [](UipcpRib *rib) {
             rib->addra =
-                make_unique<CentralizedFaultTolerantAddrAllocator>(rib);
+                utils::make_unique<CentralizedFaultTolerantAddrAllocator>(rib);
         },
         {AddrAllocator::TableName},
         {{"replicas", PolicyParam(string())},

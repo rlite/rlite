@@ -122,7 +122,7 @@ apname2gpb(const std::string &str)
 {
     gpb::APName *gan = new gpb::APName();
 
-    rina_components_from_string(
+    utils::rina_components_from_string(
         str, *gan->mutable_ap_name(), *gan->mutable_ap_instance(),
         *gan->mutable_ae_name(), *gan->mutable_ae_instance());
 
@@ -132,8 +132,9 @@ apname2gpb(const std::string &str)
 std::string
 apname2string(const gpb::APName &gname)
 {
-    return rina_string_from_components(gname.ap_name(), gname.ap_instance(),
-                                       gname.ae_name(), gname.ae_instance());
+    return utils::rina_string_from_components(
+        gname.ap_name(), gname.ap_instance(), gname.ae_name(),
+        gname.ae_instance());
 }
 
 #define MGMTBUF_SIZE_MAX 8092
@@ -273,7 +274,7 @@ UipcpRib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
         }
 
         if (!nf->conn) {
-            nf->conn = make_unique<CDAPConn>(nf->flow_fd);
+            nf->conn = utils::make_unique<CDAPConn>(nf->flow_fd);
         }
 
         assert(neigh);
@@ -704,11 +705,11 @@ UipcpRib::dump(std::stringstream &ss) const
        << " candidates" << endl;
     for (const auto &kvn : neighbors_seen) {
         const gpb::NeighborCandidate &cand = kvn.second;
-        string neigh_name                  = rina_string_from_components(
+        string neigh_name                  = utils::rina_string_from_components(
             cand.ap_name(), cand.ap_instance(), string(), string());
         ss << "    Name: "
-           << rina_string_from_components(cand.ap_name(), cand.ap_instance(),
-                                          string(), string())
+           << utils::rina_string_from_components(
+                  cand.ap_name(), cand.ap_instance(), string(), string())
            << ", Address: " << cand.address() << ", Lower DIFs: {";
 
         {
@@ -1501,7 +1502,7 @@ UipcpRib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
         neigh->flows[neigh_port_id] = nf;
     }
 
-    auto cleanup = ScopedCleanup(
+    auto cleanup = utils::ScopedCleanup(
         [this, req]() { del_neighbor(std::string(req->remote_appl)); });
 
     ret = uipcp_fa_resp(uipcp, req->kevent_id, req->ipcp_id,

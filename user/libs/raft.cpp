@@ -492,7 +492,7 @@ RaftSM::prepare_append_entries(LogReplicateStrategy strategy, RaftSMOutput *out)
         }
 
         do {
-            auto msg            = make_unique<RaftAppendEntries>();
+            auto msg            = utils::make_unique<RaftAppendEntries>();
             msg->term           = current_term;
             msg->leader_id      = local_id;
             msg->leader_commit  = commit_index;
@@ -640,7 +640,7 @@ RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
         return ret;
     }
 
-    resp       = make_unique<RaftRequestVoteResp>();
+    resp       = utils::make_unique<RaftRequestVoteResp>();
     resp->term = current_term;
 
     if (msg.term < current_term) {
@@ -767,7 +767,7 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
         return ret;
     }
 
-    resp              = make_unique<RaftAppendEntriesResp>();
+    resp              = utils::make_unique<RaftAppendEntriesResp>();
     resp->term        = current_term;
     resp->follower_id = local_id;
     resp->log_index   = msg.prev_log_index;
@@ -967,7 +967,7 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
             rand_time_in_range(ElectionTimeoutMin, ElectionTimeoutMax)));
         /* Prepare RequestVote messages for the other servers. */
         for (const auto &kv : servers) {
-            auto msg            = make_unique<RaftRequestVote>();
+            auto msg            = utils::make_unique<RaftRequestVote>();
             msg->term           = current_term;
             msg->candidate_id   = local_id;
             msg->last_log_index = last_log_index;
