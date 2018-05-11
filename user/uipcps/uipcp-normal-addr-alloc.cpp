@@ -497,6 +497,10 @@ CentralizedFaultTolerantAddrAllocator::reconfigure()
         raft = make_unique<Replica>(this, peers);
         peers.erase(it); /* remove myself */
 
+        rlm_addr_t myaddress = raft->lookup(rib->myname);
+        assert(myaddress != RL_ADDR_NULL);
+        rib->set_address(myaddress);
+
         return raft->init(peers);
     }
 
