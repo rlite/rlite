@@ -735,8 +735,11 @@ for vmname in sorted(demo.vms):
         outs += 'EOF\n'
 
     # Run rlite-node-config
-    outs += '$SUDO nohup rlite-node-config -v -d -s %s > rlite-node-config.%s.log 2>&1\n'\
-            % (node_config_file, vmname)
+    rlnc_options = ''
+    if len(demo.vms) > 400:
+        rlnc_options += ' --one-shot'
+    outs += '$SUDO nohup rlite-node-config -v -d -s %s %s > rlite-node-config.%s.log 2>&1\n'\
+            % (node_config_file, rlnc_options, vmname)
 
     # Configure netem rules inside the nodes, including htb rate limiting
     outs += demo.compute_netem_rules(vm)
