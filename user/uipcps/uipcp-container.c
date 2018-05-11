@@ -1055,6 +1055,20 @@ uipcp_put(struct uipcp *uipcp)
     if (destroy) {
         list_del(&uipcp->node);
         uipcp->uipcps->n_uipcps--;
+
+        /* Clean up topological info (under uipcps->lock). */
+        {
+            struct flow_edge *e, *tmp;
+
+            list_for_each_entry_safe (e, tmp, &uipcp->topo.lowers, node) {
+                list_del(&e->node);
+                rl_free(e, RL_MT_TOPO);
+            }
+            list_for_each_entry_safe (e, tmp, &uipcp->topo.uppers, node) {
+                list_del(&e->node);
+                rl_free(e, RL_MT_TOPO);
+            }
+        }
     }
 
     pthread_mutex_unlock(&uipcp->uipcps->lock);
