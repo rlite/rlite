@@ -140,7 +140,7 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
      * packet (i.e., right now).*/
     bool update_port = (priv->remote_addr.sin_port == htons(RL_SHIM_UDP_PORT));
     struct flow_entry *flow     = priv->flow;
-    struct rl_ipcp_stats *stats = this_cpu_ptr(flow->txrx.ipcp->stats);
+    struct rl_ipcp_stats *stats = raw_cpu_ptr(flow->txrx.ipcp->stats);
     struct socket *sock         = priv->sock;
     struct msghdr msg           = {
         .msg_control    = NULL,
@@ -340,7 +340,7 @@ static int
 rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
                        struct rl_buf *rb, unsigned flags)
 {
-    struct rl_ipcp_stats *stats      = this_cpu_ptr(ipcp->stats);
+    struct rl_ipcp_stats *stats      = raw_cpu_ptr(ipcp->stats);
     struct shim_udp4_flow *flow_priv = flow->priv;
     struct msghdr msg;
     struct iovec iov;

@@ -596,7 +596,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     struct rl_buf *rb;
     struct ethhdr *hh = eth_hdr(skb);
     struct arpt_entry *entry;
-    struct rl_ipcp_stats *stats = this_cpu_ptr(ipcp->stats);
+    struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
     unsigned len;
 
     NPD("SHIM ETH PDU from %02X:%02X:%02X:%02X:%02X:%02X [%d]\n",
@@ -790,7 +790,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct sk_buff *skb         = NULL;
     struct arpt_entry *entry    = flow->priv;
     size_t len                  = rb->len;
-    struct rl_ipcp_stats *stats = this_cpu_ptr(ipcp->stats);
+    struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
     int hhlen;
     int ret;
 

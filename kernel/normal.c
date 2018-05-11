@@ -225,7 +225,7 @@ snd_inact_tmr_cb(
 #else  /* !RL_HAVE_TIMER_SETUP */
     struct flow_entry *flow = (struct flow_entry *)arg;
 #endif /* !RL_HAVE_TIMER_SETUP */
-    struct rl_ipcp_stats *stats = this_cpu_ptr(flow->txrx.ipcp->stats);
+    struct rl_ipcp_stats *stats = raw_cpu_ptr(flow->txrx.ipcp->stats);
     struct dtp *dtp             = &flow->dtp;
     struct rl_buf *rb, *tmp;
 
@@ -282,7 +282,7 @@ rcv_inact_tmr_cb(
 #else  /* !RL_HAVE_TIMER_SETUP */
     struct flow_entry *flow = (struct flow_entry *)arg;
 #endif /* !RL_HAVE_TIMER_SETUP */
-    struct rl_ipcp_stats *stats = this_cpu_ptr(flow->txrx.ipcp->stats);
+    struct rl_ipcp_stats *stats = raw_cpu_ptr(flow->txrx.ipcp->stats);
     struct dtp *dtp             = &flow->dtp;
     struct rl_buf *rb, *tmp;
 
@@ -370,7 +370,7 @@ rtx_tmr_cb(
     struct flow_entry *flow = (struct flow_entry *)arg;
 #endif /* !RL_HAVE_TIMER_SETUP */
     struct ipcp_entry *ipcp     = flow->txrx.ipcp;
-    struct rl_ipcp_stats *stats = this_cpu_ptr(ipcp->stats);
+    struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
     struct dtp *dtp             = &flow->dtp;
     struct rl_buf *rb, *crb, *tmp;
     long unsigned next_exp = ~0U;
@@ -599,7 +599,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
     bool maysleep               = flags & RL_RMT_F_MAYSLEEP;
-    struct rl_ipcp_stats *stats = this_cpu_ptr(ipcp->stats);
+    struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
     int ret;
 
     lower_flow = rl_pduft_lookup((struct rl_normal *)ipcp->priv, remote_addr);
@@ -749,7 +749,7 @@ static int
 rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
                     struct rl_buf *rb, unsigned flags)
 {
-    struct rl_ipcp_stats *stats = this_cpu_ptr(ipcp->stats);
+    struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
     struct rl_normal *priv      = (struct rl_normal *)ipcp->priv;
     struct dtp *dtp             = &flow->dtp;
     struct dtcp_config *dc      = &flow->cfg.dtcp;
@@ -1140,7 +1140,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
 static void
 seqq_push(struct flow_entry *flow, struct rl_buf *rb)
 {
-    struct rl_ipcp_stats *stats = this_cpu_ptr(flow->txrx.ipcp->stats);
+    struct rl_ipcp_stats *stats = raw_cpu_ptr(flow->txrx.ipcp->stats);
     rl_seq_t seqnum             = RL_BUF_PCI(rb)->seqnum;
     struct dtp *dtp             = &flow->dtp;
     struct rb_list *pos         = &dtp->seqq;
@@ -1201,7 +1201,7 @@ seqq_pop_many(struct dtp *dtp, rl_seq_t max_sdu_gap, struct rb_list *qrbs)
 static int
 sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow, struct rl_buf *rb)
 {
-    struct rl_ipcp_stats *stats = this_cpu_ptr(ipcp->stats);
+    struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
     struct rina_pci_ctrl *pcic  = RL_BUF_PCI_CTRL(rb);
     struct dtp *dtp             = &flow->dtp;
     struct rb_list qrbs;
@@ -1392,7 +1392,7 @@ static struct rl_buf *
 rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
                  struct flow_entry *lower_flow)
 {
-    struct rl_ipcp_stats *stats = this_cpu_ptr(ipcp->stats);
+    struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
     struct rl_normal *priv      = ipcp->priv;
     struct rina_pci *pci        = RL_BUF_PCI(rb);
     struct flow_entry *flow;

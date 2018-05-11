@@ -66,7 +66,7 @@ rcv_work(struct work_struct *w)
 {
     struct rl_shim_loopback *priv =
         container_of(w, struct rl_shim_loopback, rcv);
-    struct rl_ipcp_stats *stats = this_cpu_ptr(priv->ipcp->stats);
+    struct rl_ipcp_stats *stats = raw_cpu_ptr(priv->ipcp->stats);
 
     for (;;) {
         struct rl_buf *rb = NULL;
@@ -289,7 +289,7 @@ static int
 rl_shim_loopback_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *tx_flow,
                            struct rl_buf *rb, unsigned flags)
 {
-    struct rl_ipcp_stats *stats   = this_cpu_ptr(ipcp->stats);
+    struct rl_ipcp_stats *stats   = raw_cpu_ptr(ipcp->stats);
     struct rl_shim_loopback *priv = ipcp->priv;
     struct flow_entry *rx_flow;
     int ret = 0;

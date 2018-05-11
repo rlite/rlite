@@ -529,8 +529,14 @@ struct ipcp_entry {
 #endif /* RL_RMT_QUEUES */
     wait_queue_head_t tx_wqh;
 
-    /* Per-cpu lossy statistics, to avoid cacheline ping-pongs between more
-     * CPUs using the same IPCP. */
+    /* Per-cpu lossy statistics, to allow accounting without cacheline
+     * ping-pongs between more CPUs accessing the same IPCP. We accept the
+     * risk of being preempted between the moment we get the per-CPU pointer
+     * and the moment we dereference it; we therefore use raw_cpu_ptr()
+     * instead of the regular this_cpu_ptr(), which would dump a warning
+     * and a stack trace. Should a race happen, we would pay the cost of a
+     * cache ping pong and we risk a lost increment. This is not a concern,
+     * as we do not require strict mutual exclusion for the counters. */
     struct rl_ipcp_stats __percpu *stats;
 
     /* The module that owns this IPC process. */

@@ -122,7 +122,7 @@ static void
 tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
 {
     struct flow_entry *flow     = priv->flow;
-    struct rl_ipcp_stats *stats = this_cpu_ptr(flow->txrx.ipcp->stats);
+    struct rl_ipcp_stats *stats = raw_cpu_ptr(flow->txrx.ipcp->stats);
     struct socket *sock         = priv->sock;
     struct msghdr msghdr;
     struct iovec iov;
@@ -333,7 +333,7 @@ static int
 tcp4_xmit(struct shim_tcp4_flow *flow_priv, struct rl_buf *rb)
 {
     struct rl_ipcp_stats *stats =
-        this_cpu_ptr(flow_priv->flow->txrx.ipcp->stats);
+        raw_cpu_ptr(flow_priv->flow->txrx.ipcp->stats);
     struct msghdr msghdr;
     struct iovec iov[2];
     uint16_t lenhdr = htons(rb->len);
