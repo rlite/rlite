@@ -155,11 +155,14 @@ struct worker {
     sem_t data_flow_ready; /* to wait for dfd */
     unsigned int interval;
     unsigned int burst;
-    int ping;
+    int ping; /* is this a ping test? */
     struct rp_test_desc *desc;
-    int cfd; /* control file descriptor */
-    int dfd; /* data file descriptor */
-    int retcode;
+    int cfd;     /* control file descriptor */
+    int dfd;     /* data file descriptor */
+    int retcode; /* for the client to report success/failure */
+    unsigned int real_duration_ms; /* measured by the client */
+
+    /* A window of RTT samples to compute ping statistics. */
 #define WINSIZE 2048
     unsigned int win_idx;
     uint32_t win[WINSIZE];
@@ -352,6 +355,7 @@ ping_client(struct worker *w)
     clock_gettime(CLOCK_MONOTONIC, &t_end);
     ns = 1000000000 * (t_end.tv_sec - t_start.tv_sec) +
          (t_end.tv_nsec - t_start.tv_nsec);
+    w->real_duration_ms = ns / 1000000;
 
     w->result.cnt = i;
     w->result.pps = 1000000000ULL;
@@ -461,6 +465,7 @@ ping_report(struct worker *w, struct rp_result_msg *snd,
         return;
     }
 
+    /* Compute and report RTT statistics. */
     for (sum = 0.0, i = 0; i < num_samples; i++) {
         double sample = w->win[i];
         sum += sample;
@@ -478,14 +483,19 @@ ping_report(struct worker *w, struct rp_result_msg *snd,
     }
     stddev = sqrt(sum / num_samples);
 
-    /* Convert to microseconds. */
-    min /= 1000.0;
-    avg /= 1000.0;
-    max /= 1000.0;
-    stddev /= 1000.0;
+    /* Convert to milliseconds. */
+    min /= 1000000.0;
+    avg /= 1000000.0;
+    max /= 1000000.0;
+    stddev /= 1000000.0;
 
-    printf("min %.2f us avg %.2f us max %.2f us stddev %.2f us\n", min, avg,
-           max, stddev);
+    printf("--- %s ping statistics ---\n", w->rp->srv_appl_name);
+    printf("%lu packets transmitted, %lu received, 0%% packet loss, "
+           "time %lums\n",
+           (long unsigned)snd->cnt, (long unsigned)rcv->cnt,
+           (long unsigned)w->real_duration_ms);
+    printf("rtt min/avg/max/mdev = %.3f/%.3f/%.3f/%.3f ms\n", min, avg, max,
+           stddev);
 }
 
 static int
@@ -587,6 +597,7 @@ perf_client(struct worker *w)
             ns -= RP_DATA_WAIT_MSECS * 1000000ULL;
         }
     }
+    w->real_duration_ms = ns / 1000000;
 
     if (ns) {
         w->result.cnt = i;
