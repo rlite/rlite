@@ -23,9 +23,42 @@
 #include <iostream>
 #include "uipcp-normal-lfdb.hpp"
 
+struct TestLFDB : public rlite::LFDB {
+    std::vector<std::pair<std::string, std::string>> links;
+
+    TestLFDB(std::vector<std::pair<std::string, std::string>> links,
+             bool lfa_enabled)
+        : rlite::LFDB(lfa_enabled, /*verbose=*/true), links(links)
+    {
+        for (const auto &link : links) {
+            gpb::LowerFlow lf1, lf2;
+
+            lf1.set_local_node(link.first);
+            lf1.set_remote_node(link.second);
+            lf2.set_local_node(link.second);
+            lf2.set_remote_node(link.first);
+            lf1.set_cost(1);
+            lf2.set_cost(1);
+            lf1.set_seqnum(1);
+            lf2.set_seqnum(1);
+            lf1.set_state(true);
+            lf2.set_state(true);
+            lf1.set_age(0);
+            lf2.set_age(0);
+
+            db[lf1.local_node()][lf1.remote_node()] = lf1;
+            db[lf2.local_node()][lf2.remote_node()] = lf2;
+        }
+    }
+};
+
 int
 main()
 {
-    rlite::LFDB lfdb(/*lfa_enabled=*/false, /*verbose=*/true);
+    std::vector<std::pair<std::string, std::string>> links = {
+        {"a", "b"}, {"a", "c"}, {"a", "d"}};
+
+    TestLFDB lfdb(links, /*lfa_enabled=*/false);
+
     return lfdb.db.size();
 }
