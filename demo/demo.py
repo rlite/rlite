@@ -810,8 +810,10 @@ fout = open('down.sh', 'w')
 
 outs =  '#!/bin/bash\n'             \
         '\n'                        \
-        'set -x\n'                  \
-        '\n'                        \
+        'set -x\n\n'
+
+if not args.namespaces:
+    outs += ''\
         'kill_qemu() {\n'           \
         '   PIDFILE=$1\n'           \
         '   PID=$(cat $PIDFILE)\n'  \
@@ -824,8 +826,6 @@ outs =  '#!/bin/bash\n'             \
         '\n'                                                    \
         '   rm $PIDFILE\n'                                      \
         '}\n\n'
-
-if not args.namespaces:
     for vmname in sorted(demo.vms):
         vm = demo.vms[vmname]
         outs += '( kill_qemu rina-%(id)s.pid ) &\n' % {'id': vm['id']}
