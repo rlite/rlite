@@ -17,8 +17,8 @@ rlite-ctl dif-policy-param-list dd ribd | wc -l | grep -q "\<1\>" || exit 1
 
 # Run a list of set operations followed by a correspondent get, checking
 # that the value got stored in the RIB.
-rlite-ctl dif-policy-param-mod dd addralloc nack-wait-secs 76 || exit 1
-rlite-ctl dif-policy-param-list dd addralloc nack-wait-secs | grep 76 || exit 1
+rlite-ctl dif-policy-param-mod dd addralloc nack-wait-secs 2 || exit 1
+rlite-ctl dif-policy-param-list dd addralloc nack-wait-secs | grep "\<2\>" || exit 1
 rlite-ctl dif-policy-param-mod dd dft replicas r1,r2,r3,r4,r5 || exit 1
 rlite-ctl dif-policy-param-list dd dft replicas | grep "r1,r2,r3,r4,r5" || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment timeout 300 || exit 1
