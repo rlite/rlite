@@ -624,17 +624,16 @@ ipcps_show(int argc, char **argv, struct cmd_descriptor *cd)
 static int
 ipcp_stats(int argc, char **argv, struct cmd_descriptor *cd)
 {
-    struct ipcp_attrs *attrs;
+    struct ipcp_attrs *attrs = NULL;
     struct rl_ipcp_stats stats;
     unsigned long ipcp_id;
     char sbuf[4][32];
     int ret;
 
     if (argc >= 1) {
-        errno   = 0;
-        ipcp_id = strtoul(argv[0], NULL, 10);
-        if (errno) {
-            PE("Invalid ipcp id %s\n", argv[0]);
+        attrs = ipcp_by_dif(argv[0]);
+        if (!attrs) {
+            PE("Could not find any IPCP in DIF %s\n", argv[0]);
             return -1;
         }
     } else {
@@ -643,8 +642,8 @@ ipcp_stats(int argc, char **argv, struct cmd_descriptor *cd)
             PE("Could not find any IPCP\n");
             return -1;
         }
-        ipcp_id = attrs->id;
     }
+    ipcp_id = attrs->id;
 
     ret = rl_conf_ipcp_get_stats(ipcp_id, &stats);
     if (ret) {
@@ -656,7 +655,7 @@ ipcp_stats(int argc, char **argv, struct cmd_descriptor *cd)
     byteprint(sbuf[1], sizeof(sbuf[1]), stats.rx_byte);
     byteprint(sbuf[2], sizeof(sbuf[2]), stats.rtx_byte);
     byteprint(sbuf[3], sizeof(sbuf[3]), stats.rmt.fwd_byte);
-    printf("Statistcs for IPCP %lu:\n"
+    printf("Statistcs for IPCP %s:\n"
            "    tx_pkt             = %llu\n"
            "    tx_byte            = %s\n"
            "    tx_err             = %llu\n"
@@ -674,7 +673,7 @@ ipcp_stats(int argc, char **argv, struct cmd_descriptor *cd)
            "    rmt.ttl_drop       = %llu\n"
            "    rmt.noflow_drop    = %llu\n"
            "    rmt.other_drop     = %llu\n",
-           (unsigned long)ipcp_id, (unsigned long long)stats.tx_pkt, sbuf[0],
+           attrs->name, (unsigned long long)stats.tx_pkt, sbuf[0],
            (unsigned long long)stats.tx_err, (unsigned long long)stats.rx_pkt,
            sbuf[1], (unsigned long long)stats.rx_err,
            (unsigned long long)stats.rtx_pkt, sbuf[2],
