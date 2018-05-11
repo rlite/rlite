@@ -9,6 +9,13 @@
 #
 ################################################
 
+sigint() {
+    STOP_ASAP=1
+}
+
+STOP_ASAP=0
+trap 'sigint' INT
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
@@ -48,6 +55,10 @@ rmmod rlite > /dev/null 2>&1
 testcnt="0"
 SECONDS=0
 for t in tests/integration/*.sh ; do
+    if [[ "${STOP_ASAP}" == "1" ]]; then
+        echo -e "${RED}>>> Interrupted${NOC}"
+        exit 0
+    fi
     testcnt=$((testcnt + 1))
     if [ "$TESTSEL" -ne "0" ] && [ "$TESTSEL" -ne "$testcnt" ]; then
         continue
