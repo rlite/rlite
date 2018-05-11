@@ -406,7 +406,6 @@ class CentralizedFaultTolerantDFT : public DFT {
         {
             return impl->lookup_req(appl_name, dst_node, preferred, cookie);
         }
-        int appl_register(const struct rl_kmsg_appl_register *req);
         int rib_handler(const CDAPMessage *rm,
                         std::shared_ptr<NeighFlow> const &nf,
                         std::shared_ptr<Neighbor> const &neigh,
@@ -498,7 +497,11 @@ public:
     int appl_register(const struct rl_kmsg_appl_register *req) override
     {
         if (raft) {
-            return raft->appl_register(req);
+            /* We may be the leader or a follower, but here we can behave as as
+             * any client to improve code reuse. We also set the leader, since
+             * we know it.
+             */
+            client->set_leader_id(raft->leader_name());
         }
         return client->appl_register(req);
     }
@@ -915,17 +918,6 @@ CentralizedFaultTolerantDFT::Replica::process_timeout()
     timer_expired(timer_type, &out);
 
     return process_sm_output(std::move(out));
-}
-
-int
-CentralizedFaultTolerantDFT::Replica::appl_register(
-    const struct rl_kmsg_appl_register *req)
-{
-    /* We may be the leader or a follower, but here we can behave as as any
-     * client to improve code reuse. We also set the leader, since we know it.
-     */
-    parent->client->set_leader_id(leader_name());
-    return parent->client->appl_register(req);
 }
 
 /* Apply a command to the replicated state machine. We just pass the command
