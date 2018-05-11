@@ -163,9 +163,9 @@ struct worker {
     unsigned int real_duration_ms; /* measured by the client */
 
     /* A window of RTT samples to compute ping statistics. */
-#define WINSIZE 4096
+#define RTT_WINSIZE 4096
     unsigned int rtt_win_idx;
-    uint32_t rtt_win[WINSIZE];
+    uint32_t rtt_win[RTT_WINSIZE];
 };
 
 struct rinaperf {
@@ -183,6 +183,7 @@ struct rinaperf {
     int cli_stop;           /* another way to stop client threads */
     int cli_flow_allocated; /* client flows allocated ? */
     int background;         /* server runs as a daemon process */
+    int cdf_points;         /* number of CDF percentiles to report */
 
     /* Synchronization between client threads and main thread. */
     sem_t cli_barrier;
@@ -333,7 +334,7 @@ ping_client(struct worker *w)
                                (unsigned long)recv_time.tv_usec);
                     }
                     w->rtt_win[w->rtt_win_idx] = ns;
-                    w->rtt_win_idx             = (w->rtt_win_idx + 1) % WINSIZE;
+                    w->rtt_win_idx = (w->rtt_win_idx + 1) % RTT_WINSIZE;
                     PRINTF("%d bytes from server: rtt = %.3f ms\n", ret,
                            ((float)ns) / 1000000.0);
                 } else {
@@ -449,11 +450,20 @@ rr_report(struct worker *w, struct rp_result_msg *snd,
 #endif
 }
 
+static int
+qsort_uint32_cmp(const void *left, const void *right)
+{
+    const uint32_t *a = (const uint32_t *)left;
+    const uint32_t *b = (const uint32_t *)right;
+    return *a > *b ? 1 : -1;
+}
+
 static void
 ping_report(struct worker *w, struct rp_result_msg *snd,
             struct rp_result_msg *rcv)
 {
-    unsigned num_samples = (snd->cnt > WINSIZE) ? WINSIZE : w->rtt_win_idx;
+    unsigned num_samples =
+        (snd->cnt > RTT_WINSIZE) ? RTT_WINSIZE : w->rtt_win_idx;
     double stddev;
     double avg;
     double sum;
@@ -466,15 +476,13 @@ ping_report(struct worker *w, struct rp_result_msg *snd,
     }
 
     /* Compute and report RTT statistics. */
+    qsort(w->rtt_win, num_samples, sizeof(uint32_t), qsort_uint32_cmp);
+    min = (double)w->rtt_win[0];
+    max = (double)w->rtt_win[num_samples - 1];
+
     for (sum = 0.0, i = 0; i < num_samples; i++) {
         double sample = w->rtt_win[i];
         sum += sample;
-        if (sample < min) {
-            min = sample;
-        }
-        if (sample > max) {
-            max = sample;
-        }
     }
     avg = sum / num_samples;
     for (sum = 0.0, i = 0; i < num_samples; i++) {
@@ -489,13 +497,26 @@ ping_report(struct worker *w, struct rp_result_msg *snd,
     max /= 1000000.0;
     stddev /= 1000000.0;
 
-    printf("--- %s ping statistics ---\n", w->rp->srv_appl_name);
-    printf("%lu packets transmitted, %lu received, 0%% packet loss, "
-           "time %lums\n",
-           (long unsigned)snd->cnt, (long unsigned)rcv->cnt,
-           (long unsigned)w->real_duration_ms);
-    printf("rtt min/avg/max/mdev = %.3f/%.3f/%.3f/%.3f ms\n", min, avg, max,
-           stddev);
+    if (w->rp->cdf_points <= 0) {
+        printf("--- %s ping statistics ---\n", w->rp->srv_appl_name);
+        printf("%lu packets transmitted, %lu received, 0%% packet loss, "
+               "time %lums\n",
+               (long unsigned)snd->cnt, (long unsigned)rcv->cnt,
+               (long unsigned)w->real_duration_ms);
+        printf("rtt min/avg/max/mdev = %.3f/%.3f/%.3f/%.3f ms\n", min, avg, max,
+               stddev);
+    } else {
+#if RTT_WINSIZE < 100
+#error "RTT_WINSIZE must be >= 100"
+#endif
+        int i;
+        printf("p0=%.3f us\n", (double)w->rtt_win[0] / 1000.0);
+        for (i = 1; i < 100; i++) {
+            int pos = (i * RTT_WINSIZE) / 100;
+            printf("p%d=%.3f us\n", i, (double)w->rtt_win[pos] / 1000.0);
+        }
+        printf("p100=%.3f us\n", (double)w->rtt_win[RTT_WINSIZE - 1] / 1000.0);
+    }
 }
 
 static int
@@ -1514,11 +1535,12 @@ main(int argc, char **argv)
     sem_init(&rp->cli_barrier, 0, 0);
     pthread_mutex_init(&rp->ticket_lock, NULL);
     rp->background = 0;
+    rp->cdf_points = 0; /* Don't report CDF percentiles. */
 
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_unreliable(&rp->flowspec);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:b:a:z:p:D:L:E:Twv")) !=
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:b:a:z:p:D:L:E:TwvC:")) !=
            -1) {
         switch (opt) {
         case 'h':
@@ -1629,6 +1651,14 @@ main(int argc, char **argv)
             rp->flowspec.max_delay = atoi(optarg);
             if (rp->flowspec.max_delay > 5000000) {
                 PRINTF("    Invalid 'max delay' %d\n", rp->flowspec.max_delay);
+                return -1;
+            }
+            break;
+
+        case 'C':
+            rp->cdf_points = atoi(optarg);
+            if (rp->cdf_points > 100) {
+                PRINTF("    Invalid number of CDF points '%s'\n", optarg);
                 return -1;
             }
             break;
