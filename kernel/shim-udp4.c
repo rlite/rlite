@@ -139,9 +139,10 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
      * destination. The endpoint port is learned upon receiving the first
      * packet (i.e., right now).*/
     bool update_port = (priv->remote_addr.sin_port == htons(RL_SHIM_UDP_PORT));
-    struct flow_entry *flow = priv->flow;
-    struct socket *sock     = priv->sock;
-    struct msghdr msg       = {
+    struct flow_entry *flow     = priv->flow;
+    struct rl_ipcp_stats *stats = this_cpu_ptr(flow->txrx.ipcp->stats);
+    struct socket *sock         = priv->sock;
+    struct msghdr msg           = {
         .msg_control    = NULL,
         .msg_controllen = 0,
         .msg_name       = NULL,
@@ -165,7 +166,7 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
         rb = rl_buf_alloc(ret, priv->flow->txrx.ipcp->rxhdroom,
                           priv->flow->txrx.ipcp->tailroom, GFP_ATOMIC);
         if (unlikely(!rb)) {
-            flow->stats.rx_err++;
+            stats->rx_err++;
             RPV(1, "Out of memory\n");
             break;
         }
@@ -185,7 +186,7 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
         } else if (unlikely(ret <= 0)) {
             if (ret) {
                 PE("recvmsg(%d): %d\n", (int)iov.iov_len, ret);
-                flow->stats.rx_err++;
+                stats->rx_err++;
             } else {
                 PI("Exit rx loop\n");
             }
@@ -206,8 +207,8 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
         rb->len = ret;
         rl_sdu_rx_flow(flow->txrx.ipcp, flow, rb, true);
 
-        flow->stats.rx_pkt++;
-        flow->stats.rx_byte += rb->len;
+        stats->rx_pkt++;
+        stats->rx_byte += rb->len;
     }
 
     mutex_unlock(&priv->rxw_lock);
@@ -340,6 +341,7 @@ static int
 rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
                        struct rl_buf *rb, unsigned flags)
 {
+    struct rl_ipcp_stats *stats      = this_cpu_ptr(ipcp->stats);
     struct shim_udp4_flow *flow_priv = flow->priv;
     struct msghdr msg;
     struct iovec iov;
@@ -366,11 +368,11 @@ rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         }
 
         PE("kernel_sendmsg(%d): failed [%d]\n", (int)rb->len, ret);
-        flow_priv->flow->stats.tx_err++;
+        stats->tx_err++;
     } else {
         NPD("kernel_sendmsg(%d)\n", (int)rb->len);
-        flow_priv->flow->stats.tx_pkt++;
-        flow_priv->flow->stats.tx_byte += rb->len;
+        stats->tx_pkt++;
+        stats->tx_byte += rb->len;
     }
 
     rl_buf_free(rb);
@@ -397,14 +399,6 @@ rl_shim_udp4_config(struct ipcp_entry *ipcp, const char *param_name,
     return -ENOSYS;
 }
 
-static int
-rl_shim_udp4_flow_get_stats(struct flow_entry *flow,
-                            struct rl_flow_stats *stats)
-{
-    *stats = flow->stats;
-    return 0;
-}
-
 #define SHIM_DIF_TYPE "shim-udp4"
 
 static struct ipcp_factory shim_udp4_factory = {
@@ -420,7 +414,6 @@ static struct ipcp_factory shim_udp4_factory = {
     .ops.flow_deallocated   = rl_shim_udp4_flow_deallocated,
     .ops.sdu_write          = rl_shim_udp4_sdu_write,
     .ops.config             = rl_shim_udp4_config,
-    .ops.flow_get_stats     = rl_shim_udp4_flow_get_stats,
     .ops.flow_writeable     = rl_shim_udp4_flow_writeable,
 };
 
