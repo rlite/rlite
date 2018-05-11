@@ -60,6 +60,9 @@ for cont in s2 s3 c; do
     ip netns exec ${cont} rlite-ctl ipcp-enroll ${cont}.n ceftdif ethdif s1.n || abort
 done
 
-#ip netns exec green rinaperf -lw -z rpinst1 || abort
-#ip netns exec red rinaperf -z rpinst1 -p 1 -c 7 -i 20 || abort
+sleep 3
+
+ip netns exec s2 rinaperf -lw -z rpinst1 || abort
+ip netns exec c rinaperf -lw -z rpinst2 || abort
+ip netns exec c rinaperf -z rpinst1 -p 1 -c 7 -i 10 || abort
 cleanup
