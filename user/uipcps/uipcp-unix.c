@@ -33,6 +33,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <arpa/inet.h>
 #include <signal.h>
 #include <assert.h>
 #include <endian.h>
@@ -55,7 +56,6 @@
 static void
 unlink_and_exit(int exit_code)
 {
-    unlink(RLITE_UIPCPS_UNIX_NAME);
     unlink(RLITE_UIPCPS_PIDFILE);
     exit(exit_code);
 }
@@ -600,7 +600,7 @@ out:
 
 /* Unix server thread to manage configuration requests. */
 static int
-unix_server(struct uipcps *uipcps)
+socket_server(struct uipcps *uipcps)
 {
     struct list_head threads;
     int threads_cnt = 0;
@@ -953,6 +953,7 @@ usage(void)
            "   -v VERB_LEVEL : set verbosity LEVEL: QUIET, WARN, INFO, "
            "DBG (default), VERY\n"
            "   -d : start as a daemon process\n"
+           "   -p : TCP port to listen to for client connections\n"
            "   -V : show versioning info and exit\n"
            "   -T PERIOD: for periodic tasks (in seconds)\n"
            "   -H HANDOVER_MANAGER: (none, signal-strength)\n");
@@ -963,15 +964,16 @@ void normal_lib_init(void);
 int
 main(int argc, char **argv)
 {
+    int port              = RLITE_UIPCP_PORT_DEFAULT;
     struct uipcps *uipcps = &guipcps;
-    struct sockaddr_un server_address;
+    struct sockaddr_in server_address;
     struct sigaction sa;
     const char *verbosity = "DBG";
     int daemon            = 0;
     int pidfd             = -1;
     int ret, opt;
 
-    while ((opt = getopt(argc, argv, "hv:dT:H:V")) != -1) {
+    while ((opt = getopt(argc, argv, "hv:dT:H:Vp:")) != -1) {
         switch (opt) {
         case 'h':
             usage();
@@ -1003,6 +1005,14 @@ main(int argc, char **argv)
             printf("    revision date: %s\n", RL_REVISION_DATE);
             return 0;
             break;
+
+        case 'p':
+            port = atoi(optarg);
+            if (port < 1 || port >= 65535) {
+                printf("    Invalid value '%s' for the -p option\n", optarg);
+                usage();
+                return -1;
+            }
 
         default:
             printf("    Unrecognized option %c\n", opt);
@@ -1047,23 +1057,13 @@ main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    /* Create pidfile and check for uniqueness. */
+    /* Create pidfile, without checking for uniqueness. There may be multiple
+     * rlite-uipcps daemons running in different namespaces, but sharing the
+     * same mountpoints/filesystem. */
     {
         pidfd = open(RLITE_UIPCPS_PIDFILE, O_RDWR | O_CREAT, 0644);
         if (pidfd < 0) {
             perror("open(pidfile)");
-            return -1;
-        }
-
-        ret =
-            flock(pidfd, LOCK_EX /* exclusive lock */ | LOCK_NB /* trylock */);
-        if (ret) {
-            if (errno == EAGAIN) {
-                PE("An instance of rlite-uipcps is already running\n");
-            } else {
-                perror("flock(pidfile)");
-            }
-
             return -1;
         }
     }
@@ -1073,42 +1073,43 @@ main(int argc, char **argv)
 
     uipcps->terminate = 0;
 
-    /* Open a Unix domain socket to listen to. */
-    uipcps->lfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    /* Open a TCP socket to listen to. */
+    uipcps->lfd = socket(AF_INET, SOCK_STREAM, 0);
     if (uipcps->lfd < 0) {
-        perror("socket(AF_UNIX)");
+        perror("socket(AF_INET)");
         unlink(RLITE_UIPCPS_PIDFILE);
         exit(EXIT_FAILURE);
     }
     memset(&server_address, 0, sizeof(server_address));
-    server_address.sun_family = AF_UNIX;
-    strncpy(server_address.sun_path, RLITE_UIPCPS_UNIX_NAME,
-            sizeof(server_address.sun_path) - 1);
-    if (unlink(RLITE_UIPCPS_UNIX_NAME) == 0) {
-        /* This should not happen if everything behaves correctly.
-         * However, if something goes wrong, the Unix domain socket
-         * could still exist and so the following bind() would fail.
-         * This unlink() will clean up in this situation. */
-        PI("Cleaned up existing unix domain socket\n");
+    server_address.sin_family      = AF_INET;
+    server_address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    server_address.sin_port        = htons(port);
+
+    {
+        int one = 1;
+        if (setsockopt(uipcps->lfd, SOL_SOCKET, SO_REUSEADDR, &one,
+                       sizeof(one)) < 0) {
+            perror("setsockopt(AF_INET)");
+            return -1;
+        }
     }
 
     ret = bind(uipcps->lfd, (struct sockaddr *)&server_address,
                sizeof(server_address));
     if (ret) {
-        perror("bind(AF_UNIX, path)");
+        perror("bind(AF_INET, path)");
         unlink(RLITE_UIPCPS_PIDFILE);
         exit(EXIT_FAILURE);
     }
     ret = listen(uipcps->lfd, 50);
     if (ret) {
-        perror("listen(AF_UNIX)");
+        perror("listen(AF_INET)");
         unlink_and_exit(EXIT_FAILURE);
     }
 
-    /* Change permissions to rlite control and I/O device and uipcp
-     * Unix socket, so that anyone can read and write. This
-     * a temporary solution, to be used until a precise
-     * permission scheme is designed. */
+    /* Change permissions to rlite control and I/O device, so that anyone can
+     * read and write. This a temporary solution, to be used until a
+     * well-thought permission scheme is designed. */
     if (chmod(RLITE_CTRLDEV_NAME,
               S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)) {
         fprintf(stderr, "warning: chmod(%s) failed: %s\n", RLITE_CTRLDEV_NAME,
@@ -1119,12 +1120,6 @@ main(int argc, char **argv)
               S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)) {
         fprintf(stderr, "warning: chmod(%s) failed: %s\n", RLITE_IODEV_NAME,
                 strerror(errno));
-    }
-
-    if (chmod(RLITE_UIPCPS_UNIX_NAME,
-              S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)) {
-        fprintf(stderr, "warning: chmod(%s) failed: %s\n",
-                RLITE_UIPCPS_UNIX_NAME, strerror(errno));
     }
 
     list_init(&uipcps->uipcps);
@@ -1198,8 +1193,8 @@ main(int argc, char **argv)
 
     /* Init the main loop which will take care of IPCP updates, to
      * align userspace IPCPs with kernelspace ones. This
-     * must be done before launching the unix server in order to
-     * avoid race conditions between main thread fetching and unix
+     * must be done before launching the socket server in order to
+     * avoid race conditions between main thread fetching and socket
      * server thread serving a client. That is, a client could see
      * incomplete state and its operation may fail or behave
      * unexpectedly.*/
@@ -1229,10 +1224,10 @@ main(int argc, char **argv)
         unlink_and_exit(EXIT_FAILURE);
     }
 
-    /* Start the unix server. */
-    unix_server(uipcps);
+    /* Start the socket server. */
+    socket_server(uipcps);
 
-    /* The following code should be never reached, since the unix
+    /* The following code should be never reached, since the
      * socket server should execute until a SIGINT signal comes. */
 
     return 0;

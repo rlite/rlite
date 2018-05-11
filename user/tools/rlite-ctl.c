@@ -32,7 +32,7 @@
 #include <errno.h>
 #include <sys/select.h>
 #include <sys/socket.h>
-#include <sys/un.h>
+#include <arpa/inet.h>
 #include <signal.h>
 #include <assert.h>
 #include <sys/ioctl.h>
@@ -124,24 +124,24 @@ select_ipcp()
 static int
 uipcps_connect(void)
 {
-    struct sockaddr_un server_address;
+    struct sockaddr_in server_address;
     int ret;
     int sfd;
 
     /* Open a Unix domain socket towards the uipcps. */
-    sfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    sfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sfd < 0) {
-        perror("socket(AF_UNIX)");
+        perror("socket(AF_INET)");
         return -1;
     }
     memset(&server_address, 0, sizeof(server_address));
-    server_address.sun_family = AF_UNIX;
-    strncpy(server_address.sun_path, RLITE_UIPCPS_UNIX_NAME,
-            sizeof(server_address.sun_path) - 1);
+    server_address.sin_family      = AF_INET;
+    server_address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    server_address.sin_port        = htons(RLITE_UIPCP_PORT_DEFAULT);
     ret = connect(sfd, (struct sockaddr *)&server_address,
                   sizeof(server_address));
     if (ret) {
-        perror("connect(AF_UNIX, path)");
+        perror("connect(AF_INET, path)");
         PI("Warning: maybe uipcps are not running?\n");
         return -1;
     }
