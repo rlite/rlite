@@ -366,8 +366,6 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
 
     /* In case of client, a pointer to client-side data structures. */
     class Client : public CeftClient {
-        uint64_t seqnum_next = 1;
-
         struct PendingReq : public CeftClient::PendingReq {
             std::string ipcp_name;
             PendingReq() = default;
@@ -421,7 +419,8 @@ public:
     }
 
     int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-                    std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)
+                    std::shared_ptr<Neighbor> const &neigh,
+                    rlm_addr_t src_addr) override
     {
         if (!raft || (rm->obj_class == ObjClass && rm->is_response())) {
             /* We may be a replica (raft != nullptr), but if this is a response
