@@ -8,6 +8,7 @@ cleanup() {
         ip netns exec ${cont} rlite-ctl terminate || ret=1
         ip netns delete ${cont} || ret=1
     done
+    rm -f /tmp/ceft-dft-*
     # veths are autodeleted once the namespace is deleted
     [ "$ret" != 0 ] && return 1 || return 0
 }
