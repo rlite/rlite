@@ -1259,6 +1259,10 @@ UipcpRib::lookup_node_address(const std::string &node_name) const
 std::string
 UipcpRib::lookup_neighbor_by_address(rlm_addr_t address)
 {
+    if (address == myaddr) {
+        return myname;
+    }
+
     for (const auto &kvn : neighbors_seen) {
         if (kvn.second.address() == address) {
             return utils::rina_string_from_components(kvn.second.ap_name(),

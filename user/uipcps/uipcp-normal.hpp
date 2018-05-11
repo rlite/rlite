@@ -337,7 +337,8 @@ struct FlowAllocator : public Component {
 
     virtual int flow_deallocated(struct rl_kmsg_flow_deallocated *req) = 0;
 
-    virtual int flows_handler_create(const CDAPMessage *rm)   = 0;
+    virtual int flows_handler_create(const CDAPMessage *rm,
+                                     rlm_addr_t src_addr)     = 0;
     virtual int flows_handler_create_r(const CDAPMessage *rm) = 0;
     virtual int flows_handler_delete(const CDAPMessage *rm,
                                      rlm_addr_t src_addr)     = 0;
