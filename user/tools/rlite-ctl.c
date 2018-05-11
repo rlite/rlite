@@ -1496,7 +1496,7 @@ usage(int i)
         return;
     }
 
-    printf("\nAvailable commands:\n");
+    printf("Available commands:\n");
 
     for (i = 0; i < NUM_COMMANDS; i++) {
         printf("    %s %s\n", cmd_descriptors[i].name,
