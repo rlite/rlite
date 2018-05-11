@@ -294,7 +294,8 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
         /* Deserialize the received CDAP message. */
         m = nf->conn->msg_deser(serbuf, serlen);
         if (!m) {
-            UPE(uipcp, "msg_deser() failed\n");
+            UPE(uipcp, "msg_deser(neigh=%s) failed\n",
+                neigh->ipcp_name.c_str());
             return -1;
         }
 

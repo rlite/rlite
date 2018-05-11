@@ -357,7 +357,7 @@ FullyReplicatedLFDB::update_kernel(bool force)
 {
     /* Update the routing table. */
     if (force) {
-      re.schedule_recomputation();
+        re.schedule_recomputation();
     }
     re.update_kernel_routing(rib->myname);
 }
