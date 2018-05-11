@@ -946,6 +946,7 @@ RoutingEngine::compute_fwd_table()
     return 0;
 }
 
+/* To be called under RIB lock. */
 void
 RoutingEngine::update_kernel_routing(const NodeId &addr)
 {
@@ -965,6 +966,7 @@ RoutingEngine::update_kernel_routing(const NodeId &addr)
                 coalesce_period, rib->uipcp, this,
                 [](struct uipcp *uipcp, void *arg) {
                     RoutingEngine *re = (RoutingEngine *)arg;
+                    std::lock_guard<std::mutex> guard(re->rib->mutex);
                     re->coalesce_timer->fired();
                     re->update_kernel_routing(re->rib->myname);
                 });
