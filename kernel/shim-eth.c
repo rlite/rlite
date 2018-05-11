@@ -71,15 +71,17 @@ struct arpt_entry {
 
 struct rl_shim_eth {
     struct ipcp_entry *ipcp;
+    /* TODO Protect access to this field with an RCU lock. */
     struct net_device *netdev;
 
-    unsigned int xmit_busy;
+    /* TODO create per-tx-queue data structure, each one in its own
+     * cache line. */
+    unsigned long *xmit_busy;
 
 #define ETH_UPPER_NAMES 4
     char *upper_names[ETH_UPPER_NAMES];
     struct list_head arp_table;
     spinlock_t arpt_lock;
-    spinlock_t tx_lock;
     struct timer_list arp_resolver_tmr;
     bool arp_tmr_shutdown;
     struct list_head node;
@@ -750,14 +752,8 @@ shim_eth_skb_destructor(struct sk_buff *skb)
         (struct flow_entry *)(skb_shinfo(skb)->destructor_arg);
     struct ipcp_entry *ipcp  = flow->txrx.ipcp;
     struct rl_shim_eth *priv = ipcp->priv;
-    bool notify;
 
-    spin_lock_bh(&priv->tx_lock);
-    notify          = priv->xmit_busy;
-    priv->xmit_busy = 0;
-    spin_unlock_bh(&priv->tx_lock);
-
-    if (notify) {
+    if (test_and_clear_bit(0, &priv->xmit_busy[skb_get_queue_mapping(skb)])) {
         rl_write_restart_flows(ipcp);
     }
 }
@@ -766,13 +762,14 @@ static bool
 rl_shim_eth_flow_writeable(struct flow_entry *flow)
 {
     struct rl_shim_eth *priv = (struct rl_shim_eth *)flow->txrx.ipcp->priv;
-    bool ret;
+    int i;
 
-    spin_lock_bh(&priv->tx_lock);
-    ret = !priv->xmit_busy;
-    spin_unlock_bh(&priv->tx_lock);
-
-    return ret;
+    for (i = 0; i < priv->netdev->num_tx_queues; i++) {
+        if (!test_bit(0, &priv->xmit_busy[i])) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static int
@@ -841,21 +838,20 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     /* Send the skb to the device for transmission. */
     ret = dev_queue_xmit(skb);
     if (unlikely(ret != NET_XMIT_SUCCESS)) {
-        RPV(1, "dev_queue_xmit() failed [%d]\n", ret);
+        int i;
 
-        spin_lock_bh(&priv->tx_lock);
+        RPV(1, "dev_queue_xmit() failed [%d]\n", ret);
         entry->stats.tx_err++;
-        priv->xmit_busy = 1;
-        spin_unlock_bh(&priv->tx_lock);
+        for (i = 0; i < priv->netdev->num_tx_queues; i++) {
+            set_bit(0, &priv->xmit_busy[i]);
+        }
 #ifndef RL_SKB
         return -EAGAIN; /* backpressure */
 #endif
     }
 
-    spin_lock_bh(&priv->tx_lock);
     entry->stats.tx_pkt++;
     entry->stats.tx_byte += len;
-    spin_unlock_bh(&priv->tx_lock);
 
 #ifndef RL_SKB
     rl_buf_free(rb);
@@ -878,12 +874,13 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
         ns = current->nsproxy->net_ns;
 #endif
         /* Detach from the current netdev, if any. */
-        spin_lock_bh(&priv->tx_lock);
         if (priv->netdev) {
             netdev       = priv->netdev;
             priv->netdev = NULL;
         }
-        spin_unlock_bh(&priv->tx_lock);
+        if (priv->xmit_busy) {
+            rl_free(priv->xmit_busy, RL_MT_SHIMDATA);
+        }
 
         if (netdev) {
             rtnl_lock();
@@ -897,6 +894,12 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
         netdev = dev_get_by_name(ns, param_value);
         if (!netdev) {
             return -EINVAL;
+        }
+        priv->xmit_busy =
+            rl_alloc(netdev->num_tx_queues * sizeof(priv->xmit_busy[0]),
+                     GFP_ATOMIC | __GFP_ZERO, RL_MT_SHIMDATA);
+        if (!priv->xmit_busy) {
+            return -ENOMEM;
         }
 
         rtnl_lock();
@@ -976,11 +979,9 @@ rl_shim_eth_flow_get_stats(struct flow_entry *flow, struct rl_flow_stats *stats)
     struct arpt_entry *flow_priv = (struct arpt_entry *)flow->priv;
     struct rl_shim_eth *priv     = (struct rl_shim_eth *)flow->txrx.ipcp->priv;
 
-    spin_lock_bh(&priv->tx_lock);
     stats->tx_pkt  = flow_priv->stats.tx_pkt;
     stats->tx_byte = flow_priv->stats.tx_byte;
     stats->tx_err  = flow_priv->stats.tx_err;
-    spin_unlock_bh(&priv->tx_lock);
 
     spin_lock_bh(&priv->arpt_lock);
     stats->rx_pkt  = flow_priv->stats.rx_pkt;
@@ -1076,10 +1077,9 @@ rl_shim_eth_create(struct ipcp_entry *ipcp)
 
     priv->ipcp      = ipcp;
     priv->netdev    = NULL;
-    priv->xmit_busy = 0;
+    priv->xmit_busy = NULL;
     INIT_LIST_HEAD(&priv->arp_table);
     spin_lock_init(&priv->arpt_lock);
-    spin_lock_init(&priv->tx_lock);
 #ifdef RL_HAVE_TIMER_SETUP
     timer_setup(&priv->arp_resolver_tmr, arp_resolver_cb, 0);
 #else  /* !RL_HAVE_TIMER_SETUP */
@@ -1128,6 +1128,10 @@ rl_shim_eth_destroy(struct ipcp_entry *ipcp)
         netdev_rx_handler_unregister(priv->netdev);
         rtnl_unlock();
         dev_put(priv->netdev);
+    }
+
+    if (priv->xmit_busy) {
+        rl_free(priv->xmit_busy, RL_MT_SHIMDATA);
     }
 
     for (i = 0; i < ETH_UPPER_NAMES; i++) {
