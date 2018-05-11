@@ -1501,6 +1501,9 @@ UipcpRib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
         neigh->flows[neigh_port_id] = nf;
     }
 
+    auto cleanup = ScopedCleanup(
+        [this, req]() { del_neighbor(std::string(req->remote_appl)); });
+
     ret = uipcp_fa_resp(uipcp, req->kevent_id, req->ipcp_id,
                         nf->reliable ? RL_IPCP_ID_NONE : uipcp->id,
                         req->port_id, result);
@@ -1509,14 +1512,15 @@ UipcpRib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
         if (ret) {
             UPE(uipcp, "uipcp_fa_resp() failed [%s]\n", strerror(errno));
         }
-        goto err;
+        return 0;
     }
 
     /* Complete the operation: open the port and set the file descriptor. */
     flow_fd = rl_open_appl_port(req->port_id);
     if (flow_fd < 0) {
-        goto err;
+        return 0;
     }
+    cleanup.deactivate();
 
     nf->flow_fd = flow_fd;
     UPD(uipcp, "%seliable N-1 flow allocated [fd=%d, port_id=%u]\n",
@@ -1530,11 +1534,6 @@ UipcpRib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     if (!nf->reliable) {
         topo_lower_flow_added(uipcp->uipcps, uipcp->id, req->ipcp_id);
     }
-
-    return 0;
-
-err:
-    del_neighbor(string(req->remote_appl));
 
     return 0;
 }
