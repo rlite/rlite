@@ -22,23 +22,27 @@
  */
 #include <iostream>
 #include <sstream>
+#include <list>
+#include <vector>
+#include <cassert>
+#include <chrono>
 
 #include "uipcp-normal-lfdb.hpp"
 
 struct TestLFDB : public rlite::LFDB {
-    std::vector<std::pair<std::string, std::string>> links;
+    using LinksList = std::vector<std::pair<int, int>>;
+    LinksList links;
 
-    TestLFDB(std::vector<std::pair<std::string, std::string>> links,
-             bool lfa_enabled)
-        : rlite::LFDB(lfa_enabled, /*verbose=*/true), links(links)
+    TestLFDB(const LinksList &links, bool lfa_enabled)
+        : rlite::LFDB(lfa_enabled, /*verbose=*/false), links(links)
     {
         for (const auto &link : links) {
             gpb::LowerFlow lf1, lf2;
 
-            lf1.set_local_node(link.first);
-            lf1.set_remote_node(link.second);
-            lf2.set_local_node(link.second);
-            lf2.set_remote_node(link.first);
+            lf1.set_local_node(std::to_string(link.first));
+            lf1.set_remote_node(std::to_string(link.second));
+            lf2.set_local_node(std::to_string(link.second));
+            lf2.set_remote_node(std::to_string(link.first));
             lf1.set_cost(1);
             lf2.set_cost(1);
             lf1.set_seqnum(1);
@@ -57,14 +61,48 @@ struct TestLFDB : public rlite::LFDB {
 int
 main()
 {
-    std::vector<std::pair<std::string, std::string>> links = {
-        {"a", "b"}, {"a", "c"}, {"a", "d"}};
+    std::list<TestLFDB::LinksList> test_vectors = {
+        {{0, 2}, {0, 3}, {0, 4}, {2, 4}, {3, 4}}};
 
-    TestLFDB lfdb(links, /*lfa_enabled=*/false);
+    {
+        /* Grid-shaped network of size NxN. */
+        TestLFDB::LinksList links;
+        const int n = 10;
 
-    std::stringstream ss;
-    lfdb.dump(ss);
-    std::cout << ss.str();
+        auto coord = [n](int i, int j) { return i * n + j; };
 
-    return !lfdb.db.size();
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n - 1; j++) {
+                links.push_back({coord(i, j), coord(i, j + 1)});
+                links.push_back({coord(j, i), coord(j + 1, i)});
+            }
+        }
+
+        test_vectors.push_back(std::move(links));
+    }
+
+    int counter = 1;
+    for (const auto &links : test_vectors) {
+        std::cout << "Test vector #" << counter++ << std::endl;
+
+        TestLFDB lfdb(links, /*lfa_enabled=*/false);
+
+        assert(!links.empty());
+
+        auto root  = std::to_string(links.front().first);
+        auto start = std::chrono::system_clock::now();
+        lfdb.compute_next_hops(root);
+        auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now() - start);
+
+        if (false) {
+            std::stringstream ss;
+            lfdb.dump(ss);
+            lfdb.dump_routing(ss, root);
+            std::cout << ss.str();
+        }
+        std::cout << "Completed in " << delta.count() << " ms" << std::endl;
+    }
+
+    return 0;
 }
