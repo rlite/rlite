@@ -70,6 +70,8 @@ struct rl_ctrl {
     unsigned flags;
 };
 
+/* A message to be delivered to an userspace application through an
+ * rlite control device. */
 struct upqueue_entry {
     void *sermsg;
     size_t serlen;
@@ -107,6 +109,10 @@ struct registered_appl {
 #define PORT_ID_HASHTABLE_BITS 10
 #define CEP_ID_HASHTABLE_BITS 10
 
+/* The rlite data model.
+ * Main data structure containing all the rlite kernel objects for a given
+ * network namespace. Objects include IPCPs, DIFs, registered applications,
+ * flows, control devices, hash tables. etc. */
 struct rl_dm {
     /* Bitmap to manage IPC process ids. */
     DECLARE_BITMAP(ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
@@ -157,6 +163,7 @@ struct rl_dm {
     struct work_struct flows_removew;
 };
 
+/* Instance of rl_dm for the default network namespace. */
 static struct rl_dm rl_dm;
 
 #define FLOCK() write_lock_bh(&rl_dm.flows_lock)
@@ -167,6 +174,20 @@ static struct rl_dm rl_dm;
 #define PUNLOCK() spin_unlock_bh(&rl_dm.ipcps_lock)
 #define RALOCK(_p) spin_lock_bh(&(_p)->regapp_lock)
 #define RAUNLOCK(_p) spin_unlock_bh(&(_p)->regapp_lock)
+
+/* We want to know if a rl_dm instance is empty so that we can remove
+ * it and release its network namespace (if it is not the default one). */
+static bool
+rl_dm_empty(struct rl_dm *dm)
+{
+    return hash_empty(dm->ipcp_table) && hash_empty(dm->flow_table) &&
+           hash_empty(dm->flow_table_by_cep) && list_empty(&dm->difs) &&
+           list_empty(&dm->ctrl_devs) && list_empty(&dm->appl_removeq) &&
+           !work_pending(&dm->appl_removew) &&
+           !timer_pending(&dm->flows_putq_tmr) &&
+           list_empty(&dm->flows_removeq) && list_empty(&dm->flows_putq) &&
+           !work_pending(&dm->flows_removew);
+}
 
 static struct ipcp_factory *
 ipcp_factories_find(const char *dif_type)
@@ -3445,6 +3466,8 @@ rlite_init(void)
        " packet buffers\n");
     PD("revision id  : %s\n", RL_REVISION_ID);
     PD("revision date: %s\n", RL_REVISION_DATE);
+
+    PD("global dm empty: %d\n", rl_dm_empty(&rl_dm));
 
     return 0;
 }
