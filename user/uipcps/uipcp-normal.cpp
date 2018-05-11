@@ -1355,7 +1355,7 @@ UipcpRib::policy_param_mod(const std::string &component,
     }
 
     /* Fix-ups. */
-    {
+    if (params_map[EnrollmentPrefix].count("nack-wait")) {
         auto eto =
             get_param_value<Msecs>(UipcpRib::EnrollmentPrefix, "timeout");
         auto ato = get_param_value<Msecs>(AddrAllocator::Prefix, "nack-wait");
