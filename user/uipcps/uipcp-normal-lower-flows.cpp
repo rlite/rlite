@@ -61,11 +61,55 @@ operator==(const gpb::LowerFlow &a, const gpb::LowerFlow &o)
            a.remote_node() == o.remote_node() && a.cost() == o.cost();
 }
 
+/* Simple class that wraps a Lower Flow database. Used as a component within
+ * the other classes. */
+struct LFDB {
+    /* Lower Flow Database. */
+    std::unordered_map<NodeId, std::unordered_map<NodeId, gpb::LowerFlow>> db;
+
+    const gpb::LowerFlow *find(const NodeId &local_node,
+                               const NodeId &remote_node) const
+    {
+        return _find(local_node, remote_node);
+    };
+    gpb::LowerFlow *find(const NodeId &local_node, const NodeId &remote_node);
+    const gpb::LowerFlow *_find(const NodeId &local_node,
+                                const NodeId &remote_node) const;
+};
+
+gpb::LowerFlow *
+LFDB::find(const NodeId &local_node, const NodeId &remote_node)
+{
+    const gpb::LowerFlow *lf = _find(local_node, remote_node);
+    return const_cast<gpb::LowerFlow *>(lf);
+}
+
+const gpb::LowerFlow *
+LFDB::_find(const NodeId &local_node, const NodeId &remote_node) const
+{
+    const auto it = db.find(local_node);
+    unordered_map<NodeId, gpb::LowerFlow>::const_iterator jt;
+
+    if (it == db.end()) {
+        return nullptr;
+    }
+
+    jt = it->second.find(remote_node);
+
+    return jt == it->second.end() ? nullptr : &jt->second;
+}
+
+/* Routing engine able to run the Dijkstra algorithm and compute kernel
+ * forwarding tables, using the information contained into an LFDB instance.
+ * This class is used as a component for the main Routing classes. */
 class RoutingEngine {
 public:
     RL_NODEFAULT_NONCOPIABLE(RoutingEngine);
-    RoutingEngine(uipcp_rib *r, bool lfa)
-        : rib(r), lfa_enabled(lfa), last_run(std::chrono::system_clock::now())
+    RoutingEngine(uipcp_rib *rib, LFDB *lfdb, bool lfa)
+        : rib(rib),
+          lfdb(lfdb),
+          lfa_enabled(lfa),
+          last_run(std::chrono::system_clock::now())
     {
     }
 
@@ -128,6 +172,9 @@ private:
     /* Backpointer. */
     uipcp_rib *rib;
 
+    /* The Lower Flows database. */
+    LFDB *lfdb;
+
     /* Is Loop Free Alternate algorithm enabled ? */
     bool lfa_enabled;
 
@@ -148,15 +195,15 @@ private:
 
 class FullyReplicatedLFDB : public Routing {
     /* Lower Flow Database. */
-    std::unordered_map<NodeId, std::unordered_map<NodeId, gpb::LowerFlow>> db;
-    friend class RoutingEngine;
+    LFDB lfdb;
 
-public:
     /* Routing engine. */
     RoutingEngine re;
 
+public:
     RL_NODEFAULT_NONCOPIABLE(FullyReplicatedLFDB);
-    FullyReplicatedLFDB(uipcp_rib *_ur, bool lfa) : Routing(_ur), re(_ur, lfa)
+    FullyReplicatedLFDB(uipcp_rib *rib, bool lfa)
+        : Routing(rib), re(rib, &lfdb, lfa)
     {
     }
     ~FullyReplicatedLFDB() {}
@@ -164,14 +211,6 @@ public:
     void dump(std::stringstream &ss) const override;
     void dump_routing(std::stringstream &ss) const override { re.dump(ss); }
 
-    const gpb::LowerFlow *find(const NodeId &local_node,
-                               const NodeId &remote_node) const
-    {
-        return _find(local_node, remote_node);
-    };
-    gpb::LowerFlow *find(const NodeId &local_node, const NodeId &remote_node);
-    const gpb::LowerFlow *_find(const NodeId &local_node,
-                                const NodeId &remote_node) const;
     bool add(const gpb::LowerFlow &lf);
     bool del(const NodeId &local_node, const NodeId &remote_node);
     void update_local(const std::string &neigh_name) override;
@@ -189,41 +228,18 @@ public:
     void age_incr() override;
 };
 
-gpb::LowerFlow *
-FullyReplicatedLFDB::find(const NodeId &local_node, const NodeId &remote_node)
-{
-    const gpb::LowerFlow *lf = _find(local_node, remote_node);
-    return const_cast<gpb::LowerFlow *>(lf);
-}
-
-const gpb::LowerFlow *
-FullyReplicatedLFDB::_find(const NodeId &local_node,
-                           const NodeId &remote_node) const
-{
-    const auto it = db.find(local_node);
-    unordered_map<NodeId, gpb::LowerFlow>::const_iterator jt;
-
-    if (it == db.end()) {
-        return nullptr;
-    }
-
-    jt = it->second.find(remote_node);
-
-    return jt == it->second.end() ? nullptr : &jt->second;
-}
-
 /* The add method has overwrite semantic, and possibly resets the age.
  * Returns true if something changed. */
 bool
 FullyReplicatedLFDB::add(const gpb::LowerFlow &lf)
 {
-    auto it            = db.find(lf.local_node());
+    auto it            = lfdb.db.find(lf.local_node());
     string repr        = to_string(lf);
     gpb::LowerFlow lfz = lf;
 
     lfz.set_age(0);
 
-    if (it == db.end() || it->second.count(lf.remote_node()) == 0) {
+    if (it == lfdb.db.end() || it->second.count(lf.remote_node()) == 0) {
         /* Not there, we should add the entry. */
         if (lf.local_node() == rib->myname &&
             rib->get_neighbor(lf.remote_node(), /*create=*/false) == nullptr) {
@@ -233,7 +249,7 @@ FullyReplicatedLFDB::add(const gpb::LowerFlow &lf)
                 repr.c_str());
             return false;
         }
-        db[lf.local_node()][lf.remote_node()] = lfz;
+        lfdb.db[lf.local_node()][lf.remote_node()] = lfz;
         re.schedule_recomputation();
         UPD(rib->uipcp, "Lower flow %s added\n", repr.c_str());
         return true;
@@ -267,11 +283,11 @@ FullyReplicatedLFDB::add(const gpb::LowerFlow &lf)
 bool
 FullyReplicatedLFDB::del(const NodeId &local_node, const NodeId &remote_node)
 {
-    auto it = db.find(local_node);
+    auto it = lfdb.db.find(local_node);
     unordered_map<NodeId, gpb::LowerFlow>::iterator jt;
     string repr;
 
-    if (it == db.end()) {
+    if (it == lfdb.db.end()) {
         return false;
     }
 
@@ -394,7 +410,7 @@ void
 FullyReplicatedLFDB::dump(std::stringstream &ss) const
 {
     ss << "Lower Flow Database:" << endl;
-    for (const auto &kvi : db) {
+    for (const auto &kvi : lfdb.db) {
         for (const auto &kvj : kvi.second) {
             const gpb::LowerFlow &flow = kvj.second;
 
@@ -418,7 +434,7 @@ FullyReplicatedLFDB::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
         std::bind(&NeighFlow::sync_obj, nf, true, ObjClass, TableName, &lfl);
     int ret = 0;
 
-    for (const auto &kvi : db) {
+    for (const auto &kvi : lfdb.db) {
         for (const auto &kvj : kvi.second) {
             const gpb::LowerFlow &flow = kvj.second;
 
@@ -443,15 +459,15 @@ FullyReplicatedLFDB::neighs_refresh(size_t limit)
     unordered_map<NodeId, gpb::LowerFlow>::iterator jt;
     int ret = 0;
 
-    if (db.size() == 0) {
+    if (lfdb.db.size() == 0) {
         /* Still not enrolled to anyone, nothing to do. */
         return 0;
     }
 
     /* Fetch the map containing all the LFDB entries with the local
      * address corresponding to me. */
-    auto it = db.find(rib->myname);
-    assert(it != db.end());
+    auto it = lfdb.db.find(rib->myname);
+    assert(it != lfdb.db.end());
 
     auto age_thresh = rib->get_param_value<Msecs>(Routing::Prefix, "age-max");
     age_thresh      = age_thresh * 30 / 100;
@@ -500,7 +516,7 @@ FullyReplicatedLFDB::age_incr()
     auto age_max = rib->get_param_value<Msecs>(Routing::Prefix, "age-max");
     gpb::LowerFlowList prop_lfl;
 
-    for (auto &kvi : db) {
+    for (auto &kvi : lfdb.db) {
         list<unordered_map<NodeId, gpb::LowerFlow>::iterator> discard_list;
 
         for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
@@ -540,7 +556,7 @@ FullyReplicatedLFDB::neigh_disconnected(const std::string &neigh_name)
 {
     gpb::LowerFlowList prop_lfl;
 
-    for (auto &kvi : db) {
+    for (auto &kvi : lfdb.db) {
         list<unordered_map<NodeId, gpb::LowerFlow>::iterator> discard_list;
 
         for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
@@ -641,17 +657,14 @@ RoutingEngine::compute_next_hops(const NodeId &local_node)
     /* Clean up state left from the previous run. */
     next_hops.clear();
 
-    FullyReplicatedLFDB *routing =
-        dynamic_cast<FullyReplicatedLFDB *>(rib->routing.get());
-
     /* Build the graph from the Lower Flow Database. */
     graph[local_node] = list<Edge>();
-    for (const auto &kvi : routing->db) {
+    for (const auto &kvi : lfdb->db) {
         for (const auto &kvj : kvi.second) {
             const gpb::LowerFlow *revlf;
 
-            revlf = routing->find(kvj.second.local_node(),
-                                  kvj.second.remote_node());
+            revlf =
+                lfdb->find(kvj.second.local_node(), kvj.second.remote_node());
 
             if (revlf == nullptr || revlf->cost() != kvj.second.cost()) {
                 /* Something is wrong, this could be malicious or erroneous. */
@@ -668,7 +681,7 @@ RoutingEngine::compute_next_hops(const NodeId &local_node)
         }
     }
 
-    PV_S("Graph [%lu nodes]:\n", (long unsigned)routing->db.size());
+    PV_S("Graph [%lu nodes]:\n", (long unsigned)lfdb->db.size());
     for (const auto &kvg : graph) {
         PV_S("%s: {", kvg.first.c_str());
         for (const Edge &edge : kvg.second) {
@@ -910,11 +923,9 @@ RoutingEngine::update_kernel_routing(const NodeId &addr)
         return; /* Nothing to do. */
     }
 
-    FullyReplicatedLFDB *routing =
-        dynamic_cast<FullyReplicatedLFDB *>(rib->routing.get());
     auto now = std::chrono::system_clock::now();
 
-    if (routing->db.size() > coalesce_size_threshold &&
+    if (lfdb->db.size() > coalesce_size_threshold &&
         (now - last_run) < coalesce_period) {
         /* Postpone this computation, possibly starting the coalesce timer. */
         if (!coalesce_timer) {
@@ -974,14 +985,14 @@ RoutingEngine::dump(std::stringstream &ss) const
 
 class StaticRouting : public Routing {
     /* Lower Flow Database. */
-    std::unordered_map<NodeId, std::unordered_map<NodeId, gpb::LowerFlow>> db;
+    LFDB lfdb;
 
-public:
-    /* Routing engine. */
+    /* Routing engine, only used to compute kernel fowarding tables. */
     RoutingEngine re;
 
+public:
     RL_NODEFAULT_NONCOPIABLE(StaticRouting);
-    StaticRouting(uipcp_rib *_ur) : Routing(_ur), re(_ur, true) {}
+    StaticRouting(uipcp_rib *_ur) : Routing(_ur), re(_ur, &lfdb, true) {}
     ~StaticRouting() {}
 
     void dump(std::stringstream &ss) const override { dump_routing(ss); }
