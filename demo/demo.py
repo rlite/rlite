@@ -469,12 +469,15 @@ if args.namespaces:
         vm1 = shim['vms'][1]
         veth0 = '%s.%s' % (shim['name'], vm0)
         veth1 = '%s.%s' % (shim['name'], vm1)
-        outs += 'sudo ip link add %s type veth peer name %s\n'\
+        outs += '(\n'\
+                'sudo ip link add %s type veth peer name %s\n'\
+                ') &\n'\
             % (veth0, veth1)
         idx0 = len(demo.vms[vm0]['ports']) + 1
         idx1 = len(demo.vms[vm1]['ports']) + 1
         demo.vms[vm0]['ports'].append({'veth': veth0, 'shim': shname, 'idx': idx0})
         demo.vms[vm1]['ports'].append({'veth': veth1, 'shim': shname, 'idx': idx1})
+    outs += 'wait\n'
 else:
     for l in sorted(demo.links):
         shim, vm = l
@@ -512,7 +515,7 @@ else:
                                         '1:11 htb rate %(speed)s\n'         \
                         % {'tap': tap, 'speed': speed}
 
-            outs += ') & \n'
+            outs += ') &\n'
 
         demo.vms[vm]['ports'].append({'tap': tap, 'shim': shim, 'idx': idx,
                              'ip': demo.dns_mappings[shim][vm]['ip'] if shim in
@@ -550,12 +553,14 @@ for vmname in sorted(demo.vms):
 
     if args.namespaces:
         vm['nsname'] = 'ns%s' % vmname
-        outs += 'sudo ip netns add %(nsname)s\n'\
+        outs += '(\n'\
+                'sudo ip netns add %(nsname)s\n'\
                 'sudo ip netns exec %(nsname)s ip link set lo up\n'\
-                    % {'nsname': vm['nsname']}
+                  % {'nsname': vm['nsname']}
         for port in vm['ports']:
             outs += 'sudo ip link set %s netns %s\n'\
                 % (port['veth'], vm['nsname'])
+        outs += ') &\n'
     else:
         fwdp = args.base_port + vmid
         fwdc = fwdp + 10000
@@ -625,6 +630,9 @@ for vmname in sorted(demo.vms):
     if budget <= 0:
         outs += 'sleep %s\n' % args.wait_for_boot
         budget = boot_batch_size
+
+if args.namespaces:
+    outs += 'wait\n'
 
 # Compute DNS mappings
 for vmname in sorted(demo.vms):
