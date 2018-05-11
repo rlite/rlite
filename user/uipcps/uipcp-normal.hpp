@@ -67,10 +67,10 @@
 #endif /* RL_MEMTRACK */
 
 enum class PolicyParamType {
-    INT = 0,
-    BOOL,
-    STRING,
-    UNDEFINED,
+    Int = 0,
+    Bool,
+    String,
+    Undefined,
 };
 
 struct PolicyParam {

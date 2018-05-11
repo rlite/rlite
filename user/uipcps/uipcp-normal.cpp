@@ -1788,17 +1788,17 @@ uipcp_rib::get_param_type(const std::string &component,
     return params_map[component][param_name].type;
 }
 
-PolicyParam::PolicyParam() { type = PolicyParamType::UNDEFINED; }
+PolicyParam::PolicyParam() { type = PolicyParamType::Undefined; }
 
 PolicyParam::PolicyParam(bool param_value)
 {
-    type    = PolicyParamType::BOOL;
+    type    = PolicyParamType::Bool;
     value.b = param_value;
 }
 
 PolicyParam::PolicyParam(int param_value, int range_min, int range_max)
 {
-    type    = PolicyParamType::INT;
+    type    = PolicyParamType::Int;
     value.i = param_value;
     min     = range_min;
     max     = range_max;
@@ -1806,7 +1806,7 @@ PolicyParam::PolicyParam(int param_value, int range_min, int range_max)
 
 PolicyParam::PolicyParam(const std::string &param_value)
 {
-    type      = PolicyParamType::STRING;
+    type      = PolicyParamType::String;
     stringval = param_value;
 }
 
@@ -1817,11 +1817,11 @@ PolicyParam::set_value(const std::string &param_value,
     int val;
     bool enable;
 
-    assert(type != PolicyParamType::UNDEFINED);
+    assert(type != PolicyParamType::Undefined);
     assert(error_reason != NULL);
 
     switch (type) {
-    case PolicyParamType::INT:
+    case PolicyParamType::Int:
         if (string2int(param_value, val)) {
             *error_reason = "Could not convert parameter value to a number";
             return -1;
@@ -1834,7 +1834,7 @@ PolicyParam::set_value(const std::string &param_value,
         }
         value.i = val;
         break;
-    case PolicyParamType::BOOL:
+    case PolicyParamType::Bool:
         enable = (param_value == "true");
         if (!enable && param_value != "false") {
             *error_reason = "Invalid param value (not 'true' or 'false')";
@@ -1842,7 +1842,7 @@ PolicyParam::set_value(const std::string &param_value,
         }
         value.b = enable;
         break;
-    case PolicyParamType::STRING:
+    case PolicyParamType::String:
         stringval = param_value;
         break;
     default:
@@ -1856,21 +1856,21 @@ PolicyParam::set_value(const std::string &param_value,
 int
 PolicyParam::get_int_value() const
 {
-    assert(type == PolicyParamType::INT);
+    assert(type == PolicyParamType::Int);
     return value.i;
 };
 
 bool
 PolicyParam::get_bool_value() const
 {
-    assert(type == PolicyParamType::BOOL);
+    assert(type == PolicyParamType::Bool);
     return value.b;
 }
 
 std::string
 PolicyParam::get_string_value() const
 {
-    assert(type == PolicyParamType::STRING);
+    assert(type == PolicyParamType::String);
     return stringval;
 };
 
@@ -1878,21 +1878,21 @@ ostream &
 operator<<(ostream &os, const PolicyParam &param)
 {
     switch (param.type) {
-    case PolicyParamType::INT:
+    case PolicyParamType::Int:
         os << param.get_int_value();
         break;
-    case PolicyParamType::BOOL:
+    case PolicyParamType::Bool:
         if (param.get_bool_value()) {
             os << "true";
         } else {
             os << "false";
         }
         break;
-    case PolicyParamType::STRING:
+    case PolicyParamType::String:
         os << param.get_string_value();
         break;
-    case PolicyParamType::UNDEFINED:
-        os << "UNDEFINED";
+    case PolicyParamType::Undefined:
+        os << "(undefined)";
         break;
     }
     return os;

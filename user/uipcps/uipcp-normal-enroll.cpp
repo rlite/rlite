@@ -805,7 +805,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
                     m = CDAPMessage();
                     m.m_write(kv.first, c + "/params");
                     switch (rib->get_param_type(c, kv.first)) {
-                    case PolicyParamType::STRING:
+                    case PolicyParamType::String:
                         val = rib->get_param_value<string>(c, kv.first);
                         break;
                     default:
