@@ -2030,6 +2030,14 @@ normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
         return -1;
     }
 
+    if (strcmp(req->dif_name, uipcp->dif_name)) {
+        UPE(uipcp,
+            "DIF name in the enroll request (%s) does not match the DIF name "
+            "(%s) known to IPCP %s\n",
+            req->dif_name, uipcp->dif_name, uipcp->name);
+        return -1;
+    }
+
     return rib->enroll(dst_name, req->supp_dif_name, wait_for_completion);
 }
 
