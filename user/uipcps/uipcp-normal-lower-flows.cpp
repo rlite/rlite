@@ -338,10 +338,10 @@ public:
     }
     ~LinkStateRouting() { age_incr_timer.reset(); }
 
-    void dump(std::stringstream &ss) const override;
+    void dump(std::stringstream &ss) const override { re.dump(ss); }
     void dump_routing(std::stringstream &ss) const override
     {
-        re.dump(ss, rib->myname);
+        re.dump_routing(ss, rib->myname);
     }
 
     bool add(const gpb::LowerFlow &lf);
@@ -542,25 +542,6 @@ LinkStateRouting::flow_state_update(struct rl_kmsg_flow_state *upd)
     return 0;
 }
 
-void
-LinkStateRouting::dump(std::stringstream &ss) const
-{
-    ss << "Lower Flow Database:" << endl;
-    for (const auto &kvi : re.db) {
-        for (const auto &kvj : kvi.second) {
-            const gpb::LowerFlow &flow = kvj.second;
-
-            ss << "    Local: " << flow.local_node()
-               << ", Remote: " << flow.remote_node()
-               << ", Cost: " << flow.cost() << ", Seqnum: " << flow.seqnum()
-               << ", State: " << flow.state() << ", Age: " << flow.age()
-               << endl;
-        }
-    }
-
-    ss << endl;
-}
-
 int
 LinkStateRouting::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
                              unsigned int limit) const
@@ -730,10 +711,10 @@ public:
     }
     ~StaticRouting() {}
 
-    void dump(std::stringstream &ss) const override { dump_routing(ss); }
+    void dump(std::stringstream &ss) const override { re.dump(ss); }
     void dump_routing(std::stringstream &ss) const override
     {
-        re.dump(ss, rib->myname);
+        re.dump_routing(ss, rib->myname);
     }
     int route_mod(const struct rl_cmsg_ipcp_route_mod *req) override;
 };

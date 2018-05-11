@@ -85,7 +85,10 @@ public:
     int compute_next_hops(const NodeId &local_node);
 
     /* Dump the routing table. */
-    void dump(std::stringstream &ss, const NodeId &local_node) const;
+    void dump_routing(std::stringstream &ss, const NodeId &local_node) const;
+
+    /* Dump the lower flows database. */
+    void dump(std::stringstream &ss) const;
 };
 
 /* Helper for pretty printing of default route. */

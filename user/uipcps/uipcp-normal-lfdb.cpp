@@ -31,7 +31,26 @@
 namespace rlite {
 
 void
-LFDB::dump(std::stringstream &ss, const NodeId &local_node) const
+LFDB::dump(std::stringstream &ss) const
+{
+    ss << "Lower Flow Database:" << std::endl;
+    for (const auto &kvi : db) {
+        for (const auto &kvj : kvi.second) {
+            const gpb::LowerFlow &flow = kvj.second;
+
+            ss << "    Local: " << flow.local_node()
+               << ", Remote: " << flow.remote_node()
+               << ", Cost: " << flow.cost() << ", Seqnum: " << flow.seqnum()
+               << ", State: " << flow.state() << ", Age: " << flow.age()
+               << std::endl;
+        }
+    }
+
+    ss << std::endl;
+}
+
+void
+LFDB::dump_routing(std::stringstream &ss, const NodeId &local_node) const
 {
     ss << "Routing table for node " << local_node << ":" << std::endl;
     for (const auto &kvr : next_hops) {
@@ -222,7 +241,7 @@ LFDB::compute_next_hops(const NodeId &local_node)
     if (verbose) {
         std::stringstream ss;
 
-        dump(ss, local_node);
+        dump_routing(ss, local_node);
         std::cout << ss.str();
     }
 
