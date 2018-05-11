@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include "uipcp-normal.hpp"
+#include "uipcp-normal-ceft.hpp"
 
 using namespace std;
 
@@ -320,6 +321,151 @@ public:
     }
 };
 
+// TODO add reconfigure
+class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
+    /* An instance of this class can be a state machine replica or it can just
+     * be a client that will redirect requests to one of the replicas. */
+
+    /* In case of state machine replica, a pointer to a Raft state
+     * machine. */
+    class Replica : public CeftReplica {
+        /* The structure of a DFT command (i.e. a log entry for the Raft SM). */
+        struct Command {
+            rlm_addr_t address;
+            char ipcp_name[31];
+            uint8_t opcode;
+            static constexpr uint8_t OpcodeSet = 1;
+            static constexpr uint8_t OpcodeDel = 2;
+        } __attribute__((packed));
+        static_assert(sizeof(Command) == sizeof(Command::address) +
+                                             sizeof(Command::ipcp_name) +
+                                             sizeof(Command::opcode),
+                      "Invalid memory layout for class Replica::Command");
+
+        /* State machine implementation: a simple table mapping IPCP names
+         * into addresses. */
+        std::map<string, rlm_addr_t> table;
+
+    public:
+        Replica(CentralizedFaultTolerantAddrAllocator *aa)
+            : CeftReplica(aa->rib, std::string("ceft-aa-") + aa->rib->myname,
+                          aa->rib->myname,
+                          std::string("/tmp/ceft-aa-") +
+                              std::to_string(aa->rib->uipcp->id) +
+                              std::string("-") + aa->rib->myname,
+                          sizeof(Command), AddrAllocator::TableName){};
+        int apply(const char *const serbuf) override;
+        int process_rib_msg(
+            const CDAPMessage *rm, rlm_addr_t src_addr,
+            std::vector<std::unique_ptr<char[]>> *commands) override;
+        void dump(std::stringstream &ss) const {} // TODO
+    };
+    std::unique_ptr<Replica> raft;
+
+    /* In case of client, a pointer to client-side data structures. */
+    class Client : public CeftClient {
+        uint64_t seqnum_next = 1;
+
+        struct PendingReq : public CeftClient::PendingReq {
+            std::string ipcp_name;
+            PendingReq() = default;
+            PendingReq(gpb::OpCode op_code, const std::string &ipcp_name)
+                : CeftClient::PendingReq(op_code), ipcp_name(ipcp_name)
+            {
+            }
+            std::unique_ptr<CeftClient::PendingReq> clone() const override
+            {
+                return make_unique<PendingReq>(*this);
+            }
+        };
+
+    public:
+        Client(CentralizedFaultTolerantAddrAllocator *aa,
+               std::list<raft::ReplicaId> names)
+            : CeftClient(aa->rib, std::move(names))
+        {
+        }
+        int allocate(rlm_addr_t *addr);
+        int process_rib_msg(const CDAPMessage *rm,
+                            CeftClient::PendingReq *const bpr,
+                            rlm_addr_t src_addr) override;
+    };
+    std::unique_ptr<Client> client;
+
+public:
+    CentralizedFaultTolerantAddrAllocator(UipcpRib *rib) : AddrAllocator(rib) {}
+    ~CentralizedFaultTolerantAddrAllocator() {}
+    void dump(std::stringstream &ss) const override
+    {
+        if (raft) {
+            raft->dump(ss);
+        } else {
+            ss << "Address allocation table: not available locally" << endl
+               << endl;
+        }
+    }
+
+    int allocate(rlm_addr_t *addr) override
+    {
+        if (raft) {
+            /* We may be the leader or a follower, but here we can behave as as
+             * any client to improve code reuse. We also set the leader, since
+             * we know it. */
+            client->set_leader_id(raft->leader_name());
+        }
+        return client->allocate(addr);
+    }
+
+    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
+                    std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)
+    {
+        if (!raft || (rm->obj_class == ObjClass && rm->is_response())) {
+            /* We may be a replica (raft != nullptr), but if this is a response
+             * to a request done by us with the role of simple clients we
+             * forward it to the client handler. */
+            return client->rib_handler(rm, nf, neigh, src_addr);
+        }
+
+        return raft->rib_handler(rm, nf, neigh, src_addr);
+    }
+    // TODO: remove the need of this
+    int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
+                   unsigned int limit) const override
+    {
+        return -1;
+    }
+};
+
+int
+CentralizedFaultTolerantAddrAllocator::Client::allocate(rlm_addr_t *addr)
+{
+    return -1;
+}
+
+int
+CentralizedFaultTolerantAddrAllocator::Client::process_rib_msg(
+    const CDAPMessage *rm, CeftClient::PendingReq *const bpr,
+    rlm_addr_t src_addr)
+{
+    return -1;
+}
+
+/* Apply a command to the replicated state machine. We just need to update our
+ * map. */
+int
+CentralizedFaultTolerantAddrAllocator::Replica::apply(const char *const serbuf)
+{
+    return -1;
+}
+
+int
+CentralizedFaultTolerantAddrAllocator::Replica::process_rib_msg(
+    const CDAPMessage *rm, rlm_addr_t src_addr,
+    std::vector<std::unique_ptr<char[]>> *commands)
+{
+    return -1;
+}
+
 void
 UipcpRib::addra_lib_init()
 {
@@ -331,6 +477,13 @@ UipcpRib::addra_lib_init()
         "distributed",
         [](UipcpRib *rib) {
             rib->addra = make_unique<DistributedAddrAllocator>(rib);
+        },
+        {AddrAllocator::TableName}));
+    available_policies[AddrAllocator::Prefix].insert(PolicyBuilder(
+        "centralized-fault-tolerant",
+        [](UipcpRib *rib) {
+            rib->addra =
+                make_unique<CentralizedFaultTolerantAddrAllocator>(rib);
         },
         {AddrAllocator::TableName}));
 }

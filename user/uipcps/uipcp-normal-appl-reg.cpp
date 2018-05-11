@@ -444,6 +444,7 @@ public:
     }
     int appl_register(const struct rl_kmsg_appl_register *req) override
     {
+        // TODO reuse this piece of code
         if (raft) {
             /* We may be the leader or a follower, but here we can behave as as
              * any client to improve code reuse. We also set the leader, since
@@ -456,6 +457,7 @@ public:
     int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
                     std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)
     {
+        // TODO reuse this piece of code
         if (!raft || (rm->obj_class == ObjClass && rm->is_response())) {
             /* We may be a replica (raft != nullptr), but if this is a response
              * to a request done by us with the role of simple clients we
@@ -467,6 +469,7 @@ public:
     }
 };
 
+// TODO possibly reuse this code
 int
 CentralizedFaultTolerantDFT::reconfigure()
 {
