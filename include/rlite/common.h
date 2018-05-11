@@ -42,6 +42,9 @@
 extern "C" {
 #endif
 
+/* Expected control API version. */
+#define RL_API_VERSION 7
+
 #define RLITE_CTRLDEV_NAME "/dev/rlite"
 #define RLITE_IODEV_NAME "/dev/rlite-io"
 #define RLITE_UIPCPS_VAR "/run/rlite/"
@@ -107,9 +110,6 @@ struct pci_sizes {
 
 #define RLITE_SUCC 0
 #define RLITE_ERR 1
-
-/* Expected control API version. */
-#define RL_API_VERSION 6
 
 /* All the possible messages begin like this. */
 struct rl_msg_hdr {

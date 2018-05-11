@@ -129,17 +129,22 @@ struct rl_sched_pfifo {
         struct rb_list q;
         int qlen;
     } * queues;
+
+    /* Maximum size of each queue, in bytes. */
+    unsigned int max_queue_size;
+
     /* Number of queues (traffic classes). */
     rl_qosid_t num_queues;
 };
 
 static int
-sched_pfifo_do_config(struct rl_sched *sched, rl_qosid_t num_queues)
+sched_pfifo_do_config(struct rl_sched *sched, unsigned int max_queue_size,
+                      rl_qosid_t num_queues)
 {
     struct rl_sched_pfifo *sched_priv = RL_SCHED_PRIV(sched);
     int i;
 
-    if (num_queues == 0) {
+    if (num_queues == 0 || max_queue_size == 0) {
         /* Invalid parameters. */
         return -1;
     }
@@ -148,7 +153,8 @@ sched_pfifo_do_config(struct rl_sched *sched, rl_qosid_t num_queues)
     sched->ops.fini(sched);
 
     /* Build the new queues. */
-    sched_priv->num_queues = num_queues;
+    sched_priv->max_queue_size = max_queue_size;
+    sched_priv->num_queues     = num_queues;
     sched_priv->queues = rl_alloc(num_queues * sizeof(sched_priv->queues[0]),
                                   GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
     if (!sched_priv->queues) {
@@ -171,13 +177,14 @@ sched_pfifo_config(struct rl_sched *sched, const struct rl_msg_base *bmsg)
     struct rl_kmsg_ipcp_sched_pfifo *req =
         (struct rl_kmsg_ipcp_sched_pfifo *)bmsg;
 
-    return sched_pfifo_do_config(sched, req->prio_levels);
+    return sched_pfifo_do_config(sched, req->max_queue_size, req->prio_levels);
 }
 
 static int
 sched_pfifo_init(struct rl_sched *sched)
 {
-    return sched_pfifo_do_config(sched, /*num_queues=*/1);
+    return sched_pfifo_do_config(sched, /*max_queue_size=*/RMTQ_MAX_SIZE,
+                                 /*num_queues=*/1);
 }
 
 static void
@@ -212,7 +219,7 @@ sched_pfifo_enq(struct rl_sched *sched, struct rl_buf *rb)
         min((rl_qosid_t)(sched_priv->num_queues - 1), RL_BUF_PCI(rb)->qos_id);
     struct rl_sched_pfifo_queue *pq = sched_priv->queues + qos_class;
 
-    if (pq->qlen > RMTQ_MAX_SIZE) {
+    if (pq->qlen > sched_priv->max_queue_size) {
         return -1;
     }
 
@@ -265,23 +272,30 @@ struct rl_sched_wrr {
         /* Amount of credit left (in bytes). */
         int credit;
     } * queues;
+
+    /* Maximum size of each queue, in bytes. */
+    unsigned int max_queue_size;
+
     /* Number of queues (traffic classes). */
     rl_qosid_t num_queues;
+
     /* Quantum in bytes. */
     unsigned int quantum;
+
     /* Current class to dequeue from. */
     unsigned int cur_class;
 };
 
 static int
-sched_wrr_do_config(struct rl_sched *sched, unsigned int quantum,
-                    rl_qosid_t num_queues, unsigned int weights[])
+sched_wrr_do_config(struct rl_sched *sched, unsigned int max_queue_size,
+                    unsigned int quantum, rl_qosid_t num_queues,
+                    unsigned int weights[])
 {
     struct rl_sched_wrr *sched_priv = RL_SCHED_PRIV(sched);
     unsigned int min_weight         = -1;
     int i;
 
-    if (quantum == 0 || num_queues == 0) {
+    if (quantum == 0 || num_queues == 0 || max_queue_size == 0) {
         /* Invalid parameters. */
         return -1;
     }
@@ -298,8 +312,9 @@ sched_wrr_do_config(struct rl_sched *sched, unsigned int quantum,
     sched->ops.fini(sched);
 
     /* Build the new queues. */
-    sched_priv->num_queues = num_queues;
-    sched_priv->quantum    = quantum;
+    sched_priv->max_queue_size = max_queue_size;
+    sched_priv->num_queues     = num_queues;
+    sched_priv->quantum        = quantum;
     sched_priv->queues = rl_alloc(num_queues * sizeof(sched_priv->queues[0]),
                                   GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
     if (!sched_priv->queues) {
@@ -330,7 +345,8 @@ sched_wrr_config(struct rl_sched *sched, const struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_sched_wrr *req = (struct rl_kmsg_ipcp_sched_wrr *)bmsg;
 
-    return sched_wrr_do_config(sched, req->quantum, req->weights.num_elements,
+    return sched_wrr_do_config(sched, req->max_queue_size, req->quantum,
+                               req->weights.num_elements,
                                req->weights.slots.dwords);
 }
 
@@ -339,7 +355,8 @@ sched_wrr_init(struct rl_sched *sched)
 {
     unsigned int weights[2] = {1, 4};
 
-    return sched_wrr_do_config(sched, /*quantum=*/2000, /*num_queues=*/2,
+    return sched_wrr_do_config(sched, /*max_queue_size=*/RMTQ_MAX_SIZE,
+                               /*quantum=*/2000, /*num_queues=*/2,
                                /*weights=*/weights);
 }
 
@@ -375,7 +392,7 @@ sched_wrr_enq(struct rl_sched *sched, struct rl_buf *rb)
         min((rl_qosid_t)(sched_priv->num_queues - 1), RL_BUF_PCI(rb)->qos_id);
     struct rl_sched_wrr_queue *wrrq = sched_priv->queues + qos_class;
 
-    if (wrrq->qlen > RMTQ_MAX_SIZE) {
+    if (wrrq->qlen > sched_priv->max_queue_size) {
         return -1;
     }
 

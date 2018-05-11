@@ -450,7 +450,12 @@ struct rl_kmsg_ipcp_stats_resp {
 struct rl_kmsg_ipcp_sched_wrr {
     struct rl_msg_ipcp ipcp_hdr;
 
+    /* Max queue size in bytes. */
+    uint32_t max_queue_size;
+
+    /* Quantum size in bytes. */
     uint32_t quantum;
+
     /* WRR weights are dwords. */
     struct rl_msg_array_field weights;
 };
@@ -458,6 +463,9 @@ struct rl_kmsg_ipcp_sched_wrr {
 /* application --> kernel message to configure a PFIFO PDU scheduler. */
 struct rl_kmsg_ipcp_sched_pfifo {
     struct rl_msg_ipcp ipcp_hdr;
+
+    /* Max queue size in bytes. */
+    uint32_t max_queue_size;
 
     /* Number of priority levels. */
     rlm_qosid_t prio_levels;

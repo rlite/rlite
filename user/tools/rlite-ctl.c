@@ -560,8 +560,9 @@ ipcp_sched_config(int argc, char **argv, struct cmd_descriptor *cd)
     const char *ipcp_name;
     const char *sched_name;
     struct ipcp_attrs *attrs;
+    unsigned int qsize;
 
-    assert(argc >= 3);
+    assert(argc >= 4);
     ipcp_name  = argv[0];
     sched_name = argv[1];
 
@@ -572,37 +573,52 @@ ipcp_sched_config(int argc, char **argv, struct cmd_descriptor *cd)
         return -1;
     }
 
+    if (strcmp(argv[2], "qsize")) {
+        PE("Missing 'quantum' argument\n");
+        return -1;
+    }
+    qsize = atoi(argv[3]);
+    if (qsize == 0 || qsize > (1 << 24)) {
+        PE("Invalid quantum '%s'\n", argv[3]);
+        return -1;
+    }
+
+    argv += 4;
+    argc -= 4;
+
     if (!strcmp(sched_name, "wrr")) {
         /* Weighted Round Robin configuration. Example:
-         *   ipcp-sched-config x.IPCP wrr quantum 1500 weights 2,5,10
+         *   ipcp-sched-config x.IPCP wrr qsize 65536 quantum 1500 weights
+         * 2,5,10
          * */
         struct rl_kmsg_ipcp_sched_wrr req;
         uint32_t *arr;
         int n;
 
-        if (argc < 6) {
+        if (argc < 4) {
             PE("Not enough arguments for wrr. Example:\n"
-               "  ipcp-sched-config x.IPCP wrr quantum 1500 weights 2,5,10\n");
+               "  ipcp-sched-config x.IPCP wrr qsize 65536 quantum 1500 "
+               "weights 2,5,10\n");
             return -1;
         }
 
-        if (strcmp(argv[2], "quantum")) {
+        if (strcmp(argv[0], "quantum")) {
             PE("Missing 'quantum' argument\n");
             return -1;
         }
-        req.quantum = atoi(argv[3]);
+        req.quantum = atoi(argv[1]);
         if (req.quantum == 0 || req.quantum > 1000000) {
-            PE("Invalid quantum '%s'\n", argv[3]);
+            PE("Invalid quantum '%s'\n", argv[1]);
             return -1;
         }
 
-        if (strcmp(argv[4], "weights")) {
+        if (strcmp(argv[2], "weights")) {
             PE("Missing 'weights' argument\n");
             return -1;
         }
 
         /* Count weights. */
-        n = str_count_elems(argv[5]);
+        n = str_count_elems(argv[3]);
         if (n <= 0) {
             PE("No valid weights\n");
             return -1;
@@ -613,7 +629,7 @@ ipcp_sched_config(int argc, char **argv, struct cmd_descriptor *cd)
 
         /* Parse weights into the array. */
         {
-            char *copy = strdup_or_quit(argv[5]);
+            char *copy = strdup_or_quit(argv[3]);
             char *ctmp = copy;
             char *saveptr;
             int i;
@@ -635,30 +651,32 @@ ipcp_sched_config(int argc, char **argv, struct cmd_descriptor *cd)
         req.ipcp_hdr.hdr.msg_type = RLITE_KER_IPCP_SCHED_WRR;
         req.ipcp_hdr.hdr.event_id = 0;
         req.ipcp_hdr.ipcp_id      = attrs->id;
+        req.max_queue_size        = qsize;
         req.weights.elem_size     = sizeof(arr[0]);
         req.weights.num_elements  = n;
         req.weights.slots.dwords  = arr;
 
         return kernel_control_write(RLITE_MB(&req));
+
     } else if (!strcmp(sched_name, "pfifo")) {
         /* Weighted Round Robin configuration. Example:
-         *   ipcp-sched-config x.IPCP pfifo levels 4
+         *   ipcp-sched-config x.IPCP qsize 65536 pfifo levels 4
          * */
         struct rl_kmsg_ipcp_sched_pfifo req;
 
-        if (argc < 4) {
+        if (argc < 2) {
             PE("Not enough arguments for pfifo. Example:\n"
-               "  ipcp-sched-config x.IPCP pfifo levels 4\n");
+               "  ipcp-sched-config x.IPCP pfifo qsize 65536 levels 4\n");
             return -1;
         }
 
-        if (strcmp(argv[2], "levels")) {
+        if (strcmp(argv[0], "levels")) {
             PE("Missing 'levels' argument\n");
             return -1;
         }
-        req.prio_levels = atoi(argv[3]);
+        req.prio_levels = atoi(argv[1]);
         if (req.prio_levels == 0 || req.prio_levels > 128) {
-            PE("Invalid number of levels '%s'\n", argv[3]);
+            PE("Invalid number of levels '%s'\n", argv[1]);
             return -1;
         }
 
@@ -666,6 +684,7 @@ ipcp_sched_config(int argc, char **argv, struct cmd_descriptor *cd)
         req.ipcp_hdr.hdr.msg_type = RLITE_KER_IPCP_SCHED_PFIFO;
         req.ipcp_hdr.hdr.event_id = 0;
         req.ipcp_hdr.ipcp_id      = attrs->id;
+        req.max_queue_size        = qsize;
 
         return kernel_control_write(RLITE_MB(&req));
     }
@@ -1542,8 +1561,8 @@ static struct cmd_descriptor cmd_descriptors[] = {
     },
     {
         .name     = "ipcp-sched-config",
-        .usage    = "IPCP_NAME SCHED_NAME [...]",
-        .num_args = 3,
+        .usage    = "IPCP_NAME SCHED_NAME qsize BYTES [...]",
+        .num_args = 4,
         .func     = ipcp_sched_config,
     },
     {
