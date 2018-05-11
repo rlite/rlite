@@ -1098,7 +1098,13 @@ CDAPConn::msg_ser(CDAPMessage *m, int invoke_id, char **buf, size_t *len)
         return -1;
     }
 
-    if (invoke_id == 0 && m->is_request()) {
+    if (invoke_id != 0 && m->is_request()) {
+        /* If this is a request we must allocate the invoke_id
+         * using our allocator. No external invoke ids allowed. */
+        return -1;
+    }
+
+    if (m->is_request()) {
         /* CDAP request message (M_*). */
         m->invoke_id = invoke_id_mgr.get_invoke_id();
 
