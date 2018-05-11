@@ -6,15 +6,6 @@ Open tasks, in decreasing order of priority:
   register only within the DIFs where it has been configured to
   do so
 
-* implement kernel support for QoS-based scheduling; this should
-  be done in such a way that if the scheduler is not overloaded
-  the dequeue() is executed by a workqueue, while if overloaded
-  the dequeue() should be executed by the same contexts that
-  call enqueue(); this is a simple trick to avoid queue overflow
-  and prevent some enqueue()rs from predating the scheduler
-
-* extend rinaperf to provide latency distribution for ping test
-
 * implement a distributed and fault-tolerant DFT by means of a
   Kademlia DHT
 

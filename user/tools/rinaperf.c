@@ -497,7 +497,10 @@ ping_report(struct worker *w, struct rp_result_msg *snd,
     max /= 1000000.0;
     stddev /= 1000000.0;
 
-    if (!w->rp->cdf) {
+    if (!w->rp->cdf || num_samples < 110) {
+        if (num_samples < 110) {
+            printf("WARNING: at least 110 samples are needed to compute CDF\n");
+        }
         printf("--- %s ping statistics ---\n", w->rp->srv_appl_name);
         printf("%lu packets transmitted, %lu received, 0%% packet loss, "
                "time %lums\n",
@@ -512,14 +515,14 @@ ping_report(struct worker *w, struct rp_result_msg *snd,
         int i;
         printf("p0=%.3f us\n", (double)w->rtt_win[0] / 1000.0);
         for (i = 1; i < 100; i++) {
-            int pos = (i * RTT_WINSIZE) / 100;
+            int pos = (i * num_samples) / 100;
             printf("p%d=%.3f us\n", i, (double)w->rtt_win[pos] / 1000.0);
         }
         for (i = 991; i < 1000; i++) {
             printf("p%.1f=%.3f us\n", (float)i / 10.0,
-                   (double)w->rtt_win[i * RTT_WINSIZE / 1000] / 1000.0);
+                   (double)w->rtt_win[i * num_samples / 1000] / 1000.0);
         }
-        printf("p100=%.3f us\n", (double)w->rtt_win[RTT_WINSIZE - 1] / 1000.0);
+        printf("p100=%.3f us\n", (double)w->rtt_win[num_samples - 1] / 1000.0);
     }
 }
 
@@ -1498,6 +1501,7 @@ usage(void)
         "   -E NUM : maximum delay introduced by the flow (microseconds)\n"
         "   -T : print timestamp (unix time + microseconds as in gettimeofday) "
         "before each line in ping test\n"
+        "   -C : client prints cumulative density function in ping mode\n"
         "   -v : be verbose\n",
         RINA_FLOW_SPEC_LOSS_MAX);
 }
