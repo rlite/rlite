@@ -3191,8 +3191,8 @@ rl_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
     char *kbuf;
     ssize_t ret;
 
-    if (len < sizeof(rl_msg_t)) {
-        /* This message doesn't even contain a message type. */
+    if (len < sizeof(struct rl_msg_base)) {
+        /* This message doesn't even contain version and message type. */
         return -EINVAL;
     }
 
