@@ -37,6 +37,7 @@
 #include <cassert>
 #include <cerrno>
 #include <regex>
+#include <iomanip>
 #include <pthread.h>
 #include <poll.h>
 #include <fcntl.h>
@@ -797,13 +798,15 @@ UipcpRib::dump_rib_paths(std::stringstream &ss) const
 void
 UipcpRib::dump_stats(std::stringstream &ss) const
 {
+    const std::vector<std::pair<const char *, const uint64_t>> pairs = {
+        {"routing_table_compute", stats.routing_table_compute},
+        {"fwd_table_compute", stats.fwd_table_compute}};
+
     ss << "Uipcp stats:" << std::endl;
-    ss << "    "
-       << "routing_table_compute"
-       << " : " << stats.routing_table_compute << std::endl;
-    ss << "    "
-       << "fwd_table_compute"
-       << " : " << stats.fwd_table_compute << std::endl;
+    for (const auto &p : pairs) {
+        ss << "    " << std::setw(25) << p.first;
+        ss << ": " << p.second << std::endl;
+    }
 };
 
 void
