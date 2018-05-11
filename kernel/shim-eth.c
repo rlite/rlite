@@ -69,14 +69,16 @@ struct arpt_entry {
     struct list_head node;
 };
 
+struct eth_tx_queue {
+    unsigned long xmit_busy;
+} __attribute__((aligned(64)));
+
 struct rl_shim_eth {
     struct ipcp_entry *ipcp;
     /* TODO Protect access to this field with an RCU lock. */
     struct net_device *netdev;
 
-    /* TODO create per-tx-queue data structure, each one in its own
-     * cache line. */
-    unsigned long *xmit_busy;
+    struct eth_tx_queue *txq;
 
 #define ETH_UPPER_NAMES 4
     char *upper_names[ETH_UPPER_NAMES];
@@ -760,7 +762,8 @@ shim_eth_skb_destructor(struct sk_buff *skb)
     struct ipcp_entry *ipcp  = flow->txrx.ipcp;
     struct rl_shim_eth *priv = ipcp->priv;
 
-    if (test_and_clear_bit(0, &priv->xmit_busy[skb_get_queue_mapping(skb)])) {
+    if (test_and_clear_bit(0,
+                           &priv->txq[skb_get_queue_mapping(skb)].xmit_busy)) {
         rl_write_restart_flows(ipcp);
     }
 }
@@ -772,7 +775,7 @@ rl_shim_eth_flow_writeable(struct flow_entry *flow)
     int i;
 
     for (i = 0; i < priv->netdev->num_tx_queues; i++) {
-        if (!test_bit(0, &priv->xmit_busy[i])) {
+        if (!test_bit(0, &priv->txq[i].xmit_busy)) {
             return true;
         }
     }
@@ -850,7 +853,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         RPV(1, "dev_queue_xmit() failed [%d]\n", ret);
         entry->stats.tx_err++;
         for (i = 0; i < priv->netdev->num_tx_queues; i++) {
-            set_bit(0, &priv->xmit_busy[i]);
+            set_bit(0, &priv->txq[i].xmit_busy);
         }
 #ifndef RL_SKB
         return -EAGAIN; /* backpressure */
@@ -885,8 +888,8 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
             netdev       = priv->netdev;
             priv->netdev = NULL;
         }
-        if (priv->xmit_busy) {
-            rl_free(priv->xmit_busy, RL_MT_SHIMDATA);
+        if (priv->txq) {
+            rl_free(priv->txq, RL_MT_SHIMDATA);
         }
 
         if (netdev) {
@@ -902,10 +905,9 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
         if (!netdev) {
             return -EINVAL;
         }
-        priv->xmit_busy =
-            rl_alloc(netdev->num_tx_queues * sizeof(priv->xmit_busy[0]),
-                     GFP_ATOMIC | __GFP_ZERO, RL_MT_SHIMDATA);
-        if (!priv->xmit_busy) {
+        priv->txq = rl_alloc(netdev->num_tx_queues * sizeof(priv->txq[0]),
+                             GFP_ATOMIC | __GFP_ZERO, RL_MT_SHIMDATA);
+        if (!priv->txq) {
             return -ENOMEM;
         }
 
@@ -1081,9 +1083,9 @@ rl_shim_eth_create(struct ipcp_entry *ipcp)
         return NULL;
     }
 
-    priv->ipcp      = ipcp;
-    priv->netdev    = NULL;
-    priv->xmit_busy = NULL;
+    priv->ipcp   = ipcp;
+    priv->netdev = NULL;
+    priv->txq    = NULL;
     INIT_LIST_HEAD(&priv->arp_table);
     rwlock_init(&priv->arpt_lock);
 #ifdef RL_HAVE_TIMER_SETUP
@@ -1136,8 +1138,8 @@ rl_shim_eth_destroy(struct ipcp_entry *ipcp)
         dev_put(priv->netdev);
     }
 
-    if (priv->xmit_busy) {
-        rl_free(priv->xmit_busy, RL_MT_SHIMDATA);
+    if (priv->txq) {
+        rl_free(priv->txq, RL_MT_SHIMDATA);
     }
 
     for (i = 0; i < ETH_UPPER_NAMES; i++) {
