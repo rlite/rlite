@@ -373,8 +373,9 @@ class CentralizedFaultTolerantDFT : public DFT {
                           sizeof(Command), DFT::TableName),
               impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
         int apply(const char *const serbuf) override;
-        int process_rib_msg(const CDAPMessage *rm, rlm_addr_t src_addr,
-                            std::vector<CommandToSubmit> *commands) override;
+        int replica_process_rib_msg(
+            const CDAPMessage *rm, rlm_addr_t src_addr,
+            std::vector<CommandToSubmit> *commands) override;
         int lookup_req(const std::string &appl_name, std::string *dst_node,
                        const std::string &preferred, uint32_t cookie)
         {
@@ -411,9 +412,9 @@ class CentralizedFaultTolerantDFT : public DFT {
             : CeftClient(dft->rib, std::move(names))
         {
         }
-        int process_rib_msg(const CDAPMessage *rm,
-                            CeftClient::PendingReq *const bpr,
-                            rlm_addr_t src_addr) override;
+        int client_process_rib_msg(const CDAPMessage *rm,
+                                   CeftClient::PendingReq *const bpr,
+                                   rlm_addr_t src_addr) override;
         int lookup_req(const std::string &appl_name, std::string *dst_node,
                        const std::string &preferred, uint32_t cookie);
         int appl_register(const struct rl_kmsg_appl_register *req);
@@ -575,7 +576,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
 }
 
 int
-CentralizedFaultTolerantDFT::Client::process_rib_msg(
+CentralizedFaultTolerantDFT::Client::client_process_rib_msg(
     const CDAPMessage *rm, CeftClient::PendingReq *const bpr,
     rlm_addr_t src_addr)
 {
@@ -636,7 +637,7 @@ CentralizedFaultTolerantDFT::Replica::apply(const char *const serbuf)
 }
 
 int
-CentralizedFaultTolerantDFT::Replica::process_rib_msg(
+CentralizedFaultTolerantDFT::Replica::replica_process_rib_msg(
     const CDAPMessage *rm, rlm_addr_t src_addr,
     std::vector<CommandToSubmit> *commands)
 {

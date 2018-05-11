@@ -88,8 +88,9 @@ public:
     virtual int apply(const char *const serbuf) = 0;
     using CommandToSubmit =
         std::pair<std::unique_ptr<char[]>, std::unique_ptr<CDAPMessage>>;
-    virtual int process_rib_msg(const CDAPMessage *rm, rlm_addr_t src_addr,
-                                std::vector<CommandToSubmit> *commands) = 0;
+    virtual int replica_process_rib_msg(
+        const CDAPMessage *rm, rlm_addr_t src_addr,
+        std::vector<CommandToSubmit> *commands) = 0;
 };
 
 /* The CeftClient class provides the client-side generic glue functionalities
@@ -146,9 +147,9 @@ public:
 
     /* Called from rib_handler() to perform implementation specific
      * processing.*/
-    virtual int process_rib_msg(const CDAPMessage *rm,
-                                CeftClient::PendingReq *const bpr,
-                                rlm_addr_t src_addr) = 0;
+    virtual int client_process_rib_msg(const CDAPMessage *rm,
+                                       CeftClient::PendingReq *const bpr,
+                                       rlm_addr_t src_addr) = 0;
 
     /* For external hints. */
     void set_leader_id(const raft::ReplicaId &name)

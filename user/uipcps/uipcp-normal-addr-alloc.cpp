@@ -374,7 +374,7 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
             }
         };
         int apply(const char *const serbuf) override;
-        virtual int process_rib_msg(
+        virtual int replica_process_rib_msg(
             const CDAPMessage *rm, rlm_addr_t src_addr,
             std::vector<CommandToSubmit> *commands) override;
         void dump(std::stringstream &ss) const;
@@ -425,9 +425,9 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
         {
         }
         int allocate(const std::string &ipcp_name, rlm_addr_t *addr);
-        int process_rib_msg(const CDAPMessage *rm,
-                            CeftClient::PendingReq *const bpr,
-                            rlm_addr_t src_addr) override;
+        int client_process_rib_msg(const CDAPMessage *rm,
+                                   CeftClient::PendingReq *const bpr,
+                                   rlm_addr_t src_addr) override;
     };
     std::unique_ptr<Client> client;
 
@@ -556,7 +556,7 @@ CentralizedFaultTolerantAddrAllocator::Client::allocate(
 }
 
 int
-CentralizedFaultTolerantAddrAllocator::Client::process_rib_msg(
+CentralizedFaultTolerantAddrAllocator::Client::client_process_rib_msg(
     const CDAPMessage *rm, CeftClient::PendingReq *const bpr,
     rlm_addr_t src_addr)
 {
@@ -627,7 +627,7 @@ CentralizedFaultTolerantAddrAllocator::Replica::apply(const char *const serbuf)
 }
 
 int
-CentralizedFaultTolerantAddrAllocator::Replica::process_rib_msg(
+CentralizedFaultTolerantAddrAllocator::Replica::replica_process_rib_msg(
     const CDAPMessage *rm, rlm_addr_t src_addr,
     std::vector<CommandToSubmit> *commands)
 {

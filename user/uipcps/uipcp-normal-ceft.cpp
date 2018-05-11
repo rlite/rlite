@@ -260,7 +260,7 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
          * to the underlying implementation. */
         std::vector<CommandToSubmit> commands;
 
-        process_rib_msg(rm, src_addr, &commands);
+        replica_process_rib_msg(rm, src_addr, &commands);
 
         /* Submit commands to the raft state machine, if any. */
         for (auto &command : commands) {
@@ -420,7 +420,7 @@ CeftClient::rib_handler(const CDAPMessage *rm,
     }
 
     /* Handle the message to the underlying implementation. */
-    int ret = process_rib_msg(rm, pi->second.get(), src_addr);
+    int ret = client_process_rib_msg(rm, pi->second.get(), src_addr);
     pending.erase(pi);
     mod_pending_timer();
 
