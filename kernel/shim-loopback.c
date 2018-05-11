@@ -66,6 +66,7 @@ rcv_work(struct work_struct *w)
 {
     struct rl_shim_loopback *priv =
         container_of(w, struct rl_shim_loopback, rcv);
+    struct rl_ipcp_stats *stats = this_cpu_ptr(priv->ipcp->stats);
 
     for (;;) {
         struct rl_buf *rb = NULL;
@@ -80,10 +81,10 @@ rcv_work(struct work_struct *w)
             tx_flow   = priv->rxr[priv->rdh].tx_flow;
             priv->rdh = (priv->rdh + 1) & (RX_ENTRIES - 1);
 
-            tx_flow->stats.tx_pkt++;
-            tx_flow->stats.tx_byte += rb->len;
-            rx_flow->stats.rx_pkt++;
-            rx_flow->stats.rx_byte += rb->len;
+            stats->tx_pkt++;
+            stats->tx_byte += rb->len;
+            stats->rx_pkt++;
+            stats->rx_byte += rb->len;
         }
         spin_unlock_bh(&priv->lock);
 
@@ -94,8 +95,8 @@ rcv_work(struct work_struct *w)
         ret = rl_sdu_rx_flow(priv->ipcp, rx_flow, rb, true);
         if (unlikely(ret)) {
             spin_lock_bh(&priv->lock);
-            tx_flow->stats.tx_err++;
-            rx_flow->stats.rx_err++;
+            stats->tx_err++;
+            stats->rx_err++;
             spin_unlock_bh(&priv->lock);
         }
         flow_put(rx_flow);
@@ -288,6 +289,7 @@ static int
 rl_shim_loopback_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *tx_flow,
                            struct rl_buf *rb, unsigned flags)
 {
+    struct rl_ipcp_stats *stats   = this_cpu_ptr(ipcp->stats);
     struct rl_shim_loopback *priv = ipcp->priv;
     struct flow_entry *rx_flow;
     int ret = 0;
@@ -343,14 +345,14 @@ rl_shim_loopback_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *tx_flow,
 
         spin_lock_bh(&priv->lock);
         if (unlikely(ret)) {
-            tx_flow->stats.tx_err++;
-            rx_flow->stats.rx_err++;
+            stats->tx_err++;
+            stats->rx_err++;
 
         } else {
-            tx_flow->stats.tx_pkt++;
-            tx_flow->stats.tx_byte += len;
-            rx_flow->stats.rx_pkt++;
-            rx_flow->stats.rx_byte += len;
+            stats->tx_pkt++;
+            stats->tx_byte += len;
+            stats->rx_pkt++;
+            stats->rx_byte += len;
         }
         spin_unlock_bh(&priv->lock);
 
@@ -382,19 +384,6 @@ rl_shim_loopback_config(struct ipcp_entry *ipcp, const char *param_name,
     return ret;
 }
 
-static int
-rl_shim_loopback_flow_get_stats(struct flow_entry *flow,
-                                struct rl_flow_stats *stats)
-{
-    struct rl_shim_loopback *priv = flow->txrx.ipcp->priv;
-
-    spin_lock_bh(&priv->lock);
-    *stats = flow->stats;
-    spin_unlock_bh(&priv->lock);
-
-    return 0;
-}
-
 #define SHIM_DIF_TYPE "shim-loopback"
 
 static struct ipcp_factory shim_loopback_factory = {
@@ -408,7 +397,6 @@ static struct ipcp_factory shim_loopback_factory = {
     .ops.flow_deallocated   = rl_shim_loopback_flow_deallocated,
     .ops.sdu_write          = rl_shim_loopback_sdu_write,
     .ops.config             = rl_shim_loopback_config,
-    .ops.flow_get_stats     = rl_shim_loopback_flow_get_stats,
     .ops.flow_writeable     = rl_shim_loopback_flow_writeable,
 };
 
