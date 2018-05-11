@@ -70,6 +70,7 @@ enum class PolicyParamType {
     Int = 0,
     Bool,
     String,
+    Duration,
     Undefined,
 };
 
@@ -82,11 +83,13 @@ struct PolicyParam {
     int min;
     int max;
     std::string stringval;
+    std::chrono::milliseconds durval;
 
     PolicyParam();
     PolicyParam(bool param_value);
     PolicyParam(int param_value, int range_min = 0, int range_max = 0);
     PolicyParam(const std::string &s);
+    PolicyParam(const std::chrono::milliseconds durval);
 
     friend std::ostream &operator<<(std::ostream &os, const PolicyParam &param);
 
@@ -94,6 +97,7 @@ struct PolicyParam {
     bool get_bool_value() const;
     int get_int_value() const;
     std::string get_string_value() const;
+    std::chrono::milliseconds get_duration_value() const;
 };
 
 struct Neighbor;

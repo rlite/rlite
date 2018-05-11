@@ -36,6 +36,7 @@
 #include <cstdlib>
 #include <cassert>
 #include <cerrno>
+#include <regex>
 #include <pthread.h>
 #include <poll.h>
 #include <fcntl.h>
@@ -1780,6 +1781,16 @@ uipcp_rib::get_param_value<string>(const std::string &component,
     return params_map[component][param_name].get_string_value();
 }
 
+template <>
+std::chrono::milliseconds
+uipcp_rib::get_param_value<std::chrono::milliseconds>(
+    const std::string &component, const std::string &param_name)
+{
+    assert(params_map.count(component) &&
+           params_map[component].count(param_name));
+    return params_map[component][param_name].get_duration_value();
+}
+
 PolicyParamType
 uipcp_rib::get_param_type(const std::string &component,
                           const std::string &param_name)
@@ -1803,6 +1814,12 @@ PolicyParam::PolicyParam(int param_value, int range_min, int range_max)
     value.i = param_value;
     min     = range_min;
     max     = range_max;
+}
+
+PolicyParam::PolicyParam(std::chrono::milliseconds val)
+{
+    type   = PolicyParamType::Duration;
+    durval = val;
 }
 
 PolicyParam::PolicyParam(const std::string &param_value)
@@ -1846,6 +1863,19 @@ PolicyParam::set_value(const std::string &param_value,
     case PolicyParamType::String:
         stringval = param_value;
         break;
+    case PolicyParamType::Duration: {
+        std::regex exp("([0-9]+)ms");
+        std::smatch m;
+        if (std::regex_match(param_value, m, exp) && m.size() == 2) {
+            int x;
+            string2int(m[1].str(), x);
+            durval = std::chrono::milliseconds(x);
+        } else {
+            *error_reason = "Invalid duration value (ex. 100ms)";
+            return -1;
+        }
+        break;
+    }
     default:
         *error_reason = "Unknown parameter type";
         return -1;
@@ -1875,6 +1905,13 @@ PolicyParam::get_string_value() const
     return stringval;
 };
 
+std::chrono::milliseconds
+PolicyParam::get_duration_value() const
+{
+    assert(type == PolicyParamType::Duration);
+    return durval;
+};
+
 ostream &
 operator<<(ostream &os, const PolicyParam &param)
 {
@@ -1891,6 +1928,9 @@ operator<<(ostream &os, const PolicyParam &param)
         break;
     case PolicyParamType::String:
         os << param.get_string_value();
+        break;
+    case PolicyParamType::Duration:
+        os << param.durval.count() << "ms";
         break;
     case PolicyParamType::Undefined:
         os << "(undefined)";
