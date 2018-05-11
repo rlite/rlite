@@ -78,6 +78,9 @@ argparser.add_argument('-v', '--verbose',
 argparser.add_argument('-o', '--once', action = 'store_true',
                        help = "Terminate after successfully executing the"
                        " initscript")
+argparser.add_argument('--one-shot',
+                       help = "Terminate as soon as the configuration completes",
+                       action = 'store_true')
 
 args = argparser.parse_args()
 
@@ -112,8 +115,11 @@ while True:
 
     # The daemon is up and running. If it's not already configured
     # we can go ahead and execute the initscript. Otherwise we wait
-    # for a while and probe again.
+    # for a while and probe again (unless we are in one-shot mode,
+    # where we simply quit).
     if configured:
+        if args.one_shot:
+            quit()
         time.sleep(10)
         continue
 
