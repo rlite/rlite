@@ -1369,10 +1369,13 @@ out:
      * is not emptied and must not be used after the scan.*/
     rb_list_foreach_safe (qrb, tmp, &qrbs) {
         struct rina_pci *pci = RL_BUF_PCI(qrb);
+        unsigned len         = qrb->len;
 
         NPD("sending [%lu] from cwq\n", (long unsigned)pci->seqnum);
         rb_list_del(qrb);
         rmt_tx(ipcp, pci->dst_addr, qrb, RL_RMT_F_CONSUME);
+        stats->tx_pkt++;
+        stats->tx_byte += len;
     }
 
     /* This could be done conditionally. */
