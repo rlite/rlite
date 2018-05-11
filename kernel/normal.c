@@ -751,13 +751,15 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct dtcp_config *dc      = &flow->cfg.dtcp;
     bool dtcp_present           = DTCP_PRESENT(flow->cfg.dtcp);
     struct rina_pci *pci;
+    unsigned len;
     int ret;
 
     spin_lock_bh(&dtp->lock);
 
     /* Token bucket traffic shaping. */
     if (flow->cfg.dtcp.bandwidth) {
-        while (dtp->tkbk.bucket_size < rb->len) {
+        len = rb->len;
+        while (dtp->tkbk.bucket_size < len) {
             ktime_t now;
             unsigned long us;
 
@@ -776,14 +778,14 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
             now = ktime_get();
             us  = ktime_to_us(ktime_sub(now, dtp->tkbk.t_last_refill));
-            if (dtp->tkbk.bucket_size < rb->len &&
+            if (dtp->tkbk.bucket_size < len &&
                 us >= dtp->tkbk.intval_ms * 1000) {
                 dtp->tkbk.bucket_size +=
                     ((flow->cfg.dtcp.bandwidth / 8) * us) / 1000000;
                 dtp->tkbk.t_last_refill = now;
             }
         }
-        dtp->tkbk.bucket_size -= rb->len;
+        dtp->tkbk.bucket_size -= len;
     }
 
     if (unlikely(flow_blocked(&flow->cfg, dtp))) {
@@ -802,8 +804,8 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     if (unlikely(rl_buf_pci_push(rb))) {
         PE("pci_push() failed\n");
-        stats->tx_err++;
         spin_unlock_bh(&dtp->lock);
+        stats->tx_err++;
         rl_buf_free(rb);
 
         return -ENOSPC;
@@ -817,10 +819,10 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     pci->src_cep   = flow->local_cep;
     pci->pdu_type  = PDU_T_DT;
     pci->pdu_flags = 0;
-    pci->pdu_len   = rb->len;
-    pci->pdu_ttl   = priv->ttl;
-    pci->pdu_csum  = 0;
-    pci->seqnum    = dtp->next_seq_num_to_use++;
+    pci->pdu_len = len = rb->len;
+    pci->pdu_ttl       = priv->ttl;
+    pci->pdu_csum      = 0;
+    pci->seqnum        = dtp->next_seq_num_to_use++;
 
     if (unlikely(dtp->flags & DTP_F_DRF_SET)) {
         dtp->flags &= ~DTP_F_DRF_SET;
@@ -828,7 +830,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     }
 
     if (priv->csum) {
-        pci->pdu_csum = inet_wrapsum(inet_csum(pci, rb->len, 0));
+        pci->pdu_csum = inet_wrapsum(inet_csum(pci, len, 0));
     }
 
     if (!dtcp_present) {
@@ -861,8 +863,8 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
             int ret = rl_rtxq_push(flow, rb);
 
             if (unlikely(ret)) {
-                stats->tx_err++;
                 spin_unlock_bh(&dtp->lock);
+                stats->tx_err++;
                 rl_buf_free(rb);
 
                 return ret;
@@ -883,19 +885,12 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         mod_timer(&dtp->snd_inact_tmr, jiffies + 3 * dtp->mpl_r_a);
     }
 
-    stats->tx_pkt++;
-    stats->tx_byte += rb->len;
-
     spin_unlock_bh(&dtp->lock);
 
     ret = rmt_tx(ipcp, flow->remote_addr, rb, flags);
-
-    if (unlikely(ret == -EAGAIN)) {
-        /* Adjust the counter. */
-        spin_lock_bh(&dtp->lock);
-        stats->tx_pkt--;
-        stats->tx_byte -= rb->len;
-        spin_unlock_bh(&dtp->lock);
+    if (likely(ret != -EAGAIN)) {
+        stats->tx_pkt++;
+        stats->tx_byte += len;
     }
 
     return ret;
@@ -1211,9 +1206,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow, struct rl_buf *rb)
     if (unlikely((pcic->base.pdu_type & PDU_T_CTRL) != PDU_T_CTRL)) {
         PE("Unknown PDU type %X\n", pcic->base.pdu_type);
         rl_buf_free(rb);
-        spin_lock_bh(&dtp->lock);
         stats->rx_err++;
-        spin_unlock_bh(&dtp->lock);
         return 0;
     }
 
@@ -1677,11 +1670,10 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
             dtp->rcv_lwe = dtp->rcv_next_seq_num;
         }
         crb = sdu_rx_sv_update(ipcp, flow, /*ack_immediate=*/false);
+        spin_unlock_bh(&dtp->lock);
 
         stats->rx_pkt++;
         stats->rx_byte += rb->len;
-
-        spin_unlock_bh(&dtp->lock);
 
         RL_BUF_RX(rb).cons_seqnum = seqnum;
         rl_buf_pci_pop(rb);
