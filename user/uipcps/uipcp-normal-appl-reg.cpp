@@ -688,6 +688,8 @@ CentralizedFaultTolerantDFT::Replica::process_rib_msg(
         m->obj_name  = rm->obj_name;
         m->obj_class = rm->obj_class;
         m->invoke_id = rm->invoke_id;
+
+        /* Return the command to the caller. */
         commands->push_back(std::make_pair(std::move(cbuf), std::move(m)));
     } else if (rm->op_code == gpb::M_READ) {
         /* We received an an M_READ sent by Client::lookup_req().

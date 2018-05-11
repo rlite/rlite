@@ -532,11 +532,10 @@ CentralizedFaultTolerantAddrAllocator::Replica::apply(const char *const serbuf)
     assert(c->opcode == Command::OpcodeSet || c->opcode == Command::OpcodeDel);
     if (c->opcode == Command::OpcodeSet) {
         table[c->ipcp_name] = c->address;
+        next_unused_address++;
     } else {
         table.erase(c->ipcp_name);
     }
-
-    // TODO answer M_WRITE_R here?
 
     return 0;
 }
@@ -576,10 +575,19 @@ CentralizedFaultTolerantAddrAllocator::Replica::process_rib_msg(
 
         /* Fill in the command struct (already serialized). */
         strncpy(c->ipcp_name, ipcp_name.c_str(), sizeof(c->ipcp_name));
-        c->address = next_unused_address++;
+        c->address = next_unused_address;
         c->opcode  = Command::OpcodeSet;
 
-        commands->push_back(make_pair(std::move(cbuf), nullptr));
+        /* Prepare the response. */
+        auto m       = make_unique<CDAPMessage>();
+        m->op_code   = gpb::M_WRITE_R;
+        m->obj_name  = rm->obj_name;
+        m->obj_class = rm->obj_class;
+        m->invoke_id = rm->invoke_id;
+        m->set_obj_value((static_cast<int64_t>(c->address)));
+
+        /* Return the command to the caller. */
+        commands->push_back(make_pair(std::move(cbuf), std::move(m)));
     } else if (rm->op_code == gpb::M_READ) {
         /* We received an an M_READ. Look up the IPCP in the map. */
         auto m         = make_unique<CDAPMessage>();
