@@ -457,7 +457,8 @@ fout = open('up.sh', 'w')
 outs =  '#!/bin/bash\n'             \
         '\n'                        \
         'set -x\n'                  \
-        '\n./clean.sh\n\n';
+        '\n./clean.sh\n\n'          \
+        'SECONDS=0\n';
 
 if args.backend == 'tap':
     for shim in sorted(demo.shims):
@@ -540,6 +541,8 @@ else:
 if args.backend == 'tap':
     outs += 'wait\n'
 
+outs += 'VNETSETUPTIME=$SECONDS\n'\
+        'SECONDS=0\n'
 
 verbmap = {'QUIET': 1, 'WARN': 2, 'INFO': 3, 'DBG': 4, 'VERY': 5}
 
@@ -840,6 +843,14 @@ for dif in demo.dif_ordering:
         print(info)
 
 
+outs += 'RINASETUPTIME=$SECONDS\n'\
+        'set +x\n\n'\
+        'echo =============================================================\n'\
+        'echo "Virtual network setup completed in $(($VNETSETUPTIME / 60)) '\
+            'minutes and $(($VNETSETUPTIME % 60)) seconds"\n'\
+        'echo "RINA networking setup completed in $(($RINASETUPTIME / 60)) '\
+            'minutes and $(($RINASETUPTIME % 60)) seconds"\n'
+
 fout.write(outs)
 
 fout.close()
@@ -852,7 +863,8 @@ fout = open('down.sh', 'w')
 
 outs =  '#!/bin/bash\n'             \
         '\n'                        \
-        'set -x\n\n'
+        'set -x\n\n'\
+        'SECONDS=0\n'
 
 if not args.namespaces:
     outs += ''\
@@ -918,6 +930,11 @@ elif args.backend == 'tap':
                 'sudo ip link del %(br)s type bridge\n' \
                 ') &\n' % {'br': shim}
     outs += 'wait\n'
+
+outs += 'set +x\n\n'\
+        'echo =============================================================\n'\
+        'echo "Teardown completed in $(($SECONDS / 60)) '\
+            'minutes and $(($SECONDS % 60)) seconds"\n'
 
 fout.write(outs)
 
