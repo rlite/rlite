@@ -959,7 +959,9 @@ daemonize(void)
         unlink_and_exit(EXIT_FAILURE);
     }
 
-    chdir("/");
+    if (chdir("/")) {
+        unlink_and_exit(EXIT_FAILURE);
+    }
 }
 
 static void
