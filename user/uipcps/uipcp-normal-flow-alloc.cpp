@@ -63,6 +63,7 @@ UipcpRib::fa_req(struct rl_kmsg_fa_req *req)
         /* Return a negative flow allocation response immediately. */
         UPI(uipcp, "No DFT matching entry for destination %s\n",
             req->remote_appl);
+        stats.fa_name_lookup_failed++;
 
         return uipcp_issue_fa_resp_arrived(
             uipcp, req->local_port, 0 /* don't care */, 0 /* don't care */,
@@ -106,6 +107,7 @@ UipcpRib::dft_lookup_resolved(const std::string &appl_name,
     if (remote_node.empty()) {
         UPI(uipcp, "No DFT matching entry for destination %s\n",
             appl_name.c_str());
+        stats.fa_name_lookup_failed++;
     }
     for (auto &fr : mit->second) {
         if (remote_node.empty()) {
@@ -398,6 +400,7 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
         return ret;
     }
     flow_reqs[obj_name.str() + string("L")] = std::move(freq);
+    rib->stats.fa_request_issued++;
 
     return 0;
 }
@@ -446,6 +449,7 @@ LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
         flow_reqs[obj_name.str() + string("R")] = std::move(freq);
     }
     flow_reqs_tmp.erase(f); /* first std::move(), then erase. */
+    rib->stats.fa_response_received++;
 
     return ret;
 }

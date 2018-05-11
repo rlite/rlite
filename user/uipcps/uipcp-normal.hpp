@@ -574,6 +574,9 @@ struct UipcpRib {
     struct {
         uint64_t routing_table_compute;
         uint64_t fwd_table_compute;
+        uint64_t fa_name_lookup_failed;
+        uint64_t fa_request_issued;
+        uint64_t fa_response_received;
     } stats;
 
     /* Time interval (in seconds) between two consecutive increments

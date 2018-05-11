@@ -800,7 +800,10 @@ UipcpRib::dump_stats(std::stringstream &ss) const
 {
     const std::vector<std::pair<const char *, const uint64_t>> pairs = {
         {"routing_table_compute", stats.routing_table_compute},
-        {"fwd_table_compute", stats.fwd_table_compute}};
+        {"fwd_table_compute", stats.fwd_table_compute},
+        {"fa_name_lookup_failed", stats.fa_name_lookup_failed},
+        {"fa_request_issued", stats.fa_request_issued},
+        {"fa_response_received", stats.fa_response_received}};
 
     ss << "Uipcp stats:" << std::endl;
     for (const auto &p : pairs) {
