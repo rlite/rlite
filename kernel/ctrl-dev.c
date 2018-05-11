@@ -1488,27 +1488,44 @@ flow_make_mortal(struct flow_entry *flow)
     }
 }
 
-static void
-ipcp_probe_references(struct ipcp_entry *ipcp)
+bool
+rl_ipcp_has_flows(struct ipcp_entry *ipcp, bool report_all)
 {
-    {
-        struct flow_entry *flow;
-        int bucket;
+    struct flow_entry *flow;
+    int bucket;
+    bool has_flows = false;
 
-        FLOCK(ipcp->dm);
-        hash_for_each(ipcp->dm->flow_table, bucket, flow, node)
-        {
-            if (flow->txrx.ipcp == ipcp) {
+    FRLOCK(ipcp->dm);
+    hash_for_each(ipcp->dm->flow_table, bucket, flow, node)
+    {
+        if (flow->txrx.ipcp == ipcp) {
+            has_flows = true;
+            if (report_all) {
                 PE("Flow %u has a horizontal dangling reference to ipcp %u\n",
                    flow->local_port, ipcp->id);
             }
-            if (flow->upper.ipcp == ipcp) {
+        }
+        if (flow->upper.ipcp == ipcp) {
+            has_flows = true;
+            if (report_all) {
                 PE("Flow %u has a vertical dangling reference to ipcp %u\n",
                    flow->local_port, ipcp->id);
             }
         }
-        FUNLOCK(ipcp->dm);
+        if (!report_all && has_flows) {
+            break;
+        }
     }
+    FRUNLOCK(ipcp->dm);
+
+    return has_flows;
+}
+EXPORT_SYMBOL(rl_ipcp_has_flows);
+
+static void
+ipcp_probe_references(struct ipcp_entry *ipcp)
+{
+    rl_ipcp_has_flows(ipcp, /*report_all=*/true);
 
     {
         struct registered_appl *appl;
