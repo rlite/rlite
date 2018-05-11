@@ -63,6 +63,8 @@ enum {
     RLITE_KER_FLOW_STATE,            /* 31 */
     RLITE_KER_IPCP_RMT_STATS_REQ,    /* 32 */
     RLITE_KER_IPCP_RMT_STATS_RESP,   /* 33 */
+    RLITE_KER_IPCP_CONFIG_GET_REQ,   /* 34 */
+    RLITE_KER_IPCP_CONFIG_GET_RESP,  /* 35 */
 
     RLITE_KER_MSG_MAX,
 };
@@ -265,6 +267,21 @@ struct rl_kmsg_ipcp_config {
     rl_ipcp_id_t ipcp_id;
     char *name;
     char *value;
+} __attribute__((packed));
+
+/* application --> kernel to ask for IPCP config value. */
+struct rl_kmsg_ipcp_config_get_req {
+    struct rl_msg_hdr hdr;
+
+    rl_ipcp_id_t ipcp_id;
+    char *param_name;
+} __attribute__((packed));
+
+/* application <-- kernel to return IPCP config value. */
+struct rl_kmsg_ipcp_config_get_resp {
+    struct rl_msg_hdr hdr;
+
+    char *param_value;
 } __attribute__((packed));
 
 /* application --> kernel to modifty an IPCP PDUFT

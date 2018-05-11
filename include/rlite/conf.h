@@ -62,6 +62,8 @@ int rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id, const int sync);
 int rl_conf_ipcp_config(rl_ipcp_id_t ipcp_id, const char *param_name,
                         const char *param_value);
 
+char *rl_conf_ipcp_config_get(rl_ipcp_id_t ipcp_id, const char *param_name);
+
 /* Fetch information about the flows in the system. */
 int rl_conf_flows_print(struct list_head *flows);
 

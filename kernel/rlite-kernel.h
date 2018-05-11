@@ -444,6 +444,8 @@ struct ipcp_ops {
                              struct flow_entry *lower_flow);
     int (*config)(struct ipcp_entry *ipcp, const char *param_name,
                   const char *param_value, int *notify);
+    int (*config_get)(struct ipcp_entry *ipcp, const char *param_name,
+                      char *buf, int buflen);
     int (*pduft_set)(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
                      struct flow_entry *flow);
     int (*pduft_del)(struct ipcp_entry *ipcp, struct pduft_entry *entry);

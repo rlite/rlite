@@ -448,6 +448,35 @@ ipcp_config(int argc, char **argv, struct cmd_descriptor *cd)
 }
 
 static int
+ipcp_config_get(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    struct ipcp_attrs *attrs;
+    const char *param_name;
+    const char *ipcp_name;
+    char *param_value;
+
+    assert(argc >= 2);
+    ipcp_name  = argv[0];
+    param_name = argv[1];
+
+    /* Does the request specifies an existing IPC process ? */
+    attrs = lookup_ipcp_by_name(ipcp_name);
+    if (!attrs) {
+        PE("No such IPCP process\n");
+        return -1;
+    }
+
+    param_value = rl_conf_ipcp_config_get(attrs->id, param_name);
+    if (!param_value) {
+        PE("Failed to get config parameter '%s'\n", param_name);
+    } else {
+        printf("%s\n", param_value);
+    }
+
+    return param_value ? 0 : -1;
+}
+
+static int
 ipcp_register_common(int argc, char **argv, unsigned int reg,
                      struct cmd_descriptor *cd)
 {
@@ -1250,6 +1279,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage    = "IPCP_NAME PARAM_NAME PARAM_VALUE",
         .num_args = 3,
         .func     = ipcp_config,
+    },
+    {
+        .name     = "ipcp-config-get",
+        .usage    = "IPCP_NAME PARAM_NAME",
+        .num_args = 2,
+        .func     = ipcp_config_get,
     },
     {
         .name     = "ipcp-register",

@@ -2020,6 +2020,66 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 }
 
 static int
+rl_ipcp_config_get(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
+{
+    struct rl_kmsg_ipcp_config_get_req *req =
+        (struct rl_kmsg_ipcp_config_get_req *)bmsg;
+    struct ipcp_entry *entry;
+    char valbuf[64];
+    int ret;
+
+    if (!req->param_name) {
+        return -EINVAL;
+    }
+
+    /* Find the IPC process entry corresponding to req->ipcp_id and
+     * fill the DIF name field. */
+    entry = ipcp_get(req->ipcp_id);
+    if (!entry) {
+        return -EINVAL;
+    }
+
+    ret = -ENOSYS; /* parameter not implemented */
+    /* Check if the IPCP knows how to change this paramter. */
+    mutex_lock(&entry->lock);
+    if (entry->ops.config_get) {
+        ret = entry->ops.config_get(entry, req->param_name, valbuf,
+                                    sizeof(valbuf));
+    }
+    mutex_unlock(&entry->lock);
+
+    if (ret == -ENOSYS) {
+        /* This operation was not managed by ops.config, let's see if
+         *  we can manage it here. */
+        ret = 0;
+        if (strcmp(req->param_name, "txhdroom") == 0) {
+            snprintf(valbuf, sizeof(valbuf), "%u", entry->txhdroom);
+        } else if (strcmp(req->param_name, "rxhdroom") == 0) {
+            snprintf(valbuf, sizeof(valbuf), "%u", entry->rxhdroom);
+        } else if (strcmp(req->param_name, "mss") == 0) {
+            snprintf(valbuf, sizeof(valbuf), "%u", entry->max_sdu_size);
+        } else {
+            ret = -EINVAL; /* unknown request */
+        }
+    }
+
+    if (ret == 0) {
+        struct rl_kmsg_ipcp_config_get_resp resp;
+
+        memset(&resp, 0, sizeof(resp));
+        resp.hdr.msg_type = RLITE_KER_IPCP_CONFIG_GET_RESP;
+        resp.hdr.event_id = req->hdr.event_id;
+        resp.param_value  = rl_strdup(valbuf, GFP_KERNEL, RL_MT_UTILS);
+        ret = rl_upqueue_append(rc, (const struct rl_msg_base *)&resp, true);
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));
+    }
+
+    ipcp_put(entry);
+
+    return ret;
+}
+
+static int
 rl_ipcp_pduft_mod(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_pduft_mod *req = (struct rl_kmsg_ipcp_pduft_mod *)bmsg;
@@ -2956,6 +3016,7 @@ static rl_msg_handler_t rl_ctrl_handlers[] = {
     [RLITE_KER_APPL_MOVE]             = rl_appl_move,
     [RLITE_KER_REG_FETCH]             = rl_reg_fetch,
     [RLITE_KER_IPCP_RMT_STATS_REQ]    = rl_rmt_get_stats,
+    [RLITE_KER_IPCP_CONFIG_GET_REQ]   = rl_ipcp_config_get,
 #ifdef RL_MEMTRACK
     [RLITE_KER_MEMTRACK_DUMP] = rl_memtrack_dump,
 #endif /* RL_MEMTRACK */

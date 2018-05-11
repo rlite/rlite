@@ -215,6 +215,47 @@ rl_conf_ipcp_config(rl_ipcp_id_t ipcp_id, const char *param_name,
     return ret;
 }
 
+char *
+rl_conf_ipcp_config_get(rl_ipcp_id_t ipcp_id, const char *param_name)
+{
+    struct rl_kmsg_ipcp_config_get_req msg;
+    struct rl_kmsg_ipcp_config_get_resp *resp;
+    char *param_value = NULL;
+    int ret;
+    int fd;
+
+    fd = rina_open();
+    if (fd < 0) {
+        return NULL;
+    }
+
+    memset(&msg, 0, sizeof(msg));
+    msg.hdr.msg_type = RLITE_KER_IPCP_CONFIG_GET_REQ;
+    msg.hdr.event_id = 1;
+    msg.ipcp_id      = ipcp_id;
+    msg.param_name   = rl_strdup(param_name, RL_MT_UTILS);
+
+    ret = rl_write_msg(fd, RLITE_MB(&msg), 1);
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
+    if (ret) {
+        return NULL;
+    }
+
+    resp = (struct rl_kmsg_ipcp_config_get_resp *)wait_for_next_msg(fd, 3000);
+    if (!resp) {
+        goto out;
+    }
+    assert(resp->hdr.event_id == msg.hdr.event_id);
+    param_value       = resp->param_value;
+    resp->param_value = NULL;
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
+    rl_free(resp, RL_MT_MSG);
+out:
+    close(fd);
+
+    return param_value;
+}
+
 /* Support for fetching flow information in kernel space. */
 
 int
