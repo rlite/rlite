@@ -708,37 +708,43 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
     if (false) {
         /* PDU scheduler path. */
         struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
-        bool enqueued               = false;
-        int ret                     = 0;
 
         spin_lock_bh(&priv->sched_qlock);
-        if (priv->sched_qlen < RMTQ_MAX_SIZE) {
-            /* Simple FIFO enqueue logic, to be replaced with a
-             * scheduling algorithm. */
-            enqueued                  = true;
-            RL_BUF_RMT(rb).lower_flow = lower_flow;
-            rb_list_enq(rb, &priv->sched_q);
-            priv->sched_qlen += rl_buf_truesize(rb);
-            stats->rmt.queued_pkt++;
-            /* The rb was handled, so must return 0. */
-        } else if (flags & RL_RMT_F_CONSUME) {
-            /* No room in the RMT queue, and we are asked to consume the
-             * buffer anyway, so we are forced to drop. */
-            RPD(1, "rmtq overrun: dropping PDU\n");
-            stats->rmt.queue_drop++;
-            rl_buf_free(rb);
-            /* The rb was handled, so must return 0. */
+        /* Simple FIFO enqueue logic, to be replaced with a
+         * scheduling algorithm. */
+        RL_BUF_RMT(rb).lower_flow = lower_flow;
+        rb_list_enq(rb, &priv->sched_q);
+        priv->sched_qlen += rl_buf_truesize(rb);
+        stats->rmt.queued_pkt++;
+        if (priv->sched_qlen > RMTQ_MAX_SIZE) {
+            /* The queue backlog is becoming too large, so we help the dequeuer
+             * to do its job. We dequeue and send a single PDU. Note that we
+             * need to overwrite both 'rb' and 'lower_flow'. */
+            BUG_ON(rb_list_empty(&priv->sched_q));
+            rb = rb_list_front(&priv->sched_q);
+            rb_list_del(rb);
+            priv->sched_qlen -= rl_buf_truesize(rb);
+            BUG_ON(priv->sched_qlen < 0);
+            lower_flow = RL_BUF_RMT(rb).lower_flow;
+            BUG_ON(!lower_flow);
+            /* We must make sure that RL_RMT_F_CONSUME is set, otherwise the
+             * rmt_tx_to_lower() below could return -EAGAIN, and the caller
+             * would try to retransmit the same rb. This would result in panics,
+             * as the 'rb' changed. */
+            flags |= RL_RMT_F_CONSUME;
         } else {
-            /* No room in the RMT queue, but we can return the backpressure
-             * signal. */
-            ret = -EAGAIN;
+            rb = NULL;
         }
         spin_unlock_bh(&priv->sched_qlock);
-        if (enqueued) {
+
+        if (!rb) {
+            /* We don't need to help the dequeuer, so we just kick it and
+             * report that the PDU was handled. */
             schedule_work(&priv->sched_deq_work);
+            return 0;
         }
 
-        return ret;
+        /* Go ahead and transmit the rb dequeued from the scheduler. */
     }
 
     /* Direct path, bypassing the PDU scheduler. */
