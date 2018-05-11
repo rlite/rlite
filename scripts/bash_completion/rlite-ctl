@@ -15,40 +15,38 @@ _rlite_ctl() {
 
     case "$pprev" in
         ipcp-config )
-            PARAMS="address ttl csum flow-del-wait-ms sched queued drop-fract"
-            COMPREPLY=( $(compgen -W "$PARAMS" -- $cur) )
+            CHOICES="address ttl csum flow-del-wait-ms sched queued drop-fract"
         ;;
         ipcp-sched-config )
-            COMPREPLY=( $(compgen -W "$SCHEDS" -- $cur) )
+            CHOICES=$SCHEDS
         ;;
         quantum )
-            COMPREPLY=( $(compgen -W "weights" -- $cur) )
+            CHOICES="weights"
         ;;
     esac
 
     case "$prev" in
         rlite-ctl )
-            CMDS=$(rlite-ctl -h | tail -n +2 | grep -o "^    [^ ]\+")
-            COMPREPLY=( $(compgen -W "$CMDS" -- $cur) )
+            CHOICES=$(rlite-ctl -h | tail -n +2 | grep -o "^    [^ ]\+")
         ;;
         dif-* )
-            DIFS=$(difs_list)
-            COMPREPLY=( $(compgen -W "$DIFS" -- $cur) )
+            CHOICES=$(difs_list)
         ;;
         ipcp-* | uipcp* )
-            IPCPS=$(ipcps_list)
-            COMPREPLY=( $(compgen -W "$IPCPS" -- $cur) )
+            CHOICES=$(ipcps_list)
         ;;
         wrr )
-            COMPREPLY=( $(compgen -W "quantum" -- $cur) )
+            CHOICES="quantum"
         ;;
         pfifo )
-            COMPREPLY=( $(compgen -W "levels" -- $cur) )
+            CHOICES="levels"
         ;;
         sched )
-            COMPREPLY=( $(compgen -W "$SCHEDS" -- $cur) )
+            CHOICES=$SCHEDS
         ;;
     esac
+
+    COMPREPLY=( $(compgen -W "$CHOICES" -- $cur) )
 }
 
 complete -F _rlite_ctl rlite-ctl
