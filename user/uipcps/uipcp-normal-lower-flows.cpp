@@ -338,7 +338,7 @@ FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm,
                                        &prop_lfl);
 
         /* Update the kernel routing table. */
-        re.update_kernel_routing(rib->myname);
+        update_kernel();
     }
 
     return 0;
@@ -500,7 +500,7 @@ FullyReplicatedLFDB::age_incr()
         rib->neighs_sync_obj_all(/*create=*/false, ObjClass, TableName,
                                  &prop_lfl);
         /* Update the routing table. */
-        re.update_kernel_routing(rib->myname);
+        update_kernel();
     }
 
     /* Reschedule */
@@ -535,7 +535,7 @@ FullyReplicatedLFDB::neigh_disconnected(const std::string &neigh_name)
         rib->neighs_sync_obj_all(/*create=*/false, ObjClass, TableName,
                                  &prop_lfl);
         /* Update the routing table. */
-        re.update_kernel_routing(rib->myname);
+        update_kernel();
     }
 }
 
