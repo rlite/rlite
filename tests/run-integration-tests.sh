@@ -48,7 +48,7 @@ rmmod rlite > /dev/null 2>&1
 testcnt="0"
 for t in tests/integration/*.sh ; do
     testcnt=$((testcnt + 1))
-    if [ "$TESTSEL" -ne "0" -a "$TESTSEL" -ne "$testcnt" ]; then
+    if [ "$TESTSEL" -ne "0" ] && [ "$TESTSEL" -ne "$testcnt" ]; then
         continue
     fi
     echo -e "${ORANGE}>>> Running integration test ${CYAN}\"${t}\"${NOC}"
