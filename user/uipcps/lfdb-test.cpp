@@ -105,17 +105,14 @@ reachable(const RoutingTables &rtables, int src_node, int dst_node,
     return cur == dst && expected_nhops == 0;
 }
 
-static void
-usage()
-{
-    std::cout << "lfdb-test -n SIZE\n"
-                 "          -v be verbose\n"
-                 "          -h show this help and exit\n";
-}
-
 int
 main(int argc, char **argv)
 {
+    auto usage = []() {
+        std::cout << "lfdb-test -n SIZE\n"
+                     "          -v be verbose\n"
+                     "          -h show this help and exit\n";
+    };
     int verbosity = 0;
     int n         = 100;
     int opt;
