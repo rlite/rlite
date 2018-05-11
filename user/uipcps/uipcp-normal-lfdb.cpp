@@ -76,7 +76,7 @@ LFDB::dump_routing(std::stringstream &ss, const NodeId &local_node) const
 
 void
 LFDB::compute_shortest_paths(
-    const NodeId &source_addr,
+    const NodeId &source_node,
     const std::unordered_map<NodeId, std::list<Edge>> &graph,
     std::unordered_map<NodeId, Info> &info)
 {
@@ -89,16 +89,16 @@ LFDB::compute_shortest_paths(
 
         info[kvg.first] = inf;
     }
-    info[source_addr].dist = 0;
+    info[source_node].dist = 0;
 
     for (;;) {
-        NodeId min_addr;
+        NodeId min_node;
         unsigned int min_dist = UINT_MAX;
 
         /* Select the closest node from the ones in the frontier. */
         for (auto &kvi : info) {
             if (!kvi.second.visited && kvi.second.dist < min_dist) {
-                min_addr = kvi.first;
+                min_node = kvi.first;
                 min_dist = kvi.second.dist;
             }
         }
@@ -107,18 +107,18 @@ LFDB::compute_shortest_paths(
             break;
         }
 
-        assert(min_addr.size() > 0);
+        assert(!min_node.empty());
 
         if (verbose) {
-            std::cout << "Selecting node " << min_addr << std::endl;
+            std::cout << "Selecting node " << min_node << std::endl;
         }
 
-        if (!graph.count(min_addr)) {
+        if (!graph.count(min_node)) {
             continue; /* nothing to do */
         }
 
-        const std::list<Edge> &edges = graph.at(min_addr);
-        Info &info_min               = info[min_addr];
+        const std::list<Edge> &edges = graph.at(min_node);
+        Info &info_min               = info[min_node];
 
         info_min.visited = true;
 
@@ -128,7 +128,7 @@ LFDB::compute_shortest_paths(
             if (info_to.dist > info_min.dist + edge.cost) {
                 info_to.dist = info_min.dist + edge.cost;
                 info_to.nhop =
-                    (min_addr == source_addr) ? edge.to : info_min.nhop;
+                    (min_node == source_node) ? edge.to : info_min.nhop;
             }
         }
     }
