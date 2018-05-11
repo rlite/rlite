@@ -422,14 +422,14 @@ struct PolicyBuilder {
     std::string name;
     std::function<std::unique_ptr<Component>(UipcpRib *)> builder =
         [](UipcpRib *) { return nullptr; };
-    std::list<std::string> paths;
-    std::list<std::pair<std::string, PolicyParam>> params;
+    std::vector<std::string> paths;
+    std::vector<std::pair<std::string, PolicyParam>> params;
 
     PolicyBuilder(const std::string &policy_name) : name(policy_name) {}
     PolicyBuilder(const std::string &policy_name,
                   std::function<std::unique_ptr<Component>(UipcpRib *)> fun,
-                  std::list<std::string> ps                         = {},
-                  std::list<std::pair<std::string, PolicyParam>> pp = {})
+                  std::vector<std::string> ps                         = {},
+                  std::vector<std::pair<std::string, PolicyParam>> pp = {})
         : PolicyBuilder(policy_name)
     {
         builder = fun;

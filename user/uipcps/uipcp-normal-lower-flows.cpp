@@ -762,7 +762,7 @@ StaticRouting::route_mod(const struct rl_cmsg_ipcp_route_mod *req)
 void
 UipcpRib::routing_lib_init()
 {
-    std::list<std::pair<std::string, PolicyParam>> link_state_params = {
+    std::vector<std::pair<std::string, PolicyParam>> link_state_params = {
         {"age-incr-intval",
          PolicyParam(Secs(int(LinkStateRouting::kAgeIncrIntvalSecs)))},
         {"age-max", PolicyParam(Secs(int(LinkStateRouting::kAgeMaxSecs)))}};
