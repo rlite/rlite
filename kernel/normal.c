@@ -122,6 +122,8 @@ rina_pci_dump(struct rina_pci *pci)
 
 #define RL_PCI_CTRL_LEN (RL_PCI_LEN + 6 * sizeof(rl_seq_t))
 
+static void sched_deq_worker(struct work_struct *w);
+
 static void *
 rl_normal_create(struct ipcp_entry *ipcp)
 {
@@ -151,6 +153,11 @@ rl_normal_create(struct ipcp_entry *ipcp)
     priv->ttl  = RL_TTL_DFLT;
     priv->csum = false;
 
+    rb_list_init(&priv->sched_q);
+    priv->sched_qlen = 0;
+    spin_lock_init(&priv->sched_qlock);
+    INIT_WORK(&priv->sched_deq_work, sched_deq_worker);
+
     PD("New IPC created [%p]\n", priv);
 
     return priv;
@@ -160,6 +167,16 @@ static void
 rl_normal_destroy(struct ipcp_entry *ipcp)
 {
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
+
+    {
+        struct rl_buf *rb, *tmp;
+
+        cancel_work_sync(&priv->sched_deq_work);
+        rb_list_foreach_safe (rb, tmp, &priv->sched_q) {
+            rb_list_del(rb);
+            rl_buf_free(rb);
+        }
+    }
 
     rl_pduft_flush(ipcp);
     rl_free(priv, RL_MT_SHIM);
@@ -631,28 +648,11 @@ rmt_tx_to_lower(struct ipcp_entry *ipcp, struct flow_entry *lower_flow,
 
             if (flags & RL_RMT_F_CONSUME) {
                 struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
-#ifdef RL_RMT_QUEUES
-                /* We must consume this buffer. We either push it to an RMT
-                 * queue or drop it if there is no space. */
-                spin_lock_bh(&lower_ipcp->rmtq_lock);
-                if (lower_ipcp->rmtq_size < RMTQ_MAX_SIZE) {
-                    RL_BUF_RMT(rb).compl_flow = lower_flow;
-                    rb_list_enq(rb, &lower_ipcp->rmtq);
-                    lower_ipcp->rmtq_size += rl_buf_truesize(rb);
-                    stats->rmt.queued_pkt++;
-                } else {
-                    /* No room in the RMT queue, we are forced to drop. */
-                    RPD(1, "rmtq overrun: dropping PDU\n");
-#endif /* RL_RMT_QUEUES */
-                    stats->rmt.queue_drop++;
-                    rl_buf_free(rb);
-                    rb = NULL;
-#ifdef RL_RMT_QUEUES
-                }
-                spin_unlock_bh(&lower_ipcp->rmtq_lock);
-#endif /* !RL_RMT_QUEUES */
-                /* The rb was managed somehow (queued or dropped),so  we must
-                 * reset the error code. If we propagated the -EAGAIN, and we
+                stats->rmt.queue_drop++;
+                rl_buf_free(rb);
+                rb = NULL;
+                /* The rb was managed somehow (dropped), so we must reset the
+                 * error code. If we propagated the -EAGAIN, and we
                  * were recursively called by an upper rmt_tx(), also the upper
                  * rmt_tx() would try to put the same rb in its queue, which
                  * is a bug that would crash the system. */
@@ -679,8 +679,9 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
        unsigned flags)
 {
     struct flow_entry *lower_flow;
+    struct rl_normal *priv = ipcp->priv;
 
-    lower_flow = rl_pduft_lookup((struct rl_normal *)ipcp->priv, remote_addr);
+    lower_flow = rl_pduft_lookup(priv, remote_addr);
     if (unlikely(!lower_flow && remote_addr != ipcp->addr)) {
         struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
 
@@ -703,6 +704,37 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
     }
 
     /* This SDU will be sent to a remote IPCP, using an N-1 flow. */
+
+    if (false) {
+        /* PDU scheduler path. */
+        struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
+
+        spin_lock_bh(&priv->sched_qlock);
+        if (priv->sched_qlen < RMTQ_MAX_SIZE) {
+            /* Simple FIFO enqueue logic, to be replaced with a
+             * scheduling algorithm. */
+            RL_BUF_RMT(rb).lower_flow = lower_flow;
+            rb_list_enq(rb, &priv->sched_q);
+            priv->sched_qlen += rl_buf_truesize(rb);
+            stats->rmt.queued_pkt++;
+        } else {
+            /* No room in the RMT queue, we are forced to drop. */
+            RPD(1, "rmtq overrun: dropping PDU\n");
+            stats->rmt.queue_drop++;
+            rl_buf_free(rb);
+            rb = NULL;
+            // TODO may return backpressure signal
+        }
+        spin_unlock_bh(&priv->sched_qlock);
+
+        schedule_work(&priv->sched_deq_work);
+
+        /* This rb was handled somehow, either queued or dropped. As a result
+         * we must not return the backpressure signal. */
+        return 0;
+    }
+
+    /* Direct path, bypassing the PDU scheduler. */
     return rmt_tx_to_lower(ipcp, lower_flow, rb, flags);
 }
 
@@ -1072,6 +1104,40 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
     }
 
     return rb;
+}
+
+static void
+sched_deq_worker(struct work_struct *w)
+{
+    struct rl_normal *priv = container_of(w, struct rl_normal, sched_deq_work);
+    struct rb_list ready;
+
+    rb_list_init(&ready);
+
+    for (;;) {
+        struct rl_buf *rb, *tmp;
+        spin_lock_bh(&priv->sched_qlock);
+        /* Simple FIFO dequeue logic, to be replaced with some scheduling
+         * algorithm. */
+        rb_list_foreach_safe (rb, tmp, &priv->sched_q) {
+            rb_list_del(rb);
+            rb_list_enq(rb, &ready);
+            priv->sched_qlen -= rl_buf_truesize(rb);
+            BUG_ON(priv->sched_qlen < 0);
+            break;
+        }
+        spin_unlock_bh(&priv->sched_qlock);
+
+        if (rb_list_empty(&ready)) {
+            break;
+        }
+        BUG_ON(!RL_BUF_RMT(rb).lower_flow);
+        rb_list_foreach_safe (rb, tmp, &ready) {
+            rb_list_del(rb);
+            rmt_tx_to_lower(priv->ipcp, RL_BUF_RMT(rb).lower_flow, rb,
+                            RL_RMT_F_MAYSLEEP | RL_RMT_F_CONSUME);
+        }
+    }
 }
 
 /* This must be called under DTP lock and after rcv_next_seq_num and rcv_lwe

@@ -69,9 +69,7 @@ rl_buf_alloc(size_t size, size_t hdroom, size_t tailroom, gfp_t gfp)
     skb_reserve(rb, hdroom);
 #endif /* RL_SKB */
 
-#ifdef RL_RMT_QUEUES
-    RL_BUF_RMT(rb).compl_flow = NULL;
-#endif /* RL_RMT_QUEUES */
+    RL_BUF_RMT(rb).lower_flow = NULL;
 
     return rb;
 }
@@ -106,9 +104,7 @@ rl_buf_clone(struct rl_buf *rb, gfp_t gfp)
 #endif /* RL_SKB */
 
     /* Reset common fields. */
-#ifdef RL_RMT_QUEUES
-    RL_BUF_RMT(crb).compl_flow = NULL;
-#endif /* RL_RMT_QUEUES */
+    RL_BUF_RMT(crb).lower_flow = NULL;
 
     return crb;
 }

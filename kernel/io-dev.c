@@ -62,47 +62,6 @@ hms_time(void)
 }
 #endif
 
-#ifdef RL_RMT_QUEUES
-void
-tx_completion_func(unsigned long arg)
-{
-    struct ipcp_entry *ipcp = (struct ipcp_entry *)arg;
-
-    for (;;) {
-        struct rl_buf *rb;
-        int ret;
-
-        spin_lock_bh(&ipcp->rmtq_lock);
-        if (ipcp->rmtq_size == 0) {
-            spin_unlock_bh(&ipcp->rmtq_lock);
-            break;
-        }
-
-        rb = rb_list_front(&ipcp->rmtq);
-        rb_list_del(rb);
-        ipcp->rmtq_size -= rl_buf_truesize(rb);
-        spin_unlock_bh(&ipcp->rmtq_lock);
-
-        RPD(1, "Sending from rmtq\n");
-
-        BUG_ON(!RL_BUF_RMT(rb).compl_flow);
-        ret = ipcp->ops.sdu_write(ipcp, RL_BUF_RMT(rb).compl_flow, rb, 0);
-        if (unlikely(ret == -EAGAIN)) {
-#if 0
-            PD("Pushing back to rmtq\n");
-            spin_lock_bh(&ipcp->rmtq_lock);
-            rb_list_enq(rb, &ipcp->rmtq);
-            ipcp->rmtq_size += rl_buf_truesize(rb);
-            spin_unlock_bh(&ipcp->rmtq_lock);
-            break;
-#else
-            rl_buf_free(rb);
-#endif
-        }
-    }
-}
-#endif /* RL_RMT_QUEUES */
-
 /* Userspace queue threshold in bytes. */
 #define RL_RXQ_SIZE_MAX (1 << 20)
 
@@ -191,15 +150,6 @@ EXPORT_SYMBOL(rl_sdu_rx_shortcut);
 static void
 rl_write_restart_wqh(struct ipcp_entry *ipcp, wait_queue_head_t *wqh)
 {
-#ifdef RL_RMT_QUEUES
-    spin_lock_bh(&ipcp->rmtq_lock);
-    if (ipcp->rmtq_size > 0) {
-        /* Schedule a tasklet to complete the tx work. */
-        tasklet_schedule(&ipcp->tx_completion);
-    }
-    spin_unlock_bh(&ipcp->rmtq_lock);
-#endif /* RL_RMT_QUEUES */
-
     /* Wake up waiting process contexts. */
     wake_up_interruptible_poll(wqh, POLLOUT | POLLWRBAND | POLLWRNORM);
 }

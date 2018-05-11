@@ -167,13 +167,11 @@ union rl_buf_ctx {
         unsigned long jiffies;
     } rtx;
 
-#ifdef RL_RMT_QUEUES
     struct {
         /* Used in the TX datapath when this rb ends up into
          * an RMT queue. */
-        struct flow_entry *compl_flow;
+        struct flow_entry *lower_flow;
     } rmt;
-#endif /* RL_RMT_QUEUES */
 
     struct {
         /* Used in the RX datapath for flow control. */
@@ -520,15 +518,6 @@ struct ipcp_entry {
     struct rl_ctrl *uipcp;
     struct txrx *mgmt_txrx;
 
-    /* RMT structures, including TX completion.
-     * These are actually used by the upper IPCP to send PDUs to its N-1
-     * flows provided by this IPCP.*/
-#ifdef RL_RMT_QUEUES
-    struct rb_list rmtq;
-    unsigned int rmtq_size;
-    spinlock_t rmtq_lock;
-    struct tasklet_struct tx_completion;
-#endif /* RL_RMT_QUEUES */
     wait_queue_head_t tx_wqh;
 
     /* Per-cpu lossy statistics, to allow accounting without cacheline
@@ -775,6 +764,12 @@ struct rl_normal {
     DECLARE_HASHTABLE(pdu_ft, PDUFT_HASHTABLE_BITS);
     struct flow_entry *pduft_dflt;
     rwlock_t pduft_lock;
+
+    /* Support for PDU scheduling. */
+    struct rb_list sched_q;
+    int sched_qlen;
+    spinlock_t sched_qlock;
+    struct work_struct sched_deq_work;
 };
 
 void dtp_init(struct dtp *dtp);
