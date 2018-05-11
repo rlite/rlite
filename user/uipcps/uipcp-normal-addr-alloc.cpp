@@ -451,7 +451,11 @@ public:
             /* Addresses in the cluster are pre-allocated to bootstrap
              * the address allocation infrastructure. */
             *addr = raft->lookup(ipcp_name);
-            return *addr == RL_ADDR_NULL ? -1 : 0;
+            if (*addr != RL_ADDR_NULL) {
+                return 0;
+            }
+            /* This happens if 'ipcp_name' is not a replica.
+             * Fallback on regular client allocation. */
         }
         return client->allocate(ipcp_name, addr);
     }
