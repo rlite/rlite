@@ -74,6 +74,7 @@ sleep 3
 
 ip netns exec s2 rinaperf -lw -z rpinst1 || abort
 ip netns exec c rinaperf -lw -z rpinst2 || abort
+sleep 0.5 # give some time to commit registration to the cluster
 ip netns exec c rinaperf -z rpinst1 -p 1 -c 7 -i 10 || abort
 ip netns exec s1 rinaperf -z rpinst2 -p 1 -c 3 -i 10 || abort
 pkill rinaperf
