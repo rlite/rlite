@@ -239,6 +239,7 @@ configure options:
     --debug                     Compile in debug mode
     --no-kernel                 Don't build kernel code
     --no-user                   Don't build userspace code
+    --sanitize-includes         Use IWYU if available
 EOF
 }
 
@@ -257,6 +258,7 @@ DEBUG="n"
 BUILD_KERNEL="y"
 BUILD_USER="y"
 CLANG_PREFIX=""
+IWYU="n"
 
 # Option parsing
 while [[ $# > 0 ]]
@@ -351,6 +353,10 @@ do
         DEBUG="y"
         ;;
 
+        "--sanitize-includes")
+        IWYU="y"
+        ;;
+
         *)
         echo "Unknown option '$key'"
         echo "Try ./configure --help"
@@ -423,9 +429,14 @@ if [ ${BUILD_USER} == "y" ]; then
     rm -rf build &> /dev/null
     mkdir build || exit 255
 
+    if [ "$IWYU" == "y" ]; then
+        CMAKE_EXTRA+="-DCMAKE_CXX_INCLUDE_WHAT_YOU_USE=/usr/bin/iwyu;-Xiwyu;any;-Xiwyu;iwyu;-Xiwyu;args"
+        CMAKE_EXTRA+="-DCMAKE_C_INCLUDE_WHAT_YOU_USE=/usr/bin/iwyu;-Xiwyu;any;-Xiwyu;iwyu;-Xiwyu;args"
+    fi
+
     (
     cd build
-    ${CLANG_PREFIX} cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug -DDEBUG=${DEBUG} -DWITH_SWIG=${WITH_SWIG}
+    ${CLANG_PREFIX} cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug -DDEBUG=${DEBUG} -DWITH_SWIG=${WITH_SWIG} ${CMAKE_EXTRA}
     ) | tee -a config.log
 fi
 
