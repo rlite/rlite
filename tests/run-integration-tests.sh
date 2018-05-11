@@ -73,4 +73,4 @@ for t in tests/integration/*.sh ; do
     fi
     echo -e "${GREEN}>>> TEST #${testcnt} PASSED${NOC}"
 done
-echo -e "${ORANGE}>>> Completed in ${SECONDS} seconds ${NOC}"
+echo -e "${ORANGE}>>> Completed in $(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds ${NOC}"
