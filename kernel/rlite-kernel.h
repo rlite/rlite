@@ -755,6 +755,7 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
 struct rl_normal;
 
 struct rl_sched_ops {
+    const char *name;
     void *(*create)(struct rl_normal *);
     void (*destroy)(struct rl_normal *);
     int (*enq)(struct rl_normal *, struct rl_buf *);

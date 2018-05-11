@@ -897,7 +897,8 @@ sched_deq_worker(struct work_struct *w)
 static void
 rl_sched_init(struct rl_normal *priv)
 {
-    struct rl_sched_ops fifo_ops = {.create  = sched_fifo_create,
+    struct rl_sched_ops fifo_ops = {.name    = "fifo",
+                                    .create  = sched_fifo_create,
                                     .destroy = sched_fifo_destroy,
                                     .enq     = sched_fifo_enq,
                                     .deq     = sched_fifo_deq};
