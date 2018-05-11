@@ -157,18 +157,20 @@ def graph_node_depth(graph, node, ub):
     return level
 
 
-def access_prologue(args, vm, outs):
+def access_prologue(args, vm, outs, escape = True):
     token = None
+    eof = '\'EOI\'' if escape else 'EOI'
     if args.namespaces:
         scriptname = '.%s.initscript' % vm['name']
-        outs += 'cat > %s << \'EOI\'\n' % scriptname
+        outs += 'cat > %(script)s << %(eof)s\n' % {'script': scriptname, 'eof': eof}
         outs += '#!/bin/bash\n'
         token = scriptname
     else:
         outs += 'DONE=255\n'\
                 'while [ $DONE != "0" ]; do\n'\
-                '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
-                % {'ssh': vm['ssh'], 'username': args.user, 'sshopts': args.sshopts}
+                '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << %(eof)s\n'\
+                % {'ssh': vm['ssh'], 'username': args.user, 'eof': eof,
+                  'sshopts': args.sshopts}
     return outs, token
 
 def access_epilogue(args, vm, outs, token):
@@ -183,7 +185,7 @@ def access_epilogue(args, vm, outs, token):
         outs +=     ''\
                     'sleep 1\n'\
                     'true\n'\
-                'ENDSSH\n'\
+                'EOI\n'\
             '   DONE=$?\n'\
             '   if [ $DONE != "0" ]; then\n'\
             '       sleep 1\n'\
@@ -966,26 +968,15 @@ outs =  '#!/bin/bash\n'             \
         '   exit 255\n'\
         'fi\n'\
 
-if not args.namespaces:
+if args.namespaces:
+    outs += 'grep "$1" uipcp.*.log\n'
+else:
     for vmname in sorted(demo.vms):
         vm = demo.vms[vmname]
-        outs += 'echo "Accessing log for node %(vmname)s"\n'\
-            'DONE=255\n'\
-            'while [ $DONE != "0" ]; do\n'\
-            '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost <<ENDSSH\n'\
-                            % {'sshopts': args.sshopts, 'username': args.user,
-                                  'ssh': vm['ssh'],
-                                  'dif': dif, 'vmname': vmname}
-
+        outs += 'echo "Accessing log for node %(vmname)s"\n' % {'vmname': vmname}
+        outs, token = access_prologue(args, vm, outs, escape=False)
         outs += 'grep "$1" uipcp.*.log\n'
-
-        outs +=      'true\n'\
-                'ENDSSH\n'\
-            '   DONE=$?\n'\
-            '   if [ $DONE != "0" ]; then\n'\
-            '       sleep 1\n'\
-            '   fi\n'\
-            'done\n\n'
+        outs = access_epilogue(args, vm, outs, token)
 
 fout.write(outs)
 fout.close()
@@ -1002,27 +993,14 @@ outs =  '#!/bin/bash\n'             \
         'fi\n'\
 
 if args.namespaces:
-        'dmesg | grep "$1"\n'
+    outs += 'dmesg | grep "$1"\n'
 else:
     for vmname in sorted(demo.vms):
         vm = demo.vms[vmname]
-        outs += 'echo "Accessing log for node %(vmname)s"\n'\
-            'DONE=255\n'\
-            'while [ $DONE != "0" ]; do\n'\
-            '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost <<ENDSSH\n'\
-                            % {'sshopts': args.sshopts, 'username': args.user,
-                                  'ssh': vm['ssh'],
-                                  'dif': dif, 'vmname': vmname}
-
+        outs += 'echo "Accessing log for node %(vmname)s"\n' % {'vmname': vmname}
+        outs, token = access_prologue(args, vm, outs, escape=False)
         outs += 'dmesg | grep "$1"\n'
-
-        outs +=      'true\n'\
-                'ENDSSH\n'\
-            '   DONE=$?\n'\
-            '   if [ $DONE != "0" ]; then\n'\
-            '       sleep 1\n'\
-            '   fi\n'\
-            'done\n\n'
+        outs = access_epilogue(args, vm, outs, token)
 
 fout.write(outs)
 fout.close()
