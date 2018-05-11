@@ -187,6 +187,22 @@ static struct rl_sched_ops rl_sched_fifo_ops = {
     .enq       = sched_fifo_enq,
     .deq       = sched_fifo_deq};
 
+struct rl_sched_wrr {
+    struct {
+        struct rb_list q;
+        int qlen;
+        /* Normalized weight.
+         *    w_n = w_u * K / w_u_min * quantum / K
+         */
+        unsigned weight;
+    } wrrq;
+    /* Array indexed by qos_id. */
+    struct wrrq *queues;
+    unsigned int num_queues;
+    /* Quantum in bytes. */
+    unsigned int quantum;
+};
+
 /* In general RL_PCI_LEN != sizeof(struct rina_pci) and
  * RL_PCI_CTRL_LEN != sizeof(struct rina_pci_ctrl), since
  * compiler may need to insert padding. */
