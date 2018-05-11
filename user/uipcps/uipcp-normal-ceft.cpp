@@ -162,8 +162,7 @@ CeftReplica::apply(raft::LogIndex index, raft::Term term,
 {
     std::unique_ptr<CDAPMessage> rm;
 
-    /* Check if this is associated to a client request. This happens if we
-     * were the leader for this log entry. */
+    /* Check if the committe entry has an associated client request. */
     auto mit = pending.find(index);
     if (mit != pending.end()) {
         rm = std::move(mit->second->m);
@@ -174,13 +173,23 @@ CeftReplica::apply(raft::LogIndex index, raft::Term term,
     apply(serbuf, rm.get());
 
     if (mit != pending.end()) {
-        /* Send the response to the client and flush the pending response. */
-        int invoke_id = rm->invoke_id;
-        rib->send_to_dst_addr(std::move(rm), mit->second->requestor_addr);
-        UPD(rib->uipcp,
-            "Pending response for index %u sent to client %llu "
-            "(invoke_id=%d)\n",
-            index, (long long unsigned)mit->second->requestor_addr, invoke_id);
+        /* We must check that the pending response really matches the committed
+         * entry, i.e., that we were the leader that submitted the entry. This
+         * is true if and only if the term with which this entry was committed
+         * matches the one that we saved at submit time (when the pending
+         * request was created). This safety property follows from the guarantee
+         * that each term has one and only one leader. */
+        if (mit->second->term == term) {
+            /* Send the response to the client and flush the pending response.
+             */
+            int invoke_id = rm->invoke_id;
+            rib->send_to_dst_addr(std::move(rm), mit->second->requestor_addr);
+            UPD(rib->uipcp,
+                "Pending response for index %u sent to client %llu "
+                "(invoke_id=%d)\n",
+                index, (long long unsigned)mit->second->requestor_addr,
+                invoke_id);
+        }
         pending.erase(index);
     }
 
