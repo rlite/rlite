@@ -498,9 +498,11 @@ uipcp_loop(void *opaque)
 
             /* Process ready events out of the lock. Callbacks are allowed to
              * add/remove fdh entries. */
-            list_for_each_entry_safe (fdh, tmp, &ready, tmpnode) {
-                list_del_init(&fdh->tmpnode);
-                fdh->cb(uipcp, fdh->fd, fdh->opaque);
+            if (!list_empty(&ready)) {
+                list_for_each_entry_safe (fdh, tmp, &ready, tmpnode) {
+                    list_del_init(&fdh->tmpnode);
+                    fdh->cb(uipcp, fdh->fd, fdh->opaque);
+                }
             }
         }
 
@@ -700,6 +702,7 @@ uipcp_loop_fdh_add(struct uipcp *uipcp, int fd, uipcp_loop_fdh_t cb,
     fdh->fd     = fd;
     fdh->cb     = cb;
     fdh->opaque = opaque;
+    list_init(&fdh->tmpnode);
 
     pthread_mutex_lock(&uipcp->lock);
     list_add_tail(&fdh->node, &uipcp->fdhs);
