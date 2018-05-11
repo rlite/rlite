@@ -435,7 +435,20 @@ int
 CentralizedFaultTolerantAddrAllocator::Client::allocate(
     const std::string &ipcp_name, rlm_addr_t *addr)
 {
-    return -1;
+    auto m = make_unique<CDAPMessage>();
+
+    m->m_read(ObjClass, TableName + "/" + ipcp_name);
+
+    auto pr = make_unique<PendingReq>(m->op_code, ipcp_name);
+    int ret = send_to_replicas(std::move(m), std::move(pr), OpSemantics::Put);
+    if (ret) {
+        return ret;
+    }
+
+    UPI(rib->uipcp, "Issued address allocation request for IPCP '%s'\n",
+        ipcp_name.c_str());
+
+    return 0;
 }
 
 int
@@ -443,7 +456,29 @@ CentralizedFaultTolerantAddrAllocator::Client::process_rib_msg(
     const CDAPMessage *rm, CeftClient::PendingReq *const bpr,
     rlm_addr_t src_addr)
 {
-    return -1;
+    PendingReq const *pr = dynamic_cast<PendingReq *>(bpr);
+    struct uipcp *uipcp  = rib->uipcp;
+
+    switch (rm->op_code) {
+    case gpb::M_READ_R: {
+        if (rm->result) {
+            UPD(uipcp,
+                "Address allocation for IPCP '%s' failed remotely [%s]\n",
+                pr->ipcp_name.c_str(), rm->result_reason.c_str());
+        } else {
+            int64_t allocated_address;
+
+            rm->get_obj_value(allocated_address);
+            UPD(uipcp, "Address %llu allocated for IPCP '%s'\n",
+                (long long unsigned)allocated_address, pr->ipcp_name.c_str());
+        }
+        break;
+    }
+    default:
+        assert(false);
+    }
+
+    return 0;
 }
 
 /* Apply a command to the replicated state machine. We just need to update our
