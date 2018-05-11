@@ -849,6 +849,75 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
     return 0;
 }
 
+static void
+sched_deq_worker(struct work_struct *w)
+{
+    struct rl_normal *priv = container_of(w, struct rl_normal, sched_deq_work);
+    struct rb_list ready;
+
+    rb_list_init(&ready);
+
+    for (;;) {
+        struct rl_buf *rb, *tmp;
+        int i;
+
+        /* Dequeue a batch of PDUs. */
+        spin_lock_bh(&priv->sched_qlock);
+        for (i = 0; i < 8; i++) {
+            rb = priv->sched_ops.deq(priv);
+            if (!rb) {
+                break;
+            }
+            rb_list_enq(rb, &ready);
+        }
+        spin_unlock_bh(&priv->sched_qlock);
+
+        if (rb_list_empty(&ready)) {
+            /* No more PDUs to dequeue, we can stop. */
+            break;
+        }
+
+        /* Transmit the PDUs out of the scheduler lock. */
+        rb_list_foreach_safe (rb, tmp, &ready) {
+            rb_list_del(rb);
+            BUG_ON(!RL_BUF_RMT(rb).lower_flow);
+            rmt_tx_to_lower(priv->ipcp, RL_BUF_RMT(rb).lower_flow, rb,
+                            RL_RMT_F_MAYSLEEP | RL_RMT_F_CONSUME);
+        }
+
+        if (true) {
+            /* Wake up processes that may be blocked waiting for more space on
+             * the scheduler queue. */
+            wake_up_interruptible_poll(&priv->sched_wqh,
+                                       POLLOUT | POLLWRBAND | POLLWRNORM);
+        }
+    }
+}
+
+static void
+rl_sched_init(struct rl_normal *priv)
+{
+    struct rl_sched_ops fifo_ops = {.create  = sched_fifo_create,
+                                    .destroy = sched_fifo_destroy,
+                                    .enq     = sched_fifo_enq,
+                                    .deq     = sched_fifo_deq};
+
+    spin_lock_init(&priv->sched_qlock);
+    INIT_WORK(&priv->sched_deq_work, sched_deq_worker);
+    init_waitqueue_head(&priv->sched_wqh);
+    if (false) {
+        void *sched_priv = fifo_ops.create(priv);
+
+        if (!sched_priv) {
+            PE("Failed to init PDU scheduler\n");
+        } else {
+            priv->sched_ops = fifo_ops;
+            rcu_assign_pointer(priv->sched_priv, sched_priv);
+            synchronize_rcu();
+        }
+    }
+}
+
 /* Called under DTP lock */
 static int
 rl_rtxq_push(struct flow_entry *flow, struct rl_buf *rb)
@@ -1215,75 +1284,6 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
     }
 
     return rb;
-}
-
-static void
-sched_deq_worker(struct work_struct *w)
-{
-    struct rl_normal *priv = container_of(w, struct rl_normal, sched_deq_work);
-    struct rb_list ready;
-
-    rb_list_init(&ready);
-
-    for (;;) {
-        struct rl_buf *rb, *tmp;
-        int i;
-
-        /* Dequeue a batch of PDUs. */
-        spin_lock_bh(&priv->sched_qlock);
-        for (i = 0; i < 8; i++) {
-            rb = priv->sched_ops.deq(priv);
-            if (!rb) {
-                break;
-            }
-            rb_list_enq(rb, &ready);
-        }
-        spin_unlock_bh(&priv->sched_qlock);
-
-        if (rb_list_empty(&ready)) {
-            /* No more PDUs to dequeue, we can stop. */
-            break;
-        }
-
-        /* Transmit the PDUs out of the scheduler lock. */
-        rb_list_foreach_safe (rb, tmp, &ready) {
-            rb_list_del(rb);
-            BUG_ON(!RL_BUF_RMT(rb).lower_flow);
-            rmt_tx_to_lower(priv->ipcp, RL_BUF_RMT(rb).lower_flow, rb,
-                            RL_RMT_F_MAYSLEEP | RL_RMT_F_CONSUME);
-        }
-
-        if (true) {
-            /* Wake up processes that may be blocked waiting for more space on
-             * the scheduler queue. */
-            wake_up_interruptible_poll(&priv->sched_wqh,
-                                       POLLOUT | POLLWRBAND | POLLWRNORM);
-        }
-    }
-}
-
-static void
-rl_sched_init(struct rl_normal *priv)
-{
-    struct rl_sched_ops fifo_ops = {.create  = sched_fifo_create,
-                                    .destroy = sched_fifo_destroy,
-                                    .enq     = sched_fifo_enq,
-                                    .deq     = sched_fifo_deq};
-
-    spin_lock_init(&priv->sched_qlock);
-    INIT_WORK(&priv->sched_deq_work, sched_deq_worker);
-    init_waitqueue_head(&priv->sched_wqh);
-    if (false) {
-        void *sched_priv = fifo_ops.create(priv);
-
-        if (!sched_priv) {
-            PE("Failed to init PDU scheduler\n");
-        } else {
-            priv->sched_ops = fifo_ops;
-            rcu_assign_pointer(priv->sched_priv, sched_priv);
-            synchronize_rcu();
-        }
-    }
 }
 
 /* This must be called under DTP lock and after rcv_next_seq_num and rcv_lwe
