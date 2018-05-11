@@ -37,8 +37,6 @@ std::string CeftReplica::AppendEntriesRespObjClass = "raft_ae_r";
 int
 CeftReplica::init(const std::list<raft::ReplicaId> &peers)
 {
-    set_election_timeout(Msecs(1000), Msecs(2000));
-    set_heartbeat_timeout(Msecs(100));
     set_verbosity(raft::RaftSM::kVerboseInfo);
 
     raft::RaftSMOutput out;

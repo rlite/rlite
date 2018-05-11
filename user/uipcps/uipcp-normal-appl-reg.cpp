@@ -498,6 +498,16 @@ CentralizedFaultTolerantDFT::reconfigure()
         raft = make_unique<Replica>(this);
         peers.erase(it); /* remove myself */
 
+        auto election_timeout =
+            rib->get_param_value<Msecs>(DFT::Prefix, "raft-election-timeout");
+        auto heartbeat_timeout =
+            rib->get_param_value<Msecs>(DFT::Prefix, "raft-heartbeat-timeout");
+        auto rtx_timeout =
+            rib->get_param_value<Msecs>(DFT::Prefix, "raft-rtx-timeout");
+        raft->set_election_timeout(election_timeout, election_timeout * 2);
+        raft->set_heartbeat_timeout(heartbeat_timeout);
+        raft->set_retransmission_timeout(rtx_timeout);
+
         return raft->init(peers);
     }
 
@@ -737,7 +747,12 @@ UipcpRib::dft_lib_init()
         },
         {DFT::TableName},
         {{"replicas", PolicyParam(string())},
-         {"cli-timeout", PolicyParam(Secs(int(CeftClient::kTimeoutSecs)))}}));
+         {"cli-timeout", PolicyParam(Secs(int(CeftClient::kTimeoutSecs)))},
+         {"raft-election-timeout", PolicyParam(Secs(1))},
+         {"raft-heartbeat-timeout",
+          PolicyParam(Msecs(int(CeftReplica::kHeartBeatTimeoutMsecs)))},
+         {"raft-rtx-timeout",
+          PolicyParam(Msecs(int(CeftReplica::kRtxTimeoutMsecs)))}}));
 }
 
 } // namespace Uipcps
