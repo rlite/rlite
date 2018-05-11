@@ -15,9 +15,13 @@ _rlite_ctl() {
             CMDS=$(rlite-ctl -h | tail -n +2 | grep -o "^    [^ ]\+")
             COMPREPLY=( $(compgen -W "$CMDS" -- $cur) )
         ;;
-        dif-policy-list|dif-policy-mod|dif-policy-param-list|dif-policy-param-mod|dif-rib-paths-show|dif-rib-show|dif-routing-show)
+        dif-* )
             DIFS=$(difs_list)
             COMPREPLY=( $(compgen -W "$DIFS" -- $cur) )
+        ;;
+        ipcp-* | uipcp* )
+            IPCPS=$(ipcps_list)
+            COMPREPLY=( $(compgen -W "$IPCPS" -- $cur) )
         ;;
     esac
 }
