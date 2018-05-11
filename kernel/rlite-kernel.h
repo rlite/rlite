@@ -752,14 +752,24 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
     txrx->flags  = 0;
 }
 
-struct rl_normal;
+struct rl_sched;
 
 struct rl_sched_ops {
     const char *name;
-    void *(*create)(struct rl_normal *);
-    void (*destroy)(struct rl_normal *);
-    int (*enq)(struct rl_normal *, struct rl_buf *);
-    struct rl_buf *(*deq)(struct rl_normal *);
+    size_t priv_size;
+    int (*init)(struct rl_sched *);
+    void (*fini)(struct rl_sched *);
+    int (*enq)(struct rl_sched *, struct rl_buf *);
+    struct rl_buf *(*deq)(struct rl_sched *);
+};
+
+struct rl_sched {
+    struct rl_sched_ops ops;
+    wait_queue_head_t wqh;
+    spinlock_t qlock;
+#define RL_SCHED_PRIV(_sched) ((void *)(_sched)->priv)
+    /* Private data allocated at the end of the struct. */
+    char priv[0];
 };
 
 /* Implementation of the normal IPCP. */
@@ -775,12 +785,10 @@ struct rl_normal {
     struct flow_entry *pduft_dflt;
     rwlock_t pduft_lock;
 
-    /* Support for PDU scheduling. */
-    spinlock_t sched_qlock;
+    /* Support for PDU scheduling. May be NULL if no PDU scheduler is installed.
+     */
+    struct rl_sched *sched;
     struct work_struct sched_deq_work;
-    wait_queue_head_t sched_wqh;
-    void *sched_priv;
-    struct rl_sched_ops sched_ops;
 };
 
 void dtp_init(struct dtp *dtp);
