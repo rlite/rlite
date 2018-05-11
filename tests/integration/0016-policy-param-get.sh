@@ -20,10 +20,14 @@ rlite-ctl dif-policy-param-list dd addralloc nack-wait | grep "\<2000ms\>" || ex
 rlite-ctl dif-policy-mod dd addralloc centralized-fault-tolerant || exit 1
 rlite-ctl dif-policy-param-mod dd addralloc replicas a1,b2,c3,d,e || exit 1
 rlite-ctl dif-policy-param-list dd addralloc replicas | grep "a1,b2,c3,d,e" || exit 1
+rlite-ctl dif-policy-param-mod dd addralloc cli-timeout 1234ms || exit 1
+rlite-ctl dif-policy-param-list dd addralloc cli-timeout | grep "\<1234ms\>" || exit 1
 
 rlite-ctl dif-policy-mod dd dft centralized-fault-tolerant || exit 1
 rlite-ctl dif-policy-param-mod dd dft replicas r1,r2,r3,r4,r5 || exit 1
 rlite-ctl dif-policy-param-list dd dft replicas | grep "r1,r2,r3,r4,r5" || exit 1
+rlite-ctl dif-policy-param-mod dd dft cli-timeout 4321ms || exit 1
+rlite-ctl dif-policy-param-list dd dft cli-timeout | grep "\<4321ms\>" || exit 1
 
 rlite-ctl dif-policy-param-mod dd enrollment timeout 3000ms || exit 1
 rlite-ctl dif-policy-param-list dd enrollment timeout | grep 3000ms || exit 1

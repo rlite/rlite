@@ -64,7 +64,7 @@ for cont in s2 s3 c1 c2; do
     if [ "$cont" == "c1" ]; then
         # Once S1, S2 and S3 have joined the DIF, we wait a little bit to let
         # the cluster elect a leader
-        sleep 3
+        sleep 1.5
     fi
     enroller=s1.n
     if [ "$cont" == "c2" ]; then
