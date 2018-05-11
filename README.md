@@ -21,14 +21,14 @@
     54. Hands-on tutorial #3: normal-over-shim-wifi
     55. Using configen
 6. Configuration of IPC Processes
-	61. shim-eth IPC Process
-	62. shim-udp4 IPC Process
-	63. shim-tcp4 IPC Process
-	64. shim-loopback IPC Process
-	65. Normal IPC Process
-		651. IPCP local parameters
-		652. IPCP flavours to support different data transfer constants
-		653. Available policies and parameters
+    61. shim-eth IPC Process
+    62. shim-udp4 IPC Process
+    63. shim-tcp4 IPC Process
+    64. shim-loopback IPC Process
+    65. Normal IPC Process
+        651. IPCP local parameters
+        652. IPCP flavours to support different data transfer constants
+        653. Available policies and parameters
 7. Tools
     71. rina-gw
     72. iporinad
@@ -1026,6 +1026,7 @@ components of a normal IPCP process:
 | ------------------- | -----------------|-----------------------------------|
 | addralloc           | static           | Static address allocation         |
 | addralloc           | distributed      | Automated address allocation      |
+| addralloc           | centralized-fault-tolerant | Allocation handled by a fault-tolerant cluster of replicas |
 | dft                 | fully-replicated | Every node has a full copy of the DFT |
 | dft                 | centralized-fault-tolerant | DFT stored by a fault-tolerant cluster of replicas |
 | routing             | link-state       | Link state routing algorithm      |
@@ -1043,7 +1044,10 @@ of a normal IPCP process:
 | Component           | Policy            | Parameter          | Description     |
 | --------------------| ------------------|--------------------|-----------------|
 | addralloc           | distributed       | nack-wait     | Time to wait for a NACK before deciding that the address is good. |
-| dft                 | centralized-fault-tolerant | replicas  | Name of the IPCPs that constitute the fault-tolerant cluster. |
+| addralloc           | centralized-fault-tolerant | replicas  | Names of the IPCPs that constitute the fault-tolerant cluster. |
+| addralloc           | centralized-fault-tolerant | cli-timeout  | Timeout for the client request to the replicas. |
+| dft                 | centralized-fault-tolerant | replicas  | Names of the IPCPs that constitute the fault-tolerant cluster. |
+| dft                 | centralized-fault-tolerant | cli-timeout  | Timeout for the client request to the replicas. |
 | enrollment          | *                 | timeout            | Enrollment timeout. |
 | enrollment          | *                 | keepalive          | Neighbor keepalive timeout (0 to disable). |
 | enrollment          | *                 | keepalive-thresh   | Number of allowed unacked keepalive requests. If exceeded, the N-1 low is pruned. |
