@@ -78,7 +78,7 @@ LFDB::dump_routing(std::stringstream &ss, const NodeId &local_node) const
 void
 LFDB::compute_shortest_paths(
     const NodeId &source_node,
-    const std::unordered_map<NodeId, std::list<Edge>> &graph,
+    const std::unordered_map<NodeId, std::vector<Edge>> &graph,
     std::unordered_map<NodeId, DijkstraInfo> &info)
 {
     /* Per-node info stored in the priority queue. */
@@ -122,7 +122,7 @@ LFDB::compute_shortest_paths(
             continue; /* nothing to do */
         }
 
-        const std::list<Edge> &edges = graphit->second;
+        const std::vector<Edge> &edges = graphit->second;
 
         /* Apply relaxation rule and update the frontier. */
         for (const Edge &edge : edges) {
@@ -151,14 +151,14 @@ LFDB::compute_next_hops(const NodeId &local_node)
 {
     std::unordered_map<NodeId, std::unordered_map<NodeId, DijkstraInfo>>
         neigh_infos;
-    std::unordered_map<NodeId, std::list<Edge>> graph;
+    std::unordered_map<NodeId, std::vector<Edge>> graph;
     std::unordered_map<NodeId, DijkstraInfo> info;
 
     /* Clean up state left from the previous run. */
     next_hops.clear();
 
     /* Build the graph from the Lower Flow Database. */
-    graph[local_node] = std::list<Edge>();
+    graph[local_node] = std::vector<Edge>();
     for (const auto &kvi : db) {
         for (const auto &kvj : kvi.second) {
             const gpb::LowerFlow *revlf;
@@ -175,7 +175,7 @@ LFDB::compute_next_hops(const NodeId &local_node)
             if (!graph.count(kvj.second.remote_node())) {
                 /* Make sure graph contains all the nodes, even if with
                  * empty lists. */
-                graph[kvj.second.remote_node()] = std::list<Edge>();
+                graph[kvj.second.remote_node()] = std::vector<Edge>();
             }
         }
     }

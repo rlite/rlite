@@ -94,7 +94,7 @@ public:
 
     /* The routing table computed by compute_next_hops(), or statically
      * updated. */
-    std::unordered_map<NodeId, std::list<NodeId>> next_hops;
+    std::unordered_map<NodeId, std::vector<NodeId>> next_hops;
     NodeId dflt_nhop;
 
     const gpb::LowerFlow *find(const NodeId &local_node,
@@ -108,7 +108,7 @@ public:
 
     void compute_shortest_paths(
         const NodeId &source_node,
-        const std::unordered_map<NodeId, std::list<Edge>> &graph,
+        const std::unordered_map<NodeId, std::vector<Edge>> &graph,
         std::unordered_map<NodeId, DijkstraInfo> &info);
 
     int compute_next_hops(const NodeId &local_node);

@@ -33,7 +33,7 @@
 
 /* A type to represent a single routing table, excluding the default next
  * hop. */
-using NextHops = std::unordered_map<rlite::NodeId, std::list<rlite::NodeId>>;
+using NextHops = std::unordered_map<rlite::NodeId, std::vector<rlite::NodeId>>;
 
 /* A type to represent a collection of routing tables, one for each node
  * in a network. */

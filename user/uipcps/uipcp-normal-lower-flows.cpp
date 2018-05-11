@@ -197,7 +197,7 @@ RoutingEngine::compute_fwd_table()
             }
         }
         next_ports_new[RL_ADDR_NULL] = make_pair(any, dflt_port);
-        next_hops[any]               = list<NodeId>(1, dflt_nhop);
+        next_hops[any]               = std::vector<NodeId>(1, dflt_nhop);
     }
 #else /* Avoid using the default forwarding entry. */
     next_ports_new = next_ports_new_;
@@ -723,7 +723,7 @@ int
 StaticRouting::route_mod(const struct rl_cmsg_ipcp_route_mod *req)
 {
     std::string dest_ipcp;
-    std::list<NodeId> next_hops;
+    std::vector<NodeId> next_hops;
 
     if (!req->dest_name || strlen(req->dest_name) == 0) {
         UPE(rib->uipcp, "No destination IPCP specified\n");
@@ -737,7 +737,7 @@ StaticRouting::route_mod(const struct rl_cmsg_ipcp_route_mod *req)
             UPE(rib->uipcp, "No next hop specified\n");
             return -1;
         }
-        next_hops = utils::strsplit<std::list>(NodeId(req->next_hops), ',');
+        next_hops = utils::strsplit<std::vector>(NodeId(req->next_hops), ',');
         {
             set<NodeId> u(next_hops.begin(), next_hops.end());
             if (u.size() != next_hops.size()) {
