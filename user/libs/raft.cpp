@@ -580,9 +580,7 @@ RaftSM::apply_committed_entries()
         if (!serbuf) {
             serbuf = std::unique_ptr<char[]>(new char[log_command_size]);
         }
-        if ((ret = log_buf_read(
-                 kLogEntriesOfs + (next - 1) * log_entry_size + sizeof(Term),
-                 serbuf.get(), log_command_size))) {
+        if ((ret = log_entry_get_command(next, serbuf.get()))) {
             return ret;
         }
         apply(next, term, serbuf.get());
