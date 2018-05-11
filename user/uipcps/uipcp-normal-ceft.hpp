@@ -84,6 +84,7 @@ public:
           rib(rib)
     {
     }
+    virtual ~CeftReplica() {}
 
     int init(const std::list<raft::ReplicaId> &peers);
     int process_sm_output(raft::RaftSMOutput out);
@@ -127,6 +128,7 @@ protected:
         {
             t = std::chrono::system_clock::now() + Secs(3);
         }
+        virtual ~PendingReq() {}
         virtual std::unique_ptr<PendingReq> clone() const = 0;
     };
     std::unordered_map</*invoke_id*/ int, std::unique_ptr<PendingReq>> pending;
@@ -143,6 +145,7 @@ public:
         : rib(rib), replicas(std::move(names))
     {
     }
+    virtual ~CeftClient() {}
     int process_timeout();
     int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
                     std::shared_ptr<Neighbor> const &neigh,
