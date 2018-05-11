@@ -1,5 +1,12 @@
 Open tasks, in decreasing order of priority:
 
+* add QosMapper uipcp component; this defines how to map rina_flow_spec
+  to flow configuration, qos_id and scheduler; implement a 'fixprio'
+  policy, so that on component creation the pfifo scheduler with two
+  (?) classes is installed, and on flow allocation the max_delay parameter
+  is used to map a flow allocation request to a qos_id; the FlowAllocator
+  component will invoke the QosMapper in the fa_req() method
+
 * implement dynamic DIF Allocator to keep the mapping between
   application names and DIFs; the DIF allocator should be an
   application embedded in the uipcps main loop; it should
