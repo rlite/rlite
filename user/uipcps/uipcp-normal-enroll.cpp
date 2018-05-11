@@ -635,65 +635,59 @@ EnrollmentResources::enrollee_thread()
         }
 
         UPD(rib->uipcp, "I <-- S M_CONNECT_R\n");
-
-        if (rib->enrolled) {
-            CDAPMessage m;
-            int ret;
-
-            /* (3LF) I --> S: M_START
-             * (4LF) I <-- S: M_START_R
-             *
-             * This is not a complete enrollment, but only the allocation
-             * of a lower flow. */
-            m.m_start(UipcpRib::LowerFlowObjClass, UipcpRib::LowerFlowObjName);
-            ret = nf->send_to_port_id(&m);
-            if (ret) {
-                UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
-                    strerror(errno));
-                return;
-            }
-            UPD(rib->uipcp, "I --> S M_START(lowerflow)\n");
-
-            rm = next_enroll_msg(lk);
-            if (!rm) {
-                return;
-            }
-
-            if (rm->op_code != gpb::M_START_R) {
-                UPE(rib->uipcp, "M_START_R expected\n");
-                return;
-            }
-
-            if (rm->obj_class != UipcpRib::LowerFlowObjClass ||
-                rm->obj_name != UipcpRib::LowerFlowObjName) {
-                UPE(rib->uipcp, "%s:%s object expected\n",
-                    UipcpRib::LowerFlowObjName.c_str(),
-                    UipcpRib::LowerFlowObjClass.c_str());
-                return;
-            }
-
-            UPD(rib->uipcp, "I <-- S M_START_R(lowerflow)\n");
-
-            if (rm->result) {
-                UPE(rib->uipcp,
-                    "Neighbor returned negative response [%d], '%s'\n",
-                    rm->result, rm->result_reason.c_str());
-                return;
-            }
-
-            goto finish;
-        }
     }
 
-    {
+    if (!rib->enrolled) {
+        /* Regular enrollment. */
         int ret = enrollee_default(lk);
 
         if (ret) {
             return;
         }
+    } else {
+        CDAPMessage m;
+        int ret;
+
+        /* (3LF) I --> S: M_START
+         * (4LF) I <-- S: M_START_R
+         *
+         * This is not a complete enrollment, but only the allocation
+         * of a lower flow. */
+        m.m_start(UipcpRib::LowerFlowObjClass, UipcpRib::LowerFlowObjName);
+        ret = nf->send_to_port_id(&m);
+        if (ret) {
+            UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
+            return;
+        }
+        UPD(rib->uipcp, "I --> S M_START(lowerflow)\n");
+
+        rm = next_enroll_msg(lk);
+        if (!rm) {
+            return;
+        }
+
+        if (rm->op_code != gpb::M_START_R) {
+            UPE(rib->uipcp, "M_START_R expected\n");
+            return;
+        }
+
+        if (rm->obj_class != UipcpRib::LowerFlowObjClass ||
+            rm->obj_name != UipcpRib::LowerFlowObjName) {
+            UPE(rib->uipcp, "%s:%s object expected\n",
+                UipcpRib::LowerFlowObjName.c_str(),
+                UipcpRib::LowerFlowObjClass.c_str());
+            return;
+        }
+
+        UPD(rib->uipcp, "I <-- S M_START_R(lowerflow)\n");
+
+        if (rm->result) {
+            UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
+                rm->result, rm->result_reason.c_str());
+            return;
+        }
     }
 
-finish:
     cleanup.deactivate();
     enrollment_commit();
     lk.unlock();
@@ -967,21 +961,17 @@ EnrollmentResources::enroller_thread()
             return;
         }
         UPD(rib->uipcp, "S --> I M_START_R(lowerflow)\n");
+    } else {
+        /* Regular enrollment. */
+        int ret;
 
-        goto finish;
-    }
-
-    msgs.push_front(std::move(rm)); /* reinject, passing ownership */
-
-    {
-        int ret = enroller_default(lk);
-
+        msgs.push_front(std::move(rm)); /* reinject, passing ownership */
+        ret = enroller_default(lk);
         if (ret) {
             return;
         }
     }
 
-finish:
     cleanup.deactivate();
     enrollment_commit();
     lk.unlock();
