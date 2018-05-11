@@ -122,8 +122,9 @@ rl_shim_tcp4_destroy(struct ipcp_entry *ipcp)
 static void
 tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
 {
-    struct flow_entry *flow = priv->flow;
-    struct socket *sock     = priv->sock;
+    struct flow_entry *flow     = priv->flow;
+    struct rl_ipcp_stats *stats = this_cpu_ptr(flow->txrx.ipcp->stats);
+    struct socket *sock         = priv->sock;
     struct msghdr msghdr;
     struct iovec iov;
     int ret;
@@ -155,7 +156,7 @@ tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
         } else if (unlikely(ret <= 0)) {
             if (ret) {
                 PE("recvmsg(%d): %d\n", (int)iov.iov_len, ret);
-                flow->stats.rx_err++;
+                stats->rx_err++;
             } else {
                 PI("Exit rx loop\n");
             }
@@ -178,7 +179,7 @@ tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
                     priv->cur_rx_rblen, priv->flow->txrx.ipcp->rxhdroom,
                     priv->flow->txrx.ipcp->tailroom, GFP_ATOMIC);
                 if (unlikely(!priv->cur_rx_rb)) {
-                    flow->stats.rx_err++;
+                    stats->rx_err++;
                     RPV(1, "Out of memory\n");
                     break;
                 }
@@ -192,8 +193,8 @@ tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
             /* We have completely read the SDU. */
             rl_sdu_rx_flow(flow->txrx.ipcp, flow, priv->cur_rx_rb, true);
 
-            flow->stats.rx_pkt++;
-            flow->stats.rx_byte += priv->cur_rx_rblen;
+            stats->rx_pkt++;
+            stats->rx_byte += priv->cur_rx_rblen;
 
             priv->cur_rx_rb    = NULL;
             priv->cur_rx_hdr   = true;
@@ -333,6 +334,8 @@ rl_shim_tcp4_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
 static int
 tcp4_xmit(struct shim_tcp4_flow *flow_priv, struct rl_buf *rb)
 {
+    struct rl_ipcp_stats *stats =
+        this_cpu_ptr(flow_priv->flow->txrx.ipcp->stats);
     struct msghdr msghdr;
     struct iovec iov[2];
     uint16_t lenhdr = htons(rb->len);
@@ -360,13 +363,13 @@ tcp4_xmit(struct shim_tcp4_flow *flow_priv, struct rl_buf *rb)
         }
 
         spin_lock_bh(&flow_priv->txstats_lock);
-        flow_priv->flow->stats.tx_err++;
+        stats->tx_err++;
         spin_unlock_bh(&flow_priv->txstats_lock);
     } else {
         NPD("kernel_sendmsg(%d + 2)\n", (int)rb->len);
         spin_lock_bh(&flow_priv->txstats_lock);
-        flow_priv->flow->stats.tx_pkt++;
-        flow_priv->flow->stats.tx_byte += rb->len;
+        stats->tx_pkt++;
+        stats->tx_byte += rb->len;
         spin_unlock_bh(&flow_priv->txstats_lock);
     }
 
@@ -480,19 +483,6 @@ rl_shim_tcp4_config(struct ipcp_entry *ipcp, const char *param_name,
     return -ENOSYS;
 }
 
-static int
-rl_shim_tcp4_flow_get_stats(struct flow_entry *flow,
-                            struct rl_flow_stats *stats)
-{
-    struct shim_tcp4_flow *priv = flow->priv;
-
-    spin_lock_bh(&priv->txstats_lock);
-    *stats = flow->stats;
-    spin_unlock_bh(&priv->txstats_lock);
-
-    return 0;
-}
-
 #define SHIM_DIF_TYPE "shim-tcp4"
 
 static struct ipcp_factory shim_tcp4_factory = {
@@ -508,7 +498,6 @@ static struct ipcp_factory shim_tcp4_factory = {
     .ops.flow_deallocated   = rl_shim_tcp4_flow_deallocated,
     .ops.sdu_write          = rl_shim_tcp4_sdu_write,
     .ops.config             = rl_shim_tcp4_config,
-    .ops.flow_get_stats     = rl_shim_tcp4_flow_get_stats,
     .ops.flow_writeable     = rl_shim_tcp4_flow_writeable,
 };
 
