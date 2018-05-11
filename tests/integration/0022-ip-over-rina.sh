@@ -1,5 +1,17 @@
 #!/bin/sh
 
+cleanup() {
+    local ret=0
+    pkill iporinad || ret=1
+    rlite-ctl reset || ret=1
+    [ "$ret" != 0 ] && return 1 || return 0
+}
+
+abort() {
+  cleanup
+  exit 1
+}
+
 rlite-ctl ipcp-create xyz.IPCP normal dd.DIF || exit 1
 cat > iporinad1.conf << EOF
 local       ipor1        dd.DIF
@@ -14,10 +26,8 @@ route       10.9.12.0/24
 route       10.9.13.0/24
 EOF
 
-iporinad -wv -c iporinad1.conf || exit 1
-iporinad -wv -c iporinad2.conf || exit 1
+iporinad -wv -c iporinad1.conf || abort
+iporinad -wv -c iporinad2.conf || abort
 sleep 2
-pkill iporinad || exit 1
-
-# Reset to wait for all the flows to go away
-rlite-ctl reset
+pkill iporinad || abort
+cleanup
