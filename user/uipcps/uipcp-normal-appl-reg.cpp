@@ -455,7 +455,8 @@ public:
         return client->appl_register(req);
     }
     int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-                    std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)
+                    std::shared_ptr<Neighbor> const &neigh,
+                    rlm_addr_t src_addr) override
     {
         // TODO reuse this piece of code
         if (!raft || (rm->obj_class == ObjClass && rm->is_response())) {
