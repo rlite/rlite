@@ -291,6 +291,9 @@ struct rl_ipcp_stats {
     uint64_t rx_byte;
     uint64_t rx_err;
 
+    uint64_t rtx_pkt;
+    uint64_t rtx_byte;
+
     struct rl_rmt_stats rmt;
 } __attribute__((aligned(64)));
 

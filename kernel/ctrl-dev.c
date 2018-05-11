@@ -2280,6 +2280,8 @@ rl_rmt_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             resp.stats.rx_pkt += cpustats->rx_pkt;
             resp.stats.rx_byte += cpustats->rx_byte;
             resp.stats.rx_err += cpustats->rx_err;
+            resp.stats.rtx_pkt += cpustats->rtx_pkt;
+            resp.stats.rtx_byte += cpustats->rtx_byte;
 
             resp.stats.rmt.fwd_pkt += cpustats->rmt.fwd_pkt;
             resp.stats.rmt.fwd_byte += cpustats->rmt.fwd_byte;
