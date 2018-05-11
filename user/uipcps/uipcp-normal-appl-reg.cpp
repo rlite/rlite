@@ -695,6 +695,8 @@ protected:
     };
     std::unordered_map</*invoke_id*/ int, std::unique_ptr<PendingReq>> pending;
 
+    int read_from_replicas(std::unique_ptr<CDAPMessage> m,
+                           std::unique_ptr<PendingReq> pr);
     void mod_pending_timer();
 
 public:
@@ -922,29 +924,23 @@ CentralizedFaultTolerantDFT::reconfigure()
 }
 
 int
-CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
-                                                std::string *dst_node,
-                                                const std::string &preferred,
-                                                uint32_t cookie)
+CeftClient::read_from_replicas(std::unique_ptr<CDAPMessage> m,
+                               std::unique_ptr<PendingReq> pr)
 {
-    /* Prepare an M_READ for a read operation. If we have a selected reader,
-     * we send it to the reader only; otherwise we send it to all the replicas.
-     */
+    /* If we have a selected reader, we send it to the reader only; otherwise
+     * we send it to all the replicas. */
     for (const auto &r : replicas) {
         if (reader_id.empty() || r == reader_id) {
-            auto m = make_unique<CDAPMessage>();
-            gpb::OpCode op_code;
+            auto mc  = make_unique<CDAPMessage>(*m);
+            auto prc = make_unique<PendingReq>(*pr);
             int invoke_id;
             int ret;
 
-            m->m_read(ObjClass, TableName + "/" + appl_name);
-            op_code = m->op_code;
+            mc->invoke_id = invoke_id = rib->invoke_id_mgr.get_invoke_id();
+            prc->replica              = r;
+            pending[invoke_id]        = std::move(prc);
 
-            m->invoke_id = invoke_id = rib->invoke_id_mgr.get_invoke_id();
-            pending[invoke_id] =
-                make_unique<PendingReq>(op_code, appl_name, r, 0);
-
-            ret = rib->send_to_dst_node(std::move(m), r, nullptr, nullptr);
+            ret = rib->send_to_dst_node(std::move(mc), r, nullptr, nullptr);
             if (ret) {
                 pending.erase(invoke_id);
                 return ret;
@@ -953,6 +949,26 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
     }
 
     mod_pending_timer();
+
+    return 0;
+}
+
+int
+CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
+                                                std::string *dst_node,
+                                                const std::string &preferred,
+                                                uint32_t cookie)
+{
+    /* Prepare an M_READ for a read operation. */
+    auto m = make_unique<CDAPMessage>();
+
+    m->m_read(ObjClass, TableName + "/" + appl_name);
+
+    auto pr = make_unique<PendingReq>(m->op_code, appl_name, string(), 0);
+    int ret = read_from_replicas(std::move(m), std::move(pr));
+    if (ret) {
+        return ret;
+    }
 
     UPI(rib->uipcp, "Read request for '%s' issued\n", appl_name.c_str());
 
