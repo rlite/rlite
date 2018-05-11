@@ -443,7 +443,8 @@ rl_io_read_iter(struct kiocb *iocb,
 
             ret = rl_buf_copy_to_user(rb, to, rb->len);
             if (flow && flow->sdu_rx_consumed && ret >= 0) {
-                flow->sdu_rx_consumed(flow, RL_BUF_RX(rb).cons_seqnum);
+                flow->sdu_rx_consumed(flow, RL_BUF_RX(rb).cons_seqnum,
+                                      blocking);
             }
 
             rl_buf_free(rb);

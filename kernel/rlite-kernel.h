@@ -622,7 +622,8 @@ struct flow_entry {
     struct rl_flow_config cfg;
     struct rina_flow_spec spec;
 
-    int (*sdu_rx_consumed)(struct flow_entry *flow, rlm_seq_t seqnum);
+    int (*sdu_rx_consumed)(struct flow_entry *flow, rlm_seq_t seqnum,
+                           bool maysleep);
 
     struct list_head pduft_entries;
 

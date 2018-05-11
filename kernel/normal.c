@@ -579,7 +579,8 @@ rtx_tmr_cb(
     spin_unlock_bh(&dtp->lock);
 }
 
-static int rl_normal_sdu_rx_consumed(struct flow_entry *flow, rlm_seq_t seqnum);
+static int rl_normal_sdu_rx_consumed(struct flow_entry *flow, rlm_seq_t seqnum,
+                                     bool maysleep);
 
 #define TKBK_INTVAL_MSEC 2
 
@@ -2097,7 +2098,8 @@ snd_crb:
 }
 
 static int
-rl_normal_sdu_rx_consumed(struct flow_entry *flow, rlm_seq_t seqnum)
+rl_normal_sdu_rx_consumed(struct flow_entry *flow, rlm_seq_t seqnum,
+                          bool maysleep)
 {
     struct ipcp_entry *ipcp = flow->txrx.ipcp;
     struct dtp *dtp         = &flow->dtp;
@@ -2113,9 +2115,8 @@ rl_normal_sdu_rx_consumed(struct flow_entry *flow, rlm_seq_t seqnum)
     spin_unlock_bh(&dtp->lock);
 
     if (crb) {
-        /* TODO If this is called in process-context only we
-         * may sleep. */
-        rmt_tx(ipcp, flow->remote_addr, crb, RL_RMT_F_CONSUME);
+        unsigned flags = maysleep ? RL_RMT_F_MAYSLEEP : 0;
+        rmt_tx(ipcp, flow->remote_addr, crb, RL_RMT_F_CONSUME | flags);
     }
 
     return 0;
