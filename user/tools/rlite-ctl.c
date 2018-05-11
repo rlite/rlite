@@ -44,6 +44,8 @@
 #include "rlite/uipcps-helpers.h"
 #include "rlite/version.h"
 
+#define TO_DFLT_MSECS 10000
+
 /* IPCP attributes. */
 struct ipcp_attrs {
     rl_ipcp_id_t id;
@@ -158,7 +160,7 @@ uipcps_disconnect(int sfd)
 typedef int (*response_handler_t)(struct rl_msg_base_resp *);
 
 static int
-read_response(int sfd, response_handler_t handler)
+read_response(int sfd, response_handler_t handler, unsigned to_msecs)
 {
     struct rl_msg_base_resp *resp;
     char msgbuf[4096];
@@ -183,7 +185,7 @@ read_response(int sfd, response_handler_t handler)
 
         pfd[0].fd     = sfd;
         pfd[0].events = POLLIN;
-        ret           = poll(pfd, 1, 10000 /* 10 seconds */);
+        ret           = poll(pfd, 1, to_msecs);
         if (ret < 0) {
             PE("poll() error [%s]\n", strerror(errno));
             return ret;
@@ -232,7 +234,8 @@ read_response(int sfd, response_handler_t handler)
 }
 
 static int
-request_response(struct rl_msg_base *req, response_handler_t handler)
+request_response(struct rl_msg_base *req, response_handler_t handler,
+                 unsigned to_msecs)
 {
     int fd;
     int ret;
@@ -247,7 +250,7 @@ request_response(struct rl_msg_base *req, response_handler_t handler)
         return ret;
     }
 
-    ret = read_response(fd, handler);
+    ret = read_response(fd, handler, to_msecs);
     uipcps_disconnect(fd);
 
     return ret;
@@ -444,7 +447,7 @@ ipcp_config(int argc, char **argv, struct cmd_descriptor *cd)
     req.name         = strdup(param_name);
     req.value        = strdup(param_value);
 
-    return request_response(RLITE_MB(&req), NULL);
+    return request_response(RLITE_MB(&req), NULL, TO_DFLT_MSECS);
 }
 
 static int
@@ -506,7 +509,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
     req.dif_name     = strdup(dif_name);
     req.reg          = reg;
 
-    return request_response(RLITE_MB(&req), NULL);
+    return request_response(RLITE_MB(&req), NULL, TO_DFLT_MSECS);
 }
 
 static int
@@ -556,7 +559,7 @@ ipcp_enroll_common(int argc, char **argv, rl_msg_t msg_type)
     req.neigh_name    = neigh_ipcp_name ? strdup(neigh_ipcp_name) : NULL;
     req.supp_dif_name = strdup(supp_dif_name);
 
-    ret = request_response(RLITE_MB(&req), NULL);
+    ret = request_response(RLITE_MB(&req), NULL, /*to_msecs=*/30000);
     if (ret) {
         PE("Enrollment failed\n");
     } else {
@@ -846,7 +849,7 @@ ipcp_policy_mod(int argc, char **argv, struct cmd_descriptor *cd)
     req.comp_name    = component_name_wrap(comp_name);
     req.policy_name  = strdup(policy_name);
 
-    return request_response(RLITE_MB(&req), NULL);
+    return request_response(RLITE_MB(&req), NULL, TO_DFLT_MSECS);
 }
 
 static int
@@ -887,7 +890,7 @@ ipcp_policy_param_mod(int argc, char **argv, struct cmd_descriptor *cd)
     req.param_name   = strdup(param_name);
     req.param_value  = strdup(param_value);
 
-    return request_response(RLITE_MB(&req), NULL);
+    return request_response(RLITE_MB(&req), NULL, TO_DFLT_MSECS);
 }
 
 static int
@@ -911,7 +914,7 @@ ipcp_enroller_mod(int argc, char **argv, struct cmd_descriptor *cd, int enable)
     req.hdr.event_id = 0;
     req.enable       = enable ? 1 : 0;
 
-    return request_response(RLITE_MB(&req), NULL);
+    return request_response(RLITE_MB(&req), NULL, TO_DFLT_MSECS);
 }
 
 static int
@@ -934,7 +937,7 @@ probe(int argc, char **argv, struct cmd_descriptor *cd)
     req.hdr.msg_type = RLITE_U_PROBE;
     req.hdr.event_id = 0;
 
-    return request_response(RLITE_MB(&req), NULL);
+    return request_response(RLITE_MB(&req), NULL, TO_DFLT_MSECS);
 }
 
 static int
@@ -945,7 +948,7 @@ terminate(int argc, char **argv, struct cmd_descriptor *cd)
     req.hdr.msg_type = RLITE_U_TERMINATE;
     req.hdr.event_id = 0;
 
-    return request_response(RLITE_MB(&req), NULL);
+    return request_response(RLITE_MB(&req), NULL, TO_DFLT_MSECS);
 }
 
 static int
@@ -971,7 +974,7 @@ ipcp_neigh_disconnect(int argc, char **argv, struct cmd_descriptor *cd)
     req.hdr.msg_type = RLITE_U_IPCP_NEIGH_DISCONNECT;
     req.hdr.event_id = 0;
 
-    return request_response(RLITE_MB(&req), NULL);
+    return request_response(RLITE_MB(&req), NULL, TO_DFLT_MSECS);
 }
 
 static int
@@ -1004,7 +1007,7 @@ ipcp_route_mod(int argc, char **argv, struct cmd_descriptor *cd)
                            : RLITE_U_IPCP_ROUTE_DEL;
     req.hdr.event_id = 0;
 
-    return request_response(RLITE_MB(&req), NULL);
+    return request_response(RLITE_MB(&req), NULL, TO_DFLT_MSECS);
 }
 
 #ifdef RL_MEMTRACK
@@ -1020,7 +1023,7 @@ memtrack_dump(int argc, char **argv, struct cmd_descriptor *cd)
     req.hdr.msg_type = RLITE_U_MEMTRACK_DUMP;
     req.hdr.event_id = 0;
 
-    return request_response(RLITE_MB(&req), NULL);
+    return request_response(RLITE_MB(&req), NULL, TO_DFLT_MSECS);
 }
 #endif
 
@@ -1085,7 +1088,8 @@ ipcp_rib_show(int argc, char **argv, struct cmd_descriptor *cd)
     }
     req.hdr.event_id = 0;
 
-    return request_response(RLITE_MB(&req), ipcp_rib_show_handler);
+    return request_response(RLITE_MB(&req), ipcp_rib_show_handler,
+                            TO_DFLT_MSECS);
 }
 
 static int
@@ -1130,7 +1134,8 @@ ipcp_policy_list(int argc, char **argv, struct cmd_descriptor *cd)
     req.hdr.event_id = 0;
     req.comp_name    = comp_name ? component_name_wrap(comp_name) : NULL;
 
-    return request_response(RLITE_MB(&req), ipcp_rib_show_handler);
+    return request_response(RLITE_MB(&req), ipcp_rib_show_handler,
+                            TO_DFLT_MSECS);
 }
 
 static int
@@ -1180,7 +1185,8 @@ ipcp_policy_param_list(int argc, char **argv, struct cmd_descriptor *cd)
     req.comp_name    = comp_name ? component_name_wrap(comp_name) : NULL;
     req.param_name   = param_name ? strdup(param_name) : NULL;
 
-    return request_response(RLITE_MB(&req), ipcp_rib_show_handler);
+    return request_response(RLITE_MB(&req), ipcp_rib_show_handler,
+                            TO_DFLT_MSECS);
 }
 
 /* Build the list of IPCPs running in the system, ordered by id. */

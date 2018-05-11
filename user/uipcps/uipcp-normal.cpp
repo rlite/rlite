@@ -1339,7 +1339,9 @@ uipcp_rib::policy_param_mod(const std::string &component,
     /* Fix-ups. */
     {
         int eto = get_param_value<int>(uipcp_rib::EnrollmentPrefix, "timeout");
-        int ato = get_param_value<int>(AddrAllocator::Prefix, "nack-wait-secs") * 1000;
+        int ato =
+            get_param_value<int>(AddrAllocator::Prefix, "nack-wait-secs") *
+            1000;
         int minval = ato * 150 / 100;
 
         if (eto < minval) {

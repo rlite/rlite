@@ -23,3 +23,5 @@ Open tasks, in decreasing order of priority:
 
 * implement utility to graphically show dif-rib-show, using graphviz
   (DIF map with active links)
+
+* use std::chrono::duration everywhere (parameters)
