@@ -765,7 +765,13 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
 
     /* This SDU will be sent to a remote IPCP, using an N-1 flow. */
 
-    if (false) {
+    rcu_read_lock();
+    if (!rcu_dereference(priv->sched_priv)) {
+        /* Direct path, bypassing the PDU scheduler. */
+        rcu_read_unlock();
+        return rmt_tx_to_lower(ipcp, lower_flow, rb, flags);
+
+    } else {
         /* PDU scheduler path. */
         struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
         bool maysleep               = flags & RL_RMT_F_MAYSLEEP;
@@ -836,12 +842,11 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
             }
         }
 
-        /* Report that the PDU was handled. */
-        return 0;
+        rcu_read_unlock();
     }
 
-    /* Direct path, bypassing the PDU scheduler. */
-    return rmt_tx_to_lower(ipcp, lower_flow, rb, flags);
+    /* Report that the PDU was handled. */
+    return 0;
 }
 
 /* Called under DTP lock */
@@ -1265,14 +1270,19 @@ rl_sched_init(struct rl_normal *priv)
                                     .enq     = sched_fifo_enq,
                                     .deq     = sched_fifo_deq};
 
-    priv->sched_ops = fifo_ops;
-
     spin_lock_init(&priv->sched_qlock);
     INIT_WORK(&priv->sched_deq_work, sched_deq_worker);
     init_waitqueue_head(&priv->sched_wqh);
-    priv->sched_priv = priv->sched_ops.create(priv);
-    if (!priv->sched_priv) {
-        PE("Failed to init PDU scheduler\n");
+    if (false) {
+        void *sched_priv = fifo_ops.create(priv);
+
+        if (!sched_priv) {
+            PE("Failed to init PDU scheduler\n");
+        } else {
+            priv->sched_ops = fifo_ops;
+            rcu_assign_pointer(priv->sched_priv, sched_priv);
+            synchronize_rcu();
+        }
     }
 }
 
