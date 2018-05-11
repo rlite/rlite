@@ -189,6 +189,7 @@ static struct rl_sched_ops rl_sched_fifo_ops = {
     .deq       = sched_fifo_deq};
 
 struct rl_sched_wrr {
+    /* Array indexed by qos_id. */
     struct {
         struct rb_list q;
         int qlen;
@@ -196,12 +197,72 @@ struct rl_sched_wrr {
          *    w_n = w_u * K / w_u_min * quantum / K
          */
         unsigned weight;
-    } wrrq;
-    /* Array indexed by qos_id. */
-    struct wrrq *queues;
+    } * queues;
     unsigned int num_queues;
     /* Quantum in bytes. */
     unsigned int quantum;
+};
+
+static int
+sched_wrr_init(struct rl_sched *sched)
+{
+    struct rl_sched_wrr *sched_priv = RL_SCHED_PRIV(sched);
+    int i;
+
+    sched_priv->num_queues = 2;
+    sched_priv->quantum    = 1500;
+    sched_priv->queues =
+        rl_alloc(sched_priv->num_queues * sizeof(sched_priv->queues[0]),
+                 GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
+    if (!sched_priv->queues) {
+        return -ENOMEM;
+    }
+    for (i = 0; i < sched_priv->num_queues; i++) {
+        rb_list_init(&sched_priv->queues[i].q);
+        sched_priv->queues[i].qlen   = 0;
+        sched_priv->queues[i].weight = i + 1;
+    }
+
+    return 0;
+}
+
+static void
+sched_wrr_fini(struct rl_sched *sched)
+{
+    struct rl_sched_wrr *sched_priv = RL_SCHED_PRIV(sched);
+    int i;
+
+    for (i = 0; i < sched_priv->num_queues; i++) {
+        struct rl_buf *rb, *tmp;
+        rb_list_foreach_safe (rb, tmp, &sched_priv->queues[i].q) {
+            rb_list_del(rb);
+            rl_buf_free(rb);
+        }
+        sched_priv->queues[i].qlen = 0;
+    }
+
+    rl_free(sched_priv->queues, RL_MT_SHIM);
+}
+
+static int
+sched_wrr_enq(struct rl_sched *sched, struct rl_buf *rb)
+{
+    return -1;
+}
+
+static struct rl_buf *
+sched_wrr_deq(struct rl_sched *sched)
+{
+    return NULL;
+}
+
+static struct rl_sched_ops rl_sched_wrr_ops = {
+    .name      = "wrr",
+    .priv_size = sizeof(struct rl_sched_wrr),
+    .init      = sched_wrr_init,
+    .fini      = sched_wrr_fini,
+    .enq       = sched_wrr_enq,
+    .deq       = sched_wrr_deq,
 };
 
 /* In general RL_PCI_LEN != sizeof(struct rina_pci) and
@@ -2123,6 +2184,7 @@ rl_normal_init(void)
 
     /* Build the (static) list of PDU schedulers. */
     list_add_tail(&rl_sched_fifo_ops.node, &rl_pdu_schedulers);
+    list_add_tail(&rl_sched_wrr_ops.node, &rl_pdu_schedulers);
 
     return rl_ipcp_factory_register(&normal_factory);
 }
