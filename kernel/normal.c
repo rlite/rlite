@@ -1124,6 +1124,7 @@ sched_deq_worker(struct work_struct *w)
     for (;;) {
         struct rl_buf *rb, *tmp;
         spin_lock_bh(&priv->sched_qlock);
+
         /* Simple FIFO dequeue logic, to be replaced with some scheduling
          * algorithm. */
         rb_list_foreach_safe (rb, tmp, &priv->sched_q) {
@@ -1136,11 +1137,14 @@ sched_deq_worker(struct work_struct *w)
         spin_unlock_bh(&priv->sched_qlock);
 
         if (rb_list_empty(&ready)) {
+            /* No more PDUs to dequeue, we can stop. */
             break;
         }
-        BUG_ON(!RL_BUF_RMT(rb).lower_flow);
+
+        /* Transmit the PDUs out of the scheduler lock. */
         rb_list_foreach_safe (rb, tmp, &ready) {
             rb_list_del(rb);
+            BUG_ON(!RL_BUF_RMT(rb).lower_flow);
             rmt_tx_to_lower(priv->ipcp, RL_BUF_RMT(rb).lower_flow, rb,
                             RL_RMT_F_MAYSLEEP | RL_RMT_F_CONSUME);
         }
