@@ -146,8 +146,8 @@ struct NeighFlow {
 
     /* If this is a kernel-bound flow, port_id and lower_ipcp_id are
      * valid. */
-    rl_port_t port_id;
-    rl_ipcp_id_t lower_ipcp_id;
+    rl_port_t port_id          = RL_PORT_ID_NONE;
+    rl_ipcp_id_t lower_ipcp_id = RL_IPCP_ID_NONE;
 
     /* If this is a kernel-bound flow, flow_fd is only used for close().
      * Otherwise, this is a management-only flow, and the file descriptor

@@ -57,7 +57,7 @@ NeighFlow::~NeighFlow()
     const char *flowlev = "N-1";
     int ret;
 
-    if (supp_dif == string(rib->uipcp->dif_name)) {
+    if (supp_dif == rib->myname) {
         flowlev = "N";
     }
 
@@ -65,9 +65,11 @@ NeighFlow::~NeighFlow()
 
     ret = close(flow_fd);
     if (ret) {
-        UPE(uipcp, "Error deallocating %s-flow [fd=%d]\n", flowlev, flow_fd);
+        UPE(uipcp, "Error deallocating %s-flow [fd=%d, port_id=%u]\n", flowlev,
+            flow_fd, port_id);
     } else {
-        UPD(uipcp, "%s-flow deallocated [fd=%d]\n", flowlev, flow_fd);
+        UPD(uipcp, "%s-flow deallocated [fd=%d, port_id=%u]\n", flowlev,
+            flow_fd, port_id);
     }
 
     if (!reliable) {
