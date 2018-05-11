@@ -1311,6 +1311,7 @@ UipcpRib::policy_mod(const std::string &component,
     }
     /* Register the new RIB paths. */
     for (const std::string &path : policy_builder->paths) {
+        assert(components[component] != nullptr);
         rib_handler_register(path, [this, component](
                                        const CDAPMessage *rm,
                                        std::shared_ptr<NeighFlow> const &nf,
