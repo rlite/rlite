@@ -324,11 +324,13 @@ class RaftSM {
     int apply_committed_entries();
 
     std::chrono::milliseconds ElectionTimeoutMin =
-        std::chrono::milliseconds(200);
+        std::chrono::milliseconds(int(kElectionTimeoutMinMsecs));
     std::chrono::milliseconds ElectionTimeoutMax =
-        std::chrono::milliseconds(500);
-    std::chrono::milliseconds HeartbeatTimeout = std::chrono::milliseconds(100);
-    std::chrono::milliseconds RtxTimeout = std::chrono::milliseconds(2000);
+        std::chrono::milliseconds(int(kElectionTimeoutMinMsecs * 3));
+    std::chrono::milliseconds HeartbeatTimeout =
+        std::chrono::milliseconds(int(kHeartBeatTimeoutMsecs));
+    std::chrono::milliseconds RtxTimeout =
+        std::chrono::milliseconds(int(kRtxTimeoutMsecs));
 
     unsigned int verbosity = kVerboseVery;
 
@@ -438,6 +440,10 @@ public:
     {
         RtxTimeout = t;
     }
+
+    static constexpr int kElectionTimeoutMinMsecs = 200;
+    static constexpr int kHeartBeatTimeoutMsecs   = 100;
+    static constexpr int kRtxTimeoutMsecs         = 2000;
 };
 
 } /* namespace raft */
