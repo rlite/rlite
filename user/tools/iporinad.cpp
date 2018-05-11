@@ -655,6 +655,7 @@ out:
             argv[i] = nullptr;
         }
     }
+    delete[] argv;
 
     return ret;
 }
