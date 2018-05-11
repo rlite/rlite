@@ -626,6 +626,7 @@ UipcpRib::rib_handler_register(std::string rib_path, RibHandler h)
 
     assert(handlers.count(rib_path) == 0);
     handlers.insert(make_pair(rib_path, info));
+    UPD(uipcp, "path %s registered\n", rib_path.c_str());
 }
 
 void
@@ -633,6 +634,7 @@ UipcpRib::rib_handler_unregister(std::string rib_path)
 {
     assert(handlers.count(rib_path) > 0);
     handlers.erase(rib_path);
+    UPD(uipcp, "path %s unregistered\n", rib_path.c_str());
 }
 
 #ifdef RL_USE_QOS_CUBES
@@ -1267,6 +1269,11 @@ UipcpRib::policy_mod(const std::string &component,
         for (const std::string &path : prev_builder->paths) {
             rib_handler_unregister(path);
         }
+
+        for (const auto &pp : prev_builder->params) {
+            params_map[component].erase(pp.first);
+            UPD(uipcp, "policy param '%s' unregistered\n", pp.first.c_str());
+        }
     }
 
     /* Set the new policy. */
@@ -1293,6 +1300,7 @@ UipcpRib::policy_mod(const std::string &component,
     /* Register the new policy parameters. */
     for (const auto &pp : policy_builder->params) {
         params_map[component][pp.first] = pp.second;
+        UPD(uipcp, "policy param '%s' registered\n", pp.first.c_str());
     }
     /* Reconfigure the new component, if necessary. */
     if (component == DFT::Prefix) {
