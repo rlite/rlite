@@ -343,7 +343,7 @@ class CentralizedFaultTolerantDFT : public DFT {
     /* In case of state machine replica, a pointer to a Raft state
      * machine. */
     class Replica : public raft::RaftSM {
-        CentralizedFaultTolerantDFT *parent = nullptr;
+        UipcpRib *rib = nullptr;
 
         /* The structure of a DFT command (i.e. a log entry for the Raft SM). */
         struct Command {
@@ -396,7 +396,7 @@ class CentralizedFaultTolerantDFT : public DFT {
                                std::to_string(dft->rib->uipcp->id) +
                                std::string("-") + dft->rib->myname,
                            sizeof(Command), std::cerr, std::cout),
-              parent(dft),
+              rib(dft->rib),
               impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
         int process_sm_output(raft::RaftSMOutput out);
         int process_timeout();
@@ -421,7 +421,7 @@ class CentralizedFaultTolerantDFT : public DFT {
 
     /* In case of client, a pointer to client-side data structures. */
     class Client {
-        CentralizedFaultTolerantDFT *parent = nullptr;
+        UipcpRib *rib = nullptr;
         std::list<raft::ReplicaId> replicas;
         /* The leader, if we know who it is, otherwise the empty
          * string. */
@@ -452,7 +452,7 @@ class CentralizedFaultTolerantDFT : public DFT {
     public:
         Client(CentralizedFaultTolerantDFT *dft,
                std::list<raft::ReplicaId> names)
-            : parent(dft), replicas(std::move(names))
+            : rib(dft->rib), replicas(std::move(names))
         {
         }
         int lookup_req(const std::string &appl_name, std::string *dst_node,
@@ -583,19 +583,18 @@ CentralizedFaultTolerantDFT::Client::mod_pending_timer()
     for (auto mit = pending.begin(); mit != pending.end();) {
         if (mit->second.t <= now) {
             /* This request has expired. */
-            UPW(parent->rib->uipcp,
-                "DFT '%s' request for name '%s' timed out\n",
+            UPW(rib->uipcp, "DFT '%s' request for name '%s' timed out\n",
                 CDAPMessage::opcode_repr(mit->second.op_code).c_str(),
                 mit->second.appl_name.c_str());
             if (mit->second.replica == leader_id) {
                 /* We got a timeout on the leader, let's forget about it. */
-                UPD(parent->rib->uipcp, "Forgetting about raft leader %s\n",
+                UPD(rib->uipcp, "Forgetting about raft leader %s\n",
                     leader_id.c_str());
                 leader_id.clear();
             } else if (mit->second.replica == reader_id) {
                 /* We got a timeout on the selected reader,
                  * let's forget about it. */
-                UPD(parent->rib->uipcp, "Forgetting about selected reader %s\n",
+                UPD(rib->uipcp, "Forgetting about selected reader %s\n",
                     reader_id.c_str());
                 reader_id.clear();
             }
@@ -614,8 +613,8 @@ CentralizedFaultTolerantDFT::Client::mod_pending_timer()
         timer = nullptr;
     } else {
         timer = make_unique<TimeoutEvent>(
-            std::chrono::duration_cast<Msecs>(t_min - now), parent->rib->uipcp,
-            this, [](struct uipcp *uipcp, void *arg) {
+            std::chrono::duration_cast<Msecs>(t_min - now), rib->uipcp, this,
+            [](struct uipcp *uipcp, void *arg) {
                 auto cli =
                     static_cast<CentralizedFaultTolerantDFT::Client *>(arg);
                 cli->timer->fired();
@@ -643,13 +642,11 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
             m->m_read(ObjClass, TableName + "/" + appl_name);
             op_code = m->op_code;
 
-            m->invoke_id = invoke_id =
-                parent->rib->invoke_id_mgr.get_invoke_id();
+            m->invoke_id = invoke_id = rib->invoke_id_mgr.get_invoke_id();
             pending[invoke_id] =
                 std::move(PendingReq(op_code, appl_name, r, 0));
 
-            ret = parent->rib->send_to_dst_node(std::move(m), r, nullptr,
-                                                nullptr);
+            ret = rib->send_to_dst_node(std::move(m), r, nullptr, nullptr);
             if (ret) {
                 pending.erase(invoke_id);
                 return ret;
@@ -659,8 +656,7 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
 
     mod_pending_timer();
 
-    UPI(parent->rib->uipcp, "Read request for '%s' issued\n",
-        appl_name.c_str());
+    UPI(rib->uipcp, "Read request for '%s' issued\n", appl_name.c_str());
 
     /* Inform the caller that we issued the request, but the
      * response will come later. */
@@ -692,18 +688,16 @@ CentralizedFaultTolerantDFT::Client::appl_register(
                 m->m_delete(ObjClass, TableName);
             }
             op_code = m->op_code;
-            dft_entry.set_ipcp_name(parent->rib->myname);
+            dft_entry.set_ipcp_name(rib->myname);
             dft_entry.set_allocated_appl_name(apname2gpb(appl_name));
             dft_entry.set_seqnum(seqnum_next++);
 
             /* Set the 'pending' map before sending, in case we are sending to
              * ourselves (and so we wouldn't find the entry in the map).*/
-            m->invoke_id = invoke_id =
-                parent->rib->invoke_id_mgr.get_invoke_id();
+            m->invoke_id = invoke_id = rib->invoke_id_mgr.get_invoke_id();
             pending[invoke_id] =
                 std::move(PendingReq(op_code, appl_name, r, req->hdr.event_id));
-            ret = parent->rib->send_to_dst_node(std::move(m), r, &dft_entry,
-                                                nullptr);
+            ret = rib->send_to_dst_node(std::move(m), r, &dft_entry, nullptr);
             if (ret) {
                 pending.erase(invoke_id);
                 return ret;
@@ -713,8 +707,8 @@ CentralizedFaultTolerantDFT::Client::appl_register(
 
     mod_pending_timer();
 
-    UPI(parent->rib->uipcp, "Write request '%s <= %llu' issued\n",
-        appl_name.c_str(), (long long unsigned)parent->rib->myaddr);
+    UPI(rib->uipcp, "Write request '%s <= %llu' issued\n", appl_name.c_str(),
+        (long long unsigned)rib->myaddr);
 
     return 0;
 }
@@ -722,7 +716,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
 int
 CentralizedFaultTolerantDFT::Client::process_timeout()
 {
-    std::lock_guard<std::mutex> guard(parent->rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     mod_pending_timer();
 
@@ -734,7 +728,7 @@ CentralizedFaultTolerantDFT::Client::rib_handler(
     const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
     std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)
 {
-    struct uipcp *uipcp = parent->rib->uipcp;
+    struct uipcp *uipcp = rib->uipcp;
 
     /* We expect a M_WRITE_R, M_DELETE_R or M_READ_R, corresponding an
      * M_WRITE/M_DELETE sent by Client::appl_register() or an M_READ sent by
@@ -803,7 +797,7 @@ CentralizedFaultTolerantDFT::Client::rib_handler(
             UPD(uipcp, "Lookup of name '%s' resolved to node '%s'\n",
                 pi->second.appl_name.c_str(), remote_node.c_str());
         }
-        parent->rib->dft_lookup_resolved(pi->second.appl_name, remote_node);
+        rib->dft_lookup_resolved(pi->second.appl_name, remote_node);
         break;
     }
     default:
@@ -874,8 +868,8 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
         }
 
         m->m_write(obj_class, TableName);
-        ret |= parent->rib->send_to_dst_node(std::move(m), pair.first,
-                                             obj.get(), nullptr);
+        ret |=
+            rib->send_to_dst_node(std::move(m), pair.first, obj.get(), nullptr);
     }
 
     /* Here we make an assumption about the raft library, that is one
@@ -898,7 +892,7 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
              * the unicity of the timer is not true. */
             assert(timer == nullptr || timer_type == cmd.type);
             timer = make_unique<TimeoutEvent>(
-                cmd.milliseconds, parent->rib->uipcp, this,
+                cmd.milliseconds, rib->uipcp, this,
                 [](struct uipcp *uipcp, void *arg) {
                     auto replica =
                         static_cast<CentralizedFaultTolerantDFT::Replica *>(
@@ -916,7 +910,7 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
 int
 CentralizedFaultTolerantDFT::Replica::process_timeout()
 {
-    std::lock_guard<std::mutex> guard(parent->rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
     raft::RaftSMOutput out;
 
     timer_expired(timer_type, &out);
@@ -949,8 +943,8 @@ CentralizedFaultTolerantDFT::Replica::apply(raft::LogIndex index,
         m->obj_name  = mit->second.obj_name;
         m->obj_class = mit->second.obj_class;
         m->invoke_id = mit->second.invoke_id;
-        parent->rib->send_to_dst_addr(std::move(m), mit->second.requestor_addr);
-        UPD(parent->rib->uipcp,
+        rib->send_to_dst_addr(std::move(m), mit->second.requestor_addr);
+        UPD(rib->uipcp,
             "Pending response for index %u sent to client %llu "
             "(invoke_id=%d)\n",
             index, (long long unsigned)mit->second.requestor_addr,
@@ -966,7 +960,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
     const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
     std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)
 {
-    struct uipcp *uipcp = parent->rib->uipcp;
+    struct uipcp *uipcp = rib->uipcp;
     const char *objbuf  = nullptr;
     raft::RaftSMOutput out;
     size_t objlen = 0;
@@ -1019,7 +1013,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
             /* Submit the command to the raft state machine. */
             ret = submit(reinterpret_cast<const char *const>(&c), &index, &out);
             if (ret) {
-                UPE(parent->rib->uipcp,
+                UPE(rib->uipcp,
                     "Failed to submit application %sregistration for '%s' to "
                     "the raft state machine\n",
                     rm->op_code == gpb::M_WRITE ? "" : "un", appl_name.c_str());
@@ -1044,7 +1038,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(
                         /*result_reason=*/ret ? "No match found" : string());
             m->invoke_id = rm->invoke_id;
             m->set_obj_value(remote_node);
-            parent->rib->send_to_dst_addr(std::move(m), src_addr);
+            rib->send_to_dst_addr(std::move(m), src_addr);
         } else {
             UPE(uipcp, "M_WRITE(dft) or M_DELETE(dft) expected\n");
             return 0;
