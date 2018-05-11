@@ -206,9 +206,8 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
         NPD("read %d bytes\n", ret);
         rb->len = ret;
         rl_sdu_rx_flow(flow->txrx.ipcp, flow, rb, true);
-
         stats->rx_pkt++;
-        stats->rx_byte += rb->len;
+        stats->rx_byte += ret;
     }
 
     mutex_unlock(&priv->rxw_lock);
