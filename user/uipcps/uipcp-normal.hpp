@@ -387,14 +387,14 @@ struct AddrAllocator {
     AddrAllocator(UipcpRib *_ur) : rib(_ur) {}
     virtual ~AddrAllocator() {}
 
-    virtual void dump(std::stringstream &ss) const   = 0;
-    virtual int allocate(rlm_addr_t *addr)           = 0;
+    virtual void dump(std::stringstream &ss) const                       = 0;
+    virtual int allocate(const std::string &ipcp_name, rlm_addr_t *addr) = 0;
     virtual int rib_handler(const CDAPMessage *rm,
                             std::shared_ptr<NeighFlow> const &nf,
                             std::shared_ptr<Neighbor> const &neigh,
-                            rlm_addr_t src_addr)     = 0;
+                            rlm_addr_t src_addr)                         = 0;
     virtual int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
-                           unsigned int limit) const = 0;
+                           unsigned int limit) const                     = 0;
 
     static std::string TableName;
     static std::string ObjClass;
@@ -660,7 +660,10 @@ struct UipcpRib {
     int realize_registrations(bool reg);
     int enroller_enable(bool enable);
 
-    int addr_allocate(rlm_addr_t *addr) { return addra->allocate(addr); };
+    int addr_allocate(const std::string &ipcp_name, rlm_addr_t *addr)
+    {
+        return addra->allocate(ipcp_name, addr);
+    };
     int set_address(rlm_addr_t address);
     void update_address(rlm_addr_t new_addr);
     rlm_addr_t lookup_node_address(const std::string &node_name) const;

@@ -21,7 +21,7 @@ public:
     ~DistributedAddrAllocator() {}
 
     void dump(std::stringstream &ss) const override;
-    int allocate(rlm_addr_t *addr) override;
+    int allocate(const std::string &ipcp_name, rlm_addr_t *addr) override;
     int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
                     std::shared_ptr<Neighbor> const &neigh,
                     rlm_addr_t src_addr) override;
@@ -71,7 +71,8 @@ DistributedAddrAllocator::sync_neigh(const std::shared_ptr<NeighFlow> &nf,
 }
 
 int
-DistributedAddrAllocator::allocate(rlm_addr_t *result)
+DistributedAddrAllocator::allocate(const std::string &ipcp_name,
+                                   rlm_addr_t *result)
 {
     rlm_addr_t modulo = addr_alloc_table.size() + 1;
     const int inflate = 2;
@@ -314,7 +315,7 @@ class StaticAddrAllocator : public DistributedAddrAllocator {
 public:
     RL_NODEFAULT_NONCOPIABLE(StaticAddrAllocator);
     StaticAddrAllocator(UipcpRib *_ur) : DistributedAddrAllocator(_ur) {}
-    int allocate(rlm_addr_t *addr) override
+    int allocate(const std::string &ipcp_name, rlm_addr_t *addr) override
     {
         *addr = RL_ADDR_NULL;
         return 0;
@@ -385,7 +386,7 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
             : CeftClient(aa->rib, std::move(names))
         {
         }
-        int allocate(rlm_addr_t *addr);
+        int allocate(const std::string &ipcp_name, rlm_addr_t *addr);
         int process_rib_msg(const CDAPMessage *rm,
                             CeftClient::PendingReq *const bpr,
                             rlm_addr_t src_addr) override;
@@ -405,7 +406,7 @@ public:
         }
     }
 
-    int allocate(rlm_addr_t *addr) override
+    int allocate(const std::string &ipcp_name, rlm_addr_t *addr) override
     {
         if (raft) {
             /* We may be the leader or a follower, but here we can behave as as
@@ -413,7 +414,7 @@ public:
              * we know it. */
             client->set_leader_id(raft->leader_name());
         }
-        return client->allocate(addr);
+        return client->allocate(ipcp_name, addr);
     }
 
     int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
@@ -437,7 +438,8 @@ public:
 };
 
 int
-CentralizedFaultTolerantAddrAllocator::Client::allocate(rlm_addr_t *addr)
+CentralizedFaultTolerantAddrAllocator::Client::allocate(
+    const std::string &ipcp_name, rlm_addr_t *addr)
 {
     return -1;
 }

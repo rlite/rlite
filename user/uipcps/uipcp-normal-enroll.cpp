@@ -759,7 +759,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
 
         /* Return address. */
         enr_info.ParseFromArray(objbuf, objlen);
-        if (rib->addr_allocate(&addr)) {
+        if (rib->addr_allocate(neigh->ipcp_name, &addr)) {
             UPE(rib->uipcp, "Address allocation failed\n");
             return -1;
         }
@@ -1969,7 +1969,7 @@ UipcpRib::check_for_address_conflicts()
          * designated one to change it. */
         rlm_addr_t newaddr;
 
-        if (addra->allocate(&newaddr)) {
+        if (addra->allocate(myname, &newaddr)) {
             return;
         }
 
