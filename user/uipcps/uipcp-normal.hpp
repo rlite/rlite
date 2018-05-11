@@ -405,20 +405,24 @@ struct AddrAllocator {
     static std::string Prefix;
 };
 
-/* Object used to store policy names and allocate/switch policies. */
+/* An object that knows how to build, register and unregister a
+ * policy for an IPCP component. */
 struct PolicyBuilder {
     std::string name;
     std::function<void(UipcpRib *)> builder = [](UipcpRib *) {};
     std::list<std::string> paths;
+    std::list<std::pair<std::string, PolicyParam>> params;
 
     PolicyBuilder(const std::string &policy_name) : name(policy_name) {}
     PolicyBuilder(const std::string &policy_name,
                   std::function<void(UipcpRib *)> fun,
-                  std::list<std::string> ps = {})
+                  std::list<std::string> ps                         = {},
+                  std::list<std::pair<std::string, PolicyParam>> pp = {})
         : PolicyBuilder(policy_name)
     {
         builder = fun;
-        paths   = ps;
+        paths   = std::move(ps);
+        params  = std::move(pp);
     }
     bool operator<(const PolicyBuilder &o) const { return name < o.name; }
     bool operator==(const PolicyBuilder &o) const { return name == o.name; }
