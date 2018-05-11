@@ -46,16 +46,6 @@ struct LFDB {
     struct DijkstraInfo {
         unsigned int dist;
         NodeId nhop;
-        bool visited;
-    };
-
-    struct PQInfo {
-        NodeId node;
-        unsigned int dist;
-        PQInfo(const NodeId &node, unsigned int dist) : node(node), dist(dist)
-        {
-        }
-        bool operator<(const PQInfo &other) const { return dist > other.dist; }
     };
 
     /* Is Loop Free Alternate algorithm enabled ? */

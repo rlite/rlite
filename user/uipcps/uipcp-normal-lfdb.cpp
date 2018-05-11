@@ -81,19 +81,26 @@ LFDB::compute_shortest_paths(
     const std::unordered_map<NodeId, std::list<Edge>> &graph,
     std::unordered_map<NodeId, DijkstraInfo> &info)
 {
+    /* Per-node info stored in the priority queue. */
+    struct PQInfo {
+        NodeId node;
+        unsigned int dist;
+        PQInfo(const NodeId &node, unsigned int dist) : node(node), dist(dist)
+        {
+        }
+        bool operator<(const PQInfo &other) const { return dist > other.dist; }
+    };
     std::priority_queue<PQInfo> frontier;
-
-    frontier.push({source_node, 0});
 
     /* Initialize the per-node info map. */
     for (const auto &kvg : graph) {
         struct DijkstraInfo inf;
 
         inf.dist        = UINT_MAX;
-        inf.visited     = false;
         info[kvg.first] = std::move(inf);
     }
 
+    frontier.push({source_node, 0});
     while (!frontier.empty()) {
         /* Select the closest node from the ones in the frontier. */
         PQInfo closer = frontier.top();
@@ -105,7 +112,6 @@ LFDB::compute_shortest_paths(
 
         DijkstraInfo &info_min = info[closer.node];
         info_min.dist          = closer.dist;
-        info_min.visited       = true;
 
         if (verbose) {
             std::cout << "Selecting node " << closer.node << std::endl;
@@ -118,6 +124,7 @@ LFDB::compute_shortest_paths(
 
         const std::list<Edge> &edges = graphit->second;
 
+        /* Apply relaxation rule and update the frontier. */
         for (const Edge &edge : edges) {
             DijkstraInfo &info_to = info[edge.to];
 
@@ -134,8 +141,7 @@ LFDB::compute_shortest_paths(
         std::cout << "Dijkstra result:" << std::endl;
         for (const auto &kvi : info) {
             std::cout << "    Node: " << kvi.first
-                      << ", Dist: " << kvi.second.dist << ", Visited "
-                      << kvi.second.visited << std::endl;
+                      << ", Dist: " << kvi.second.dist << std::endl;
         }
     }
 }
@@ -189,7 +195,7 @@ LFDB::compute_next_hops(const NodeId &local_node)
      * result to fill in the next_hops routing table. */
     compute_shortest_paths(local_node, graph, info);
     for (const auto &kvi : info) {
-        if (kvi.first == local_node || !kvi.second.visited) {
+        if (kvi.first == local_node || kvi.second.dist == UINT_MAX) {
             /* I don't need a next hop for myself. */
             continue;
         }
