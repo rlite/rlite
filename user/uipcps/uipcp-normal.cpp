@@ -478,7 +478,8 @@ UipcpRib::UipcpRib(struct uipcp *_u)
 
     params_map[AddrAllocator::Prefix]["nack-wait"] =
         PolicyParam(Secs(int(kAddrAllocDistrNackWaitSecs)));
-    params_map[DFT::Prefix]["replicas"] = PolicyParam(string());
+    params_map[AddrAllocator::Prefix]["replicas"] = PolicyParam(string());
+    params_map[DFT::Prefix]["replicas"]           = PolicyParam(string());
     params_map[UipcpRib::EnrollmentPrefix]["timeout"] =
         PolicyParam(Msecs(int(kEnrollTimeoutMsecs)));
     params_map[UipcpRib::EnrollmentPrefix]["keepalive"] =
