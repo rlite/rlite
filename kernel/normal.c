@@ -1774,7 +1774,6 @@ static struct ipcp_factory normal_factory = {
     .ops.pduft_del_addr     = rl_pduft_del_addr,
     .ops.mgmt_sdu_build     = rl_normal_mgmt_sdu_build,
     .ops.sdu_rx             = rl_normal_sdu_rx,
-    .ops.flow_get_stats     = flow_get_stats,
     .ops.flow_writeable     = rl_normal_flow_writeable,
     .ops.qos_supported      = rl_normal_qos_supported,
 };

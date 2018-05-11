@@ -133,21 +133,6 @@ dtp_dump(struct dtp *dtp)
 }
 EXPORT_SYMBOL(dtp_dump);
 
-int
-flow_get_stats(struct flow_entry *flow, struct rl_flow_stats *stats)
-{
-    struct dtp *dtp = &flow->dtp;
-
-    spin_lock_bh(&flow->txrx.rx_lock);
-    spin_lock_bh(&dtp->lock);
-    *stats = flow->stats;
-    spin_unlock_bh(&dtp->lock);
-    spin_unlock_bh(&flow->txrx.rx_lock);
-
-    return 0;
-}
-EXPORT_SYMBOL(flow_get_stats);
-
 static struct pduft_entry *
 pduft_lookup_internal(struct rl_normal *priv, rlm_addr_t dst_addr)
 {

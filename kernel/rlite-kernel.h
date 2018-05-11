@@ -429,7 +429,6 @@ struct ipcp_ops {
     int (*flow_cfg_update)(struct flow_entry *flow,
                            const struct rl_flow_config *cfg);
     int (*flow_deallocated)(struct ipcp_entry *ipcp, struct flow_entry *flow);
-    int (*flow_get_stats)(struct flow_entry *flow, struct rl_flow_stats *stats);
 
 /* The SDU write implementation can sleep (e.g., when it is called from
  * process context. */
@@ -757,7 +756,6 @@ struct rl_normal {
 void dtp_init(struct dtp *dtp);
 void dtp_fini(struct dtp *dtp);
 void dtp_dump(struct dtp *dtp);
-int flow_get_stats(struct flow_entry *flow, struct rl_flow_stats *stats);
 int rl_pduft_del_addr(struct ipcp_entry *ipcp, rlm_addr_t dst_addr);
 int rl_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry);
 int rl_pduft_flush(struct ipcp_entry *ipcp);

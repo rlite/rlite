@@ -2392,17 +2392,19 @@ rl_flow_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     if (!flow) {
         return -EINVAL;
     }
+    dtp = &flow->dtp;
 
     memset(&resp, 0, sizeof(resp));
     resp.hdr.msg_type = RLITE_KER_FLOW_STATS_RESP;
     resp.hdr.event_id = req->hdr.event_id;
 
-    if (flow->txrx.ipcp->ops.flow_get_stats) {
-        ret = flow->txrx.ipcp->ops.flow_get_stats(flow, &resp.stats);
-    }
+    spin_lock_bh(&flow->txrx.rx_lock);
+    spin_lock_bh(&dtp->lock);
+
+    /* Copy in rl_io device stats. */
+    memcpy(&resp.stats, &flow->stats, sizeof(resp.stats));
 
     /* Copy in DTP state. */
-    dtp                             = &flow->dtp;
     resp.dtp.snd_lwe                = dtp->snd_lwe;
     resp.dtp.snd_rwe                = dtp->snd_rwe;
     resp.dtp.next_seq_num_to_use    = dtp->next_seq_num_to_use;
@@ -2423,6 +2425,9 @@ rl_flow_get_stats(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     resp.dtp.last_seq_num_acked     = dtp->last_seq_num_acked;
     resp.dtp.next_snd_ctl_seq       = dtp->next_snd_ctl_seq;
     resp.dtp.seqq_len               = dtp->seqq_len;
+
+    spin_unlock_bh(&dtp->lock);
+    spin_unlock_bh(&flow->txrx.rx_lock);
 
     flow_put(flow);
 
