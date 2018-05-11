@@ -341,8 +341,8 @@ FullyReplicatedDFT::neighs_refresh(size_t limit)
  * through CDAP; (ii) keep track of pending client requests; (iii) implement
  * the timers needed by Raft.
  * Specific centralized-fault-tolerant components should extend this class
- * implementing the access to the specific resource and reacting to CDAP
- * input messages. */
+ * implementing the access to the specific resource and the reaction to input
+ * CDAP messages. */
 class CeftReplica : public raft::RaftSM {
     /* Size of a command in the replicated state machine log. */
     const size_t CommandSize;
@@ -668,6 +668,15 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
     return process_sm_output(std::move(out));
 }
 
+/* The CeftClient class provides the client-side generic glue functionalities
+ * to interact with a cluster of Raft replicas. Functionalities in detail:
+ * (i) send and receive messages to the replicas through CDAP; (ii) keep track
+ * of pending requests awaiting for a response from the replicas;
+ * (iii) implement the necessary timers to let pending requests timeout.
+ * Specific centralized-fault-tolerant components should extend this class to
+ * implement the access to the specific resource and to react to input CDAP
+ * messages. Also the CeftClient::PendingReq may be extended to include
+ * additional client-side information. */
 class CeftClient {
 protected:
     UipcpRib *rib = nullptr;
@@ -815,6 +824,54 @@ CeftClient::send_to_replicas(std::unique_ptr<CDAPMessage> m,
     mod_pending_timer();
 
     return 0;
+}
+
+int
+CeftClient::rib_handler(const CDAPMessage *rm,
+                        std::shared_ptr<NeighFlow> const &nf,
+                        std::shared_ptr<Neighbor> const &neigh,
+                        rlm_addr_t src_addr)
+{
+    struct uipcp *uipcp = rib->uipcp;
+
+    /* Lookup rm->invoke_id in the pending map and erase it. Lookup
+     * may fail if we receive multiple responses (but not for the
+     * first response). */
+    auto pi = pending.find(rm->invoke_id);
+    if (pi == pending.end()) {
+        UPW(uipcp, "Cannot find pending request with invoke id %d\n",
+            rm->invoke_id);
+        return 0;
+    }
+    /* Check that rm->op_code is consistent with the pending request. */
+    if (rm->op_code != pi->second->op_code + 1) {
+        UPE(uipcp, "Opcode mismatch for request with invoke id %d\n",
+            rm->invoke_id);
+        pending.erase(pi);
+        return 0;
+    }
+
+    if (rm->op_code == gpb::M_READ_R) {
+        /* The first reader that answers becomes our selected reader. */
+        if (reader_id.empty()) {
+            reader_id = pi->second->replica;
+            UPD(uipcp, "Selected reader: %s\n", reader_id.c_str());
+        }
+    } else {
+        /* We assume it was the leader to answer. So now we know who the
+         * leader is. */
+        if (leader_id.empty()) {
+            leader_id = pi->second->replica;
+            UPD(uipcp, "Raft leader discovered: %s\n", leader_id.c_str());
+        }
+    }
+
+    /* Handle the message to the underlying implementation. */
+    int ret = process_rib_msg(rm, pi->second.get(), src_addr);
+    pending.erase(pi);
+    mod_pending_timer();
+
+    return ret;
 }
 
 class CentralizedFaultTolerantDFT : public DFT {
@@ -1048,54 +1105,6 @@ CentralizedFaultTolerantDFT::Client::appl_register(
     }
 
     return 0;
-}
-
-int
-CeftClient::rib_handler(const CDAPMessage *rm,
-                        std::shared_ptr<NeighFlow> const &nf,
-                        std::shared_ptr<Neighbor> const &neigh,
-                        rlm_addr_t src_addr)
-{
-    struct uipcp *uipcp = rib->uipcp;
-
-    /* Lookup rm->invoke_id in the pending map and erase it. Lookup
-     * may fail if we receive multiple responses (but not for the
-     * first response). */
-    auto pi = pending.find(rm->invoke_id);
-    if (pi == pending.end()) {
-        UPW(uipcp, "Cannot find pending request with invoke id %d\n",
-            rm->invoke_id);
-        return 0;
-    }
-    /* Check that rm->op_code is consistent with the pending request. */
-    if (rm->op_code != pi->second->op_code + 1) {
-        UPE(uipcp, "Opcode mismatch for request with invoke id %d\n",
-            rm->invoke_id);
-        pending.erase(pi);
-        return 0;
-    }
-
-    if (rm->op_code == gpb::M_READ_R) {
-        /* The first reader that answers becomes our selected reader. */
-        if (reader_id.empty()) {
-            reader_id = pi->second->replica;
-            UPD(uipcp, "Selected reader: %s\n", reader_id.c_str());
-        }
-    } else {
-        /* We assume it was the leader to answer. So now we know who the
-         * leader is. */
-        if (leader_id.empty()) {
-            leader_id = pi->second->replica;
-            UPD(uipcp, "Raft leader discovered: %s\n", leader_id.c_str());
-        }
-    }
-
-    /* Handle the message to the underlying implementation. */
-    int ret = process_rib_msg(rm, pi->second.get(), src_addr);
-    pending.erase(pi);
-    mod_pending_timer();
-
-    return ret;
 }
 
 int
