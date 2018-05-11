@@ -596,7 +596,6 @@ LocalFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     std::unique_ptr<FlowRequest> freq = std::move(f->second);
 
     flow_reqs.erase(f);
-    assert(!!(freq->flags & RL_FLOWREQ_INITIATOR) == !!req->initiator);
     send_del = (freq->flags & RL_FLOWREQ_SEND_DEL);
 
     UPV(rib->uipcp, "Removed flow request with port_id %u\n",
@@ -609,7 +608,7 @@ LocalFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     /* We should wait 2 MPL here before notifying the peer. */
     m = utils::make_unique<CDAPMessage>();
     remote_obj_name << TableName << "/";
-    if (req->initiator) {
+    if (freq->flags & RL_FLOWREQ_INITIATOR) {
         remote_obj_name << freq->dst_port();
     } else {
         remote_obj_name << freq->src_port();

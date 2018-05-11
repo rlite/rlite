@@ -381,8 +381,7 @@ struct rl_kmsg_flow_deallocated {
     rl_ipcp_id_t ipcp_id;
     rl_port_t local_port_id;
     rl_port_t remote_port_id;
-    uint8_t initiator;
-    uint8_t pad1;
+    uint16_t pad1;
     rlm_addr_t remote_addr;
 };
 

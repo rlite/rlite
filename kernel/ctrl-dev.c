@@ -1275,7 +1275,6 @@ flow_del(struct flow_entry *entry)
         ntfy.local_port_id  = entry->local_port;
         ntfy.remote_port_id = entry->remote_port;
         ntfy.remote_addr    = entry->remote_addr;
-        ntfy.initiator      = !!(entry->flags & RL_FLOW_INITIATOR);
     }
 
     if (entry->upper.rc) {
