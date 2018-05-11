@@ -1257,6 +1257,14 @@ static int
 rl_normal_sched_config(struct ipcp_entry *ipcp, struct rl_msg_base *bmsg)
 {
     int ret = -ENOSYS;
+
+    if (rl_ipcp_has_flows(ipcp, /*report_all=*/false)) {
+        /* Do not allow scheduler changes if this IPCP is being
+         * use by some flow. There is a race condition that
+         * needs to be addressed, though. */
+        return -EBUSY;
+    }
+
     switch (bmsg->hdr.msg_type) {
     case RLITE_KER_IPCP_SCHED_WRR: {
         struct rl_kmsg_ipcp_sched_wrr *req =
