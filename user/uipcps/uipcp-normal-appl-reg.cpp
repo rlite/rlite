@@ -684,8 +684,7 @@ protected:
         gpb::OpCode op_code;
         std::chrono::system_clock::time_point t;
         PendingReq() = default;
-        PendingReq(const raft::ReplicaId &replica, gpb::OpCode op_code)
-            : replica(replica), op_code(op_code)
+        PendingReq(gpb::OpCode op_code) : op_code(op_code)
         {
             t = std::chrono::system_clock::now() + Secs(3);
         }
@@ -774,7 +773,6 @@ CeftClient::mod_pending_timer()
     }
 }
 
-// TODO remove replica from PendingReq() constructor.
 int
 CeftClient::send_to_replicas(std::unique_ptr<CDAPMessage> m,
                              std::unique_ptr<PendingReq> pr, OpSemantics sem)
@@ -866,9 +864,9 @@ class CentralizedFaultTolerantDFT : public DFT {
             std::string appl_name;
             uint32_t kevent_id;
             PendingReq() = default;
-            PendingReq(const raft::ReplicaId &replica, gpb::OpCode op_code,
-                       const std::string &appl_name, uint32_t kevent_id)
-                : CeftClient::PendingReq(replica, op_code),
+            PendingReq(gpb::OpCode op_code, const std::string &appl_name,
+                       uint32_t kevent_id)
+                : CeftClient::PendingReq(op_code),
                   appl_name(appl_name),
                   kevent_id(kevent_id)
             {
@@ -987,7 +985,7 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
 
     m->m_read(ObjClass, TableName + "/" + appl_name);
 
-    auto pr = make_unique<PendingReq>(string(), m->op_code, appl_name, 0);
+    auto pr = make_unique<PendingReq>(m->op_code, appl_name, 0);
     int ret = send_to_replicas(std::move(m), std::move(pr), OpSemantics::Get);
     if (ret) {
         return ret;
@@ -1017,8 +1015,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
         m->m_delete(ObjClass, TableName);
     }
 
-    auto pr = make_unique<PendingReq>(string(), m->op_code, appl_name,
-                                      req->hdr.event_id);
+    auto pr = make_unique<PendingReq>(m->op_code, appl_name, req->hdr.event_id);
     gpb::DFTEntry dft_entry;
 
     dft_entry.set_ipcp_name(rib->myname);
