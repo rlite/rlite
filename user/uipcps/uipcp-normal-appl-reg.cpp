@@ -729,7 +729,7 @@ UipcpRib::dft_lib_init()
         [](UipcpRib *rib) {
             rib->dft = make_unique<CentralizedFaultTolerantDFT>(rib);
         },
-        {DFT::TableName}));
+        {DFT::TableName}, {{"replicas", PolicyParam(string())}}));
 }
 
 } // namespace Uipcps

@@ -29,6 +29,10 @@ public:
                    unsigned int limit) const override;
 
     static std::string ReqObjClass;
+
+    /* Default value for the NACK timer before considering the address
+     * allocation successful. */
+    static constexpr int kAddrAllocDistrNackWaitSecs = 4;
 };
 
 std::string DistributedAddrAllocator::ReqObjClass = "aareq";
@@ -629,14 +633,17 @@ UipcpRib::addra_lib_init()
         [](UipcpRib *rib) {
             rib->addra = make_unique<DistributedAddrAllocator>(rib);
         },
-        {AddrAllocator::TableName}));
+        {AddrAllocator::TableName},
+        {{"nack-wait",
+          PolicyParam(Secs(
+              int(DistributedAddrAllocator::kAddrAllocDistrNackWaitSecs)))}}));
     available_policies[AddrAllocator::Prefix].insert(PolicyBuilder(
         "centralized-fault-tolerant",
         [](UipcpRib *rib) {
             rib->addra =
                 make_unique<CentralizedFaultTolerantAddrAllocator>(rib);
         },
-        {AddrAllocator::TableName}));
+        {AddrAllocator::TableName}, {{"replicas", PolicyParam(string())}}));
 }
 
 } // namespace Uipcps

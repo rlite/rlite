@@ -625,10 +625,6 @@ struct UipcpRib {
      * queue (in terms of PDUs). */
     static constexpr int kFlowControlMaxCwqLen = 128;
 
-    /* Default value for the NACK timer before considering the address
-     * allocation successful. */
-    static constexpr int kAddrAllocDistrNackWaitSecs = 4;
-
     /* Time window to compute statistics about management traffic (in seconds).
      */
     static constexpr int kNeighFlowStatsPeriod = 20;

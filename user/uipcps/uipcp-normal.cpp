@@ -476,10 +476,6 @@ UipcpRib::UipcpRib(struct uipcp *_u)
     dt_constants.set_max_ack_delay(200 /* ms */);
     dt_constants.set_ctrl_seq_num_width(dt_constants.seq_num_width());
 
-    params_map[AddrAllocator::Prefix]["nack-wait"] =
-        PolicyParam(Secs(int(kAddrAllocDistrNackWaitSecs)));
-    params_map[AddrAllocator::Prefix]["replicas"] = PolicyParam(string());
-    params_map[DFT::Prefix]["replicas"]           = PolicyParam(string());
     params_map[UipcpRib::EnrollmentPrefix]["timeout"] =
         PolicyParam(Msecs(int(kEnrollTimeoutMsecs)));
     params_map[UipcpRib::EnrollmentPrefix]["keepalive"] =
