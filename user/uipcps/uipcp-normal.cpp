@@ -459,6 +459,8 @@ UipcpRib::UipcpRib(struct uipcp *_u)
     }
 #endif /* RL_USE_QOS_CUBES */
 
+    memset(&stats, 0, sizeof(stats));
+
     dt_constants.set_max_pdu_size(65536);
     dt_constants.set_address_width(sizeof(rl_addr_t));
     dt_constants.set_port_id_width(sizeof(rl_port_t));
