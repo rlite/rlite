@@ -600,24 +600,6 @@ struct UipcpRib {
     /* Enrollment timeouts in milliseconds. */
     static constexpr int kEnrollTimeoutMsecs = 7000;
 
-    /* Default value for the A timer in milliseconds. */
-    static constexpr int kATimerMsecsDflt = 20;
-
-    /* Default value for the R timer in milliseconds. */
-    static constexpr int kRtxTimerMsecsDflt = 1000;
-
-    /* Default value for the maximum length of the retransmission queue
-     * (in PDUs). */
-    static constexpr int kRtxQueueMaxLen = 512;
-
-    /* Default value for the flow control initial credit (windows size in terms
-       of PDUs). */
-    static constexpr int kFlowControlInitialCredit = 512;
-
-    /* Default value for the maximum length of the flow control closed window
-     * queue (in terms of PDUs). */
-    static constexpr int kFlowControlMaxCwqLen = 128;
-
     /* Time window to compute statistics about management traffic (in seconds).
      */
     static constexpr int kNeighFlowStatsPeriod = 20;

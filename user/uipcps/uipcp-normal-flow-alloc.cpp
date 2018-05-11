@@ -146,6 +146,24 @@ public:
     int flows_handler_create_r(const CDAPMessage *rm) override;
     int flows_handler_delete(const CDAPMessage *rm) override;
 
+    /* Default value for the A timer in milliseconds. */
+    static constexpr int kATimerMsecsDflt = 20;
+
+    /* Default value for the R timer in milliseconds. */
+    static constexpr int kRtxTimerMsecsDflt = 1000;
+
+    /* Default value for the maximum length of the retransmission queue
+     * (in PDUs). */
+    static constexpr int kRtxQueueMaxLen = 512;
+
+    /* Default value for the flow control initial credit (windows size in terms
+       of PDUs). */
+    static constexpr int kFlowControlInitialCredit = 512;
+
+    /* Default value for the maximum length of the flow control closed window
+     * queue (in terms of PDUs). */
+    static constexpr int kFlowControlMaxCwqLen = 128;
+
 private:
     void flowspec2flowcfg(const struct rina_flow_spec *spec,
                           struct rl_flow_config *cfg) const;
@@ -714,7 +732,17 @@ UipcpRib::fa_lib_init()
     available_policies[FlowAllocator::Prefix].insert(PolicyBuilder(
         "local",
         [](UipcpRib *rib) { rib->fa = make_unique<LocalFlowAllocator>(rib); },
-        {FlowAllocator::TableName}));
+        {FlowAllocator::TableName},
+        {{"force-flow-control", PolicyParam(false)},
+         {"max-cwq-len",
+          PolicyParam(LocalFlowAllocator::kFlowControlMaxCwqLen)},
+         {"initial-credit",
+          PolicyParam(LocalFlowAllocator::kFlowControlInitialCredit)},
+         {"initial-a",
+          PolicyParam(Msecs(int(LocalFlowAllocator::kATimerMsecsDflt)))},
+         {"initial-rtx-timeout",
+          PolicyParam(Msecs(int(LocalFlowAllocator::kRtxTimerMsecsDflt)))},
+         {"max-rtxq-len", PolicyParam(LocalFlowAllocator::kRtxQueueMaxLen)}}));
 }
 
 } // namespace Uipcps

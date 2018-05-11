@@ -484,18 +484,6 @@ UipcpRib::UipcpRib(struct uipcp *_u)
         PolicyParam(kKeepaliveThresh);
     params_map[UipcpRib::EnrollmentPrefix]["auto-reconnect"] =
         PolicyParam(true);
-    params_map[FlowAllocator::Prefix]["force-flow-control"] =
-        PolicyParam(false);
-    params_map[FlowAllocator::Prefix]["max-cwq-len"] =
-        PolicyParam(kFlowControlMaxCwqLen);
-    params_map[FlowAllocator::Prefix]["initial-credit"] =
-        PolicyParam(kFlowControlInitialCredit);
-    params_map[FlowAllocator::Prefix]["initial-a"] =
-        PolicyParam(Msecs(int(kATimerMsecsDflt)));
-    params_map[FlowAllocator::Prefix]["initial-rtx-timeout"] =
-        PolicyParam(Msecs(int(kRtxTimerMsecsDflt)));
-    params_map[FlowAllocator::Prefix]["max-rtxq-len"] =
-        PolicyParam(kRtxQueueMaxLen);
     params_map[UipcpRib::ResourceAllocPrefix]["reliable-flows"] =
         PolicyParam(false);
     params_map[UipcpRib::ResourceAllocPrefix]["reliable-n-flows"] =
