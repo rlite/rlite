@@ -346,6 +346,7 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
         /* State machine implementation: a simple table mapping IPCP names
          * into addresses. */
         std::map<string, rlm_addr_t> table;
+        rlm_addr_t next_unused_address = 1;
 
     public:
         Replica(CentralizedFaultTolerantAddrAllocator *aa)
@@ -437,7 +438,7 @@ CentralizedFaultTolerantAddrAllocator::Client::allocate(
 {
     auto m = make_unique<CDAPMessage>();
 
-    m->m_read(ObjClass, TableName + "/" + ipcp_name);
+    m->m_write(ObjClass, TableName + "/" + ipcp_name);
 
     auto pr = make_unique<PendingReq>(m->op_code, ipcp_name);
     int ret = send_to_replicas(std::move(m), std::move(pr), OpSemantics::Put);
@@ -460,17 +461,20 @@ CentralizedFaultTolerantAddrAllocator::Client::process_rib_msg(
     struct uipcp *uipcp  = rib->uipcp;
 
     switch (rm->op_code) {
-    case gpb::M_READ_R: {
+    case gpb::M_READ_R:
+    case gpb::M_WRITE_R: {
         if (rm->result) {
-            UPD(uipcp,
-                "Address allocation for IPCP '%s' failed remotely [%s]\n",
+            UPD(uipcp, "Address %s for IPCP '%s' failed remotely [%s]\n",
+                rm->op_code == gpb::M_WRITE_R ? "allocation" : "lookup",
                 pr->ipcp_name.c_str(), rm->result_reason.c_str());
         } else {
             int64_t allocated_address;
 
             rm->get_obj_value(allocated_address);
-            UPD(uipcp, "Address %llu allocated for IPCP '%s'\n",
-                (long long unsigned)allocated_address, pr->ipcp_name.c_str());
+            UPD(uipcp, "Address %llu %s for IPCP '%s'\n",
+                (long long unsigned)allocated_address,
+                rm->op_code == gpb::M_WRITE_R ? "allocated" : "looked up",
+                pr->ipcp_name.c_str());
         }
         break;
     }
@@ -486,7 +490,18 @@ CentralizedFaultTolerantAddrAllocator::Client::process_rib_msg(
 int
 CentralizedFaultTolerantAddrAllocator::Replica::apply(const char *const serbuf)
 {
-    return -1;
+    auto c = reinterpret_cast<const Command *const>(serbuf);
+
+    assert(c->opcode == Command::OpcodeSet || c->opcode == Command::OpcodeDel);
+    if (c->opcode == Command::OpcodeSet) {
+        table[c->ipcp_name] = c->address;
+    } else {
+        table.erase(c->ipcp_name);
+    }
+
+    // TODO answer M_WRITE_R here?
+
+    return 0;
 }
 
 int
@@ -494,7 +509,58 @@ CentralizedFaultTolerantAddrAllocator::Replica::process_rib_msg(
     const CDAPMessage *rm, rlm_addr_t src_addr,
     std::vector<std::unique_ptr<char[]>> *commands)
 {
-    return -1;
+    struct uipcp *uipcp = rib->uipcp;
+
+    if (rm->obj_class != ObjClass) {
+        UPE(uipcp, "Unexpected object class '%s'\n", rm->obj_class.c_str());
+        return 0;
+    }
+
+    /* Either we are the leader (so we can go ahead and serve the request),
+     * or this is a read request that we can serve because it's ok to be
+     * eventually consistent. */
+    if (!leader() && rm->op_code != gpb::M_READ) {
+        /* We are not the leader and this is not a read request. We
+         * need to deny the request to preserve consistency. */
+        UPD(uipcp, "Ignoring request, let the leader answer\n");
+        return 0;
+    }
+
+    /* Recover the name of the IPCP for which we want to allocate or
+     * lookup the address. */
+    string ipcp_name = rm->obj_name.substr(rm->obj_name.rfind("/") + 1);
+
+    if (rm->op_code == gpb::M_WRITE) {
+        /* We received an M_WRITE sent by Client::allocate().
+         * We are the leader. Let's allocate an address and submit the
+         * request to the Raft state machine. */
+        auto cbuf  = std::unique_ptr<char[]>(new char[sizeof(Command)]);
+        Command *c = reinterpret_cast<Command *>(cbuf.get());
+
+        /* Fill in the command struct (already serialized). */
+        strncpy(c->ipcp_name, ipcp_name.c_str(), sizeof(c->ipcp_name));
+        c->address = next_unused_address++;
+        c->opcode  = Command::OpcodeSet;
+
+        commands->push_back(std::move(cbuf));
+    } else if (rm->op_code == gpb::M_READ) {
+        /* We received an an M_READ. Look up the IPCP in the map. */
+        auto m         = make_unique<CDAPMessage>();
+        const auto mit = table.find(ipcp_name);
+
+        m->m_read_r(rm->obj_class, rm->obj_name, /*obj_inst=*/0,
+                    /*result=*/mit == table.end() ? -1 : 0,
+                    /*result_reason=*/mit == table.end() ? "No address found"
+                                                         : string());
+        m->invoke_id = rm->invoke_id;
+        m->set_obj_value((static_cast<int64_t>(mit->second)));
+        rib->send_to_dst_addr(std::move(m), src_addr);
+    } else {
+        UPE(uipcp, "M_WRITE(aa), M_READ(aa) or M_DELETE(aa) expected\n");
+        return 0;
+    }
+
+    return 0;
 }
 
 void

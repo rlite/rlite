@@ -702,7 +702,7 @@ CentralizedFaultTolerantDFT::Replica::process_rib_msg(
         m->set_obj_value(remote_node);
         rib->send_to_dst_addr(std::move(m), src_addr);
     } else {
-        UPE(uipcp, "M_WRITE(dft) or M_DELETE(dft) expected\n");
+        UPE(uipcp, "M_WRITE(dft), M_READ(dft) or M_DELETE(dft) expected\n");
         return 0;
     }
 
