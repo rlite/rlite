@@ -256,7 +256,7 @@ main(int argc, char **argv)
                 if (argc - optind - 1 < cmd_descriptors[i].num_args) {
                     /* Not enough arguments. */
                     PE("Not enough arguments\n");
-                    usage(i);
+                    usage();
                     return -1;
                 }
 
