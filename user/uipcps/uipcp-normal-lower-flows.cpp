@@ -218,9 +218,7 @@ public:
     int flow_state_update(struct rl_kmsg_flow_state *upd) override;
     void neigh_disconnected(const std::string &neigh_name) override;
 
-    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-                    std::shared_ptr<Neighbor> const &neigh,
-                    rlm_addr_t src_addr) override;
+    int rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src) override;
 
     int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
                    unsigned int limit) const override;
@@ -337,10 +335,7 @@ FullyReplicatedLFDB::update_local(const string &node_name)
 }
 
 int
-FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm,
-                                 std::shared_ptr<NeighFlow> const &nf,
-                                 std::shared_ptr<Neighbor> const &neigh,
-                                 rlm_addr_t src_addr)
+FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
 {
     const char *objbuf;
     size_t objlen;
@@ -382,7 +377,7 @@ FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm,
 
     if (prop_lfl.flows_size() > 0) {
         /* Send the received lower flows to the other neighbors. */
-        rib->neighs_sync_obj_excluding(neigh, add_f, ObjClass, TableName,
+        rib->neighs_sync_obj_excluding(src.neigh, add_f, ObjClass, TableName,
                                        &prop_lfl);
 
         /* Update the kernel routing table. */

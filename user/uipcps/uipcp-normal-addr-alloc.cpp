@@ -27,9 +27,7 @@ public:
 
     void dump(std::stringstream &ss) const override;
     int allocate(const std::string &ipcp_name, rlm_addr_t *addr) override;
-    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-                    std::shared_ptr<Neighbor> const &neigh,
-                    rlm_addr_t src_addr) override;
+    int rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src) override;
     int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
                    unsigned int limit) const override;
 
@@ -164,9 +162,7 @@ DistributedAddrAllocator::allocate(const std::string &ipcp_name,
 
 int
 DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
-                                      std::shared_ptr<NeighFlow> const &nf,
-                                      std::shared_ptr<Neighbor> const &neigh,
-                                      rlm_addr_t src_addr)
+                                      const MsgSrcInfo &src)
 {
     bool create;
     const char *objbuf;
@@ -271,7 +267,7 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
 
         if (propagate) {
             /* nf can be nullptr for M_DELETE messages */
-            rib->neighs_sync_obj_excluding(neigh, create, rm->obj_class,
+            rib->neighs_sync_obj_excluding(src.neigh, create, rm->obj_class,
                                            rm->obj_name, &aar);
         }
 
@@ -309,8 +305,8 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm,
         }
 
         if (prop_aal.entries_size() > 0) {
-            assert(nf);
-            rib->neighs_sync_obj_excluding(neigh, create, rm->obj_class,
+            assert(src.nf);
+            rib->neighs_sync_obj_excluding(src.neigh, create, rm->obj_class,
                                            rm->obj_name, &prop_aal);
         }
 
@@ -467,18 +463,16 @@ public:
         return client->allocate(ipcp_name, addr);
     }
 
-    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-                    std::shared_ptr<Neighbor> const &neigh,
-                    rlm_addr_t src_addr) override
+    int rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src) override
     {
         if (!raft || (rm->obj_class == ObjClass && rm->is_response())) {
             /* We may be a replica (raft != nullptr), but if this is a response
              * to a request done by us with the role of simple clients we
              * forward it to the client handler. */
-            return client->rib_handler(rm, nf, neigh, src_addr);
+            return client->rib_handler(rm, src);
         }
 
-        return raft->rib_handler(rm, nf, neigh, src_addr);
+        return raft->rib_handler(rm, src);
     }
 };
 

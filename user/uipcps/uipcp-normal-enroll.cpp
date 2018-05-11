@@ -357,7 +357,7 @@ EnrollmentResources::enrollment_commit()
 
     /* Dispatch queued messages. */
     while (!msgs.empty()) {
-        rib->cdap_dispatch(msgs.front().get(), nf, neigh, RL_ADDR_NULL);
+        rib->cdap_dispatch(msgs.front().get(), {nf, neigh, RL_ADDR_NULL});
         msgs.pop_front();
     }
 
@@ -522,7 +522,7 @@ EnrollmentResources::enrollee_default(std::unique_lock<std::mutex> &lk)
         /* Here M_CREATE messages from the slave are accepted and
          * dispatched to the RIB. */
         if (rm->op_code == gpb::M_CREATE || rm->op_code == gpb::M_WRITE) {
-            rib->cdap_dispatch(rm.get(), nf, neigh, RL_ADDR_NULL);
+            rib->cdap_dispatch(rm.get(), {nf, neigh, RL_ADDR_NULL});
             continue;
         }
 
@@ -759,7 +759,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
         /* Return address. */
         enr_info.ParseFromArray(objbuf, objlen);
         if (rib->addra->allocate(neigh->ipcp_name, &addr)) {
-            UPE(rib->uipcp, "Failed to allocate and address for IPCP %s\n",
+            UPE(rib->uipcp, "Failed to allocate an address for IPCP %s\n",
                 neigh->ipcp_name.c_str());
             return -1;
         }
@@ -1289,10 +1289,7 @@ common_lower_dif(const gpb::NeighborCandidate &cand, const list<string> l2)
 }
 
 int
-UipcpRib::neighbors_handler(const CDAPMessage *rm,
-                            std::shared_ptr<NeighFlow> const &nf,
-                            std::shared_ptr<Neighbor> const &neigh,
-                            rlm_addr_t src_addr)
+UipcpRib::neighbors_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
 {
     const char *objbuf;
     size_t objlen;
@@ -1378,7 +1375,7 @@ UipcpRib::neighbors_handler(const CDAPMessage *rm,
     if (propagate) {
         /* Propagate the updated information to the other neighbors,
          * so that they can update their Neighbor objects. */
-        neighs_sync_obj_excluding(neigh, add, Neighbor::ObjClass,
+        neighs_sync_obj_excluding(src.neigh, add, Neighbor::ObjClass,
                                   Neighbor::TableName, &prop_ncl);
         /* Update the routing, as node addressing information has changed. */
         routing->update_kernel();
@@ -1388,10 +1385,7 @@ UipcpRib::neighbors_handler(const CDAPMessage *rm,
 }
 
 int
-UipcpRib::keepalive_handler(const CDAPMessage *rm,
-                            std::shared_ptr<NeighFlow> const &nf,
-                            std::shared_ptr<Neighbor> const &neigh,
-                            rlm_addr_t src_addr)
+UipcpRib::keepalive_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
 {
     CDAPMessage m;
     int ret;
@@ -1404,10 +1398,10 @@ UipcpRib::keepalive_handler(const CDAPMessage *rm,
     if (rm->op_code == gpb::M_READ_R) {
         /* Reset the keepalive request counter, we know the neighbor
          * is alive on this flow. */
-        nf->pending_keepalive_reqs = 0;
+        src.nf->pending_keepalive_reqs = 0;
 
         UPV(uipcp, "M_READ_R(keepalive) received from neighbor %s\n",
-            static_cast<string>(neigh->ipcp_name).c_str());
+            static_cast<string>(src.neigh->ipcp_name).c_str());
         return 0;
     }
 
@@ -1415,7 +1409,7 @@ UipcpRib::keepalive_handler(const CDAPMessage *rm,
 
     m.m_read_r(NeighFlow::KeepaliveObjClass, NeighFlow::KeepaliveObjName);
 
-    ret = nf->send_to_port_id(&m, rm->invoke_id);
+    ret = src.nf->send_to_port_id(&m, rm->invoke_id);
     if (ret) {
         UPE(uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
     }

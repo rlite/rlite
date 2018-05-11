@@ -52,9 +52,7 @@ public:
     int lookup_req(const std::string &appl_name, std::string *dst_node,
                    const std::string &preferred, uint32_t cookie) override;
     int appl_register(const struct rl_kmsg_appl_register *req) override;
-    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-                    std::shared_ptr<Neighbor> const &neigh,
-                    rlm_addr_t src_addr) override;
+    int rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src) override;
     int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
                    unsigned int limit) const override;
     int neighs_refresh(size_t limit) override;
@@ -226,10 +224,7 @@ FullyReplicatedDFT::mod_table(const gpb::DFTEntry &e, bool add,
 }
 
 int
-FullyReplicatedDFT::rib_handler(const CDAPMessage *rm,
-                                std::shared_ptr<NeighFlow> const &nf,
-                                std::shared_ptr<Neighbor> const &neigh,
-                                rlm_addr_t src_addr)
+FullyReplicatedDFT::rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
 {
     struct uipcp *uipcp = rib->uipcp;
     const char *objbuf;
@@ -263,12 +258,12 @@ FullyReplicatedDFT::rib_handler(const CDAPMessage *rm,
     /* Propagate the DFT entries update to the other neighbors,
      * except for who told us. */
     if (prop_dft_add.entries_size() > 0) {
-        rib->neighs_sync_obj_excluding(neigh, true, ObjClass, TableName,
+        rib->neighs_sync_obj_excluding(src.neigh, true, ObjClass, TableName,
                                        &prop_dft_add);
     }
 
     if (prop_dft_del.entries_size() > 0) {
-        rib->neighs_sync_obj_excluding(neigh, false, ObjClass, TableName,
+        rib->neighs_sync_obj_excluding(src.neigh, false, ObjClass, TableName,
                                        &prop_dft_del);
     }
 
@@ -459,18 +454,16 @@ public:
         return client->appl_register(req);
     }
 
-    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-                    std::shared_ptr<Neighbor> const &neigh,
-                    rlm_addr_t src_addr) override
+    int rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src) override
     {
         if (!raft || (rm->obj_class == ObjClass && rm->is_response())) {
             /* We may be a replica (raft != nullptr), but if this is a response
              * to a request done by us with the role of simple clients we
              * forward it to the client handler. */
-            return client->rib_handler(rm, nf, neigh, src_addr);
+            return client->rib_handler(rm, src);
         }
 
-        return raft->rib_handler(rm, nf, neigh, src_addr);
+        return raft->rib_handler(rm, src);
     }
 };
 

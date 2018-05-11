@@ -145,10 +145,10 @@ public:
     int flow_deallocated(struct rl_kmsg_flow_deallocated *req) override;
 
     int flows_handler_create(const CDAPMessage *rm,
-                             rlm_addr_t src_addr) override;
+                             const MsgSrcInfo &src) override;
     int flows_handler_create_r(const CDAPMessage *rm) override;
     int flows_handler_delete(const CDAPMessage *rm,
-                             rlm_addr_t src_addr) override;
+                             const MsgSrcInfo &src) override;
 
     /* Default value for the A timer in milliseconds. */
     static constexpr int kATimerMsecsDflt = 20;
@@ -470,7 +470,7 @@ LocalFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
 /* (2) Slave FA <-- Initiator FA : M_CREATE */
 int
 LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm,
-                                         rlm_addr_t src_addr)
+                                         const MsgSrcInfo &src)
 {
     const char *objbuf;
     size_t objlen;
@@ -486,21 +486,21 @@ LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm,
     struct rl_flow_config flowcfg;
 
     freq->ParseFromArray(objbuf, objlen);
-    freq->remote_node = rib->lookup_neighbor_by_address(src_addr);
-    if (freq->connections_size() < 1 || freq->src_addr() != src_addr ||
+    freq->remote_node = rib->lookup_neighbor_by_address(src.addr);
+    if (freq->connections_size() < 1 || freq->src_addr() != src.addr ||
         freq->remote_node.empty()) {
         std::unique_ptr<CDAPMessage> m;
         std::stringstream error_msg;
 
         if (freq->connections_size() < 1) {
             error_msg << "No connections specified on this flow";
-        } else if (freq->src_addr() != src_addr) {
+        } else if (freq->src_addr() != src.addr) {
             error_msg << "Wrong source address, got " << freq->src_addr()
-                      << ", expected " << src_addr;
+                      << ", expected " << src.addr;
         } else if (freq->remote_node.empty()) {
             error_msg << "Flow allocation from unknown neighbor with "
                          "address "
-                      << src_addr;
+                      << src.addr;
         }
 
         UPE(rib->uipcp, "%s\n", error_msg.str().c_str());
@@ -618,7 +618,7 @@ LocalFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 
 int
 LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm,
-                                         rlm_addr_t src_addr)
+                                         const MsgSrcInfo &src)
 {
     rlm_addr_t expected_src_addr;
     rl_port_t local_port;
@@ -640,11 +640,11 @@ LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm,
 
     expected_src_addr = (freq->flags & RL_FLOWREQ_INITIATOR) ? freq->dst_addr()
                                                              : freq->src_addr();
-    if (src_addr != expected_src_addr) {
+    if (src.addr != expected_src_addr) {
         UPW(rib->uipcp,
             "Remote flow deallocation from unmatching address "
             "'%lu' (expected=%lu)\n",
-            (long unsigned)src_addr, (long unsigned)expected_src_addr);
+            (long unsigned)src.addr, (long unsigned)expected_src_addr);
         return 0;
     }
 
@@ -656,20 +656,17 @@ LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm,
 }
 
 int
-FlowAllocator::rib_handler(const CDAPMessage *rm,
-                           std::shared_ptr<NeighFlow> const &nf,
-                           std::shared_ptr<Neighbor> const &neigh,
-                           rlm_addr_t src_addr)
+FlowAllocator::rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
 {
     switch (rm->op_code) {
     case gpb::M_CREATE:
-        return flows_handler_create(rm, src_addr);
+        return flows_handler_create(rm, src);
 
     case gpb::M_CREATE_R:
         return flows_handler_create_r(rm);
 
     case gpb::M_DELETE:
-        return flows_handler_delete(rm, src_addr);
+        return flows_handler_delete(rm, src);
 
     case gpb::M_DELETE_R:
         UPE(rib->uipcp, "M_DELETE_R(flowalloc) not supported\n");

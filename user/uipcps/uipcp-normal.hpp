@@ -268,6 +268,20 @@ struct Neighbor {
 #define RL_LOCK_ASSERT(_lock, _locked)
 #endif
 
+/* Source information associated to a received CDAP message. */
+struct MsgSrcInfo {
+    std::shared_ptr<NeighFlow> const &nf;
+    std::shared_ptr<Neighbor> const &neigh;
+    rlm_addr_t addr;
+
+    MsgSrcInfo() = delete;
+    MsgSrcInfo(std::shared_ptr<NeighFlow> const &nf,
+               std::shared_ptr<Neighbor> const &neigh, rlm_addr_t addr)
+        : nf(nf), neigh(neigh), addr(addr)
+    {
+    }
+};
+
 /* Base class for all the component of a normal IPCP. */
 struct Component {
     /* Dump the current state of the component. */
@@ -275,10 +289,7 @@ struct Component {
 
     /* Handle an incoming CDAP message coming from a neighbor or
      * another (farther) RIB member. */
-    virtual int rib_handler(const CDAPMessage *rm,
-                            std::shared_ptr<NeighFlow> const &nf,
-                            std::shared_ptr<Neighbor> const &neigh,
-                            rlm_addr_t src_addr)
+    virtual int rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
     {
         return 0;
     };
@@ -338,15 +349,13 @@ struct FlowAllocator : public Component {
     virtual int flow_deallocated(struct rl_kmsg_flow_deallocated *req) = 0;
 
     virtual int flows_handler_create(const CDAPMessage *rm,
-                                     rlm_addr_t src_addr)     = 0;
+                                     const MsgSrcInfo &src)   = 0;
     virtual int flows_handler_create_r(const CDAPMessage *rm) = 0;
     virtual int flows_handler_delete(const CDAPMessage *rm,
-                                     rlm_addr_t src_addr)     = 0;
+                                     const MsgSrcInfo &src)   = 0;
 
     virtual int rib_handler(const CDAPMessage *rm,
-                            std::shared_ptr<NeighFlow> const &nf,
-                            std::shared_ptr<Neighbor> const &neigh,
-                            rlm_addr_t src_addr) override;
+                            const MsgSrcInfo &src) override;
 
     static std::string TableName;
     static std::string ObjClass;
@@ -486,9 +495,8 @@ struct UipcpRib {
 
     struct periodic_task *tasks = nullptr;
 
-    using RibHandler = std::function<int(
-        const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-        std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)>;
+    using RibHandler =
+        std::function<int(const CDAPMessage *rm, const MsgSrcInfo &src)>;
     struct RibHandlerInfo {
         RibHandler handler;
     };
@@ -705,68 +713,20 @@ struct UipcpRib {
     int sync_rib(const std::shared_ptr<NeighFlow> &nf);
 
     /* Receive info from neighbors. */
-    int cdap_dispatch(const CDAPMessage *rm,
-                      std::shared_ptr<NeighFlow> const &nf,
-                      std::shared_ptr<Neighbor> const &neigh,
-                      rlm_addr_t src_addr);
+    int cdap_dispatch(const CDAPMessage *rm, const MsgSrcInfo &src);
 
     void rib_handler_register(std::string rib_path, RibHandler h);
     void rib_handler_unregister(std::string rib_path);
 
-    /* RIB handlers for received CDAP messages. */
-    int dft_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-                    std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr)
-    {
-        return dft->rib_handler(rm, nf, neigh, src_addr);
-    };
-    int neighbors_handler(const CDAPMessage *rm,
-                          std::shared_ptr<NeighFlow> const &nf,
-                          std::shared_ptr<Neighbor> const &neigh,
-                          rlm_addr_t src_addr);
-    int routing_handler(const CDAPMessage *rm,
-                        std::shared_ptr<NeighFlow> const &nf,
-                        std::shared_ptr<Neighbor> const &neigh,
-                        rlm_addr_t src_addr)
-    {
-        return routing->rib_handler(rm, nf, neigh, src_addr);
-    };
-    int flows_handler(const CDAPMessage *rm,
-                      std::shared_ptr<NeighFlow> const &nf,
-                      std::shared_ptr<Neighbor> const &neigh,
-                      rlm_addr_t src_addr)
-    {
-        return fa->rib_handler(rm, nf, neigh, src_addr);
-    };
-    int keepalive_handler(const CDAPMessage *rm,
-                          std::shared_ptr<NeighFlow> const &nf,
-                          std::shared_ptr<Neighbor> const &neigh,
-                          rlm_addr_t src_addr);
-    int status_handler(const CDAPMessage *rm,
-                       std::shared_ptr<NeighFlow> const &nf,
-                       std::shared_ptr<Neighbor> const &neigh,
-                       rlm_addr_t src_addr);
-    int addr_alloc_handler(const CDAPMessage *rm,
-                           std::shared_ptr<NeighFlow> const &nf,
-                           std::shared_ptr<Neighbor> const &neigh,
-                           rlm_addr_t src_addr)
-    {
-        return addra->rib_handler(rm, nf, neigh, src_addr);
-    }
+    int neighbors_handler(const CDAPMessage *rm, const MsgSrcInfo &src);
+    int keepalive_handler(const CDAPMessage *rm, const MsgSrcInfo &src);
+    int status_handler(const CDAPMessage *rm, const MsgSrcInfo &src);
 
-    int lowerflow_handler(const CDAPMessage *rm,
-                          std::shared_ptr<NeighFlow> const &nf,
-                          std::shared_ptr<Neighbor> const &neigh,
-                          rlm_addr_t src_addr);
+    int lowerflow_handler(const CDAPMessage *rm, const MsgSrcInfo &src);
 
-    int policy_handler(const CDAPMessage *rm,
-                       std::shared_ptr<NeighFlow> const &nf,
-                       std::shared_ptr<Neighbor> const &neigh,
-                       rlm_addr_t src_addr);
+    int policy_handler(const CDAPMessage *rm, const MsgSrcInfo &src);
 
-    int policy_param_handler(const CDAPMessage *rm,
-                             std::shared_ptr<NeighFlow> const &nf,
-                             std::shared_ptr<Neighbor> const &neigh,
-                             rlm_addr_t src_addr);
+    int policy_param_handler(const CDAPMessage *rm, const MsgSrcInfo &src);
 
     void neighs_refresh();
     void neighs_refresh_tmr_restart();

@@ -85,9 +85,7 @@ public:
     int process_timeout();
     int apply(raft::LogIndex index, raft::Term term,
               const char *const serbuf) override final;
-    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-                    std::shared_ptr<Neighbor> const &neigh,
-                    rlm_addr_t src_addr);
+    int rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src);
     virtual int apply(const char *const serbuf, CDAPMessage *const rm) = 0;
     using CommandToSubmit =
         std::pair<std::unique_ptr<char[]>, std::unique_ptr<CDAPMessage>>;
@@ -144,9 +142,7 @@ public:
     }
     virtual ~CeftClient() {}
     int process_timeout();
-    int rib_handler(const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-                    std::shared_ptr<Neighbor> const &neigh,
-                    rlm_addr_t src_addr);
+    int rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src);
 
     /* Called from rib_handler() to perform implementation specific
      * processing.*/

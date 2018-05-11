@@ -197,10 +197,7 @@ CeftReplica::apply(raft::LogIndex index, raft::Term term,
 }
 
 int
-CeftReplica::rib_handler(const CDAPMessage *rm,
-                         std::shared_ptr<NeighFlow> const &nf,
-                         std::shared_ptr<Neighbor> const &neigh,
-                         rlm_addr_t src_addr)
+CeftReplica::rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
 {
     struct uipcp *uipcp = rib->uipcp;
     const char *objbuf  = nullptr;
@@ -208,7 +205,7 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
     size_t objlen = 0;
     int ret       = 0;
 
-    if (src_addr == RL_ADDR_NULL) {
+    if (src.addr == RL_ADDR_NULL) {
         UPE(uipcp, "Source address not set\n");
         return 0;
     }
@@ -276,7 +273,7 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
          * to the underlying implementation. */
         std::vector<CommandToSubmit> commands;
 
-        replica_process_rib_msg(rm, src_addr, &commands);
+        replica_process_rib_msg(rm, src.addr, &commands);
 
         /* Submit commands to the raft state machine, if any. */
         for (auto &command : commands) {
@@ -291,7 +288,7 @@ CeftReplica::rib_handler(const CDAPMessage *rm,
                 continue;
             }
             pending[index] = utils::make_unique<PendingResp>(
-                std::move(command.second), src_addr, curr_term());
+                std::move(command.second), src.addr, curr_term());
         }
     }
 
@@ -400,10 +397,7 @@ CeftClient::send_to_replicas(std::unique_ptr<CDAPMessage> m,
 }
 
 int
-CeftClient::rib_handler(const CDAPMessage *rm,
-                        std::shared_ptr<NeighFlow> const &nf,
-                        std::shared_ptr<Neighbor> const &neigh,
-                        rlm_addr_t src_addr)
+CeftClient::rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
 {
     struct uipcp *uipcp = rib->uipcp;
 
@@ -440,7 +434,7 @@ CeftClient::rib_handler(const CDAPMessage *rm,
     }
 
     /* Handle the message to the underlying implementation. */
-    int ret = client_process_rib_msg(rm, pi->second.get(), src_addr);
+    int ret = client_process_rib_msg(rm, pi->second.get(), src.addr);
     pending.erase(pi);
     mod_pending_timer();
 

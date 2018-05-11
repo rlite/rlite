@@ -245,13 +245,14 @@ UipcpRib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
             }
 
             /* Get the encapsulated CDAP message and dispatch it. */
-            auto cdap = msg_deser_stateless(adata.cdap_msg().data(),
+            auto cdap           = msg_deser_stateless(adata.cdap_msg().data(),
                                             adata.cdap_msg().size());
+            rlm_addr_t src_addr = adata.src_addr();
             if (!cdap) {
                 UPE(uipcp, "Failed to deserialize encapsulated CDAP message\n");
                 return 0;
             }
-            cdap_dispatch(cdap.get(), nullptr, nullptr, adata.src_addr());
+            cdap_dispatch(cdap.get(), {nullptr, nullptr, src_addr});
 
             return 0;
         }
@@ -337,7 +338,7 @@ UipcpRib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
         } else {
             /* We are already enrolled, we can dispatch this message to
              * the RIB. */
-            ret = cdap_dispatch(m.get(), nf, neigh, RL_ADDR_NULL);
+            ret = cdap_dispatch(m.get(), {nf, neigh, RL_ADDR_NULL});
         }
 
     } catch (std::bad_alloc &e) {
@@ -378,8 +379,8 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 
     std::lock_guard<std::mutex> guard(rib->mutex);
 
-    /* Lookup neighbor by port id. If ADATA, it is not an error
-     * if the lookup fails (nf == nullptr). */
+    /* Lookup neighbor by port id. If ADATA, the lookup fails with
+     * (nf == nullptr && neigh == nullptr), but this is not an error. */
     rib->lookup_neigh_flow_by_port_id(mhdr->local_port, &nf, &neigh);
 
     /* Hand off the message to the RIB. */
@@ -507,45 +508,35 @@ UipcpRib::UipcpRib(struct uipcp *_u)
     assert(routing);
 
     /* Insert handlers for common RIB objects. */
-    rib_handler_register(
-        Neighbor::TableName,
-        [this](const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-               std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr) {
-            return neighbors_handler(rm, nf, neigh, src_addr);
-        });
+    rib_handler_register(Neighbor::TableName,
+                         [this](const CDAPMessage *rm, const MsgSrcInfo &src) {
+                             return neighbors_handler(rm, src);
+                         });
 
-    rib_handler_register(
-        NeighFlow::KeepaliveObjName,
-        [this](const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-               std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr) {
-            return keepalive_handler(rm, nf, neigh, src_addr);
-        });
+    rib_handler_register(NeighFlow::KeepaliveObjName,
+                         [this](const CDAPMessage *rm, const MsgSrcInfo &src) {
+                             return keepalive_handler(rm, src);
+                         });
 
-    rib_handler_register(
-        StatusObjName,
-        [this](const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-               std::shared_ptr<Neighbor> const &neigh, rlm_addr_t src_addr) {
-            return status_handler(rm, nf, neigh, src_addr);
-        });
+    rib_handler_register(StatusObjName,
+                         [this](const CDAPMessage *rm, const MsgSrcInfo &src) {
+                             return status_handler(rm, src);
+                         });
 
     for (const auto &component :
          {DFT::Prefix, Routing::Prefix, AddrAllocator::Prefix}) {
         rib_handler_register(
             component + "/policy",
-            [this](const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-                   std::shared_ptr<Neighbor> const &neigh,
-                   rlm_addr_t src_addr) {
-                return policy_handler(rm, nf, neigh, src_addr);
+            [this](const CDAPMessage *rm, const MsgSrcInfo &src) {
+                return policy_handler(rm, src);
             });
     }
 
     for (const auto &component : {DFT::Prefix, AddrAllocator::Prefix}) {
         rib_handler_register(
             component + "/params",
-            [this](const CDAPMessage *rm, std::shared_ptr<NeighFlow> const &nf,
-                   std::shared_ptr<Neighbor> const &neigh,
-                   rlm_addr_t src_addr) {
-                return policy_param_handler(rm, nf, neigh, src_addr);
+            [this](const CDAPMessage *rm, const MsgSrcInfo &src) {
+                return policy_param_handler(rm, src);
             });
     }
 
@@ -1027,7 +1018,7 @@ UipcpRib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
 
     if (dst_addr == myaddr) {
         /* This is a message to be delivered to myself. */
-        int ret = cdap_dispatch(m.get(), nullptr, nullptr, myaddr);
+        int ret = cdap_dispatch(m.get(), {nullptr, nullptr, myaddr});
 
         return ret;
     }
@@ -1108,16 +1099,13 @@ UipcpRib::send_to_myself(std::unique_ptr<CDAPMessage> m,
 /* To be called under RIB lock. This function does not take ownership
  * of 'rm'. */
 int
-UipcpRib::cdap_dispatch(const CDAPMessage *rm,
-                        std::shared_ptr<NeighFlow> const &nf,
-                        std::shared_ptr<Neighbor> const &neigh,
-                        rlm_addr_t src_addr)
+UipcpRib::cdap_dispatch(const CDAPMessage *rm, const MsgSrcInfo &src)
 {
     /* Dispatch depending on the obj_name specified in the request. */
     auto hi = handlers.find(rm->obj_name);
     int ret = 0;
 
-    assert(nf != nullptr || src_addr != RL_ADDR_NULL);
+    assert(src.nf != nullptr || src.addr != RL_ADDR_NULL);
 
     if (hi == handlers.end()) {
         size_t pos = rm->obj_name.rfind("/");
@@ -1131,8 +1119,9 @@ UipcpRib::cdap_dispatch(const CDAPMessage *rm,
         }
     }
 
-    if (neigh) {
-        neigh->unheard_since = std::chrono::system_clock::now(); /* update */
+    if (src.neigh) {
+        src.neigh->unheard_since =
+            std::chrono::system_clock::now(); /* update */
     }
 
     if (hi == handlers.end()) {
@@ -1140,17 +1129,14 @@ UipcpRib::cdap_dispatch(const CDAPMessage *rm,
             rm->obj_name.c_str());
         rm->dump();
     } else {
-        ret = hi->second.handler(rm, nf, neigh, src_addr);
+        ret = hi->second.handler(rm, src);
     }
 
     return ret;
 }
 
 int
-UipcpRib::status_handler(const CDAPMessage *rm,
-                         std::shared_ptr<NeighFlow> const &nf,
-                         std::shared_ptr<Neighbor> const &neigh,
-                         rlm_addr_t src_addr)
+UipcpRib::status_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
 {
     if (rm->op_code != gpb::M_START) {
         UPE(uipcp, "M_START expected\n");
@@ -1312,12 +1298,9 @@ UipcpRib::policy_mod(const std::string &component,
     /* Register the new RIB paths. */
     for (const std::string &path : policy_builder->paths) {
         assert(components[component] != nullptr);
-        rib_handler_register(path, [this, component](
-                                       const CDAPMessage *rm,
-                                       std::shared_ptr<NeighFlow> const &nf,
-                                       std::shared_ptr<Neighbor> const &neigh,
-                                       rlm_addr_t src_addr) {
-            return components[component]->rib_handler(rm, nf, neigh, src_addr);
+        rib_handler_register(path, [this, component](const CDAPMessage *rm,
+                                                     const MsgSrcInfo &src) {
+            return components[component]->rib_handler(rm, src);
         });
     }
     /* Register the new policy parameters. */
@@ -1754,10 +1737,7 @@ UipcpRib::policy_param_list(
 }
 
 int
-UipcpRib::policy_handler(const CDAPMessage *rm,
-                         std::shared_ptr<NeighFlow> const &nf,
-                         std::shared_ptr<Neighbor> const &neigh,
-                         rlm_addr_t src_addr)
+UipcpRib::policy_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
 {
     std::string prefix = rm->obj_name.substr(0, rm->obj_name.rfind("/"));
     std::string policy_name;
@@ -1779,10 +1759,7 @@ UipcpRib::policy_handler(const CDAPMessage *rm,
 }
 
 int
-UipcpRib::policy_param_handler(const CDAPMessage *rm,
-                               std::shared_ptr<NeighFlow> const &nf,
-                               std::shared_ptr<Neighbor> const &neigh,
-                               rlm_addr_t src_addr)
+UipcpRib::policy_param_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
 {
     std::string prefix = rm->obj_name.substr(0, rm->obj_name.rfind("/"));
     std::string obj_value;
