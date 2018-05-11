@@ -1294,6 +1294,10 @@ UipcpRib::policy_mod(const std::string &component,
         }
         rib_handler_register(path, h);
     }
+    /* Register the new policy parameters. */
+    for (const auto &pp : policy_builder->params) {
+        params_map[component][pp.first] = pp.second;
+    }
     /* Reconfigure the new component, if necessary. */
     if (component == DFT::Prefix) {
         dft->reconfigure();
