@@ -898,7 +898,7 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
         if (cmd.action == raft::RaftTimerAction::Restart) {
             /* The following assertion will fail if our assumption about
              * the unicity of the timer is not true. */
-            assert(timer == nullptr);
+            assert(timer == nullptr || timer_type == cmd.type);
             timer = make_unique<TimeoutEvent>(
                 cmd.milliseconds, parent->rib->uipcp, this,
                 [](struct uipcp *uipcp, void *arg) {
