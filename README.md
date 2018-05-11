@@ -1324,7 +1324,7 @@ To run the the unit tests, use the following commands from the repository root d
 (assuming `./configure` has already been run)
 
     $ make test
-    
+
 and the output will report about tests succeeding or failing, e.g.
 
     100% tests passed, 0 tests failed out of 3
@@ -1494,7 +1494,7 @@ session terminates, the client can deallocate the flow with the `close` system
 call.
 
 
-### 9.3 API specification 
+### 9.3 API specification
 In the following, the API calls are listed and documented in depth.
 Some general considerations:
  * The API functions typically return 0 or a positive value on success. On
@@ -1511,7 +1511,7 @@ strings are for instance "aa|bb|cc|dd", "aa|bb||", "aa|bb", "aa".
 ```
 int rina_open(void)
 ```
-    
+
 This function opens a RINA control device that can be used to register/unregister names,
 and manage incoming flow allocation requests. On success, it returns a file descriptor that can
 be later passed to `rina_register()`, `rina_unregister()`, `rina_flow_accept()`, and
@@ -1519,7 +1519,7 @@ be later passed to `rina_register()`, `rina_unregister()`, `rina_flow_accept()`,
 call this function as a first step to implement server-side functionalities.
 
     int rina_register(int fd, const char *dif, const char *appl, int flags)
-    
+
 This function registers the application name appl to a DIF in the system. After a successful
 registration, flow allocation requests can be received on fd by means of `rina_flow_accept()`.
 If dif is not NULL, the system may register the application to dif. However, the dif argument
@@ -1534,7 +1534,7 @@ poll() or select()). In this case the operation can be completed by a subsequent
 On error -1 is returned, with the errno code properly set.
 
     int rina_unregister(int fd, const char *dif, const char *appl, int flags)
-    
+
 This function unregisters the application name appl from the DIF where it was registered to. The
 dif argument must match the one passed to `rina_register()`. After a successful unregistration,
 flow allocation requests can no longer be received on fd. The meaning of the `RINA_F_NOWAIT`
@@ -1543,7 +1543,7 @@ later completed by calling `rina_register_wait()`.
 Returns 0 on success, -1 on error, with the errno code properly set.
 
     int rina_register_wait(int fd, int wfd)
-    
+
 This function is called to wait for the completion of a (un)registration procedure previously
 initiated with a call to `rina_register()` or `rina_unregister` on fd which had the `RINA_F_NOWAIT`
 flag set. The wfd file descriptor must match the one that was returned by
@@ -1566,12 +1566,12 @@ success a positive number is returned as an handle to be passed to a subsequent 
 `rina_flow_respond()`. Hence the code
 
     cfd = rina_flow_accept(fd, &x, flags &  RINA_F_NORESP)
-    
+
 is functionally equivalent to
 
     h = rina_flow_accept(sfd, &x, flags | RINA_F_NORESP);
     cfd = rina_flow_respond(sfd, h, 0 /* positive response */);
-    
+
 On error -1 is returned, with the errno code properly set.
 
     int rina_flow_respond(int fd, int handle, int response)
@@ -1590,7 +1590,7 @@ set.
                         const char *remote_appl,
                         const struct rina_flow_spec *flowspec,
                         unsigned int flags);
-                        
+
 This function is called to issue a flow allocation request towards the destination application
 called remote appl, using local appl as a source application name. If flowspec is not
 NULL, it specifies the QoS parameters to be used for the flow, should the flow allocation request
@@ -1609,7 +1609,7 @@ with standard I/O system calls to exchange SDUs on the flow and synchronize.
 In any case, -1 is returned on error, with the errno code properly set.
 
     int rina_flow_alloc_wait(int wfd)
-    
+
 This function waits for the completion of a flow allocation procedure previosuly initiated with
 a call to `rina_flow_alloc()` with the `RINA_F_NOWAIT` flag set. The wfd file descriptor
 must match the one returned by `rina_flow_alloc()`. On success, it returns a file descriptor
@@ -1626,7 +1626,7 @@ synchronize. On error -1 is returned, with the errno code properly set.
         uint8_t msg_boundaries; /* boolean */
     };
     void rina_flow_spec_unreliable(struct rina_flow_spec *spec)
-        
+
 This function fills in the provided spec with an implementation-specific default QoS, which
 should correspond to a best-effort QoS. The fields of the rina flow spec data structure specify
 the QoS of a RINA flow as follows:
@@ -1648,7 +1648,7 @@ does not preserve message boundaries, and therefore write() and read() system ca
 are used to exchange a stream of bytes, and the granularity of the exchange is the byte.
 If false, the flow is datagram-oriented, like UDP, and does preserve message boundaries.
 The I/O system calls are used to exchanges messages (SDUs), and the granularity of the
-exchange is the message.    
+exchange is the message.
 
 
 ### 9.4 Mapping sockets API to RINA API
