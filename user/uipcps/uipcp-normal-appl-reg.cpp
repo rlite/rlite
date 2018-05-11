@@ -24,6 +24,7 @@
 #include <ctime>
 #include <iterator>
 #include <cstdlib>
+#include <chrono>
 
 #include "uipcp-normal.hpp"
 #include "Raft.pb.h"
@@ -35,15 +36,10 @@ namespace Uipcps {
 static uint64_t
 time64()
 {
-    struct timespec tv;
-
-    if (clock_gettime(CLOCK_MONOTONIC, &tv)) {
-        perror("clock_gettime() failed");
-        tv.tv_sec  = 0;
-        tv.tv_nsec = 0;
-    }
-
-    return ((uint64_t)tv.tv_sec << 32) | (tv.tv_nsec & ((1LL << 32) - 1LL));
+    auto now = std::chrono::system_clock::now();
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+               now.time_since_epoch())
+        .count();
 }
 
 class FullyReplicatedDFT : public DFT {
