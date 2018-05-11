@@ -397,6 +397,8 @@ class CentralizedFaultTolerantAddrAllocator : public AddrAllocator {
 public:
     CentralizedFaultTolerantAddrAllocator(UipcpRib *rib) : AddrAllocator(rib) {}
     ~CentralizedFaultTolerantAddrAllocator() {}
+    int reconfigure() override;
+
     void dump(std::stringstream &ss) const override
     {
         if (raft) {
@@ -431,6 +433,42 @@ public:
         return raft->rib_handler(rm, nf, neigh, src_addr);
     }
 };
+
+// TODO possibly reuse this code
+int
+CentralizedFaultTolerantAddrAllocator::reconfigure()
+{
+    list<raft::ReplicaId> peers;
+    string replicas;
+
+    replicas =
+        rib->get_param_value<std::string>(AddrAllocator::Prefix, "replicas");
+    if (replicas.empty()) {
+        UPW(rib->uipcp, "replicas param not configured\n");
+    } else {
+        UPD(rib->uipcp, "replicas = %s\n", replicas.c_str());
+    }
+    peers = strsplit(replicas, ',');
+
+    /* Create the client anyway. */
+    client = make_unique<Client>(this, peers);
+    UPI(rib->uipcp, "Client initialized\n");
+
+    /* See if I'm also one of the replicas. */
+    auto it = peers.begin();
+    for (; it != peers.end(); it++) {
+        if (*it == rib->myname) {
+            /* I'm one of the replicas. Create a Raft state machine and
+             * initialize it. */
+            raft = make_unique<Replica>(this);
+            peers.erase(it); /* remove myself */
+
+            return raft->init(peers);
+        }
+    }
+
+    return 0;
+}
 
 int
 CentralizedFaultTolerantAddrAllocator::Client::allocate(

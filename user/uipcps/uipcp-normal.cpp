@@ -1341,6 +1341,8 @@ UipcpRib::policy_param_mod(const std::string &component,
     /* Invoke the reconfigure() method if available. */
     if (component == DFT::Prefix) {
         dft->reconfigure();
+    } else if (component == AddrAllocator::Prefix) {
+        addra->reconfigure();
     }
 
     /* Fix-ups. */

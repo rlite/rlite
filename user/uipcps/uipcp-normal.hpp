@@ -387,6 +387,7 @@ struct AddrAllocator {
     AddrAllocator(UipcpRib *_ur) : rib(_ur) {}
     virtual ~AddrAllocator() {}
 
+    virtual int reconfigure() { return 0; }
     virtual void dump(std::stringstream &ss) const                       = 0;
     virtual int allocate(const std::string &ipcp_name, rlm_addr_t *addr) = 0;
     virtual int rib_handler(const CDAPMessage *rm,
