@@ -543,7 +543,6 @@ UipcpRib::UipcpRib(struct uipcp *_u)
     }
 
     /* Start timers for periodic tasks. */
-    age_incr_tmr_restart();
     neighs_refresh_tmr_restart();
 
     /* Set a valid address, 0 is the null address. */
@@ -611,7 +610,6 @@ UipcpRib::~UipcpRib()
      * backpointer is invalid. A better solution would be to use std::weak_ptr
      * for backpointers, everywhere. */
     sync_timer.reset();
-    age_incr_timer.reset();
     keepalive_timers.clear();
     enrollment_resources.clear();
     neighbors.clear();

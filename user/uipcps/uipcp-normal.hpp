@@ -384,7 +384,6 @@ struct Routing : public Component {
     /* Called to flush all the local entries related to a given neighbor. */
     virtual void neigh_disconnected(const std::string &neigh_name) {}
 
-    virtual void age_incr() {}
     virtual int route_mod(const struct rl_cmsg_ipcp_route_mod *req)
     {
         return 0;
@@ -598,9 +597,6 @@ struct UipcpRib {
     std::map<std::string, struct rl_flow_config> qos_cubes;
 #endif /* RL_USE_QOS_CUBES */
 
-    /* Timer ID for age increment of LFDB entries. */
-    std::unique_ptr<TimeoutEvent> age_incr_timer;
-
     struct {
         uint64_t routing_table_compute;
         uint64_t fwd_table_compute;
@@ -731,7 +727,6 @@ struct UipcpRib {
 
     void neighs_refresh();
     void neighs_refresh_tmr_restart();
-    void age_incr_tmr_restart();
 
     int policy_mod(const std::string &component,
                    const std::string &policy_name);

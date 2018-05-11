@@ -386,13 +386,17 @@ class FullyReplicatedLFDB : public Routing {
     /* Routing engine. */
     RoutingEngine re;
 
+    /* Timer ID for age increment of LFDB entries. */
+    std::unique_ptr<TimeoutEvent> age_incr_timer;
+
 public:
     RL_NODEFAULT_NONCOPIABLE(FullyReplicatedLFDB);
     FullyReplicatedLFDB(UipcpRib *rib, bool lfa)
         : Routing(rib), re(rib, /*lfa_enabled=*/lfa)
     {
+        age_incr_tmr_restart();
     }
-    ~FullyReplicatedLFDB() {}
+    ~FullyReplicatedLFDB() { age_incr_timer.reset(); }
 
     void dump(std::stringstream &ss) const override;
     void dump_routing(std::stringstream &ss) const override
@@ -412,7 +416,8 @@ public:
     int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
                    unsigned int limit) const override;
     int neighs_refresh(size_t limit) override;
-    void age_incr() override;
+    void age_incr();
+    void age_incr_tmr_restart();
 
     /* Time interval (in seconds) between two consecutive increments
      * of the age of LFDB entries. */
@@ -685,16 +690,15 @@ FullyReplicatedLFDB::neighs_refresh(size_t limit)
     return ret;
 }
 
-// TODO move to FullyReplicated
 void
-UipcpRib::age_incr_tmr_restart()
+FullyReplicatedLFDB::age_incr_tmr_restart()
 {
     age_incr_timer = utils::make_unique<TimeoutEvent>(
-        get_param_value<Msecs>(Routing::Prefix, "age-incr-intval"), uipcp, this,
-        [](struct uipcp *uipcp, void *arg) {
-            UipcpRib *rib = (UipcpRib *)arg;
-            rib->age_incr_timer->fired();
-            rib->routing->age_incr();
+        rib->get_param_value<Msecs>(Routing::Prefix, "age-incr-intval"),
+        rib->uipcp, this, [](struct uipcp *uipcp, void *arg) {
+            FullyReplicatedLFDB *r = (FullyReplicatedLFDB *)arg;
+            r->age_incr_timer->fired();
+            r->age_incr();
         });
 }
 
@@ -740,7 +744,7 @@ FullyReplicatedLFDB::age_incr()
     }
 
     /* Reschedule */
-    rib->age_incr_tmr_restart();
+    age_incr_tmr_restart();
 }
 
 void
