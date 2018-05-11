@@ -21,6 +21,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 #include <iostream>
+#include <sstream>
+
 #include "uipcp-normal-lfdb.hpp"
 
 struct TestLFDB : public rlite::LFDB {
@@ -60,5 +62,9 @@ main()
 
     TestLFDB lfdb(links, /*lfa_enabled=*/false);
 
-    return lfdb.db.size();
+    std::stringstream ss;
+    lfdb.dump(ss);
+    std::cout << ss.str();
+
+    return !lfdb.db.size();
 }
