@@ -423,6 +423,10 @@ public:
         verbosity = level; /* no need to check */
     }
 
+    /* At most 1000 bytes of log chunk per each RaftAppendEntries
+     * message. */
+    static constexpr size_t kMaxLogChunkBytes = 1000;
+
 private:
     Stats stats;
     unsigned int verbosity = kVerboseVery;

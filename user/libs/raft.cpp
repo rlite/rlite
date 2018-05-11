@@ -484,30 +484,37 @@ RaftSM::prepare_append_entries(LogReplicateStrategy strategy, RaftSMOutput *out)
             kv.second.next_index_unacked = kv.second.next_index_acked;
         }
 
-        auto msg            = make_unique<RaftAppendEntries>();
-        msg->term           = current_term;
-        msg->leader_id      = local_id;
-        msg->leader_commit  = commit_index;
-        msg->prev_log_index = kv.second.next_index_unacked - 1;
-        if (log_entry_get_term(msg->prev_log_index, &msg->prev_log_term)) {
-            return -1;
-        }
-        for (LogIndex i = kv.second.next_index_unacked; i <= last_log_index;
-             i++) {
-            auto bufcopy = std::unique_ptr<char[]>(new char[log_command_size]);
-            Term term    = 0;
-            int ret;
+        do {
+            auto msg            = make_unique<RaftAppendEntries>();
+            msg->term           = current_term;
+            msg->leader_id      = local_id;
+            msg->leader_commit  = commit_index;
+            msg->prev_log_index = kv.second.next_index_unacked - 1;
+            if (log_entry_get_term(msg->prev_log_index, &msg->prev_log_term)) {
+                return -1;
+            }
 
-            if ((ret = log_entry_get_term(i, &term))) {
-                return ret;
+            LogIndex i = kv.second.next_index_unacked;
+            for (size_t chunk_bytes = 0;
+                 i <= last_log_index && chunk_bytes <= kMaxLogChunkBytes; i++) {
+                auto bufcopy =
+                    std::unique_ptr<char[]>(new char[log_command_size]);
+                Term term = 0;
+                int ret;
+
+                if ((ret = log_entry_get_term(i, &term))) {
+                    return ret;
+                }
+                if ((ret = log_entry_get_command(i, bufcopy.get()))) {
+                    return ret;
+                }
+                chunk_bytes += log_entry_size;
+                msg->entries.push_back(
+                    std::make_pair(term, std::move(bufcopy)));
             }
-            if ((ret = log_entry_get_command(i, bufcopy.get()))) {
-                return ret;
-            }
-            msg->entries.push_back(std::make_pair(term, std::move(bufcopy)));
-        }
-        kv.second.next_index_unacked = last_log_index + 1;
-        out->output_messages.push_back(make_pair(kv.first, std::move(msg)));
+            kv.second.next_index_unacked = i;
+            out->output_messages.push_back(make_pair(kv.first, std::move(msg)));
+        } while (kv.second.next_index_unacked < last_log_index);
     }
 
     out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
