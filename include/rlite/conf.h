@@ -85,7 +85,7 @@ int rl_conf_flow_get_dtp(rl_port_t port_id, struct rl_flow_dtp *dtp);
 
 int rl_conf_flow_get_stats(rl_port_t port_id, struct rl_flow_stats *stats);
 
-int rl_conf_rmt_get_stats(rl_ipcp_id_t ipcp_id, struct rl_ipcp_stats *stats);
+int rl_conf_ipcp_get_stats(rl_ipcp_id_t ipcp_id, struct rl_ipcp_stats *stats);
 
 #ifdef RL_MEMTRACK
 int rl_conf_memtrack_dump(void);

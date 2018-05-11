@@ -646,7 +646,7 @@ ipcp_stats(int argc, char **argv, struct cmd_descriptor *cd)
         ipcp_id = attrs->id;
     }
 
-    ret = rl_conf_rmt_get_stats(ipcp_id, &stats);
+    ret = rl_conf_ipcp_get_stats(ipcp_id, &stats);
     if (ret) {
         PE("Could not find ipcp with id %lu\n", ipcp_id);
         return ret;
