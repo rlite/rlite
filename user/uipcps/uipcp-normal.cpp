@@ -476,7 +476,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map[uipcp_rib::EnrollmentPrefix]["timeout"] =
         PolicyParam(std::chrono::milliseconds(int(kEnrollTimeoutMsecs)));
     params_map[uipcp_rib::EnrollmentPrefix]["keepalive"] =
-        PolicyParam(kKeepaliveTimeout);
+        PolicyParam(std::chrono::seconds(int(kKeepaliveTimeoutSecs)));
     params_map[uipcp_rib::EnrollmentPrefix]["keepalive-thresh"] =
         PolicyParam(kKeepaliveThresh);
     params_map[uipcp_rib::EnrollmentPrefix]["auto-reconnect"] =

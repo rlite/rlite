@@ -206,16 +206,16 @@ void
 NeighFlow::keepalive_tmr_start()
 {
     /* Keepalive timeout is expressed in seconds. */
-    unsigned int keepalive =
-        rib->get_param_value<int>(uipcp_rib::EnrollmentPrefix, "keepalive");
+    auto keepalive = rib->get_param_value<std::chrono::milliseconds>(
+        uipcp_rib::EnrollmentPrefix, "keepalive");
 
-    if (keepalive == 0) {
+    if (keepalive == std::chrono::milliseconds::zero()) {
         /* no keepalive */
         return;
     }
 
     rib->keepalive_timers[flow_fd] = make_unique<TimeoutEvent>(
-        std::chrono::seconds(keepalive), rib->uipcp,
+        keepalive, rib->uipcp,
         reinterpret_cast<void *>(static_cast<uintptr_t>(flow_fd)),
         [](struct uipcp *uipcp, void *arg) {
             int flow_fd    = reinterpret_cast<uintptr_t>(arg);

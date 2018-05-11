@@ -23,8 +23,8 @@ rlite-ctl dif-policy-param-mod dd dft replicas r1,r2,r3,r4,r5 || exit 1
 rlite-ctl dif-policy-param-list dd dft replicas | grep "r1,r2,r3,r4,r5" || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment timeout 3000ms || exit 1
 rlite-ctl dif-policy-param-list dd enrollment timeout | grep 3000ms || exit 1
-rlite-ctl dif-policy-param-mod dd enrollment keepalive 478 || exit 1
-rlite-ctl dif-policy-param-list dd enrollment keepalive | grep 478 || exit 1
+rlite-ctl dif-policy-param-mod dd enrollment keepalive 478s || exit 1
+rlite-ctl dif-policy-param-list dd enrollment keepalive | grep 478000ms || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment keepalive-thresh 21 || exit 1
 rlite-ctl dif-policy-param-list dd enrollment keepalive-thresh | grep 21 || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment auto-reconnect false || exit 1

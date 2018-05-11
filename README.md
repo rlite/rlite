@@ -1042,8 +1042,8 @@ of a normal IPCP process:
 | --------------------| ------------------|--------------------|-----------------|
 | addralloc           | distributed       | nack-wait     | Time to wait for a NACK before deciding that the address is good. |
 | dft                 | centralized-fault-tolerant | replicas  | Name of the IPCPs that constitute the fault-tolerant cluster. |
-| enrollment          | *                 | timeout            | Enrollment timeout in milliseconds. |
-| enrollment          | *                 | keepalive          | Neighbor keepalive timeout in seconds (0 to disable). |
+| enrollment          | *                 | timeout            | Enrollment timeout. |
+| enrollment          | *                 | keepalive          | Neighbor keepalive timeout (0 to disable). |
 | enrollment          | *                 | keepalive-thresh   | Number of allowed unacked keepalive requests. If exceeded, the N-1 low is pruned. |
 | enrollment          | *                 | auto-reconnect     | Automatically re-enroll to neighbors pruned because unresponsive. |
 | flowalloc           | local             | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
@@ -1055,9 +1055,9 @@ of a normal IPCP process:
 | resalloc            | *                 | reliable-flows     | Use dedicated reliable N-1-flows for management traffic rather than reusing kernel-bound unreliable N-1 flows if possible (boolean). |
 | resalloc            | *                 | reliable-n-flows   | Use dedicated reliable N-flows if reliable N-1-flows are not available (boolean). |
 | resalloc            | *                 | broadcast-enroller | Let the IPCP register the name of the DIF (DAF name) in addition to the IPCP name (boolean). |
-| ribd                | *                 | refresh-intval     | Time interval (in seconds) between two consecutive periodic RIB synchronizations. |
-| routing             | *                 | age-incr-intval    | Time interval (in seconds) between two consecutive increments of the age of LFDB entries. |
-| routing             | *                 | age-incr-max       | Maximum age (in seconds) allowed for an LFDB entry before being discarded. |
+| ribd                | *                 | refresh-intval     | Time interval between two consecutive periodic RIB synchronizations. |
+| routing             | *                 | age-incr-intval    | Time interval between two consecutive increments of the age of LFDB entries. |
+| routing             | *                 | age-incr-max       | Maximum age allowed for an LFDB entry before being discarded. |
 
 This is an example of how to change the nack-wait parameter of the
 distributed address allocation policy of a normal IPCP process
