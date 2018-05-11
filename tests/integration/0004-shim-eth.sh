@@ -27,6 +27,8 @@ rlite-ctl ipcp-create s1 shim-eth d1 || abort
 rlite-ctl ipcp-config s0 netdev rina.veth0 || abort
 rlite-ctl ipcp-config s1 netdev rina.veth1 || abort
 rlite-ctl ipcp-config s1 netdev rina.veth0 && abort
+rlite-ctl ipcp-config-get s0 netdev | grep "\<rina.veth0\>" || abort
+rlite-ctl ipcp-config-get s0 wrongy && abort
 
 # Register an application on the first shim-eth
 rina-echo-async -lw -z rpinstance4 -d d0 || abort

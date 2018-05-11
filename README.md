@@ -277,6 +277,7 @@ Available commands:
 * `ipcp-create`: Create a new IPCP in the system.
 * `ipcp-destroy`: Destroy an existing IPCP.
 * `ipcp-config`: Configure an IPCP.
+* `ipcp-config-get`: Get IPCP configuration parameter.
 * `ipcp-register`: Register an N-IPCP into an N-1-DIF.
 * `ipcp-unregister`: Unregister an N-IPCP from an N-1-DIF.
 * `ipcp-enroller-enable`: Enable an IPCP to act as enroller for its DIF.

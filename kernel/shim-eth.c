@@ -947,6 +947,26 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
 }
 
 static int
+rl_shim_eth_config_get(struct ipcp_entry *ipcp, const char *param_name,
+                       char *buf, int buflen)
+{
+    struct rl_shim_eth *priv = (struct rl_shim_eth *)ipcp->priv;
+    int ret                  = 0;
+
+    if (strcmp(param_name, "netdev") == 0) {
+        if (!priv->netdev) {
+            ret = -ENXIO;
+        } else {
+            snprintf(buf, buflen, "%s", priv->netdev->name);
+        }
+    } else {
+        ret = -ENOSYS;
+    }
+
+    return ret;
+}
+
+static int
 rl_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
     struct rl_shim_eth *priv = (struct rl_shim_eth *)ipcp->priv;
@@ -1160,6 +1180,7 @@ static struct ipcp_factory shim_eth_factory = {
     .ops.flow_allocate_resp = rl_shim_eth_fa_resp,
     .ops.sdu_write          = rl_shim_eth_sdu_write,
     .ops.config             = rl_shim_eth_config,
+    .ops.config_get         = rl_shim_eth_config_get,
     .ops.appl_register      = rl_shim_eth_register,
     .ops.flow_deallocated   = rl_shim_eth_flow_deallocated,
     .ops.flow_get_stats     = rl_shim_eth_flow_get_stats,
