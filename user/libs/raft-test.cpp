@@ -209,9 +209,15 @@ struct TestEvent {
     }
 };
 
+enum class ElectionType {
+    Random,
+    Conflicting,
+};
+
 /* Returns 0 on test success, 1 on test failure, -1 on error. */
 int
-run_simulation(const list<TestEvent> &external_events)
+run_simulation(const list<TestEvent> &external_events,
+               ElectionType election_type)
 {
     list<string> names = {"r1", "r2", "r3", "r4", "r5"};
     map<string, std::unique_ptr<TestReplica>> replicas;
@@ -358,6 +364,34 @@ run_simulation(const list<TestEvent> &external_events)
             if (r) {
                 return r;
             }
+        }
+
+        if (election_type == ElectionType::Conflicting) {
+            /* Force the election timers to fire very close (at most 1 ms far
+             * from each other), so that we test the voting process in case of
+             * conflicts. */
+            auto all_the_election_timers =
+                [&replicas](std::list<RaftTimerCmd> timer_commands) -> bool {
+                std::set<RaftSM *> re;
+                for (const RaftTimerCmd &cmd : timer_commands) {
+                    if (cmd.type != RaftTimerType::Election) {
+                        return false;
+                    }
+                    re.insert(cmd.sm);
+                }
+                return re.size() == replicas.size();
+            };
+            /* Check if we are being asked to program the election timers
+             * (and only those) for all the replicas. */
+            if (all_the_election_timers(output.timer_commands)) {
+                /* Modify the timeout values to generate conflicts. */
+                int x = 0;
+                for (RaftTimerCmd &cmd : output.timer_commands) {
+                    cmd.milliseconds = std::chrono::milliseconds(100 + x);
+                    x                = 1 - x;
+                }
+            }
+            election_type = ElectionType::Random;
         }
 
         /* Process current timer commands. */
@@ -646,7 +680,7 @@ main(int argc, char **argv)
         int ret;
 
         if (test_selector <= 0 || test_selector == test_counter) {
-            ret = run_simulation(vector);
+            ret = run_simulation(vector, ElectionType::Conflicting);
             cout << "Test #: " << test_counter;
             switch (ret) {
             case -1:
