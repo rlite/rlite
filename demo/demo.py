@@ -763,15 +763,7 @@ if args.enrollment_order == 'sequential':
                           'sudo': sudo,
                          'oper': oper}
 
-            if args.namespaces:
-                scriptname = '.%s.enrollscript' % vm['name']
-                outs += 'cat > %s << \'EOI\'\n' % scriptname
-                outs += '#!/bin/bash\n'
-            else:
-                outs += 'DONE=255\n'\
-                    'while [ $DONE != "0" ]; do\n'\
-                    '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
-                    % {'ssh': vm['ssh'], 'username': args.user, 'sshopts': args.sshopts}
+            outs, token = access_prologue(args, vm, outs)
 
             outs += 'set -x\n'\
                     'SUDO=%(sudo)s\n'\
@@ -782,21 +774,7 @@ if args.enrollment_order == 'sequential':
             else:
                 outs += '\n'
 
-            if args.namespaces:
-                outs += 'EOI\n'\
-                        'chmod +x %(script)s\n'\
-                        'sudo ip netns exec %(nsname)s bash %(script)s\n'\
-                        '#rm %(script)s\n'\
-                            % {'script': scriptname, 'nsname': vm['nsname']}
-            else:
-                outs += 'sleep 1\n'\
-                        'true\n'\
-                        'ENDSSH\n'\
-                        '   DONE=$?\n'\
-                        '   if [ $DONE != "0" ]; then\n'\
-                        '       sleep 1\n'\
-                        '   fi\n'\
-                        'done\n\n' % vars_dict
+            outs = access_epilogue(args, vm, outs, token)
 
 # Just for debugging
 for dif in demo.dif_ordering:
@@ -961,29 +939,17 @@ if args.register:
         pivot = sorted(demo.difs[dif])[0]
         outs += 'echo "Use \"%(pivot)s\" as a pivot for DIF %(dif)s"\n'\
                     % {'pivot': pivot, 'dif': dif}
-        if not args.namespaces:
-            outs += ''\
-            'DONE=255\n'\
-            'while [ $DONE != "0" ]; do\n'\
-            '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
-                    '#set -x\n' % {'sshopts': args.sshopts, 'username': args.user,
-                                  'ssh': demo.vms[pivot]['ssh']}
+        outs, token = access_prologue(args, demo.vms[pivot], outs)
 
         for vmname in sorted(demo.difs[dif]):
-            outs += 'echo "%(pivot)s --> %(vmname)s"\n'\
+            outs += '#set -x\n'\
+                    'echo "%(pivot)s --> %(vmname)s"\n'\
                     'rina-echo-async -z rina-echo-async.%(vmname)s -d %(dif)s.DIF\n' \
                     '[ "$?" == "0" ] || echo "Failed to reach %(vmname)s ' \
                         'in DIF %(dif)s"\n'\
                         % {'vmname': vmname, 'dif': dif, 'pivot': pivot}
 
-        if not args.namespaces:
-            outs += 'true\n'\
-                'ENDSSH\n'\
-            '   DONE=$?\n'\
-            '   if [ $DONE != "0" ]; then\n'\
-            '       sleep 1\n'\
-            '   fi\n'\
-            'done\n\n'
+        outs = access_epilogue(args, demo.vms[pivot], outs, token)
 
     fout.write(outs)
     fout.close()
