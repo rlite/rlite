@@ -308,7 +308,7 @@ static int
 flow_fetch_append(struct list_head *flows,
                   const struct rl_kmsg_flow_fetch_resp *resp)
 {
-    struct rl_flow *rl_flow, *scan;
+    struct rl_flow_info *rl_flow, *scan;
 
     if (resp->end) {
         /* This response is just to say there are no
@@ -400,7 +400,7 @@ rl_conf_flows_fetch(struct list_head *flows, rl_ipcp_id_t ipcp_id)
 void
 rl_conf_flows_purge(struct list_head *flows)
 {
-    struct rl_flow *rl_flow, *tmp;
+    struct rl_flow_info *rl_flow, *tmp;
 
     /* Purge the flows list. */
     list_for_each_entry_safe (rl_flow, tmp, flows, node) {
@@ -470,84 +470,12 @@ rl_conf_flow_get_stats(rl_port_t port_id, struct rl_flow_stats *stats)
     return rl_conf_flow_get_info(port_id, stats, NULL);
 }
 
-static char *
-byteprint(char *buf, size_t len, uint64_t bytes)
-{
-    const char *unit = "B";
-
-    if (bytes > 1024) {
-        unit = "KB";
-        bytes /= 1024;
-    }
-
-    if (bytes > 1024) {
-        unit = "MB";
-        bytes /= 1024;
-    }
-
-    if (bytes > 1024) {
-        unit = "GB";
-        bytes /= 1024;
-    }
-
-    snprintf(buf, len, "%llu%s", (long long unsigned)bytes, unit);
-
-    return buf;
-}
-
-int
-rl_conf_flows_print(struct list_head *flows)
-{
-    struct rl_flow *rl_flow;
-    char specinfo[16];
-
-    PI_S("Flows table:\n");
-    list_for_each_entry (rl_flow, flows, node) {
-        char bbuf[3][32];
-        size_t blen = 32;
-        struct rl_flow_stats stats;
-        int ofs = 0;
-        int ret;
-
-        ret = rl_conf_flow_get_stats(rl_flow->local_port, &stats);
-        if (ret) {
-            /* This can fail because the flow disappeared since
-             * it was fetched into 'flows'. */
-            continue;
-        }
-
-        memset(specinfo, '\0', sizeof(specinfo));
-        if (rl_flow->flow_control) {
-            ofs += snprintf(specinfo + ofs, sizeof(specinfo) - ofs, "fc");
-        }
-        if (rl_flow->spec.max_sdu_gap == 0) {
-            ofs += snprintf(specinfo + ofs, sizeof(specinfo) - ofs, " rtx");
-        }
-        if (ofs) {
-            ofs += snprintf(specinfo + ofs, sizeof(specinfo) - ofs, ", ");
-        }
-
-        PI_S("  ipcp %u, addr:port %llu:%u<-->%llu:%u, %s"
-             "rx(pkt:%llu, %s, drop:%llu), "
-             "tx(pkt:%llu, %s)\n",
-             rl_flow->ipcp_id, (long long unsigned int)rl_flow->local_addr,
-             rl_flow->local_port, (long long unsigned int)rl_flow->remote_addr,
-             rl_flow->remote_port, specinfo, (long long unsigned)stats.rx_pkt,
-             byteprint(bbuf[0], blen, stats.rx_byte),
-             (long long unsigned)stats.rx_overrun_pkt,
-             (long long unsigned)stats.tx_pkt,
-             byteprint(bbuf[1], blen, stats.tx_byte));
-    }
-
-    return 0;
-}
-
 /* Support for fetching registration information in kernel space. */
 
 static int
 reg_fetch_append(struct list_head *regs, struct rl_kmsg_reg_fetch_resp *resp)
 {
-    struct rl_reg *rl_reg, *scan;
+    struct rl_reg_info *rl_reg, *scan;
 
     if (resp->end) {
         /* This response is just to say there are no
@@ -636,7 +564,7 @@ rl_conf_regs_fetch(struct list_head *regs, rl_ipcp_id_t ipcp_id)
 void
 rl_conf_regs_purge(struct list_head *regs)
 {
-    struct rl_reg *rl_reg, *tmp;
+    struct rl_reg_info *rl_reg, *tmp;
 
     /* Purge the regs list. */
     list_for_each_entry_safe (rl_reg, tmp, regs, node) {
@@ -644,20 +572,6 @@ rl_conf_regs_purge(struct list_head *regs)
         rl_free(rl_reg->appl_name, RL_MT_UTILS);
         rl_free(rl_reg, RL_MT_CONF);
     }
-}
-
-int
-rl_conf_regs_print(struct list_head *regs)
-{
-    struct rl_reg *rl_reg;
-
-    PI_S("Locally registered applications:\n");
-    list_for_each_entry (rl_reg, regs, node) {
-        PI_S("  ipcp %u, name %s%s\n", rl_reg->ipcp_id, rl_reg->appl_name,
-             rl_reg->pending ? " (incomplete)" : "");
-    }
-
-    return 0;
 }
 
 /* Return 0 if the @spec is supported by the IPCP with id @ipcp_id. */

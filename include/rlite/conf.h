@@ -31,7 +31,7 @@
 extern "C" {
 #endif
 
-struct rl_flow {
+struct rl_flow_info {
     /* Flow attributes. */
     rl_ipcp_id_t ipcp_id;
     rl_port_t local_port;
@@ -44,7 +44,7 @@ struct rl_flow {
     struct list_head node;
 };
 
-struct rl_reg {
+struct rl_reg_info {
     rl_ipcp_id_t ipcp_id;
     int pending;
     char *appl_name;
@@ -65,15 +65,11 @@ int rl_conf_ipcp_config(rl_ipcp_id_t ipcp_id, const char *param_name,
 char *rl_conf_ipcp_config_get(rl_ipcp_id_t ipcp_id, const char *param_name);
 
 /* Fetch information about the flows in the system. */
-int rl_conf_flows_print(struct list_head *flows);
-
 int rl_conf_flows_fetch(struct list_head *flows, rl_ipcp_id_t ipcp_id);
 
 void rl_conf_flows_purge(struct list_head *flows);
 
 /* Fetch information about the application names registered in the system. */
-int rl_conf_regs_print(struct list_head *regs);
-
 int rl_conf_regs_fetch(struct list_head *regs, rl_ipcp_id_t ipcp_id);
 
 void rl_conf_regs_purge(struct list_head *regs);

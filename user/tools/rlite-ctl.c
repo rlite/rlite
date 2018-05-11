@@ -711,7 +711,50 @@ flows_show(int argc, char **argv, struct cmd_descriptor *cd)
 
     list_init(&flows);
     rl_conf_flows_fetch(&flows, ipcp_id);
-    rl_conf_flows_print(&flows);
+    {
+        struct rl_flow_info *rl_flow;
+        char specinfo[16];
+
+        PI_S("Flows table:\n");
+        list_for_each_entry (rl_flow, &flows, node) {
+            char bbuf[3][32];
+            size_t blen = 32;
+            struct rl_flow_stats stats;
+            int ofs = 0;
+            int ret;
+
+            ret = rl_conf_flow_get_stats(rl_flow->local_port, &stats);
+            if (ret) {
+                /* This can fail because the flow disappeared since
+                 * it was fetched into 'flows'. */
+                continue;
+            }
+
+            memset(specinfo, '\0', sizeof(specinfo));
+            if (rl_flow->flow_control) {
+                ofs += snprintf(specinfo + ofs, sizeof(specinfo) - ofs, "fc");
+            }
+            if (rl_flow->spec.max_sdu_gap == 0) {
+                ofs += snprintf(specinfo + ofs, sizeof(specinfo) - ofs, " rtx");
+            }
+            if (ofs) {
+                ofs += snprintf(specinfo + ofs, sizeof(specinfo) - ofs, ", ");
+            }
+
+            PI_S("  ipcp %u, addr:port %llu:%u<-->%llu:%u, %s"
+                 "rx(pkt:%llu, %s, drop:%llu), "
+                 "tx(pkt:%llu, %s)\n",
+                 rl_flow->ipcp_id, (long long unsigned int)rl_flow->local_addr,
+                 rl_flow->local_port,
+                 (long long unsigned int)rl_flow->remote_addr,
+                 rl_flow->remote_port, specinfo,
+                 (long long unsigned)stats.rx_pkt,
+                 byteprint(bbuf[0], blen, stats.rx_byte),
+                 (long long unsigned)stats.rx_overrun_pkt,
+                 (long long unsigned)stats.tx_pkt,
+                 byteprint(bbuf[1], blen, stats.tx_byte));
+        }
+    }
     rl_conf_flows_purge(&flows);
 
     return 0;
@@ -792,7 +835,15 @@ regs_show(int argc, char **argv, struct cmd_descriptor *cd)
 
     list_init(&regs);
     rl_conf_regs_fetch(&regs, ipcp_id);
-    rl_conf_regs_print(&regs);
+    {
+        struct rl_reg_info *rl_reg;
+
+        printf("Locally registered applications:\n");
+        list_for_each_entry (rl_reg, &regs, node) {
+            printf("  ipcp %u, name %s%s\n", rl_reg->ipcp_id, rl_reg->appl_name,
+                   rl_reg->pending ? " (incomplete)" : "");
+        }
+    }
     rl_conf_regs_purge(&regs);
 
     return 0;
