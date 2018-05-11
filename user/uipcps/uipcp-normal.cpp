@@ -515,13 +515,14 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     rib_handler_register(NeighFlow::KeepaliveObjName,
                          &uipcp_rib::keepalive_handler);
     rib_handler_register(StatusObjName, &uipcp_rib::status_handler);
-    rib_handler_register(DFT::Prefix + "/policy", &uipcp_rib::policy_handler);
-    rib_handler_register(Routing::Prefix + "/policy",
-                         &uipcp_rib::policy_handler);
-    rib_handler_register(AddrAllocator::Prefix + "/policy",
-                         &uipcp_rib::policy_handler);
-    rib_handler_register(DFT::Prefix + "/params",
-                         &uipcp_rib::policy_param_handler);
+    for (const auto &component :
+         {DFT::Prefix, Routing::Prefix, AddrAllocator::Prefix}) {
+        rib_handler_register(component + "/policy", &uipcp_rib::policy_handler);
+    }
+    for (const auto &component : {DFT::Prefix, AddrAllocator::Prefix}) {
+        rib_handler_register(component + "/params",
+                             &uipcp_rib::policy_param_handler);
+    }
 
     /* Start timers for periodic tasks. */
     age_incr_tmr_restart();

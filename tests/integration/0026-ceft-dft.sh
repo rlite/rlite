@@ -51,11 +51,11 @@ for cont in s1 s2 s3 c; do
     ip netns exec ${cont} rlite-ctl ipcp-config ${cont}.eth netdev veth.${cont}c || abort
     ip netns exec ${cont} rlite-ctl ipcp-create ${cont}.n normal ceftdif || abort
     ip netns exec ${cont} rlite-ctl ipcp-register ${cont}.n ethdif || abort
-    ip netns exec ${cont} rlite-ctl dif-policy-param-mod ceftdif addralloc nack-wait-secs 1 || abort
     ip netns exec ${cont} rlite-ctl dif-policy-mod ceftdif dft centralized-fault-tolerant || abort
 done
 
 # S1 is going to be the enrollment master, the others enroll to it
+ip netns exec s1 rlite-ctl dif-policy-param-mod ceftdif addralloc nack-wait-secs 1 || abort
 ip netns exec s1 rlite-ctl dif-policy-param-mod ceftdif dft replicas s1.n,s2.n,s3.n || abort
 ip netns exec s1 rlite-ctl ipcp-enroller-enable s1.n || abort
 for cont in s2 s3 c; do

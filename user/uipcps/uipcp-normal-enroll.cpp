@@ -797,7 +797,7 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
 
         {
             /* Send component parameters. */
-            list<std::string> components = {DFT::Prefix};
+            list<std::string> components = {DFT::Prefix, AddrAllocator::Prefix};
             for (const auto &c : components) {
                 for (const auto &kv : rib->params_map[c]) {
                     std::stringstream oss;

@@ -1040,7 +1040,7 @@ of a normal IPCP process:
 
 | Component           | Policy            | Parameter          | Description     |
 | --------------------| ------------------|--------------------|-----------------|
-| addralloc   | distributed       | nack-wait-secs     | Time to wait for a NACK before deciding that the address is good. |
+| addralloc           | distributed       | nack-wait-secs     | Time to wait for a NACK before deciding that the address is good. |
 | dft                 | centralized-fault-tolerant | replicas  | Name of the IPCPs that constitute the fault-tolerant cluster. |
 | enrollment          | *                 | timeout            | Enrollment timeout in milliseconds. |
 | enrollment          | *                 | keepalive          | Neighbor keepalive timeout in seconds (0 to disable). |
