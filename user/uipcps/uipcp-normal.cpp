@@ -184,7 +184,7 @@ uipcp_rib::mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
 
 int
 uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
-                    std::shared_ptr<Neighbor> neigh)
+                    std::shared_ptr<Neighbor> neigh, rl_port_t port_id)
 {
     std::unique_ptr<CDAPMessage> m;
     int ret = 1;
@@ -268,7 +268,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
         m.reset();
 
         if (!nf) {
-            UPE(uipcp, "Received message from unknown port id\n");
+            UPE(uipcp, "Received message from unknown port id %u\n", port_id);
             return -1;
         }
 
@@ -276,6 +276,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
             nf->conn = make_unique<CDAPConn>(nf->flow_fd);
         }
 
+        assert(neigh);
         if (neigh->enrollment_complete() && nf == neigh->mgmt_conn() &&
             !nf->initiator && is_connect_attempt &&
             src_appl == neigh->ipcp_name) {
@@ -377,7 +378,8 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
     rib->lookup_neigh_flow_by_port_id(mhdr->local_port, &nf, &neigh);
 
     /* Hand off the message to the RIB. */
-    rib->recv_msg(((char *)(mhdr + 1)), n - sizeof(*mhdr), nf, neigh);
+    rib->recv_msg(((char *)(mhdr + 1)), n - sizeof(*mhdr), nf, neigh,
+                  mhdr->local_port);
 }
 
 void

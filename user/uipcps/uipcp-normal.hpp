@@ -678,7 +678,8 @@ struct uipcp_rib {
     int fa_req(struct rl_kmsg_fa_req *req);
 
     int recv_msg(char *serbuf, int serlen, std::shared_ptr<NeighFlow> nf,
-                 std::shared_ptr<Neighbor> neigh);
+                 std::shared_ptr<Neighbor> neigh,
+                 rl_port_t port_id = RL_PORT_ID_NONE);
     int mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
                               size_t buflen);
     int obj_serialize(CDAPMessage *m,
