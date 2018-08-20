@@ -498,7 +498,7 @@ ping_report(struct worker *w, struct rp_result_msg *snd,
     stddev /= 1000000.0;
 
     if (!w->rp->cdf || num_samples < 110) {
-        if (num_samples < 110) {
+        if (num_samples < 110 && w->rp->cdf) {
             printf("WARNING: at least 110 samples are needed to compute CDF\n");
         }
         printf("--- %s ping statistics ---\n", w->rp->srv_appl_name);
