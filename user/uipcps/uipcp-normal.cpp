@@ -1901,6 +1901,9 @@ PolicyParam::set_value(const std::string &param_value,
         stringval = param_value;
         break;
     case PolicyParamType::Duration: {
+        // TODO enable the code once std::regex gets fixed on the travis
+        // Ubuntu environment.
+#if 0
         std::regex exp("([0-9]+)(m?s)");
         std::smatch m;
         if (std::regex_match(param_value, m, exp) && m.size() == 3) {
@@ -1914,6 +1917,27 @@ PolicyParam::set_value(const std::string &param_value,
             *error_reason = "Invalid duration value (ex. 100ms)";
             return -1;
         }
+#else
+        /* Hand-crafted code to parse a duration without using std::regex.
+         * This is currently required to workaround issues on the broken g++
+         * (old) release used by travis. */
+        std::stringstream ss;
+        unsigned int num;
+        std::string unit;
+        ss << param_value;
+        ss >> num;
+        ss >> unit;
+
+        if (unit == "s" || unit == "ms") {
+            if (unit == "s") {
+                num *= 1000;
+            }
+            durval = Msecs(num);
+        } else {
+            *error_reason = "Invalid duration value (ex. 100ms)";
+            return -1;
+        }
+#endif
         break;
     }
     default:
