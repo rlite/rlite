@@ -25,6 +25,7 @@
 #include <sstream>
 #include <iostream>
 #include <queue>
+#include <limits>
 
 #include "BaseRIB.pb.h"
 #include "uipcp-normal-lfdb.hpp"
@@ -96,7 +97,7 @@ LFDB::compute_shortest_paths(
     for (const auto &kvg : graph) {
         struct DijkstraInfo inf;
 
-        inf.dist        = UINT_MAX;
+        inf.dist        = std::numeric_limits<unsigned int>::max();
         info[kvg.first] = std::move(inf);
     }
 
@@ -106,7 +107,7 @@ LFDB::compute_shortest_paths(
         PQInfo closer = frontier.top();
         frontier.pop();
 
-        if (closer.dist == UINT_MAX) {
+        if (closer.dist == std::numeric_limits<unsigned int>::max()) {
             break;
         }
 
@@ -195,7 +196,8 @@ LFDB::compute_next_hops(const NodeId &local_node)
      * result to fill in the next_hops routing table. */
     compute_shortest_paths(local_node, graph, info);
     for (const auto &kvi : info) {
-        if (kvi.first == local_node || kvi.second.dist == UINT_MAX) {
+        if (kvi.first == local_node ||
+            kvi.second.dist == std::numeric_limits<unsigned int>::max()) {
             /* I don't need a next hop for myself. */
             continue;
         }
