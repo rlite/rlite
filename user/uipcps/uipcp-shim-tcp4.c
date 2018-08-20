@@ -481,7 +481,7 @@ remove_endpoint_by_port_id(struct shim_tcp4 *shim, rl_port_t port_id)
     list_for_each_entry (ep, &shim->endpoints, node) {
         if (port_id == ep->port_id) {
             UPD(shim->uipcp,
-                "Removing endpoint [port=%u,kevent_id=%u,"
+                "Removing endpoint [port_id=%u,kevent_id=%u,"
                 "sfd=%d]\n",
                 ep->port_id, ep->kevent_id, ep->fd);
             close(ep->fd);
@@ -518,8 +518,8 @@ shim_tcp4_fa_resp(struct uipcp *uipcp, const struct rl_msg_base *msg)
     }
 
     /* Negative response, we have to close the TCP/UDP connection. */
-    UPD(uipcp, "Removing endpoint [port=%u,kevent_id=%u,sfd=%d]\n", ep->port_id,
-        ep->kevent_id, ep->fd);
+    UPD(uipcp, "Removing endpoint [port_id=%u,kevent_id=%u,sfd=%d]\n",
+        ep->port_id, ep->kevent_id, ep->fd);
     close(ep->fd);
     rl_free(ep, RL_MT_SHIMDATA);
 

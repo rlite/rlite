@@ -517,7 +517,7 @@ shim_udp4_fa_resp(struct uipcp *uipcp, const struct rl_msg_base *msg)
 
     if (resp->response) {
         /* Negative response, we have to close the endpoint. */
-        UPD(uipcp, "Removing endpoint [port=%u,kevent_id=%u,sfd=%d]\n",
+        UPD(uipcp, "Removing endpoint [port_id=%u,kevent_id=%u,sfd=%d]\n",
             ep->port_id, ep->kevent_id, ep->fd);
         udp4_endpoint_close(ep);
     }
@@ -537,7 +537,7 @@ shim_udp4_flow_deallocated(struct uipcp *uipcp, const struct rl_msg_base *msg)
     list_for_each_entry (ep, &shim->endpoints, node) {
         if (req->local_port_id == ep->port_id) {
             UPD(uipcp,
-                "Removing endpoint [port=%u,kevent_id=%u,"
+                "Removing endpoint [port_id=%u,kevent_id=%u,"
                 "sfd=%d]\n",
                 ep->port_id, ep->kevent_id, ep->fd);
             udp4_endpoint_close(ep);

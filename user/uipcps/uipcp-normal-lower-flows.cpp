@@ -225,11 +225,11 @@ RoutingEngine::compute_fwd_table()
         if (ret) {
             UPE(uipcp,
                 "Failed to delete PDUFT entry for %s(%lu) "
-                "(port=%u) [%s]\n",
+                "(port_id=%u) [%s]\n",
                 node_id_pretty(dst_node).c_str(), (long unsigned)dst_addr,
                 port_id, strerror(errno));
         } else {
-            UPD(uipcp, "Delete PDUFT entry for %s(%lu) (port=%u)\n",
+            UPD(uipcp, "Delete PDUFT entry for %s(%lu) (port_id=%u)\n",
                 node_id_pretty(dst_node).c_str(), (long unsigned)dst_addr,
                 port_id);
         }
@@ -255,14 +255,14 @@ RoutingEngine::compute_fwd_table()
         ret      = uipcp_pduft_set(uipcp, dst_addr, port_id);
         if (ret) {
             UPE(uipcp,
-                "Failed to insert %s(%lu) --> %s (port=%u) PDUFT "
+                "Failed to insert %s(%lu) --> %s (port_id=%u) PDUFT "
                 "entry [%s]\n",
                 node_id_pretty(dst_node).c_str(), (long unsigned)dst_addr,
                 next_hops[dst_node].front().c_str(), port_id, strerror(errno));
             /* Trigger re insertion next time. */
             kve.second = make_pair(NodeId(), 0);
         } else {
-            UPD(uipcp, "Set PDUFT entry %s(%lu) --> %s (port=%u)\n",
+            UPD(uipcp, "Set PDUFT entry %s(%lu) --> %s (port_id=%u)\n",
                 node_id_pretty(dst_node).c_str(), (long unsigned)dst_addr,
                 next_hops[dst_node].front().c_str(), port_id);
         }
