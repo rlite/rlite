@@ -38,7 +38,7 @@ install: usr_install ker_install
 usr_install:
 	cd build && $(MAKE) install
 
-ker_install: ker
+ker_install: @KER_INSTALL_DEPS@
 	$(MAKE) -C $(KERNBUILDDIR) INSTALL_MOD_PATH=@INSTALL_MOD_PATH@ M=$(KERNMODDIR) modules_install
 
 depmod: ker_install

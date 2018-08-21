@@ -263,6 +263,7 @@ CLANG_PREFIX=""
 IWYU="n"
 USE_CLANG="n"
 OPTIMIZE="n"
+KER_INSTALL_DEPS="ker"
 
 # Option parsing
 while [[ $# > 0 ]]
@@ -391,8 +392,15 @@ if [ ${BUILD_USER} == "y" ]; then
     # Make sure CMake is installed
     which cmake || no_cmake
     # Check if we have
-    if [ $DEBUG == "y" ] && [ $(which scan-build) ]; then
-        CLANG_PREFIX="scan-build"
+    if [ $DEBUG == "y" ]; then
+        # In case of debug build we clean KER_INSTALL_DEPS
+        # as a workaround for the travis build, that does not
+        # have "scan-build" available for the superuser (and the
+        # ker target is invoked on "sudo make install")
+        KER_INSTALL_DEPS=""
+        if [ $(which scan-build) ]; then
+            CLANG_PREFIX="scan-build"
+        fi
     fi
 fi
 
@@ -464,6 +472,7 @@ sed -i "s|@KERNBUILDDIR@|$KERNBUILDDIR|g" Makefile
 sed -i "s|@CLANG_PREFIX@|${CLANG_PREFIX}|g" Makefile
 sed -i "s|@WITH_SHIM_UDP4@|${WITH_SHIM_UDP4}|g" Makefile
 sed -i "s|@WITH_SHIM_TCP4@|${WITH_SHIM_TCP4}|g" Makefile
+sed -i "s|@KER_INSTALL_DEPS@|${KER_INSTALL_DEPS}|g" Makefile
 
 if [ ${BUILD_KERNEL} == "y" ]; then
     # Generate kernel Makefile
