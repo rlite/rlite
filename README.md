@@ -29,6 +29,7 @@
         651. IPCP local parameters
         652. IPCP flavours to support different data transfer constants
         653. Available policies and parameters
+        654. PDU scheduler configuration
 7. Tools
     71. rina-gw
     72. iporinad
@@ -293,6 +294,9 @@ Available commands:
                     the static routing policy.
 * `ipcp-route-del`: Remove a routing rule from a local IPCP; valid for the
                     static routing policy.
+* `ipcp-sched-config`: Configure the PDU scheduler of an IPCP. The configuration
+                       parameters depend on the specific scheduler (see Section
+                       6.5.4).
 * `ipcps-show`: Show the list of IPCPs that are currently running in the system.
 * `ipcp-stats`: Show data transfer statistics for an IPCP running in the system.
 * `uipcp-stats-show`: Show management layer statistics for an IPCP running in
@@ -975,7 +979,7 @@ be modified using the `ipcp-config` command:
 | ttl             | Initial value for the TTL (Time To Live) field in the PDU header (default 64). |
 | csum            | Checksum to perform on each PDU: possible values are "none" (default, no checksum) or "inet" (Internet checksum). |
 | flow-del-wait-ms| How much to postpone flow removal, to allow for inflight packets to arrive (default 4000 ms). |
-| sched           | PDU scheduler to use for transmission: possible values are "none" (default) or "pfifo". |
+| sched           | PDU scheduler to use for transmission: possible values are "none" (default), "pfifo" or "wrr". |
 
 As an example, a normal IPC Process can be manually configured with an address unique in its
 DIF. This step is not usually necessary, since a simple default policy for
@@ -1076,6 +1080,33 @@ distributed address allocation policy of a normal IPCP process
 This is an example how to enable reliable flows in the resource allocator
 
     # rlite-ctl dif-policy-param-mod n.DIF resalloc reliable-flows true
+
+
+#### 6.5.4. PDU scheduler configuration
+By default, IPCPs do not perform any PDU scheduling in the kernel-space
+datapath. However, PDU scheduling is supported and can be configured. The
+first step is to choose a scheduling algorithm among the available ones.
+We currently support priority fifo (`pfifo`) and weighted round robin (`wrr`).
+Queues are numbered from `0` to `N-1`, where the number of queues `N` can
+be configured in an algorithm-specific way. A PDU with QoS id `i`
+will be enqueued to the queue with number `min(i, N-1)`.
+Example of assigning a PDU scheduler to an IPCP:
+
+    # rlite-ctl ipcp-config myipcp sched pfifo
+
+The `pfifo` scheduler can configured with the number of priority levels and
+per-queue max size (in bytes). Each priority level corresponds to a different
+queue. PDUs are dequeued from lower priority queues only when higher priority
+ones are empty. Example of `pfifo` configuration:
+
+    # rlite-ctl ipcp-sched-config myipcp pfifo qsize 65535 levels 3
+
+The `wrr` scheduler can be configured with a quantum (in bytes),
+the weights to assign to each queue, and per-queue maximum size (in bytes).
+Example of `wrr` configuration with 4 queues:
+
+    # rlite-ctl ipcp-sched-config myipcp wrr qsize 65535 quantum 1600 weights 2,4,9,5
+
 
 ## 7. Tools
 This section documents useful programs that are part of the *rlite*
