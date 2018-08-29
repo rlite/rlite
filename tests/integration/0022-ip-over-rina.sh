@@ -1,20 +1,9 @@
-#!/bin/bash
+#!/bin/bash -e
 
-cleanup() {
-    local ret=0
-    pkill iporinad || ret=1
-    rm -f iporinad1.conf iporinad2.conf
-    rlite-ctl reset || ret=1
-    [ "$ret" != 0 ] && return 1 || return 0
-}
+source tests/libtest.sh
 
-abort() {
-  cleanup
-  exit 1
-}
-
-rlite-ctl ipcp-create xyz.IPCP normal dd.DIF || exit 1
-rlite-ctl ipcp-config xyz.IPCP flow-del-wait-ms 100 || exit 1
+rlite-ctl ipcp-create xyz.IPCP normal dd.DIF
+rlite-ctl ipcp-config xyz.IPCP flow-del-wait-ms 100
 cat > iporinad1.conf << EOF
 local       ipor1        dd.DIF
 remote      ipor2        dd.DIF       192.168.203.0/30
@@ -27,8 +16,8 @@ remote      ipor1        dd.DIF       192.168.203.0/30
 route       10.9.12.0/24
 route       10.9.13.0/24
 EOF
+cumulative_trap "rm -f iporinad1.conf iporinad2.conf" "EXIT"
 
-iporinad -wv -c iporinad1.conf || abort
-iporinad -wv -c iporinad2.conf || abort
-sleep 2
-cleanup
+start_daemon iporinad -wv -c iporinad1.conf
+start_daemon iporinad -wv -c iporinad2.conf
+sleep 1
