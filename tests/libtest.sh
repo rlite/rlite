@@ -37,3 +37,17 @@ function create_veth_pair()
     ip link set ${ifname}0 up || return 1
     ip link set ${ifname}1 up || return 1
 }
+
+################################################################################
+# Start a daemon process.
+# Arguments:
+#   $1 -> daemon name
+#   $2 -> daemon arguments
+################################################################################
+function start_daemon()
+{
+    local progname="$1"
+    shift
+    $progname $@ || return 1
+    cumulative_trap "pkill $progname" "EXIT"
+}
