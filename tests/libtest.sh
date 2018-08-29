@@ -7,20 +7,20 @@
 ################################################################################
 function cumulative_trap()
 {
-	local new_command="$1"
-	local signal="$2"
-	local current_command=""
+    local new_commands="$1"
+    local signal="$2"
+    local current_commands=""
 
-	# If we run "trap -p SIGNAL" in a subshell we read the traps for that
-	# subshell, instead of the current one.
-	# https://unix.stackexchange.com/a/334593
-	shopt -s lastpipe
-	trap -p "$signal" | read current_command
-	shopt -u lastpipe
+    # If we run "trap -p SIGNAL" in a subshell we read the traps for that
+    # subshell, instead of the current one.
+    # https://unix.stackexchange.com/a/334593
+    shopt -s lastpipe
+    trap -p "$signal" | read current_commands || true
+    shopt -u lastpipe
+    current_commands="$(echo $current_commands | awk -F\' '{print $2}')"
+    new_commands="$new_commands; $current_commands"
 
-	current_command="$(echo $current_command | awk -F\' '{print $2}')"
-	new_command="$new_command; $current_command"
-	trap "$new_command" "$signal"
+    trap "$new_commands" "$signal"
 }
 
 ################################################################################
