@@ -49,5 +49,5 @@ function start_daemon()
     local progname="$1"
     shift
     $progname $@ || return 1
-    cumulative_trap "pkill $progname" "EXIT"
+    cumulative_trap "pkill $progname || true" "EXIT"
 }
