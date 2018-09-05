@@ -1035,7 +1035,7 @@ components of a normal IPCP process:
 | addralloc           | distributed      | Automated address allocation      |
 | addralloc           | centralized-fault-tolerant | Allocation handled by a fault-tolerant cluster of replicas |
 | dft                 | fully-replicated | Every node has a full copy of the DFT |
-| dft                 | centralized-fault-tolerant | DFT stored by a fault-tolerant cluster of replicas |
+| dft                 | centralized-fault-tolerant | DFT stored in a fault-tolerant cluster of replicas |
 | routing             | link-state       | Link state routing algorithm      |
 | routing             | link-state-lfa   | Link state enhanced with Loop Free Alternate |
 | routing             | static           | Statically configured routing rules |
