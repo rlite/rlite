@@ -523,6 +523,3 @@ echo "#define __RLITE_VERSION_H__" >> $VERF
 echo "#define RL_REVISION_ID \"$REVISION\"" >> $VERF
 echo "#define RL_REVISION_DATE \"$REVISION_DATE\"" >> $VERF
 echo "#endif" >> $VERF
-
-chmod +x prepare.sh
-chmod +x unprepare.sh
