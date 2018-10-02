@@ -253,6 +253,14 @@ stoppable_usleep(struct rinaperf *rp, unsigned int usecs)
     }
 }
 
+long long int
+nanodiff(const struct timespec *t2, const struct timespec *t1)
+{
+    return (long long int)t2->tv_nsec - (long long int)t1->tv_nsec +
+           ((long long int)t2->tv_sec - (long long int)t1->tv_sec) *
+               1000000000LL;
+}
+
 static int config_msg_read(int cfd, struct rp_config_msg *cfg);
 
 /* Used for both ping and rr tests. */
@@ -269,7 +277,7 @@ ping_client(struct worker *w)
     unsigned int timeouts     = 0;
     int ping                  = w->ping;
     unsigned int i            = 0;
-    unsigned long long ns;
+    long long ns;
     struct pollfd pfd[2];
     int ret = 0;
 
@@ -325,8 +333,7 @@ ping_client(struct worker *w)
             if (ping) {
                 if (*seqnum == expected) {
                     clock_gettime(CLOCK_MONOTONIC, &t2);
-                    ns = 1000000000 * (t2.tv_sec - t1.tv_sec) +
-                         (t2.tv_nsec - t1.tv_nsec);
+                    ns = nanodiff(&t2, &t1);
                     if (w->rp->timestamp) {
                         struct timeval recv_time;
                         gettimeofday(&recv_time, NULL);
@@ -354,8 +361,8 @@ ping_client(struct worker *w)
     }
 
     clock_gettime(CLOCK_MONOTONIC, &t_end);
-    ns = 1000000000 * (t_end.tv_sec - t_start.tv_sec) +
-         (t_end.tv_nsec - t_start.tv_nsec);
+
+    ns                  = nanodiff(&t_end, &t_start);
     w->real_duration_ms = ns / 1000000;
 
     w->result.cnt = i;
@@ -538,7 +545,7 @@ perf_client(struct worker *w)
     struct timespec t_start, t_end;
     struct timespec w1, w2;
     char buf[SDU_SIZE_MAX];
-    unsigned long long ns;
+    long long ns;
     struct pollfd pfd[2];
     unsigned int i = 0;
     int timeout    = 0;
@@ -603,8 +610,7 @@ perf_client(struct worker *w)
                 clock_gettime(CLOCK_MONOTONIC, &w1);
                 for (;;) {
                     clock_gettime(CLOCK_MONOTONIC, &w2);
-                    ns = 1000000000ULL * (w2.tv_sec - w1.tv_sec) +
-                         (w2.tv_nsec - w1.tv_nsec);
+                    ns = nanodiff(&w2, &w1);
                     if (ns >= 1000 * interval) {
                         break;
                     }
@@ -615,8 +621,7 @@ perf_client(struct worker *w)
     }
 
     clock_gettime(CLOCK_MONOTONIC, &t_end);
-    ns = 1000000000ULL * (t_end.tv_sec - t_start.tv_sec) +
-         (t_end.tv_nsec - t_start.tv_nsec);
+    ns = nanodiff(&t_end, &t_start);
     if (timeout) {
         /* There was a timeout, adjust the time measurement. */
         if (ns <= RP_DATA_WAIT_MSECS * 1000000ULL) {
@@ -688,7 +693,7 @@ perf_server(struct worker *w)
     unsigned long long rate_bytes       = 0;
     struct timespec rate_ts, t_start, t_end;
     char buf[SDU_SIZE_MAX];
-    unsigned long long ns;
+    long long ns;
     struct pollfd pfd[2];
     unsigned int i;
     int verb    = w->rp->verbose;
@@ -800,8 +805,7 @@ perf_server(struct worker *w)
     }
 
     clock_gettime(CLOCK_MONOTONIC, &t_end);
-    ns = 1000000000 * (t_end.tv_sec - t_start.tv_sec) +
-         (t_end.tv_nsec - t_start.tv_nsec);
+    ns = nanodiff(&t_end, &t_start);
     if (timeout) {
         /* There was a timeout, adjust the time measurement. */
         if (ns <= RP_DATA_WAIT_MSECS * 1000000ULL) {
