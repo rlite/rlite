@@ -569,16 +569,19 @@ main(int argc, char **argv)
         }
     }
 
-    /* Build the Gateway object here, as building it starts the workers. */
+    if (background) {
+        /* Become a daemon. This must be done before starting the workers
+         * (non-detached threads), otherwise the workers terminate on the
+         * parent exiting. */
+        daemonize();
+    }
+
+    /* Build the Gateway object. The constructor also starts the workers. */
     gw = new Gateway();
 
     parse_conf(confname);
     print_conf();
     setup_for_listening();
-
-    if (background) {
-        daemonize();
-    }
 
     for (;;) {
         vector<int> completed_flow_allocs;
