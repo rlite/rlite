@@ -406,7 +406,7 @@ if args.namespaces:
     outs += 'sudo ip netns exec ns${MACHINE_ID} bash\n'
 else:
     outs += 'USER=%s\n' % args.user
-    outs += 'SSHOPTS=%s\n' % args.sshopts
+    outs += 'SSHOPTS="%s"\n' % args.sshopts
     outs += ''\
             'SSH_PORT=$(grep "\\<${MACHINE_ID}\\>" demo.map | awk \'{print $2}\')\n'\
             'if [ "$SSH_PORT" == "" ]; then\n'\
