@@ -473,6 +473,34 @@ setup_for_listening(void)
     return 0;
 }
 
+/* Turn this program into a daemon process. */
+static void
+daemonize(void)
+{
+    pid_t pid = fork();
+    pid_t sid;
+
+    if (pid < 0) {
+        perror("fork(daemonize)");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid > 0) {
+        /* This is the parent. We can terminate it. */
+        exit(0);
+    }
+
+    /* Execution continues only in the child's context. */
+    sid = setsid();
+    if (sid < 0) {
+        exit(EXIT_FAILURE);
+    }
+
+    if (chdir("/")) {
+        exit(EXIT_FAILURE);
+    }
+}
+
 static void
 print_conf()
 {
@@ -492,10 +520,12 @@ print_conf()
 static void
 usage(void)
 {
-    cout << "rina-gw\n"
-         << "    -h <show this help>\n"
-         << "    -v <increase verbosity>\n"
-         << "    -c PATH_TO_CONFIG_FILE (default = '/etc/rina/rina-gw.conf')\n";
+    cout << "rina-gw" << endl
+         << "    -h <show this help>" << endl
+         << "    -v <increase verbosity>" << endl
+         << "    -c PATH_TO_CONFIG_FILE (default = '/etc/rina/rina-gw.conf')"
+         << endl
+         << "    -w <run in background>" << endl;
 }
 
 int
@@ -503,6 +533,7 @@ main(int argc, char **argv)
 {
     const char *confname = "/etc/rina/rina-gw.conf";
     struct pollfd pfd[128];
+    bool background = false;
     int ret;
     int opt;
 
@@ -513,7 +544,7 @@ main(int argc, char **argv)
         return -1;
     }
 
-    while ((opt = getopt(argc, argv, "hvc:")) != -1) {
+    while ((opt = getopt(argc, argv, "hvc:w")) != -1) {
         switch (opt) {
         case 'h':
             usage();
@@ -525,6 +556,10 @@ main(int argc, char **argv)
 
         case 'c':
             confname = optarg;
+            break;
+
+        case 'w':
+            background = true;
             break;
 
         default:
@@ -544,6 +579,10 @@ main(int argc, char **argv)
 
     print_conf();
     setup_for_listening();
+
+    if (background) {
+        daemonize();
+    }
 
     for (;;) {
         vector<int> completed_flow_allocs;

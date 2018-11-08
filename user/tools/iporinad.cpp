@@ -1332,6 +1332,7 @@ usage(void)
          << RINA_FLOW_SPEC_LOSS_MAX << ")" << endl
          << "   -E NUM : maximum delay introduced by the flow (microseconds)"
          << endl
+         << "   -w : run in background" << endl
          << "   -v : be verbose" << endl;
 }
 
@@ -1339,7 +1340,7 @@ int
 main(int argc, char **argv)
 {
     const char *confpath = "/etc/rina/iporinad.conf";
-    int background       = 0;
+    bool background      = false;
     int opt;
 
     while ((opt = getopt(argc, argv, "hc:vL:E:w")) != -1) {
@@ -1373,7 +1374,7 @@ main(int argc, char **argv)
             break;
 
         case 'w':
-            background = 1;
+            background = true;
             break;
 
         default:
