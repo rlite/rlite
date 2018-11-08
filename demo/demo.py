@@ -317,7 +317,7 @@ flavour_suffix = ''
 if args.flavour != '':
     flavour_suffix = '-' + args.flavour
 
-if not args.namespaces:
+if not args.namespaces and args.image == '':
     imgprefix = "rlite.%s" % ('debug' if args.debug else 'prod',)
     download_if_needed(vmimgpath, 'https://bitbucket.org/vmaffione/rina-images/downloads/%s.rootfs.cpio' % imgprefix)
     download_if_needed('buildroot/bzImage', 'https://bitbucket.org/vmaffione/rina-images/downloads/%s.bzImage' % imgprefix)
