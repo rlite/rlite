@@ -195,14 +195,14 @@ Gateway::~Gateway()
 
 Gateway *gw = NULL; /* global data structure */
 
-static int
+static void
 parse_conf(const char *confname)
 {
     ifstream fin(confname);
 
     if (fin.fail()) {
         printf("Failed to open configuration file '%s'\n", confname);
-        return -1;
+        exit(EXIT_FAILURE);
     }
 
     for (unsigned int lines_cnt = 1; !fin.eof(); lines_cnt++) {
@@ -230,6 +230,7 @@ parse_conf(const char *confname)
                 if (tokens.size()) {
                     printf("Invalid configuration entry at line %d\n",
                            lines_cnt);
+                    exit(EXIT_FAILURE);
                 }
                 continue;
             }
@@ -245,6 +246,7 @@ parse_conf(const char *confname)
                     printf("Invalid configuration entry at line %d: "
                            "invalid port number '%s'\n",
                            lines_cnt, tokens[4].c_str());
+                    exit(EXIT_FAILURE);
                 }
                 ret =
                     inet_pton(AF_INET, tokens[3].c_str(), &inet_addr.sin_addr);
@@ -252,7 +254,7 @@ parse_conf(const char *confname)
                     printf("Invalid configuration entry at line %d: "
                            "invalid IP address '%s'\n",
                            lines_cnt, tokens[3].c_str());
-                    continue;
+                    exit(EXIT_FAILURE);
                 }
 
                 InetName inet_name(inet_addr);
@@ -268,15 +270,14 @@ parse_conf(const char *confname)
                     printf("Invalid configuration entry at line %d: %s is "
                            "unknown\n",
                            lines_cnt, tokens[0].c_str());
-                    continue;
+                    exit(EXIT_FAILURE);
                 }
             } catch (std::bad_alloc &e) {
                 printf("Out of memory while processing configuration file\n");
+                exit(EXIT_FAILURE);
             }
         }
     }
-
-    return 0;
 }
 
 static int
@@ -430,7 +431,7 @@ inet_server_socket(const InetName &inet_name)
     return fd;
 }
 
-static int
+static void
 setup_for_listening(void)
 {
     /* Open Internet listening sockets. */
@@ -441,7 +442,7 @@ setup_for_listening(void)
         if (fd < 0) {
             printf("Failed to open listening socket for '%s'\n",
                    static_cast<string>(mit->first).c_str());
-            continue;
+            exit(EXIT_FAILURE);
         }
 
         gw->i2r_fd_map[fd] = mit->second;
@@ -455,7 +456,7 @@ setup_for_listening(void)
 
         if (fd < 0) {
             perror("rina_open()");
-            continue;
+            exit(EXIT_FAILURE);
         }
 
         set_nonblocking(fd);
@@ -465,12 +466,11 @@ setup_for_listening(void)
         if (ret) {
             printf("Registration of application '%s' failed\n",
                    static_cast<string>(mit->first).c_str());
+            exit(EXIT_FAILURE);
         } else {
             gw->r2i_fd_map[fd] = mit->second;
         }
     }
-
-    return 0;
 }
 
 /* Turn this program into a daemon process. */
@@ -572,11 +572,7 @@ main(int argc, char **argv)
     /* Build the Gateway object here, as building it starts the workers. */
     gw = new Gateway();
 
-    ret = parse_conf(confname);
-    if (ret) {
-        return ret;
-    }
-
+    parse_conf(confname);
     print_conf();
     setup_for_listening();
 
