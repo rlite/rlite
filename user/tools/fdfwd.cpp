@@ -165,7 +165,9 @@ FwdWorker::terminate(unsigned int i, int ret, int errcode)
         if (ret == 0 || errcode == EPIPE) {
             how = "normally";
         } else {
-            how = "with errors";
+            how = "with errors (";
+            how += std::strerror(errcode);
+            how += ")";
         }
 
         cout << "w" << idx << ": Session " << fds[i].fd << " <--> " << fds[j].fd
