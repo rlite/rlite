@@ -26,6 +26,11 @@ elseif (WITH_SWIG)
         swig_add_library(cdap LANGUAGE python SOURCES cdap.i)
     endif()
 
+    # Hack for gcc8, where swigh code does not compile with the
+    # stringop-truncation warning enabled.
+    set_target_properties(${SWIG_MODULE_cdap_REAL_NAME} PROPERTIES COMPILE_FLAGS "-Wno-stringop-truncation")
+    set_target_properties(${SWIG_MODULE_rina_REAL_NAME} PROPERTIES COMPILE_FLAGS "-Wno-stringop-truncation")
+
     # Tell the build system to link the _rina.so python module against
     # the librina-api.so library
     swig_link_libraries(rina ${PYTHON_LIBRARIES} rina-api)
