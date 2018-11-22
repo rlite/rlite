@@ -53,8 +53,10 @@ function create_namespace()
 
     ip netns add ${name} || return 1
     cumulative_trap "ip netns delete ${name}" "EXIT"
-    cumulative_trap "ip netns exec ${name} rlite-ctl terminate" "EXIT"
-    cumulative_trap "ip netns exec ${name} rlite-ctl reset" "EXIT"
+    ip netns exec ${name} ip link set lo up || return 1
+    ip netns exec ${name} rlite-uipcps -d || return 1
+    cumulative_trap "ip netns exec ${name} rlite-ctl terminate || true" "EXIT"
+    cumulative_trap "ip netns exec ${name} rlite-ctl reset || true" "EXIT"
     # veths are autodeleted once the namespace is deleted
 }
 
@@ -73,7 +75,7 @@ function start_daemon()
 }
 
 ################################################################################
-# Start a daemon process in namespace.
+# Start a daemon process in a network namespace.
 # Arguments:
 #   $1 -> namespace name
 #   $2 -> daemon name
