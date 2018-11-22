@@ -149,6 +149,10 @@ List of required packages:
 * python, swig [optional, for python bindings]
 * wpasupplicant, hostapd [optional, for shim-wifi]
 
+Example command:
+
+    $ sudo apt-get install gcc g++ libprotobuf-dev protobuf-compiler cmake linux-headers-$(uname -r) python swig wpasupplicant hostapd
+
 ### Archlinux
 
 List of required packages:
@@ -160,10 +164,14 @@ List of required packages:
 * python, swig [optional, for python bindings]
 * wpa_supplicant, hostapd [optional, for shim-wifi]
 
-On Archlinux *rlite* is available from the AUR repository. It can be installed
-using yaourt:
+Example command:
 
-    $ yaourt --noconfirm -S rlite-git
+    $ sudo pacman -S gcc cmake protobuf linux-headers python swig wpa_supplicant hostapd
+
+On Archlinux *rlite* is available from the AUR repository. It can be installed
+using `yaourt` or `pacaur`:
+
+    $ pacaur --noconfirm -S rlite-git
 
 ### CentOS 7
 
