@@ -71,7 +71,7 @@ for t in tests/integration/*.sh ; do
     rlite-uipcps -d || abort_prepare
     ${t}
     retcode="$?"
-    rm -f /tmp/ceft-dft-*
+    rm -f /tmp/ceft-dft-* /tmp/ceft-aa-*
     rlite-ctl reset || abort_cleanup
     rlite-ctl terminate || abort_cleanup
     rlite-ctl reset || abort_cleanup
