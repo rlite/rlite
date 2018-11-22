@@ -43,6 +43,20 @@ function create_veth_pair()
 }
 
 ################################################################################
+# Create a bridge.
+# Arguments:
+#   $1 -> bridge name
+################################################################################
+function create_bridge()
+{
+    local brname="$1"
+
+    ip link add name ${brname} type bridge || return 1
+    cumulative_trap "ip link del ${brname} type bridge || true" "EXIT"
+    ip link set ${brname} up || return 1
+}
+
+################################################################################
 # Create a network namespace.
 # Arguments:
 #   $1 -> name of the namespace
