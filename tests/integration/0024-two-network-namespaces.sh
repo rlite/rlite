@@ -46,5 +46,3 @@ ip netns exec green rlite-ctl dif-rib-show | grep "rpinstcli1,red.n,"
 # Check if uipcp-stats-show works
 ip netns exec red rlite-ctl uipcp-stats-show
 ip netns exec green rlite-ctl uipcp-stats-show
-
-set -x
