@@ -11,10 +11,10 @@ cumulative_trap "rlite-ctl reset" "EXIT"
 # the same, but we'll cheat only for the purpose of testing.
 rlite-ctl ipcp-create s0 shim-eth d0
 rlite-ctl ipcp-create s1 shim-eth d1
-rlite-ctl ipcp-config s0 netdev rina.veth0
-rlite-ctl ipcp-config s1 netdev rina.veth1
-rlite-ctl ipcp-config s1 netdev rina.veth0 && exit 1
-rlite-ctl ipcp-config-get s0 netdev | grep "\<rina.veth0\>"
+rlite-ctl ipcp-config s0 netdev rina.veth.0
+rlite-ctl ipcp-config s1 netdev rina.veth.1
+rlite-ctl ipcp-config s1 netdev rina.veth.0 && exit 1
+rlite-ctl ipcp-config-get s0 netdev | grep "\<rina.veth.0\>"
 rlite-ctl ipcp-config-get s0 wrongy && exit 1
 rlite-ctl ipcp-config s0 flow-del-wait-ms 100
 rlite-ctl ipcp-config s1 flow-del-wait-ms 100

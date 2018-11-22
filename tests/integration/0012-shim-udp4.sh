@@ -4,8 +4,8 @@ source tests/libtest.sh
 
 # Create a veth pair
 create_veth_pair rinau.veth
-ip addr add 10.11.12.13/24 dev rinau.veth0
-ip addr add 10.11.12.14/24 dev rinau.veth1
+ip addr add 10.11.12.13/24 dev rinau.veth.0
+ip addr add 10.11.12.14/24 dev rinau.veth.1
 cp /etc/hosts /etc/hosts.save
 cumulative_trap "cp /etc/hosts.save /etc/hosts" "EXIT"
 echo "10.11.12.13 rpinstance5" > /etc/hosts

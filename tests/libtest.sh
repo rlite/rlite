@@ -27,15 +27,35 @@ function cumulative_trap()
 # Create a pair of veth devices.
 # Arguments:
 #   $1 -> base name for the veth
+#   $2 -> name extension for the first peer (optional, default="0")
+#   $3 -> name extension for the sedcond peer (optional, default="1")
 ################################################################################
 function create_veth_pair()
 {
     local ifname="$1"
+    local sx="${2:-0}"
+    local dx="${3:-1}"
 
-    ip link add ${ifname}0 type veth peer name ${ifname}1 || return 1
-    cumulative_trap "ip link del ${ifname}0" "EXIT"
-    ip link set ${ifname}0 up || return 1
-    ip link set ${ifname}1 up || return 1
+    ip link add ${ifname}.${sx} type veth peer name ${ifname}.${dx} || return 1
+    cumulative_trap "ip link del ${ifname}.${sx} || true" "EXIT"
+    ip link set ${ifname}.${sx} up || return 1
+    ip link set ${ifname}.${dx} up || return 1
+}
+
+################################################################################
+# Create a network namespace.
+# Arguments:
+#   $1 -> name of the namespace
+################################################################################
+function create_namespace()
+{
+    local name="$1"
+
+    ip netns add ${name} || return 1
+    cumulative_trap "ip netns delete ${name}" "EXIT"
+    cumulative_trap "ip netns exec ${name} rlite-ctl terminate" "EXIT"
+    cumulative_trap "ip netns exec ${name} rlite-ctl reset" "EXIT"
+    # veths are autodeleted once the namespace is deleted
 }
 
 ################################################################################
@@ -50,4 +70,21 @@ function start_daemon()
     shift
     $progname $@ || return 1
     cumulative_trap "pkill $progname || true" "EXIT"
+}
+
+################################################################################
+# Start a daemon process in namespace.
+# Arguments:
+#   $1 -> namespace name
+#   $2 -> daemon name
+#   $3 -> daemon arguments
+################################################################################
+function start_daemon_namespace()
+{
+    local namespace="$1"
+    local progname="$2"
+    shift
+    shift
+    ip netns exec "${namespace}" ${progname} $@ || return 1
+    cumulative_trap "ip netns exec ${namespace} pkill ${progname} || true" "EXIT"
 }
