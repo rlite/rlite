@@ -75,6 +75,21 @@ function create_namespace()
 }
 
 ################################################################################
+# Add a veth device to a namespace.
+# Arguments:
+#   $1 -> namespace name
+#   $2 -> veth device name
+################################################################################
+function add_veth_to_namespace()
+{
+    local namespace="$1"
+    local veth="$2"
+
+    ip link set ${veth} netns ${namespace} || return 1
+    ip netns exec ${namespace} ip link set ${veth} up || return 1
+}
+
+################################################################################
 # Start a daemon process.
 # Arguments:
 #   $1 -> daemon name

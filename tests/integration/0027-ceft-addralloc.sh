@@ -19,13 +19,12 @@ create_bridge vethbr1
 for cont in s1 s2 s3 c1 c2; do
     create_veth_pair veth ${cont}h ${cont}c
     create_namespace ${cont}
-    ip link set veth.${cont}c netns ${cont}
+    add_veth_to_namespace ${cont} veth.${cont}c
     ip link set veth.${cont}h master vethbr1
 done
 
 # Normal over shim setup in all the namespaces
 for cont in s1 s2 s3 c1 c2; do
-    ip netns exec ${cont} ip link set veth.${cont}c up
     ip netns exec ${cont} rlite-ctl ipcp-create ${cont}.eth shim-eth ethdif
     ip netns exec ${cont} rlite-ctl ipcp-config ${cont}.eth netdev veth.${cont}c
     ip netns exec ${cont} rlite-ctl ipcp-config ${cont}.eth flow-del-wait-ms 100

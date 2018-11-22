@@ -33,10 +33,8 @@ for li in ab ac ad bd cd; do
     create_veth_pair veth ${li}l ${li}r
     left=${li:0:1}
     right=${li:1:1}
-    ip link set veth.${li}l netns $left
-    ip link set veth.${li}r netns $right
-    ip netns exec $left ip link set veth.${li}l up
-    ip netns exec $right ip link set veth.${li}r up
+    add_veth_to_namespace ${left} veth.${li}l
+    add_veth_to_namespace ${right} veth.${li}r
     # Normal over shim setup in all the namespaces
     ip netns exec $left rlite-ctl ipcp-create ${li}l.eth shim-eth ${li}dif
     ip netns exec $right rlite-ctl ipcp-create ${li}r.eth shim-eth ${li}dif
