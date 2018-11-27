@@ -21,10 +21,10 @@ script:
   - make test
   - sudo make install
   - sudo make depmod
-  - sudo tests/run-integration-tests.sh
+  - sudo make intest
   - ./configure --debug
   - make
   - make test
   - sudo make install
   - sudo make depmod
-  - sudo tests/run-integration-tests.sh
+  - sudo make intest
