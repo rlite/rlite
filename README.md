@@ -1,50 +1,49 @@
 # Documentation
 
 ## Table of contents
-````
-1. Introduction
-    11. Features at a glance
-    12. Basic performance evaluation
-2. Software requirements
-3. Build instructions
-4. Overview of the software components
-    41. Kernel modules
-    42. Userspace IPCPs daemon
-    43. Libraries
-    44. Administration tools
-    45. Other tools
-    46. Python bindings
-5. Tutorials
-    51. Using the demonstrator
-    52. Hands-on tutorial #1: normal-over-shim-eth
-    53. Hands-on tutorial #2: normal-over-shim-udp4
-    54. Hands-on tutorial #3: normal-over-shim-wifi
-    55. Using configen
-6. Configuration of IPC Processes
-    61. shim-eth IPC Process
-    62. shim-udp4 IPC Process
-    63. shim-tcp4 IPC Process
-    64. shim-loopback IPC Process
-    65. Normal IPC Process
-        651. IPCP local parameters
-        652. IPCP flavours to support different data transfer constants
-        653. Available policies and parameters
-        654. PDU scheduler configuration
-7. Tools
-    71. rina-gw
-    72. iporinad
-    73. rinaperf
-    74. rina-echo-async
-8. Development workflow
-    81. Demonstrator-driven verification
-9. RINA API
-    91. Server-side operations
-    92. Client-side operations
-    93. API specification
-    94. Mapping sockets API to RINA API
-        941. Server-side mapping
-        942. Client-side mapping
-````
+
+1. [Introduction](#1-introduction)  
+    11. [Features at a glance](#11-features-at-a-glance)  
+    12. [Basic performance evaluation](#12-basic-performance-evaluation)  
+2. [Software requirements](#2-software-requirements)  
+3. [Build instructions](#3-build-instructions)  
+4. [Overview of the software components](#4-overview-of-the-software-components)  
+    41. [Kernel modules](#41-kernel-modules)  
+    42. [Userspace IPCPs daemon](#42-userspace-ipcps-daemon)  
+    43. [Libraries](#43-libraries)  
+    44. [Administration tools](#44-administration-tools)  
+    45. [Other tools](#45-other-tools)  
+    46. [Python bindings](#46-python-bindings)  
+5. [Tutorials](#5-tutorials)  
+    51. [Using the demonstrator](#51-using-the-demonstrator)  
+    52. [Hands-on tutorial #1: normal-over-shim-eth](#52-hands-on-tutorial-1-normal-over-shim-eth)  
+    53. [Hands-on tutorial #2: normal-over-shim-udp4](#53-hands-on-tutorial-2-normal-over-shim-udp4)  
+    54. [Hands-on tutorial #3: normal-over-shim-wifi](#54-hands-on-tutorial-3-normal-over-shim-wifi)  
+    55. [Using configen](#55-using-configen)  
+6. [Configuration of IPC Processes](#6-configuration-of-ipc-processes)  
+    61. [shim-eth IPC Process](#61-shim-eth-ipc-process)  
+    62. [shim-udp4 IPC Process](#62-shim-udp4-ipc-process)  
+    63. [shim-tcp4 IPC Process](#63-shim-tcp4-ipc-process)  
+    64. [shim-loopback IPC Process](#64-shim-loopback-ipc-process)  
+    65. [Normal IPC Process](#65-normal-ipc-process)  
+        651. [IPCP local parameters](#651-ipcp-local-parameters)  
+        652. [IPCP flavours to support different data transfer constants](#652-ipcp-flavours-to-support-different-data-transfer-constants)  
+        653. [Available policies and parameters](#653-available-policies-and-parameters)  
+        654. [PDU scheduler configuration](#654-pdu-scheduler-configuration)  
+7. [Tools](#7-tools)  
+    71. [rina-gw](#71-rina-gw)  
+    72. [iporinad](#72-iporinad)  
+    73. [rinaperf](#73-rinaperf)  
+    74. [rina-echo-async](#74-rina-echo-async)  
+8. [Developer workflow](#8-developer-workflow)  
+    81. [Demonstrator-driven verification](#81-demonstrator-driven-verification)  
+9. [RINA API documentation](#9-rina-api-documentation)  
+    91. [Server-side operations](#91-server-side-operations)  
+    92. [Client-side operations](#92-client-side-operations)  
+    93. [API specification](#93-api-specification)  
+    94. [Mapping sockets API to RINA API](#94-mapping-sockets-api-to-rina-api)  
+        941. [Client-side mapping](#941-client-side-mapping)  
+        942. [Server-side mapping](#942-server-side-mapping)  
 
 ## 1. Introduction
 
