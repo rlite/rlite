@@ -317,7 +317,7 @@ rl_io_write_iter(struct kiocb *iocb,
         }
 
         for (;;) {
-            current->state = TASK_INTERRUPTIBLE;
+            set_current_state(TASK_INTERRUPTIBLE);
 
             ret = ipcp->ops.sdu_write(ipcp, flow, rb, flags);
 
@@ -346,7 +346,7 @@ rl_io_write_iter(struct kiocb *iocb,
             break;
         }
 
-        current->state = TASK_RUNNING;
+        __set_current_state(TASK_RUNNING);
         if ((flags & RL_RMT_F_MAYSLEEP)) {
             remove_wait_queue(flow->txrx.tx_wqh, &wait);
         }
@@ -398,7 +398,7 @@ rl_io_read_iter(struct kiocb *iocb,
     while (ulen) {
         struct rl_buf *rb;
 
-        current->state = TASK_INTERRUPTIBLE;
+        set_current_state(TASK_INTERRUPTIBLE);
 
         spin_lock_bh(&txrx->rx_lock);
         if (rb_list_empty(&txrx->rx_q)) {
@@ -453,7 +453,7 @@ rl_io_read_iter(struct kiocb *iocb,
         break;
     }
 
-    current->state = TASK_RUNNING;
+    __set_current_state(TASK_RUNNING);
 
     if (blocking) {
         remove_wait_queue(&txrx->rx_wqh, &wait);

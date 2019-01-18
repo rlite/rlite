@@ -352,7 +352,7 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
             }
 
             /* Wait for more space, but not more than 2 seconds. */
-            schedule_timeout_interruptible(to);
+            schedule_timeout(to);
             continue;
         }
         list_add_tail(&entry->node, &rc->upqueue);
@@ -2363,7 +2363,7 @@ rl_ipcp_uipcp_wait(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     for (;;) {
         struct rl_ctrl *uipcp;
 
-        current->state = TASK_INTERRUPTIBLE;
+        set_current_state(TASK_INTERRUPTIBLE);
 
         mutex_lock(&entry->lock);
         uipcp = entry->uipcp;
@@ -2381,7 +2381,7 @@ rl_ipcp_uipcp_wait(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         schedule();
     }
 
-    current->state = TASK_RUNNING;
+    __set_current_state(TASK_RUNNING);
     remove_wait_queue(&entry->uipcp_wqh, &wait);
 
     ipcp_put(entry);
@@ -3287,7 +3287,7 @@ rl_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
         add_wait_queue(&rc->upqueue_wqh, &wait);
     }
     while (len) {
-        current->state = TASK_INTERRUPTIBLE;
+        set_current_state(TASK_INTERRUPTIBLE);
 
         spin_lock(&rc->upqueue_lock);
         if (list_empty(&rc->upqueue)) {
@@ -3329,7 +3329,7 @@ rl_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
         break;
     }
 
-    current->state = TASK_RUNNING;
+    __set_current_state(TASK_RUNNING);
     if (blocking) {
         remove_wait_queue(&rc->upqueue_wqh, &wait);
     }

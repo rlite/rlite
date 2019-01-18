@@ -903,7 +903,7 @@ rmt_tx_to_lower(struct ipcp_entry *ipcp, struct flow_entry *lower_flow,
     }
 
     for (;;) {
-        current->state = TASK_INTERRUPTIBLE;
+        set_current_state(TASK_INTERRUPTIBLE);
 
         /* Try to push the rb down to the lower IPCP. */
         ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb,
@@ -945,7 +945,7 @@ rmt_tx_to_lower(struct ipcp_entry *ipcp, struct flow_entry *lower_flow,
         break;
     }
 
-    current->state = TASK_RUNNING;
+    __set_current_state(TASK_RUNNING);
     if (maysleep) {
         remove_wait_queue(lower_flow->txrx.tx_wqh, &wait);
     }
@@ -1032,7 +1032,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
             for (;;) {
                 int err;
 
-                current->state = TASK_INTERRUPTIBLE;
+                set_current_state(TASK_INTERRUPTIBLE);
                 spin_lock_bh(&sched->qlock);
                 err = sched->ops.enq(sched, rb);
                 spin_unlock_bh(&sched->qlock);
@@ -1052,7 +1052,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                 schedule();
             }
             rb             = NULL;
-            current->state = TASK_RUNNING;
+            __set_current_state(TASK_RUNNING);
             remove_wait_queue(&sched->wqh, &wait);
         }
 
