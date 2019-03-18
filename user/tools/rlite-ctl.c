@@ -593,6 +593,7 @@ ipcp_sched_config(int argc, char **argv, struct cmd_descriptor *cd)
          * */
         struct rl_kmsg_ipcp_sched_wrr req;
         uint32_t *arr;
+        int ret;
         int n;
 
         if (argc < 4) {
@@ -634,7 +635,7 @@ ipcp_sched_config(int argc, char **argv, struct cmd_descriptor *cd)
             char *saveptr;
             int i;
 
-            for (i = 0;; i++, ctmp = NULL) {
+            for (i = 0; i < n; i++, ctmp = NULL) {
                 char *token = strtok_r(ctmp, ", ", &saveptr);
                 if (token == NULL) {
                     break;
@@ -645,6 +646,7 @@ ipcp_sched_config(int argc, char **argv, struct cmd_descriptor *cd)
                     return -1;
                 }
             }
+            free(copy);
         }
 
         /* Build the request. */
@@ -656,7 +658,10 @@ ipcp_sched_config(int argc, char **argv, struct cmd_descriptor *cd)
         req.weights.num_elements  = n;
         req.weights.slots.dwords  = arr;
 
-        return kernel_control_write(RLITE_MB(&req));
+        ret = kernel_control_write(RLITE_MB(&req));
+        free(arr);
+
+        return ret;
 
     } else if (!strcmp(sched_name, "pfifo")) {
         /* Weighted Round Robin configuration. Example:
