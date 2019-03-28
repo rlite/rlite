@@ -735,14 +735,14 @@ CentralizedFaultTolerantDFT::Replica::replica_process_rib_msg(
 void
 UipcpRib::dft_lib_init()
 {
-    available_policies[DFT::Prefix].insert(
-        PolicyBuilder("fully-replicated",
-                      [](UipcpRib *rib) {
-                          return utils::make_unique<FullyReplicatedDFT>(rib);
-                      },
-                      {DFT::TableName}));
-    available_policies[DFT::Prefix].insert(PolicyBuilder(
-        "centralized-fault-tolerant",
+    UipcpRib::policy_register(
+        DFT::Prefix, "fully-replicated",
+        [](UipcpRib *rib) {
+            return utils::make_unique<FullyReplicatedDFT>(rib);
+        },
+        {DFT::TableName});
+    UipcpRib::policy_register(
+        DFT::Prefix, "centralized-fault-tolerant",
         [](UipcpRib *rib) {
             return utils::make_unique<CentralizedFaultTolerantDFT>(rib);
         },
@@ -753,7 +753,7 @@ UipcpRib::dft_lib_init()
          {"raft-heartbeat-timeout",
           PolicyParam(Msecs(int(CeftReplica::kHeartBeatTimeoutMsecs)))},
          {"raft-rtx-timeout",
-          PolicyParam(Msecs(int(CeftReplica::kRtxTimeoutMsecs)))}}));
+          PolicyParam(Msecs(int(CeftReplica::kRtxTimeoutMsecs)))}});
 }
 
 } // namespace rlite

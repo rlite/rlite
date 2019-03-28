@@ -767,21 +767,21 @@ UipcpRib::routing_lib_init()
          PolicyParam(Secs(int(LinkStateRouting::kAgeIncrIntvalSecs)))},
         {"age-max", PolicyParam(Secs(int(LinkStateRouting::kAgeMaxSecs)))}};
 
-    available_policies[Routing::Prefix].insert(PolicyBuilder(
-        "link-state",
-        [](UipcpRib *rib) {
-            return utils::make_unique<LinkStateRouting>(rib, false);
-        },
-        {Routing::TableName}, link_state_params));
-    available_policies[Routing::Prefix].insert(PolicyBuilder(
-        "link-state-lfa",
-        [](UipcpRib *rib) {
-            return utils::make_unique<LinkStateRouting>(rib, true);
-        },
-        {Routing::TableName}, link_state_params));
-    available_policies[Routing::Prefix].insert(PolicyBuilder(
-        "static",
-        [](UipcpRib *rib) { return utils::make_unique<StaticRouting>(rib); }));
+    UipcpRib::policy_register(Routing::Prefix, "link-state",
+                              [](UipcpRib *rib) {
+                                  return utils::make_unique<LinkStateRouting>(
+                                      rib, false);
+                              },
+                              {Routing::TableName}, link_state_params);
+    UipcpRib::policy_register(Routing::Prefix, "link-state-lfa",
+                              [](UipcpRib *rib) {
+                                  return utils::make_unique<LinkStateRouting>(
+                                      rib, true);
+                              },
+                              {Routing::TableName}, link_state_params);
+    UipcpRib::policy_register(Routing::Prefix, "static", [](UipcpRib *rib) {
+        return utils::make_unique<StaticRouting>(rib);
+    });
 }
 
 } // namespace rlite

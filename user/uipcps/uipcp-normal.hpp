@@ -424,17 +424,20 @@ struct PolicyBuilder {
         [](UipcpRib *) { return nullptr; };
     std::vector<std::string> paths;
     std::vector<std::pair<std::string, PolicyParam>> params;
+    std::vector<std::pair<std::string, std::string>> dependencies;
 
     PolicyBuilder(const std::string &policy_name) : name(policy_name) {}
     PolicyBuilder(const std::string &policy_name,
                   std::function<std::unique_ptr<Component>(UipcpRib *)> fun,
                   std::vector<std::string> ps                         = {},
-                  std::vector<std::pair<std::string, PolicyParam>> pp = {})
+                  std::vector<std::pair<std::string, PolicyParam>> pp = {},
+                  std::vector<std::pair<std::string, std::string>> pd = {})
         : PolicyBuilder(policy_name)
     {
-        builder = fun;
-        paths   = std::move(ps);
-        params  = std::move(pp);
+        builder      = fun;
+        paths        = std::move(ps);
+        params       = std::move(pp);
+        dependencies = std::move(pd);
     }
     bool operator<(const PolicyBuilder &o) const { return name < o.name; }
     bool operator==(const PolicyBuilder &o) const { return name == o.name; }
@@ -728,6 +731,10 @@ struct UipcpRib {
     void neighs_refresh();
     void neighs_refresh_tmr_restart();
 
+    std::vector<std::pair<const std::string, const PolicyBuilder &>>
+    policy_deps_get(const std::string &component,
+                    const std::string &policy_name);
+
     int policy_mod(const std::string &component,
                    const std::string &policy_name);
     int policy_param_mod(const std::string &component,
@@ -755,6 +762,25 @@ struct UipcpRib {
      * and assign the policy). */
     static std::unordered_map<std::string, std::set<PolicyBuilder>>
         available_policies;
+
+    static int policy_register(
+        const std::string &component, const std::string &policy_name,
+        std::function<std::unique_ptr<Component>(UipcpRib *)> builder =
+            [](UipcpRib *) { return nullptr; },
+        std::vector<std::string> paths                                = {},
+        std::vector<std::pair<std::string, PolicyParam>> params       = {},
+        std::vector<std::pair<std::string, std::string>> dependencies = {});
+
+    static int policy_register_group(
+        const std::vector<std::tuple<
+            const std::string & /* component */,
+            const std::string & /* policy_name */,
+            std::function<std::unique_ptr<Component>(UipcpRib *)> /* builder */,
+            std::vector<std::string> /* paths */,
+            std::vector<std::pair<std::string, PolicyParam> /* params */>,
+            std::vector<std::pair<std::string,
+                                  std::string>> /* dependencies */>> &policies);
+
     static void addra_lib_init();
     static void dft_lib_init();
     static void fa_lib_init();

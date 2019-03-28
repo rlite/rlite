@@ -733,21 +733,21 @@ CentralizedFaultTolerantAddrAllocator::Replica::replica_process_rib_msg(
 void
 UipcpRib::addra_lib_init()
 {
-    available_policies[AddrAllocator::Prefix].insert(
-        PolicyBuilder("static", [](UipcpRib *rib) {
+    UipcpRib::policy_register(
+        AddrAllocator::Prefix, "static", [](UipcpRib *rib) {
             return utils::make_unique<StaticAddrAllocator>(rib);
-        }));
-    available_policies[AddrAllocator::Prefix].insert(PolicyBuilder(
-        "distributed",
+        });
+    UipcpRib::policy_register(
+        AddrAllocator::Prefix, "distributed",
         [](UipcpRib *rib) {
             return utils::make_unique<DistributedAddrAllocator>(rib);
         },
         {AddrAllocator::TableName},
         {{"nack-wait",
           PolicyParam(Secs(
-              int(DistributedAddrAllocator::kAddrAllocDistrNackWaitSecs)))}}));
-    available_policies[AddrAllocator::Prefix].insert(PolicyBuilder(
-        "centralized-fault-tolerant",
+              int(DistributedAddrAllocator::kAddrAllocDistrNackWaitSecs)))}});
+    UipcpRib::policy_register(
+        AddrAllocator::Prefix, "centralized-fault-tolerant",
         [](UipcpRib *rib) {
             return utils::make_unique<CentralizedFaultTolerantAddrAllocator>(
                 rib);
@@ -759,7 +759,7 @@ UipcpRib::addra_lib_init()
          {"raft-heartbeat-timeout",
           PolicyParam(Msecs(int(CeftReplica::kHeartBeatTimeoutMsecs)))},
          {"raft-rtx-timeout",
-          PolicyParam(Msecs(int(CeftReplica::kRtxTimeoutMsecs)))}}));
+          PolicyParam(Msecs(int(CeftReplica::kRtxTimeoutMsecs)))}});
 }
 
 } // namespace rlite
