@@ -724,8 +724,8 @@ LocalFlowAllocator::dump_memtrack(std::stringstream &ss) const
 void
 UipcpRib::fa_lib_init()
 {
-    available_policies[FlowAllocator::Prefix].insert(PolicyBuilder(
-        "local",
+    UipcpRib::policy_register(
+        FlowAllocator::Prefix, "local",
         [](UipcpRib *rib) {
             return utils::make_unique<LocalFlowAllocator>(rib);
         },
@@ -739,7 +739,7 @@ UipcpRib::fa_lib_init()
           PolicyParam(Msecs(int(LocalFlowAllocator::kATimerMsecsDflt)))},
          {"initial-rtx-timeout",
           PolicyParam(Msecs(int(LocalFlowAllocator::kRtxTimerMsecsDflt)))},
-         {"max-rtxq-len", PolicyParam(LocalFlowAllocator::kRtxQueueMaxLen)}}));
+         {"max-rtxq-len", PolicyParam(LocalFlowAllocator::kRtxQueueMaxLen)}});
 }
 
 } // namespace rlite

@@ -1989,10 +1989,8 @@ UipcpRib::check_for_address_conflicts()
 void
 UipcpRib::ra_lib_init()
 {
-    available_policies[UipcpRib::EnrollmentPrefix].insert(
-        PolicyBuilder("default"));
-    available_policies[UipcpRib::ResourceAllocPrefix].insert(
-        PolicyBuilder("default"));
+    UipcpRib::policy_register(UipcpRib::EnrollmentPrefix, "default");
+    UipcpRib::policy_register(UipcpRib::ResourceAllocPrefix, "default");
 }
 
 } // namespace rlite

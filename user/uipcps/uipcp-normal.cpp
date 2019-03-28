@@ -1242,78 +1242,153 @@ UipcpRib::neigh_flow_prune(const std::shared_ptr<NeighFlow> &nf)
     }
 }
 
-int
-UipcpRib::policy_mod(const std::string &component,
-                     const std::string &policy_name)
+std::vector<std::pair<const std::string, const PolicyBuilder &>>
+UipcpRib::policy_deps_get(const std::string &component,
+                          const std::string &policy_name)
 {
-    int ret = 0;
+    std::vector<std::pair<const std::string, const PolicyBuilder &>> result;
 
     if (!available_policies.count(component)) {
         UPE(uipcp, "Unknown component %s\n", component.c_str());
-        return -1;
+        return {};
     }
 
     auto policy_builder = available_policies[component].find(policy_name);
     if (policy_builder == available_policies[component].end()) {
         UPE(uipcp, "Unknown %s policy %s\n", component.c_str(),
             policy_name.c_str());
+        return {};
+    }
+
+    result.emplace_back(component, *policy_builder);
+
+    unsigned int previous_size = 0;
+    unsigned int size          = result.size();
+
+    do {
+        for (unsigned int i = previous_size; i < size; i++) {
+            auto policy = result[i];
+            for (auto dependency : policy.second.dependencies) {
+                const std::string &component   = dependency.first;
+                const std::string &policy_name = dependency.second;
+                bool satisfied                 = false;
+
+                if (!available_policies.count(component)) {
+                    UPE(uipcp, "Unknown component %s\n", component.c_str());
+                    return {};
+                }
+
+                for (unsigned int j = 0; j < size; j++) {
+                    auto pending_policy = result[j];
+                    if (pending_policy.first == component) {
+                        if (pending_policy.second.name == policy_name) {
+                            satisfied = true;
+                            break;
+                        } else {
+                            UPE(uipcp, "Multiple policies for component %s\n",
+                                component.c_str());
+                            return {};
+                        }
+                    }
+                }
+
+                if (!satisfied) {
+                    auto policy_builder =
+                        available_policies[component].find(policy_name);
+                    if (policy_builder == available_policies[component].end()) {
+                        UPE(uipcp, "Unknown %s policy %s\n", component.c_str(),
+                            policy_name.c_str());
+                        return {};
+                    }
+
+                    std::string component_copy(component);
+                    result.emplace_back(component_copy, *policy_builder);
+                }
+            }
+        }
+        previous_size = size;
+        size          = result.size();
+    } while (size != previous_size);
+    return result;
+};
+
+int
+UipcpRib::policy_mod(const std::string &component,
+                     const std::string &policy_name)
+{
+    int ret = 0;
+    std::vector<std::pair<const std::string, const PolicyBuilder &>>
+        policy_deplist;
+
+    policy_deplist = policy_deps_get(component, policy_name);
+
+    if (policy_deplist.size() == 0) {
         return -1;
     }
 
-    if (policies[component] == policy_name) {
-        return 0; /* nothing to do */
-    }
+    for (auto policy = policy_deplist.rbegin(); policy != policy_deplist.rend();
+         policy++) {
+        const std::string &component        = policy->first;
+        const PolicyBuilder &policy_builder = policy->second;
+        const std::string &policy_name      = policy->second.name;
 
-    /* Unregister previous RIB paths and parameters, if any. */
-    if (!policies[component].empty()) {
-        auto prev_builder =
-            available_policies[component].find(policies[component]);
-
-        assert(prev_builder != available_policies[component].end());
-        for (const std::string &path : prev_builder->paths) {
-            rib_handler_unregister(path);
+        if (policies[component] == policy_name) {
+            continue; /* nothing to do */
         }
 
-        for (const auto &pp : prev_builder->params) {
-            params_map[component].erase(pp.first);
-            UPV(uipcp, "policy param '%s.%s' unregistered\n", component.c_str(),
+        /* Unregister previous RIB paths and parameters, if any. */
+        if (!policies[component].empty()) {
+            auto prev_builder =
+                available_policies[component].find(policies[component]);
+
+            assert(prev_builder != available_policies[component].end());
+            for (const std::string &path : prev_builder->paths) {
+                rib_handler_unregister(path);
+            }
+
+            for (const auto &pp : prev_builder->params) {
+                params_map[component].erase(pp.first);
+                UPV(uipcp, "policy param '%s.%s' unregistered\n",
+                    component.c_str(), pp.first.c_str());
+            }
+        }
+
+        /* Register the new policy parameters. This is done before building the
+         * component, as parameters may be needed during creation. */
+        for (const auto &pp : policy_builder.params) {
+            params_map[component][pp.first] = pp.second;
+            UPV(uipcp, "policy param '%s.%s' registered\n", component.c_str(),
                 pp.first.c_str());
         }
-    }
 
-    /* Register the new policy parameters. This is done before building the
-     * component, as parameters may be needed during creation. */
-    for (const auto &pp : policy_builder->params) {
-        params_map[component][pp.first] = pp.second;
-        UPV(uipcp, "policy param '%s.%s' registered\n", component.c_str(),
-            pp.first.c_str());
-    }
-
-    /* Set the new policy. */
-    policies[component] = policy_name;
-    UPD(uipcp, "set %s policy to %s\n", component.c_str(), policy_name.c_str());
-    /* Invoke the policy builder and install the policy. */
-    components[component] = std::move(policy_builder->builder(this));
-    if (component == DFT::Prefix) {
-        dft = dynamic_cast<DFT *>(components[component].get());
-    } else if (component == Routing::Prefix) {
-        routing = dynamic_cast<Routing *>(components[component].get());
-    } else if (component == FlowAllocator::Prefix) {
-        fa = dynamic_cast<FlowAllocator *>(components[component].get());
-    } else if (component == AddrAllocator::Prefix) {
-        addra = dynamic_cast<AddrAllocator *>(components[component].get());
-    }
-    /* Register the new RIB paths. */
-    for (const std::string &path : policy_builder->paths) {
-        assert(components[component] != nullptr);
-        rib_handler_register(path, [this, component](const CDAPMessage *rm,
-                                                     const MsgSrcInfo &src) {
-            return components[component]->rib_handler(rm, src);
-        });
-    }
-    /* Reconfigure the new component, if necessary. */
-    if (components[component]) {
-        components[component]->reconfigure();
+        /* Set the new policy. */
+        policies[component] = policy_name;
+        UPD(uipcp, "set %s policy to %s\n", component.c_str(),
+            policy_name.c_str());
+        /* Invoke the policy builder and install the policy. */
+        components[component] = std::move(policy_builder.builder(this));
+        if (component == DFT::Prefix) {
+            dft = dynamic_cast<DFT *>(components[component].get());
+        } else if (component == Routing::Prefix) {
+            routing = dynamic_cast<Routing *>(components[component].get());
+        } else if (component == FlowAllocator::Prefix) {
+            fa = dynamic_cast<FlowAllocator *>(components[component].get());
+        } else if (component == AddrAllocator::Prefix) {
+            addra = dynamic_cast<AddrAllocator *>(components[component].get());
+        }
+        /* Register the new RIB paths. */
+        for (const std::string &path : policy_builder.paths) {
+            assert(components[component] != nullptr);
+            rib_handler_register(
+                path, [this, component](const CDAPMessage *rm,
+                                        const MsgSrcInfo &src) {
+                    return components[component]->rib_handler(rm, src);
+                });
+        }
+        /* Reconfigure the new component, if necessary. */
+        if (components[component]) {
+            components[component]->reconfigure();
+        }
     }
 
     return ret;
@@ -1974,6 +2049,68 @@ PolicyParam::get_duration_value() const
 {
     assert(type == PolicyParamType::Duration);
     return durval;
+};
+
+int
+UipcpRib::policy_register(
+    const std::string &component, const std::string &policy_name,
+    std::function<std::unique_ptr<Component>(UipcpRib *)> builder,
+    std::vector<std::string> paths,
+    std::vector<std::pair<std::string, PolicyParam>> params,
+    std::vector<std::pair<std::string, std::string>> dependencies)
+{
+    std::unordered_map<std::string, bool> components;
+    for (auto dependency : dependencies) {
+        if (components.find(dependency.first) == components.end()) {
+            components[dependency.first] = true;
+        } else {
+            return -1;
+        }
+    }
+    available_policies[component].insert(
+        PolicyBuilder(policy_name, builder, paths, params, dependencies));
+
+    return 0;
+}
+
+int
+UipcpRib::policy_register_group(
+    const std::vector<std::tuple<
+        const std::string & /* component */,
+        const std::string & /* policy_name */,
+        std::function<std::unique_ptr<Component>(UipcpRib *)> /* builder */,
+        std::vector<std::string> /* paths */,
+        std::vector<std::pair<std::string, PolicyParam>> /* params */,
+        std::vector<std::pair<std::string, std::string>> /* dependencies */>>
+        &policies)
+{
+    for (auto policy : policies) {
+        const std::string &component   = std::get<0>(policy);
+        const std::string &policy_name = std::get<1>(policy);
+        std::function<std::unique_ptr<Component>(UipcpRib *)> &builder =
+            std::get<2>(policy);
+        std::vector<std::string> &paths = std::get<3>(policy);
+        std::vector<std::pair<std::string, PolicyParam>> &params =
+            std::get<4>(policy);
+        std::vector<std::pair<std::string, std::string>> &dependencies =
+            std::get<5>(policy);
+
+        for (auto dependency : policies) {
+            const std::string &depend_component   = std::get<0>(dependency);
+            const std::string &depend_policy_name = std::get<1>(dependency);
+            if (depend_component == component &&
+                depend_policy_name == policy_name) {
+                continue;
+            }
+            dependencies.emplace_back(depend_component, depend_policy_name);
+        }
+
+        if (UipcpRib::policy_register(component, policy_name, builder, paths,
+                                      params, dependencies)) {
+            return -1;
+        }
+    }
+    return 0;
 };
 
 ostream &
