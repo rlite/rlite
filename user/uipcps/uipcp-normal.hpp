@@ -640,6 +640,7 @@ struct UipcpRib {
     static std::string RibDaemonPrefix;
 
     RL_NODEFAULT_NONCOPIABLE(UipcpRib);
+    UipcpRib(struct uipcp *_u, void *test);
     UipcpRib(struct uipcp *_u);
     ~UipcpRib();
 

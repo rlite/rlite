@@ -428,6 +428,11 @@ normal_periodic_tasks(struct uipcp *const uipcp)
     return 0;
 }
 
+UipcpRib::UipcpRib(struct uipcp *_u, void *test) : uipcp(_u), myname(_u->name)
+{
+    mgmtfd = -1;
+}
+
 UipcpRib::UipcpRib(struct uipcp *_u)
     : uipcp(_u),
       myname(_u->name),
@@ -587,7 +592,9 @@ UipcpRib::~UipcpRib()
         return cnt;
     };
 
-    periodic_task_unregister(tasks);
+    if (tasks) {
+        periodic_task_unregister(tasks);
+    }
     tasks = nullptr;
 
     lock();
@@ -620,8 +627,10 @@ UipcpRib::~UipcpRib()
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(p.get()));
         }
     }
-    uipcp_loop_fdh_del(uipcp, mgmtfd);
-    close(mgmtfd);
+    if (!(mgmtfd < 0)) {
+        uipcp_loop_fdh_del(uipcp, mgmtfd);
+        close(mgmtfd);
+    }
     UPD(uipcp, "RIB %s destroyed\n", myname.c_str());
     unlock();
 }
