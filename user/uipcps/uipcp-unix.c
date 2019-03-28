@@ -980,7 +980,7 @@ usage(void)
 
 void normal_lib_init(void);
 
-int
+__attribute__((weak)) int
 main(int argc, char **argv)
 {
     int port              = RLITE_UIPCP_PORT_DEFAULT;
