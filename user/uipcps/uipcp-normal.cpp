@@ -627,7 +627,7 @@ UipcpRib::~UipcpRib()
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(p.get()));
         }
     }
-    if (!(mgmtfd < 0)) {
+    if (mgmtfd >= 0) {
         uipcp_loop_fdh_del(uipcp, mgmtfd);
         close(mgmtfd);
     }
@@ -1251,6 +1251,8 @@ UipcpRib::neigh_flow_prune(const std::shared_ptr<NeighFlow> &nf)
     }
 }
 
+/* Compute all the dependencies that are needed for a given input
+ * policy. */
 std::vector<std::pair<const std::string, const PolicyBuilder &>>
 UipcpRib::policy_deps_get(const std::string &component,
                           const std::string &policy_name)
@@ -1271,53 +1273,64 @@ UipcpRib::policy_deps_get(const std::string &component,
 
     result.emplace_back(component, *policy_builder);
 
+    /* Breadth first search on the policy dependency graph. */
     unsigned int previous_size = 0;
     unsigned int size          = result.size();
 
     do {
+        /* For all the policies in the frontier set ... */
         for (unsigned int i = previous_size; i < size; i++) {
             auto policy = result[i];
-            for (auto dependency : policy.second.dependencies) {
-                const std::string &component   = dependency.first;
-                const std::string &policy_name = dependency.second;
-                bool satisfied                 = false;
 
-                if (!available_policies.count(component)) {
-                    UPE(uipcp, "Unknown component %s\n", component.c_str());
+            /* Scan the dependencies of the current policy. */
+            for (auto dependency : policy.second.dependencies) {
+                const std::string &fr_component   = dependency.first;
+                const std::string &fr_policy_name = dependency.second;
+                bool satisfied                    = false;
+
+                if (!available_policies.count(fr_component)) {
+                    UPE(uipcp, "Unknown component %s\n", fr_component.c_str());
                     return {};
                 }
 
+                /* Check if this dependency is already satisfied. */
                 for (unsigned int j = 0; j < size; j++) {
                     auto pending_policy = result[j];
-                    if (pending_policy.first == component) {
-                        if (pending_policy.second.name == policy_name) {
+                    if (pending_policy.first == fr_component) {
+                        if (pending_policy.second.name == fr_policy_name) {
                             satisfied = true;
                             break;
                         } else {
                             UPE(uipcp, "Multiple policies for component %s\n",
-                                component.c_str());
+                                fr_component.c_str());
                             return {};
                         }
                     }
                 }
 
                 if (!satisfied) {
+                    /* This dependency is not satisfied yet, and thus we need
+                     * to add it to the frontier set (for the next BFS
+                     * iteration). */
                     auto policy_builder =
-                        available_policies[component].find(policy_name);
-                    if (policy_builder == available_policies[component].end()) {
-                        UPE(uipcp, "Unknown %s policy %s\n", component.c_str(),
-                            policy_name.c_str());
+                        available_policies[fr_component].find(fr_policy_name);
+
+                    if (policy_builder ==
+                        available_policies[fr_component].end()) {
+                        UPE(uipcp, "Unknown %s policy %s\n",
+                            fr_component.c_str(), fr_policy_name.c_str());
                         return {};
                     }
 
-                    std::string component_copy(component);
-                    result.emplace_back(component_copy, *policy_builder);
+                    result.emplace_back(std::string(fr_component),
+                                        *policy_builder);
                 }
             }
         }
         previous_size = size;
         size          = result.size();
     } while (size != previous_size);
+
     return result;
 };
 
@@ -1325,16 +1338,19 @@ int
 UipcpRib::policy_mod(const std::string &component,
                      const std::string &policy_name)
 {
-    int ret = 0;
     std::vector<std::pair<const std::string, const PolicyBuilder &>>
         policy_deplist;
+    int ret = 0;
 
+    /* Build a list of policies to load: the input policy plus
+     * all of its dependencies. */
     policy_deplist = policy_deps_get(component, policy_name);
-
     if (policy_deplist.size() == 0) {
         return -1;
     }
 
+    /* Load all the policies in reverse order, so that dependencies are
+     * loaded before the policy that depends on them. */
     for (auto policy = policy_deplist.rbegin(); policy != policy_deplist.rend();
          policy++) {
         const std::string &component        = policy->first;
