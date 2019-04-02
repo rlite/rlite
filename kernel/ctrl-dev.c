@@ -2957,16 +2957,16 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         fput(rc->file);
     }
 
-    PD("Flow allocation response [%u] issued to IPC process %u, "
-       "port-id %u\n",
-       resp->response, flow_entry->txrx.ipcp->id, flow_entry->local_port);
-
     if (!resp->response && resp->upper_ipcp_id != 0xffff) {
         ret = upper_ipcp_flow_bind(rc, resp->upper_ipcp_id, flow_entry);
         if (ret) {
             goto out;
         }
     }
+
+    PD("Flow allocation response [%u] issued to IPC process %u, "
+       "port-id %u\n",
+       resp->response, flow_entry->txrx.ipcp->id, flow_entry->local_port);
 
     /* Notify the involved IPC process about the response. */
     ipcp = flow_entry->txrx.ipcp;

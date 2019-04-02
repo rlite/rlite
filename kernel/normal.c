@@ -1051,7 +1051,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                 /* Sleep waiting for more space in the queue. */
                 schedule();
             }
-            rb             = NULL;
+            rb = NULL;
             __set_current_state(TASK_RUNNING);
             remove_wait_queue(&sched->wqh, &wait);
         }

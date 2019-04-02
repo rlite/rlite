@@ -44,7 +44,14 @@ struct udp4_endpoint {
     struct sockaddr_in remote_addr;
     rl_port_t port_id;
     uint32_t kevent_id;
+    struct list_head tmpq;
     struct list_head node;
+};
+
+struct udp4_tmpq_packet {
+    struct list_head node;
+    size_t len;
+    uint8_t buf[0];
 };
 
 /* Structure associated to a registered application, it contains an
@@ -215,6 +222,7 @@ udp4_endpoint_open(struct shim_udp4 *shim)
         rl_free(ep, RL_MT_SHIMDATA);
         return NULL;
     }
+    list_init(&ep->tmpq);
 
     list_add_tail(&ep->node, &shim->endpoints);
 
@@ -224,8 +232,14 @@ udp4_endpoint_open(struct shim_udp4 *shim)
 static void
 udp4_endpoint_close(struct udp4_endpoint *ep)
 {
+    struct udp4_tmpq_packet *tpkt, *tmp;
+
     close(ep->fd);
     list_del(&ep->node);
+    list_for_each_entry_safe (tpkt, tmp, &ep->tmpq, node) {
+        list_del(&tpkt->node);
+        rl_free(tpkt, RL_MT_SHIMDATA);
+    }
     rl_free(ep, RL_MT_SHIMDATA);
 }
 
@@ -234,7 +248,7 @@ udp4_endpoint_close(struct udp4_endpoint *ep)
  * the UDP socket, see rl_shim_udp4_flow_init().*/
 static int
 udp4_fwd_sdu(struct shim_udp4 *shim, struct udp4_endpoint *ep,
-             const uint8_t *buf, int len)
+             const uint8_t *buf, size_t len)
 {
     struct sockaddr_in dstaddr;
     socklen_t addrlen = sizeof(dstaddr);
@@ -248,7 +262,7 @@ udp4_fwd_sdu(struct shim_udp4 *shim, struct udp4_endpoint *ep,
     dstaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
     {
         char strbuf[INET_ADDRSTRLEN];
-        UPV(shim->uipcp, "Forwarding %d bytes to to %s:%u\n", len,
+        UPV(shim->uipcp, "Forwarding %zu bytes to to %s:%u\n", len,
             inet_ntop(AF_INET, &dstaddr.sin_addr, strbuf, sizeof(strbuf)),
             ntohs(dstaddr.sin_port));
     }
@@ -276,8 +290,9 @@ udp4_recv_dgram(struct uipcp *uipcp, int bfd, void *opaque)
     struct shim_udp4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
     socklen_t addrlen = sizeof(remote_addr);
-    uint8_t payload[65536];
+    struct udp4_tmpq_packet *tpkt;
     struct udp4_endpoint *ep;
+    uint8_t payload[65536];
     int payload_len;
 
     /* Read the packet from the bound UDP socket. */
@@ -344,8 +359,17 @@ udp4_recv_dgram(struct uipcp *uipcp, int bfd, void *opaque)
         }
     }
 
-    /* Inject the UDP packet into the kernel. */
-    udp4_fwd_sdu(shim, ep, payload, payload_len);
+    /* Insert this packet in a temporary queue. Once the flow allocation
+     * is complete, the packets in the queue will be injected in the
+     * kernel. */
+    tpkt = rl_alloc(sizeof(*tpkt) + payload_len, RL_MT_SHIMDATA);
+    if (tpkt == NULL) {
+        UPE(uipcp, "Failed to allocate memory for tmpq packet\n");
+        return;
+    }
+    tpkt->len = payload_len;
+    memcpy(tpkt->buf, payload, payload_len);
+    list_add_tail(&tpkt->node, &ep->tmpq);
 }
 
 static struct udp4_bindpoint *
@@ -502,6 +526,7 @@ shim_udp4_fa_resp(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     struct shim_udp4 *shim       = SHIM(uipcp);
     struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)msg;
+    struct udp4_tmpq_packet *tpkt, *tmp;
     struct udp4_endpoint *ep;
 
     UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
@@ -520,6 +545,13 @@ shim_udp4_fa_resp(struct uipcp *uipcp, const struct rl_msg_base *msg)
         UPD(uipcp, "Removing endpoint [port_id=%u,kevent_id=%u,sfd=%d]\n",
             ep->port_id, ep->kevent_id, ep->fd);
         udp4_endpoint_close(ep);
+    }
+
+    /* Inject the UDP packets from the temporary queue into the kernel. */
+    list_for_each_entry_safe (tpkt, tmp, &ep->tmpq, node) {
+        udp4_fwd_sdu(shim, ep, tpkt->buf, tpkt->len);
+        list_del(&tpkt->node);
+        rl_free(tpkt, RL_MT_SHIMDATA);
     }
 
     return 0;
