@@ -1946,7 +1946,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
     }
 
     if (unlikely(rb->len < sizeof(struct rina_pci))) {
-        RPD(1, "Dropping PDU shorter [%u] than PCI\n", (unsigned int)rb->len);
+        RPD(1, "Dropping PDU shorter [%zu] than PCI\n", rb->len);
         rl_buf_free(rb);
         stats->rmt.other_drop++;
         return NULL; /* -EINVAL */
@@ -2377,20 +2377,19 @@ rl_normal_init(void)
     /* Refuse to register this IPCP if the PCI layout is not supported by
      * our implementation. */
     if (RL_PCI_LEN != sizeof(struct rina_pci)) {
-        PE("PCI layout not supported: %u != %u\n", (unsigned)RL_PCI_LEN,
-           (unsigned)(sizeof(struct rina_pci)));
+        PE("PCI layout not supported: %zu != %zu\n", RL_PCI_LEN,
+           sizeof(struct rina_pci));
         return -1;
     }
 
     if (RL_PCI_CTRL_LEN != sizeof(struct rina_pci_ctrl)) {
-        PE("Control PCI layout not supported: %u != %u\n",
-           (unsigned)RL_PCI_CTRL_LEN, (unsigned)(sizeof(struct rina_pci_ctrl)));
+        PE("Control PCI layout not supported: %zu != %zu\n",
+           RL_PCI_CTRL_LEN, sizeof(struct rina_pci_ctrl));
         return -1;
     }
 
-    PI("Flavour %s: DT PCI %u bytes, CTRL PCI %u bytes\n", SHIM_DIF_TYPE,
-       (unsigned)sizeof(struct rina_pci),
-       (unsigned)sizeof(struct rina_pci_ctrl));
+    PI("Flavour %s: DT PCI %zu bytes, CTRL PCI %zu bytes\n", SHIM_DIF_TYPE,
+       sizeof(struct rina_pci), sizeof(struct rina_pci_ctrl));
 
     /* Build the (static) list of PDU schedulers. */
     list_add_tail(&rl_sched_pfifo_ops.node, &rl_pdu_schedulers);

@@ -154,7 +154,7 @@ tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
             break;
         } else if (unlikely(ret <= 0)) {
             if (ret) {
-                PE("recvmsg(%d): %d\n", (int)iov.iov_len, ret);
+                PE("recvmsg(%zu): %d\n", iov.iov_len, ret);
                 stats->rx_err++;
             } else {
                 PI("Exit rx loop\n");
@@ -357,12 +357,12 @@ tcp4_xmit(struct shim_tcp4_flow *flow_priv, struct rl_buf *rb)
             PE("kernel_sendmsg(): failed [%d]\n", ret);
 
         } else {
-            PI("kernel_sendmsg(): partial write %d/%d\n", ret, (int)rb->len);
+            PI("kernel_sendmsg(): partial write %d/%zu\n", ret, rb->len);
         }
 
         stats->tx_err++;
     } else {
-        NPD("kernel_sendmsg(%d + 2)\n", (int)rb->len);
+        NPD("kernel_sendmsg(%zu + 2)\n", rb->len);
         stats->tx_pkt++;
         stats->tx_byte += rb->len;
     }
@@ -397,7 +397,7 @@ tcp4_tx_worker(struct work_struct *w)
 
         if (sk_stream_wspace(qe->flow_priv->sock->sk) < totlen + 2) {
             /* Cannot backpressure here, we have to drop */
-            RPD(1, "Dropping SDU [len=%d]\n", (int)qe->rb->len);
+            RPD(1, "Dropping SDU [len=%zu]\n", qe->rb->len);
             rl_buf_free(qe->rb);
         } else {
             tcp4_xmit(qe->flow_priv, qe->rb);

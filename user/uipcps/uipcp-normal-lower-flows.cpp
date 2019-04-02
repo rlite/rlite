@@ -767,18 +767,18 @@ UipcpRib::routing_lib_init()
          PolicyParam(Secs(int(LinkStateRouting::kAgeIncrIntvalSecs)))},
         {"age-max", PolicyParam(Secs(int(LinkStateRouting::kAgeMaxSecs)))}};
 
-    UipcpRib::policy_register(Routing::Prefix, "link-state",
-                              [](UipcpRib *rib) {
-                                  return utils::make_unique<LinkStateRouting>(
-                                      rib, false);
-                              },
-                              {Routing::TableName}, link_state_params);
-    UipcpRib::policy_register(Routing::Prefix, "link-state-lfa",
-                              [](UipcpRib *rib) {
-                                  return utils::make_unique<LinkStateRouting>(
-                                      rib, true);
-                              },
-                              {Routing::TableName}, link_state_params);
+    UipcpRib::policy_register(
+        Routing::Prefix, "link-state",
+        [](UipcpRib *rib) {
+            return utils::make_unique<LinkStateRouting>(rib, false);
+        },
+        {Routing::TableName}, link_state_params);
+    UipcpRib::policy_register(
+        Routing::Prefix, "link-state-lfa",
+        [](UipcpRib *rib) {
+            return utils::make_unique<LinkStateRouting>(rib, true);
+        },
+        {Routing::TableName}, link_state_params);
     UipcpRib::policy_register(Routing::Prefix, "static", [](UipcpRib *rib) {
         return utils::make_unique<StaticRouting>(rib);
     });

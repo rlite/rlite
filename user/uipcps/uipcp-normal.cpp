@@ -145,7 +145,7 @@ UipcpRib::mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
 {
     struct pollfd pfd;
     char *mgmtbuf;
-    int n;
+    ssize_t n;
 
     if (buflen > MGMTBUF_SIZE_MAX) {
         errno = EFBIG;
@@ -173,7 +173,7 @@ UipcpRib::mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
     } else {
         n = write(mgmtfd, mgmtbuf, buflen);
         if (n >= 0) {
-            assert(n == (int)buflen);
+            assert(n == (ssize_t)buflen);
             n = 0;
         }
     }
@@ -358,7 +358,7 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
     struct rl_mgmt_hdr *mhdr;
     std::shared_ptr<NeighFlow> nf;
     std::shared_ptr<Neighbor> neigh;
-    int n;
+    ssize_t n;
 
     assert(fd == rib->mgmtfd);
 
@@ -366,12 +366,12 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
      * a management SDU. */
     n = read(fd, mgmtbuf, sizeof(mgmtbuf));
     if (n < 0) {
-        UPE(uipcp, "Error: read() failed [%d]\n", n);
+        UPE(uipcp, "Error: read() failed [%zd]\n", n);
         return;
 
-    } else if (n < (int)sizeof(*mhdr)) {
-        UPE(uipcp, "Error: read() does not contain mgmt header, %d<%d\n", n,
-            (int)sizeof(*mhdr));
+    } else if (n < (ssize_t)sizeof(*mhdr)) {
+        UPE(uipcp, "Error: read() does not contain mgmt header, %zd < %zd\n",
+            n, (ssize_t)sizeof(*mhdr));
         return;
     }
 

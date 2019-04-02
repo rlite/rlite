@@ -200,7 +200,7 @@ test_cdap_server(int port)
         }
 
         if (k != n) {
-            PE("Partial write %d/%d\n", (int)k, (int)n);
+            PE("Partial write %d/%d\n", k, n);
         }
     }
 

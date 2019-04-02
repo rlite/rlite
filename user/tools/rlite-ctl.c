@@ -77,7 +77,7 @@ malloc_or_quit(size_t size)
 {
     void *mem = malloc(size);
     if (!mem) {
-        PE("malloc(%u) failed\n", (unsigned)size);
+        PE("malloc(%zu) failed\n", size);
         exit(EXIT_FAILURE);
     }
     return mem;
@@ -94,7 +94,7 @@ strdup_or_quit(const char *s)
 
     copy = strdup(s);
     if (!copy) {
-        PE("strdup(%u)\n", (unsigned)strlen(s));
+        PE("strdup(%zu)\n", strlen(s));
         exit(EXIT_FAILURE);
     }
 

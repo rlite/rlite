@@ -185,7 +185,7 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
             break;
         } else if (unlikely(ret <= 0)) {
             if (ret) {
-                PE("recvmsg(%d): %d\n", (int)iov.iov_len, ret);
+                PE("recvmsg(%zu): %d\n", iov.iov_len, ret);
                 stats->rx_err++;
             } else {
                 PI("Exit rx loop\n");
@@ -366,10 +366,10 @@ rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
             return -EAGAIN;
         }
 
-        PE("kernel_sendmsg(%d): failed [%d]\n", (int)rb->len, ret);
+        PE("kernel_sendmsg(%zu): failed [%d]\n", rb->len, ret);
         stats->tx_err++;
     } else {
-        NPD("kernel_sendmsg(%d)\n", (int)rb->len);
+        NPD("kernel_sendmsg(%zu)\n", rb->len);
         stats->tx_pkt++;
         stats->tx_byte += rb->len;
     }

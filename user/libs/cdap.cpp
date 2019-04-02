@@ -944,7 +944,7 @@ CDAPMessage::dump() const
         break;
 
     case ObjValType::BYTES:
-        PD_S("obj_value: %d bytes at %p, ", (int)obj_value.u.buf.len,
+        PD_S("obj_value: %zu bytes at %p, ", obj_value.u.buf.len,
              obj_value.u.buf.ptr);
         break;
 
@@ -1139,7 +1139,7 @@ CDAPConn::msg_send(CDAPMessage *m, int invoke_id)
         if (n < 0) {
             perror("write(cdap_msg)");
         } else {
-            PE("Partial write %d/%d\n", (int)n, (int)serlen);
+            PE("Partial write %zd/%zu\n", n, serlen);
         }
         return -1;
     }

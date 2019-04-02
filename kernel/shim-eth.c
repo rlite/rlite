@@ -936,7 +936,7 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
 
         PD("netdev set to %p [max_sdu_size=%u, txhdroom=%u, rxhdroom=%u, "
            "troom=%u]\n",
-           netdev, (unsigned)ipcp->max_sdu_size, ipcp->txhdroom, ipcp->rxhdroom,
+           netdev, ipcp->max_sdu_size, ipcp->txhdroom, ipcp->rxhdroom,
            ipcp->tailroom);
 
     } else if (strcmp(param_name, "mss") == 0) {
