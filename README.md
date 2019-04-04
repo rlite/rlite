@@ -347,7 +347,7 @@ If an enrollment command fails, conversely, it is likely that the remote
 enroller node is not up yet, or network is temporarily down; for this reason,
 on failure the program waits for a few seconds and tries again, as many times
 as it is necessary. When the current enrollment succeeds, it proceeds to
-the next one, until all the enrollments are completed.
+the next one, until all the enrollments have completed.
 By default **rlite-node-config** starts with a reset operation to remove all
 the existing IPCPs, and then reads the initscript stored at
 `/etc/rina/initscript`.
@@ -585,7 +585,7 @@ DIF and b.IPCP as a neighbor:
     $ sudo rlite-ctl ipcp-enroll c.IPCP n.DIF ethBC.DIF b.IPCP
 
 On any node, you can check the standard output of the userspace daemon,
-to check that the previous operations are completed with success.
+to check that the previous operations have completed with success.
 Also the kernel log (dmesg) contains valuable log information.
 
 It is also possible to check the list of IPCPs running in the local system:
@@ -598,7 +598,7 @@ provided by the shim DIFs, which are being used by the normal DIF):
     $ sudo rlite-ctl flows-show
 
 
-At this point, the setup is completed, and it is possible to run
+At this point, the setup is complete, and it is possible to run
 applications on top of the normal DIF. As an example, we may run
 the **rinaperf** application in server mode on node A, and the
 same application in client perf mode on node C, while B will forward
