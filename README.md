@@ -45,7 +45,9 @@
         941. [Client-side mapping](#941-client-side-mapping)  
         942. [Server-side mapping](#942-server-side-mapping)  
 
+
 ## 1. Introduction
+<img src="https://bitbucket.org/vmaffione/rina-images/downloads/rlite-logo.png" width="20%">
 
 The *rlite* project provides a lightweight Free and Open Source implementation
 of the Recursive InterNetwork Architecture (RINA) for GNU/Linux operating
