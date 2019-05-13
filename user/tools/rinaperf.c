@@ -551,12 +551,15 @@ perf_client(struct worker *w)
     int timeout    = 0;
     int ret;
 
-    /* We use non-blocking writes. See the explanation in
-     * perf_server(). */
-    ret = fcntl(w->dfd, F_SETFL, O_NONBLOCK);
-    if (ret) {
-        perror("fcntl(F_SETFL)");
-        return -1;
+    if (rp->flowspec.avg_bandwidth == 0) {
+        /* We use non-blocking writes, unless we need rate limiting, which
+	 * needs the kernel to sleep for some time. See the explanation in
+         * perf_server(). */
+        ret = fcntl(w->dfd, F_SETFL, O_NONBLOCK);
+        if (ret) {
+            perror("fcntl(F_SETFL)");
+            return -1;
+        }
     }
 
     pfd[0].fd     = w->dfd;
