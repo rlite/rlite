@@ -600,7 +600,7 @@ rcv_inact_tmr_cb(
     spin_unlock_bh(&dtp->lock);
 }
 
-static int rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr,
+static int rmt_tx(struct ipcp_entry *ipcp,
                   struct rl_buf *rb, unsigned flags);
 
 static struct rl_buf *sdu_rx_sv_update(struct ipcp_entry *ipcp,
@@ -632,7 +632,7 @@ a_tmr_cb(
     spin_unlock_bh(&dtp->lock);
 
     if (crb) {
-        rmt_tx(ipcp, flow->remote_addr, crb, RL_RMT_F_CONSUME);
+        rmt_tx(ipcp, crb, RL_RMT_F_CONSUME);
     }
 }
 
@@ -731,7 +731,7 @@ rtx_tmr_cb(
 
         RPD(1, "sending [%lu] from rtxq\n", (long unsigned)pci->seqnum);
         rb_list_del(crb);
-        rmt_tx(ipcp, pci->dst_addr, crb, RL_RMT_F_CONSUME);
+        rmt_tx(ipcp, crb, RL_RMT_F_CONSUME);
     }
 
     spin_lock_bh(&dtp->lock);
@@ -954,9 +954,9 @@ rmt_tx_to_lower(struct ipcp_entry *ipcp, struct flow_entry *lower_flow,
 }
 
 static int
-rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
-       unsigned flags)
+rmt_tx(struct ipcp_entry *ipcp, struct rl_buf *rb, unsigned flags)
 {
+    rl_addr_t remote_addr = RL_BUF_PCI(rb)->dst_addr;
     struct flow_entry *lower_flow;
     struct rl_normal *priv = ipcp->priv;
     struct rl_sched *sched;
@@ -978,7 +978,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
 
     if (!lower_flow) {
         /* This SDU gets loopbacked to this IPCP, since this is a
-         * self flow (flow->remote_addr == ipcp->addr). */
+         * self flow (remote_addr == ipcp->addr). */
         rb = ipcp->ops.sdu_rx(ipcp, rb, NULL /* unused */);
         BUG_ON(rb != NULL);
         return 0;
@@ -1374,7 +1374,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     spin_unlock_bh(&dtp->lock);
 
-    ret = rmt_tx(ipcp, flow->remote_addr, rb, flags);
+    ret = rmt_tx(ipcp, rb, flags);
     if (likely(ret != -EAGAIN)) {
         stats->tx_pkt++;
         stats->tx_byte += len;
@@ -1906,12 +1906,12 @@ out:
     /* Send PDUs popped out from cwq, if any. Note that the qrbs list
      * is not emptied and must not be used after the scan.*/
     rb_list_foreach_safe (qrb, tmp, &qrbs) {
-        struct rina_pci *pci = RL_BUF_PCI(qrb);
         unsigned len         = qrb->len;
 
-        NPD("sending [%lu] from cwq\n", (long unsigned)pci->seqnum);
+        NPD("sending [%lu] from cwq\n",
+	    (long unsigned)RL_BUF_PCI(qrb)->seqnum);
         rb_list_del(qrb);
-        rmt_tx(ipcp, pci->dst_addr, qrb, RL_RMT_F_CONSUME);
+        rmt_tx(ipcp, qrb, RL_RMT_F_CONSUME);
         stats->tx_pkt++;
         stats->tx_byte += len;
     }
@@ -2040,7 +2040,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
             pci->pdu_csum = (uint16_t)sum;
         }
 
-        rmt_tx(ipcp, pci->dst_addr, rb, RL_RMT_F_CONSUME);
+        rmt_tx(ipcp, rb, RL_RMT_F_CONSUME);
         stats->rmt.fwd_pkt++;
         stats->rmt.fwd_byte += len;
 
@@ -2254,7 +2254,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 
 snd_crb:
     if (crb) {
-        rmt_tx(ipcp, flow->remote_addr, crb, RL_RMT_F_CONSUME);
+        rmt_tx(ipcp, crb, RL_RMT_F_CONSUME);
     }
 
     flow_put(flow);
@@ -2281,7 +2281,7 @@ rl_normal_sdu_rx_consumed(struct flow_entry *flow, rlm_seq_t seqnum,
 
     if (crb) {
         unsigned flags = maysleep ? RL_RMT_F_MAYSLEEP : 0;
-        rmt_tx(ipcp, flow->remote_addr, crb, RL_RMT_F_CONSUME | flags);
+        rmt_tx(ipcp, crb, RL_RMT_F_CONSUME | flags);
     }
 
     return 0;
