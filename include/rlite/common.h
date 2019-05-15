@@ -43,7 +43,7 @@ extern "C" {
 #endif
 
 /* Expected control API version. */
-#define RL_API_VERSION 7
+#define RL_API_VERSION 8
 
 #define RLITE_CTRLDEV_NAME "/dev/rlite"
 #define RLITE_IODEV_NAME "/dev/rlite-io"

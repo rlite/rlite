@@ -304,11 +304,15 @@ int uipcp_do_register(struct uipcp *uipcp, const char *dif_name,
 int uipcp_appl_register_resp(struct uipcp *uipcp, uint8_t response,
                              uint32_t kevent_id, const char *appl_name);
 
-int uipcp_pduft_set(struct uipcp *uipcp, rlm_addr_t dst_addr,
-                    rl_port_t local_port);
+int uipcp_pduft_set(struct uipcp *uipcp, rl_port_t local_port,
+                    rlm_addr_t dst_addr, rlm_addr_t src_addr,
+                    rlm_cepid_t dst_cepid, rlm_cepid_t src_cepid,
+                    rlm_qosid_t qosid);
 
-int uipcp_pduft_del(struct uipcp *uipcp, rlm_addr_t dst_addr,
-                    rl_port_t local_port);
+int uipcp_pduft_del(struct uipcp *uipcp, rl_port_t local_port,
+                    rlm_addr_t dst_addr, rlm_addr_t src_addr,
+                    rlm_cepid_t dst_cepid, rlm_cepid_t src_cepid,
+                    rlm_qosid_t qosid);
 
 int uipcp_pduft_flush(struct uipcp *uipcp);
 

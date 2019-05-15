@@ -302,19 +302,24 @@ struct rl_kmsg_ipcp_config_get_resp {
     char *param_value;
 };
 
-/* application --> kernel to modifty an IPCP PDUFT
+/* application --> kernel to modify an IPCP PDUFT
  * (PDU Forwarding Table) entry. */
 struct rl_kmsg_ipcp_pduft_mod {
     struct rl_msg_hdr hdr;
 
     /* The IPCP whose PDUFT is to be modified. */
     rl_ipcp_id_t ipcp_id;
-    /* The local port through which the remote IPCP
-     * can be reached. */
+    /* The local port where matching packets must be forwarded. */
     rl_port_t local_port;
     uint32_t pad1;
-    /* The address of a remote IPCP. */
+    /* Values of PCI fields that must match in order for this
+     * entry to be selected. */
     rlm_addr_t dst_addr;
+    rlm_addr_t src_addr;
+    rlm_cepid_t dst_cepid;
+    rlm_cepid_t src_cepid;
+    rlm_qosid_t qos_id;
+    rlm_qosid_t pad2;
 };
 
 /* application --> kernel message to flush the PDUFT of an IPC Process. */

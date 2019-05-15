@@ -197,6 +197,7 @@ rl_pduft_set(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
 
         entry->flow    = flow;
         entry->address = dst_addr;
+        entry->dst_cepid = 0;
     }
     write_unlock_bh(&priv->pduft_lock);
 

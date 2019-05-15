@@ -647,6 +647,7 @@ struct flow_entry {
 
 struct pduft_entry {
     rlm_addr_t address; /* pdu_ft key */
+    rlm_cepid_t dst_cepid;
     struct flow_entry *flow;
     struct hlist_node node; /* for the pdu_ft hash table */
     struct list_head fnode; /* for the flow->pduft_entries list */
