@@ -165,7 +165,7 @@ rl_pduft_lookup(struct rl_normal *priv, rlm_addr_t dst_addr)
 EXPORT_SYMBOL(rl_pduft_lookup);
 
 int
-rl_pduft_set(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
+rl_pduft_set(struct ipcp_entry *ipcp, const struct rl_pci_match *match,
              struct flow_entry *flow)
 {
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
@@ -173,11 +173,11 @@ rl_pduft_set(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
 
     write_lock_bh(&priv->pduft_lock);
 
-    if (dst_addr == RL_ADDR_NULL) {
+    if (match->dst_addr == RL_ADDR_NULL) {
         /* Default entry. */
         priv->pduft_dflt = flow;
     } else {
-        entry = pduft_lookup_internal(priv, dst_addr);
+        entry = pduft_lookup_internal(priv, match->dst_addr);
 
         if (!entry) {
             entry = rl_alloc(sizeof(*entry), GFP_ATOMIC, RL_MT_PDUFT);
@@ -186,7 +186,7 @@ rl_pduft_set(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
                 return -ENOMEM;
             }
 
-            hash_add(priv->pdu_ft, &entry->node, dst_addr);
+            hash_add(priv->pdu_ft, &entry->node, match->dst_addr);
             list_add_tail(&entry->fnode, &flow->pduft_entries);
         } else {
             /* Move from the old list to the new one. */
@@ -195,8 +195,8 @@ rl_pduft_set(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
             flow_put(entry->flow);
         }
 
-        entry->flow    = flow;
-        entry->address = dst_addr;
+        entry->flow      = flow;
+        entry->address   = match->dst_addr;
         entry->dst_cepid = 0;
     }
     write_unlock_bh(&priv->pduft_lock);
@@ -257,14 +257,14 @@ rl_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
 EXPORT_SYMBOL(rl_pduft_del);
 
 int
-rl_pduft_del_addr(struct ipcp_entry *ipcp, rlm_addr_t dst_addr)
+rl_pduft_del_addr(struct ipcp_entry *ipcp, const struct rl_pci_match *match)
 {
     struct rl_normal *priv    = (struct rl_normal *)ipcp->priv;
     struct pduft_entry *entry = NULL;
     int ret                   = -1;
 
     write_lock_bh(&priv->pduft_lock);
-    if (dst_addr == RL_ADDR_NULL) {
+    if (match->dst_addr == RL_ADDR_NULL) {
         /* Default entry. */
         if (priv->pduft_dflt) {
             flow_put(priv->pduft_dflt);
@@ -272,7 +272,7 @@ rl_pduft_del_addr(struct ipcp_entry *ipcp, rlm_addr_t dst_addr)
             ret              = 0;
         }
     } else {
-        entry = pduft_lookup_internal(priv, dst_addr);
+        entry = pduft_lookup_internal(priv, match->dst_addr);
         if (entry) {
             pduft_entry_unlink(entry);
             ret = 0;

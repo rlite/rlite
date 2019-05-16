@@ -194,6 +194,16 @@ struct rl_mgmt_hdr {
     rlm_addr_t remote_addr;
 };
 
+/* Match values for PDUFT entries. */
+struct rl_pci_match {
+    rlm_addr_t dst_addr;
+    rlm_addr_t src_addr;
+    rlm_cepid_t dst_cepid;
+    rlm_cepid_t src_cepid;
+    rlm_qosid_t qos_id;
+    rlm_qosid_t pad2;
+};
+
 #define DTCP_PRESENT(_dc) ((_dc).flags != 0)
 
 struct dtcp_config {

@@ -451,10 +451,11 @@ struct ipcp_ops {
                   const char *param_value, int *notify);
     int (*config_get)(struct ipcp_entry *ipcp, const char *param_name,
                       char *buf, int buflen);
-    int (*pduft_set)(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
+    int (*pduft_set)(struct ipcp_entry *ipcp, const struct rl_pci_match *match,
                      struct flow_entry *flow);
     int (*pduft_del)(struct ipcp_entry *ipcp, struct pduft_entry *entry);
-    int (*pduft_del_addr)(struct ipcp_entry *ipcp, rlm_addr_t dst_addr);
+    int (*pduft_del_addr)(struct ipcp_entry *ipcp,
+                          const struct rl_pci_match *match);
     int (*pduft_flush)(struct ipcp_entry *ipcp);
     int (*mgmt_sdu_build)(struct ipcp_entry *ipcp,
                           const struct rl_mgmt_hdr *hdr, struct rl_buf *rb,
@@ -801,10 +802,11 @@ struct rl_normal {
 void dtp_init(struct dtp *dtp);
 void dtp_fini(struct dtp *dtp);
 void dtp_dump(struct dtp *dtp);
-int rl_pduft_del_addr(struct ipcp_entry *ipcp, rlm_addr_t dst_addr);
+int rl_pduft_del_addr(struct ipcp_entry *ipcp,
+                      const struct rl_pci_match *match);
 int rl_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry);
 int rl_pduft_flush(struct ipcp_entry *ipcp);
-int rl_pduft_set(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
+int rl_pduft_set(struct ipcp_entry *ipcp, const struct rl_pci_match *match,
                  struct flow_entry *flow);
 struct flow_entry *rl_pduft_lookup(struct rl_normal *priv, rlm_addr_t dst_addr);
 

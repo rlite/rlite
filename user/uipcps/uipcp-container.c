@@ -98,9 +98,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, uint8_t response,
 
 static int
 uipcp_pduft_mod(struct uipcp *uipcp, rl_msg_t msg_type, rl_port_t local_port,
-                rlm_addr_t dst_addr, rlm_addr_t src_addr,
-                rlm_cepid_t dst_cepid, rlm_cepid_t src_cepid,
-                rlm_qosid_t qosid)
+                const struct rl_pci_match *match)
 {
     struct rl_kmsg_ipcp_pduft_mod req;
     int ret;
@@ -110,7 +108,7 @@ uipcp_pduft_mod(struct uipcp *uipcp, rl_msg_t msg_type, rl_port_t local_port,
     req.hdr.msg_type = msg_type;
     req.hdr.event_id = 1;
     req.ipcp_id      = uipcp->id;
-    req.dst_addr     = dst_addr;
+    req.match        = *match;
     req.local_port   = local_port;
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
@@ -123,21 +121,17 @@ uipcp_pduft_mod(struct uipcp *uipcp, rl_msg_t msg_type, rl_port_t local_port,
 }
 
 int
-uipcp_pduft_set(struct uipcp *uipcp, rl_port_t local_port, rlm_addr_t dst_addr,
-                rlm_addr_t src_addr, rlm_cepid_t dst_cepid,
-                rlm_cepid_t src_cepid, rlm_qosid_t qosid)
+uipcp_pduft_set(struct uipcp *uipcp, rl_port_t local_port,
+                const struct rl_pci_match *match)
 {
-    return uipcp_pduft_mod(uipcp, RLITE_KER_IPCP_PDUFT_SET, local_port,
-                           dst_addr, src_addr, dst_cepid, src_cepid, qosid);
+    return uipcp_pduft_mod(uipcp, RLITE_KER_IPCP_PDUFT_SET, local_port, match);
 }
 
 int
-uipcp_pduft_del(struct uipcp *uipcp,  rl_port_t local_port, rlm_addr_t dst_addr,
-                rlm_addr_t src_addr, rlm_cepid_t dst_cepid,
-                rlm_cepid_t src_cepid, rlm_qosid_t qosid)
+uipcp_pduft_del(struct uipcp *uipcp, rl_port_t local_port,
+                const struct rl_pci_match *match)
 {
-    return uipcp_pduft_mod(uipcp, RLITE_KER_IPCP_PDUFT_DEL, local_port,
-                           dst_addr, src_addr, dst_cepid, src_cepid, qosid);
+    return uipcp_pduft_mod(uipcp, RLITE_KER_IPCP_PDUFT_DEL, local_port, match);
 }
 
 int

@@ -1240,7 +1240,8 @@ flow_del(struct flow_entry *entry)
         r = upper_ipcp->ops.pduft_del(upper_ipcp, pfte);
         if (r == 0) {
             PD("Removed IPC process %s PDUFT entry: %llu --> %u\n",
-               upper_ipcp->name, (unsigned long long)dst_addr, entry->local_port);
+               upper_ipcp->name, (unsigned long long)dst_addr,
+               entry->local_port);
         }
     }
     if (entry->local_appl)
@@ -2252,16 +2253,16 @@ rl_ipcp_pduft_mod(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
          * anymore (so references to flows in the pduft will stay there forever,
          * and so the IPCPs bound to them). */
         if (req->hdr.msg_type == RLITE_KER_IPCP_PDUFT_SET) {
-            ret = ipcp->ops.pduft_set(ipcp, req->dst_addr, flow);
+            ret = ipcp->ops.pduft_set(ipcp, &req->match, flow);
         } else { /* RLITE_KER_IPCP_PDUFT_DEL */
-            ret = ipcp->ops.pduft_del_addr(ipcp, req->dst_addr);
+            ret = ipcp->ops.pduft_del_addr(ipcp, &req->match);
         }
         mutex_unlock(&ipcp->lock);
     }
 
     if (ret == 0) {
         PV("Set IPC process %s PDUFT entry: %llu --> %u\n", ipcp->name,
-           (unsigned long long)req->dst_addr, req->local_port);
+           (unsigned long long)req->match.dst_addr, req->local_port);
     }
 
     flow_put(flow);
@@ -2893,7 +2894,8 @@ out:
 
     if (ret == 0) {
         PD("Flow allocation requested to IPC process %s, "
-           "port-id %u\n", ipcp_entry->name, local_port);
+           "port-id %u\n",
+           ipcp_entry->name, local_port);
     }
     ipcp_put(ipcp_entry);
 

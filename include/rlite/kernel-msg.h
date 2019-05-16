@@ -314,12 +314,7 @@ struct rl_kmsg_ipcp_pduft_mod {
     uint32_t pad1;
     /* Values of PCI fields that must match in order for this
      * entry to be selected. */
-    rlm_addr_t dst_addr;
-    rlm_addr_t src_addr;
-    rlm_cepid_t dst_cepid;
-    rlm_cepid_t src_cepid;
-    rlm_qosid_t qos_id;
-    rlm_qosid_t pad2;
+    struct rl_pci_match match;
 };
 
 /* application --> kernel message to flush the PDUFT of an IPC Process. */

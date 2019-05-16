@@ -553,7 +553,7 @@ perf_client(struct worker *w)
 
     if (rp->flowspec.avg_bandwidth == 0) {
         /* We use non-blocking writes, unless we need rate limiting, which
-	 * needs the kernel to sleep for some time. See the explanation in
+         * needs the kernel to sleep for some time. See the explanation in
          * perf_server(). */
         ret = fcntl(w->dfd, F_SETFL, O_NONBLOCK);
         if (ret) {

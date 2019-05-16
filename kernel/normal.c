@@ -600,8 +600,7 @@ rcv_inact_tmr_cb(
     spin_unlock_bh(&dtp->lock);
 }
 
-static int rmt_tx(struct ipcp_entry *ipcp,
-                  struct rl_buf *rb, unsigned flags);
+static int rmt_tx(struct ipcp_entry *ipcp, struct rl_buf *rb, unsigned flags);
 
 static struct rl_buf *sdu_rx_sv_update(struct ipcp_entry *ipcp,
                                        struct flow_entry *flow,
@@ -1906,10 +1905,9 @@ out:
     /* Send PDUs popped out from cwq, if any. Note that the qrbs list
      * is not emptied and must not be used after the scan.*/
     rb_list_foreach_safe (qrb, tmp, &qrbs) {
-        unsigned len         = qrb->len;
+        unsigned len = qrb->len;
 
-        NPD("sending [%lu] from cwq\n",
-	    (long unsigned)RL_BUF_PCI(qrb)->seqnum);
+        NPD("sending [%lu] from cwq\n", (long unsigned)RL_BUF_PCI(qrb)->seqnum);
         rb_list_del(qrb);
         rmt_tx(ipcp, qrb, RL_RMT_F_CONSUME);
         stats->tx_pkt++;
@@ -2383,8 +2381,8 @@ rl_normal_init(void)
     }
 
     if (RL_PCI_CTRL_LEN != sizeof(struct rina_pci_ctrl)) {
-        PE("Control PCI layout not supported: %zu != %zu\n",
-           RL_PCI_CTRL_LEN, sizeof(struct rina_pci_ctrl));
+        PE("Control PCI layout not supported: %zu != %zu\n", RL_PCI_CTRL_LEN,
+           sizeof(struct rina_pci_ctrl));
         return -1;
     }
 

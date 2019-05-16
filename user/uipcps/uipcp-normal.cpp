@@ -370,8 +370,8 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
         return;
 
     } else if (n < (ssize_t)sizeof(*mhdr)) {
-        UPE(uipcp, "Error: read() does not contain mgmt header, %zd < %zd\n",
-            n, (ssize_t)sizeof(*mhdr));
+        UPE(uipcp, "Error: read() does not contain mgmt header, %zd < %zd\n", n,
+            (ssize_t)sizeof(*mhdr));
         return;
     }
 

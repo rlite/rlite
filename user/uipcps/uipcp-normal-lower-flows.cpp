@@ -205,7 +205,7 @@ RoutingEngine::compute_fwd_table()
 
     /* Remove old PDUFT entries first. */
     for (const auto &kve : next_ports) {
-        rlm_addr_t dst_addr;
+        struct rl_pci_match match = {};
         rl_port_t port_id;
         NodeId dst_node;
         int ret;
@@ -218,28 +218,26 @@ RoutingEngine::compute_fwd_table()
         }
 
         /* Delete the old one. */
-        dst_addr = kve.first;
-        dst_node = kve.second.first;
-        port_id  = kve.second.second;
-        ret      = uipcp_pduft_del(uipcp, port_id, dst_addr, /*src_addr=*/0,
-                                   /*dst_cepid=*/0, /*src_cepid=*/0,
-                                   /*qosid=*/0);
+        match.dst_addr = kve.first;
+        dst_node       = kve.second.first;
+        port_id        = kve.second.second;
+        ret            = uipcp_pduft_del(uipcp, port_id, &match);
         if (ret) {
             UPE(uipcp,
                 "Failed to delete PDUFT entry for %s(%lu) "
                 "(port_id=%u) [%s]\n",
-                node_id_pretty(dst_node).c_str(), (long unsigned)dst_addr,
+                node_id_pretty(dst_node).c_str(), (long unsigned)match.dst_addr,
                 port_id, strerror(errno));
         } else {
             UPD(uipcp, "Delete PDUFT entry for %s(%lu) (port_id=%u)\n",
-                node_id_pretty(dst_node).c_str(), (long unsigned)dst_addr,
+                node_id_pretty(dst_node).c_str(), (long unsigned)match.dst_addr,
                 port_id);
         }
     }
 
     /* Generate new PDUFT entries. */
     for (auto &kve : next_ports_new) {
-        rlm_addr_t dst_addr;
+        struct rl_pci_match match = {};
         rl_port_t port_id;
         NodeId dst_node;
         int ret;
@@ -251,23 +249,21 @@ RoutingEngine::compute_fwd_table()
         }
 
         /* Add the new one. */
-        dst_addr = kve.first;
-        dst_node = kve.second.first;
-        port_id  = kve.second.second;
-        ret      = uipcp_pduft_set(uipcp, port_id, dst_addr, /*src_addr=*/0,
-                                   /*dst_cepid=*/0, /*src_cepid=*/0,
-                                   /*qosid=*/0);
+        match.dst_addr = kve.first;
+        dst_node       = kve.second.first;
+        port_id        = kve.second.second;
+        ret            = uipcp_pduft_set(uipcp, port_id, &match);
         if (ret) {
             UPE(uipcp,
                 "Failed to insert %s(%lu) --> %s (port_id=%u) PDUFT "
                 "entry [%s]\n",
-                node_id_pretty(dst_node).c_str(), (long unsigned)dst_addr,
+                node_id_pretty(dst_node).c_str(), (long unsigned)match.dst_addr,
                 next_hops[dst_node].front().c_str(), port_id, strerror(errno));
             /* Trigger re insertion next time. */
             kve.second = make_pair(NodeId(), 0);
         } else {
             UPD(uipcp, "Set PDUFT entry %s(%lu) --> %s (port_id=%u)\n",
-                node_id_pretty(dst_node).c_str(), (long unsigned)dst_addr,
+                node_id_pretty(dst_node).c_str(), (long unsigned)match.dst_addr,
                 next_hops[dst_node].front().c_str(), port_id);
         }
     }
