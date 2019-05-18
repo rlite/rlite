@@ -968,6 +968,9 @@ rmt_tx(struct ipcp_entry *ipcp, struct rl_buf *rb, unsigned flags)
     match.src_cepid = (rlm_cepid_t)pci->src_cep;
     match.qos_id    = (rlm_qosid_t)pci->qos_id;
 
+    /* For now we let rl_pduft_lookup() accept a rl_pci_match struct.
+     * In the future we may let this function accept RL_BUF_PCI(rb),
+     * so that we get rid of the format conversion. */
     lower_flow = rl_pduft_lookup(priv, &match);
     if (unlikely(!lower_flow && match.dst_addr != ipcp->addr)) {
         struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);

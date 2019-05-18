@@ -133,12 +133,31 @@ dtp_dump(struct dtp *dtp)
 }
 EXPORT_SYMBOL(dtp_dump);
 
+#define PDUFT_PERFLOW_KEY(daddr, dcep) ((daddr) | (dcep) << 16)
+
 static struct pduft_entry *
 pduft_lookup_internal(struct rl_normal *priv, const struct rl_pci_match *pci)
 {
     struct pduft_entry *entry;
     struct hlist_head *head;
 
+    /* If the per-flow table is not empty, lookup there first. */
+    if (priv->perflow_present) {
+        head = &priv->pdu_ft_perflow[hash_min(
+            PDUFT_PERFLOW_KEY(pci->dst_addr, pci->dst_cepid),
+            HASH_BITS(priv->pdu_ft_perflow))];
+        hlist_for_each_entry (entry, head, node) {
+            if (entry->match.dst_addr == pci->dst_addr &&
+                entry->match.src_addr == pci->src_addr &&
+                entry->match.dst_cepid == pci->dst_cepid &&
+                entry->match.src_cepid == pci->src_cepid &&
+                entry->match.qos_id == pci->qos_id) {
+                return entry;
+            }
+        }
+    }
+
+    /* Lookup the regular (destination-based) table. */
     head = &priv->pdu_ft[hash_min(pci->dst_addr, HASH_BITS(priv->pdu_ft))];
     hlist_for_each_entry (entry, head, node) {
         if (entry->match.dst_addr == pci->dst_addr) {
@@ -164,12 +183,32 @@ rl_pduft_lookup(struct rl_normal *priv, const struct rl_pci_match *pci)
 }
 EXPORT_SYMBOL(rl_pduft_lookup);
 
+static bool
+rl_pduft_match_is_dstonly(const struct rl_pci_match *match)
+{
+    return match->src_addr == RL_ADDR_NULL && match->dst_cepid == 0 &&
+           match->src_cepid == 0;
+}
+
+static bool
+rl_pduft_match_is_perflow(const struct rl_pci_match *match)
+{
+    return match->dst_addr != RL_ADDR_NULL && match->src_addr != RL_ADDR_NULL &&
+           match->dst_cepid != 0 && match->src_cepid != 0;
+}
+
 int
 rl_pduft_set(struct ipcp_entry *ipcp, const struct rl_pci_match *match,
              struct flow_entry *flow)
 {
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
     struct pduft_entry *entry;
+
+    if (!rl_pduft_match_is_dstonly(match) &&
+        !rl_pduft_match_is_perflow(match)) {
+        PE("Invalid route: neither dst-only nor per-flow\n");
+        return -EINVAL;
+    }
 
     write_lock_bh(&priv->pduft_lock);
 
@@ -186,7 +225,14 @@ rl_pduft_set(struct ipcp_entry *ipcp, const struct rl_pci_match *match,
                 return -ENOMEM;
             }
 
-            hash_add(priv->pdu_ft, &entry->node, match->dst_addr);
+            if (rl_pduft_match_is_dstonly(match)) {
+                hash_add(priv->pdu_ft, &entry->node, match->dst_addr);
+            } else {
+                BUG_ON(!rl_pduft_match_is_perflow(match));
+                hash_add(priv->pdu_ft_perflow, &entry->node,
+                         PDUFT_PERFLOW_KEY(match->dst_addr, match->dst_cepid));
+                priv->perflow_present = true;
+            }
         } else {
             flow_put(entry->flow);
         }
@@ -203,9 +249,12 @@ rl_pduft_set(struct ipcp_entry *ipcp, const struct rl_pci_match *match,
 EXPORT_SYMBOL(rl_pduft_set);
 
 static void
-pduft_entry_unlink(struct pduft_entry *entry)
+pduft_entry_unlink(struct rl_normal *priv, struct pduft_entry *entry)
 {
     hash_del(&entry->node);
+    if (hash_empty(priv->pdu_ft_perflow)) {
+        priv->perflow_present = false;
+    }
     flow_put(entry->flow);
 }
 
@@ -225,7 +274,12 @@ rl_pduft_flush(struct ipcp_entry *ipcp)
     }
     hash_for_each_safe(priv->pdu_ft, bucket, tmp, entry, node)
     {
-        pduft_entry_unlink(entry);
+        pduft_entry_unlink(priv, entry);
+        rl_free(entry, RL_MT_PDUFT);
+    }
+    hash_for_each_safe(priv->pdu_ft_perflow, bucket, tmp, entry, node)
+    {
+        pduft_entry_unlink(priv, entry);
         rl_free(entry, RL_MT_PDUFT);
     }
 
@@ -248,7 +302,15 @@ rl_pduft_flush_by_flow(struct ipcp_entry *ipcp, const struct flow_entry *flow)
     hash_for_each_safe(priv->pdu_ft, bucket, tmp, entry, node)
     {
         if (entry->flow == flow) {
-            pduft_entry_unlink(entry);
+            pduft_entry_unlink(priv, entry);
+            rl_free(entry, RL_MT_PDUFT);
+        }
+    }
+
+    hash_for_each_safe(priv->pdu_ft_perflow, bucket, tmp, entry, node)
+    {
+        if (entry->flow == flow) {
+            pduft_entry_unlink(priv, entry);
             rl_free(entry, RL_MT_PDUFT);
         }
     }
@@ -265,7 +327,7 @@ rl_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
 
     write_lock_bh(&priv->pduft_lock);
-    pduft_entry_unlink(entry);
+    pduft_entry_unlink(priv, entry);
     write_unlock_bh(&priv->pduft_lock);
 
     rl_free(entry, RL_MT_PDUFT);
@@ -292,7 +354,7 @@ rl_pduft_del_addr(struct ipcp_entry *ipcp, const struct rl_pci_match *match)
     } else {
         entry = pduft_lookup_internal(priv, match);
         if (entry) {
-            pduft_entry_unlink(entry);
+            pduft_entry_unlink(priv, entry);
             ret = 0;
         }
     }
