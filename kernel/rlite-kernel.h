@@ -647,8 +647,7 @@ struct flow_entry {
 };
 
 struct pduft_entry {
-    rlm_addr_t address; /* pdu_ft key */
-    rlm_cepid_t dst_cepid;
+    struct rl_pci_match match;
     struct flow_entry *flow;
     struct hlist_node node; /* for the pdu_ft hash table */
     struct list_head fnode; /* for the flow->pduft_entries list */
@@ -786,12 +785,17 @@ struct rl_normal {
     uint16_t ttl; /* time to live */
     bool csum;    /* compute/check internet checksum on each PDU */
 
-    /* Implementation of the PDU Forwarding Table (PDUFT).
-     * An hash table, a default entry and a lock. */
+    /* Implementation of the PDU Forwarding Table (PDUFT): a lock, a
+     * default entry, and two hash tables. One of the has tables maps
+     * (dst_addr) --> (lower_flow). The other maps
+     * (dst_addr, src_addr, dst_cepid, src_cepid, qosid) --> (lower_flow)
+     */
+    rwlock_t pduft_lock;
+    struct flow_entry *pduft_dflt;
+    bool perflow_present;
 #define PDUFT_HASHTABLE_BITS 3
     DECLARE_HASHTABLE(pdu_ft, PDUFT_HASHTABLE_BITS);
-    struct flow_entry *pduft_dflt;
-    rwlock_t pduft_lock;
+    DECLARE_HASHTABLE(pdu_ft_perflow, PDUFT_HASHTABLE_BITS);
 
     /* Support for PDU scheduling. May be NULL if no PDU scheduler is
      * actually installed. */
@@ -808,7 +812,8 @@ int rl_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry);
 int rl_pduft_flush(struct ipcp_entry *ipcp);
 int rl_pduft_set(struct ipcp_entry *ipcp, const struct rl_pci_match *match,
                  struct flow_entry *flow);
-struct flow_entry *rl_pduft_lookup(struct rl_normal *priv, rlm_addr_t dst_addr);
+struct flow_entry *rl_pduft_lookup(struct rl_normal *priv,
+                                   const struct rl_pci_match *pci);
 
 #define RL_UNBOUND_FLOW_TO (msecs_to_jiffies(15000))
 

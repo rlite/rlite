@@ -134,14 +134,14 @@ dtp_dump(struct dtp *dtp)
 EXPORT_SYMBOL(dtp_dump);
 
 static struct pduft_entry *
-pduft_lookup_internal(struct rl_normal *priv, rlm_addr_t dst_addr)
+pduft_lookup_internal(struct rl_normal *priv, const struct rl_pci_match *pci)
 {
     struct pduft_entry *entry;
     struct hlist_head *head;
 
-    head = &priv->pdu_ft[hash_min(dst_addr, HASH_BITS(priv->pdu_ft))];
+    head = &priv->pdu_ft[hash_min(pci->dst_addr, HASH_BITS(priv->pdu_ft))];
     hlist_for_each_entry (entry, head, node) {
-        if (entry->address == dst_addr) {
+        if (entry->match.dst_addr == pci->dst_addr) {
             return entry;
         }
     }
@@ -150,13 +150,13 @@ pduft_lookup_internal(struct rl_normal *priv, rlm_addr_t dst_addr)
 }
 
 struct flow_entry *
-rl_pduft_lookup(struct rl_normal *priv, rlm_addr_t dst_addr)
+rl_pduft_lookup(struct rl_normal *priv, const struct rl_pci_match *pci)
 {
     struct pduft_entry *entry;
     struct flow_entry *flow;
 
     read_lock_bh(&priv->pduft_lock);
-    entry = pduft_lookup_internal(priv, dst_addr);
+    entry = pduft_lookup_internal(priv, pci);
     flow  = entry ? entry->flow : priv->pduft_dflt;
     read_unlock_bh(&priv->pduft_lock);
 
@@ -177,7 +177,7 @@ rl_pduft_set(struct ipcp_entry *ipcp, const struct rl_pci_match *match,
         /* Default entry. */
         priv->pduft_dflt = flow;
     } else {
-        entry = pduft_lookup_internal(priv, match->dst_addr);
+        entry = pduft_lookup_internal(priv, match);
 
         if (!entry) {
             entry = rl_alloc(sizeof(*entry), GFP_ATOMIC, RL_MT_PDUFT);
@@ -195,9 +195,8 @@ rl_pduft_set(struct ipcp_entry *ipcp, const struct rl_pci_match *match,
             flow_put(entry->flow);
         }
 
-        entry->flow      = flow;
-        entry->address   = match->dst_addr;
-        entry->dst_cepid = 0;
+        entry->flow  = flow;
+        entry->match = *match;
     }
     write_unlock_bh(&priv->pduft_lock);
 
@@ -272,7 +271,7 @@ rl_pduft_del_addr(struct ipcp_entry *ipcp, const struct rl_pci_match *match)
             ret              = 0;
         }
     } else {
-        entry = pduft_lookup_internal(priv, match->dst_addr);
+        entry = pduft_lookup_internal(priv, match);
         if (entry) {
             pduft_entry_unlink(entry);
             ret = 0;

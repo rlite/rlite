@@ -1231,7 +1231,7 @@ flow_del(struct flow_entry *entry)
     entry->txrx.rx_qsize = 0;
 
     list_for_each_entry_safe (pfte, tmp_pfte, &entry->pduft_entries, fnode) {
-        rlm_addr_t dst_addr = pfte->address;
+        rlm_addr_t dst_addr = pfte->match.dst_addr;
         int r;
 
         BUG_ON(!upper_ipcp || !upper_ipcp->ops.pduft_del);

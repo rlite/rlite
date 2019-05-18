@@ -955,18 +955,25 @@ rmt_tx_to_lower(struct ipcp_entry *ipcp, struct flow_entry *lower_flow,
 static int
 rmt_tx(struct ipcp_entry *ipcp, struct rl_buf *rb, unsigned flags)
 {
-    rl_addr_t remote_addr = RL_BUF_PCI(rb)->dst_addr;
+    struct rina_pci *pci = RL_BUF_PCI(rb);
     struct flow_entry *lower_flow;
+    struct rl_pci_match match;
     struct rl_normal *priv = ipcp->priv;
     struct rl_sched *sched;
     int ret = 0;
 
-    lower_flow = rl_pduft_lookup(priv, remote_addr);
-    if (unlikely(!lower_flow && remote_addr != ipcp->addr)) {
+    match.dst_addr  = (rlm_addr_t)pci->dst_addr;
+    match.src_addr  = (rlm_addr_t)pci->src_addr;
+    match.dst_cepid = (rlm_cepid_t)pci->dst_cep;
+    match.src_cepid = (rlm_cepid_t)pci->src_cep;
+    match.qos_id    = (rlm_qosid_t)pci->qos_id;
+
+    lower_flow = rl_pduft_lookup(priv, &match);
+    if (unlikely(!lower_flow && match.dst_addr != ipcp->addr)) {
         struct rl_ipcp_stats *stats = raw_cpu_ptr(ipcp->stats);
 
         RPD(1, "No route to IPCP %lu, dropping packet\n",
-            (long unsigned)remote_addr);
+            (long unsigned)match.dst_addr);
         rl_buf_free(rb);
         stats->rmt.noroute_drop++;
         /* Do not return -EHOSTUNREACH, this would break applications.
@@ -977,7 +984,7 @@ rmt_tx(struct ipcp_entry *ipcp, struct rl_buf *rb, unsigned flags)
 
     if (!lower_flow) {
         /* This SDU gets loopbacked to this IPCP, since this is a
-         * self flow (remote_addr == ipcp->addr). */
+         * self flow (match.dst_addr == ipcp->addr). */
         rb = ipcp->ops.sdu_rx(ipcp, rb, NULL /* unused */);
         BUG_ON(rb != NULL);
         return 0;
@@ -1394,9 +1401,13 @@ rl_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
     struct rina_pci *pci;
     rl_addr_t dst_addr = RL_ADDR_NULL; /* Not valid. */
+    struct rl_pci_match match;
+
+    memset(&match, 0, sizeof(match));
+    match.dst_addr = mhdr->remote_addr;
 
     if (mhdr->type == RLITE_MGMT_HDR_T_OUT_DST_ADDR) {
-        *lower_flow = rl_pduft_lookup(priv, mhdr->remote_addr);
+        *lower_flow = rl_pduft_lookup(priv, &match);
         if (unlikely(!(*lower_flow))) {
             RPD(1, "No route to IPCP %lu, dropping packet\n",
                 (long unsigned)mhdr->remote_addr);
@@ -2309,7 +2320,9 @@ rl_normal_create(struct ipcp_entry *ipcp)
 
     priv->ipcp = ipcp;
     hash_init(priv->pdu_ft);
-    priv->pduft_dflt = NULL;
+    hash_init(priv->pdu_ft_perflow);
+    priv->perflow_present = false;
+    priv->pduft_dflt      = NULL;
     rwlock_init(&priv->pduft_lock);
     priv->ttl  = RL_TTL_DFLT;
     priv->csum = false;
