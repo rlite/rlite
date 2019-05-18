@@ -187,11 +187,7 @@ rl_pduft_set(struct ipcp_entry *ipcp, const struct rl_pci_match *match,
             }
 
             hash_add(priv->pdu_ft, &entry->node, match->dst_addr);
-            list_add_tail(&entry->fnode, &flow->pduft_entries);
         } else {
-            /* Move from the old list to the new one. */
-            list_del_init(&entry->fnode);
-            list_add_tail_safe(&entry->fnode, &flow->pduft_entries);
             flow_put(entry->flow);
         }
 
@@ -209,7 +205,6 @@ EXPORT_SYMBOL(rl_pduft_set);
 static void
 pduft_entry_unlink(struct pduft_entry *entry)
 {
-    list_del_init(&entry->fnode);
     hash_del(&entry->node);
     flow_put(entry->flow);
 }
@@ -239,6 +234,30 @@ rl_pduft_flush(struct ipcp_entry *ipcp)
     return 0;
 }
 EXPORT_SYMBOL(rl_pduft_flush);
+
+int
+rl_pduft_flush_by_flow(struct ipcp_entry *ipcp, const struct flow_entry *flow)
+{
+    struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
+    struct pduft_entry *entry;
+    struct hlist_node *tmp;
+    int bucket;
+
+    write_lock_bh(&priv->pduft_lock);
+
+    hash_for_each_safe(priv->pdu_ft, bucket, tmp, entry, node)
+    {
+        if (entry->flow == flow) {
+            pduft_entry_unlink(entry);
+            rl_free(entry, RL_MT_PDUFT);
+        }
+    }
+
+    write_unlock_bh(&priv->pduft_lock);
+
+    return 0;
+}
+EXPORT_SYMBOL(rl_pduft_flush_by_flow);
 
 int
 rl_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)

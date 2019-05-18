@@ -457,6 +457,8 @@ struct ipcp_ops {
     int (*pduft_del_addr)(struct ipcp_entry *ipcp,
                           const struct rl_pci_match *match);
     int (*pduft_flush)(struct ipcp_entry *ipcp);
+    int (*pduft_flush_by_flow)(struct ipcp_entry *ipcp,
+                               const struct flow_entry *flow);
     int (*mgmt_sdu_build)(struct ipcp_entry *ipcp,
                           const struct rl_mgmt_hdr *hdr, struct rl_buf *rb,
                           struct ipcp_entry **lower_ipcp,
@@ -626,8 +628,6 @@ struct flow_entry {
     int (*sdu_rx_consumed)(struct flow_entry *flow, rlm_seq_t seqnum,
                            bool maysleep);
 
-    struct list_head pduft_entries;
-
     void *priv;
 
     struct rl_flow_stats stats;
@@ -650,7 +650,6 @@ struct pduft_entry {
     struct rl_pci_match match;
     struct flow_entry *flow;
     struct hlist_node node; /* for the pdu_ft hash table */
-    struct list_head fnode; /* for the flow->pduft_entries list */
 };
 
 int __ipcp_put(struct ipcp_entry *entry);
@@ -810,6 +809,8 @@ int rl_pduft_del_addr(struct ipcp_entry *ipcp,
                       const struct rl_pci_match *match);
 int rl_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry);
 int rl_pduft_flush(struct ipcp_entry *ipcp);
+int rl_pduft_flush_by_flow(struct ipcp_entry *ipcp,
+                           const struct flow_entry *flow);
 int rl_pduft_set(struct ipcp_entry *ipcp, const struct rl_pci_match *match,
                  struct flow_entry *flow);
 struct flow_entry *rl_pduft_lookup(struct rl_normal *priv,

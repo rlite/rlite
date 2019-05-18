@@ -2360,26 +2360,27 @@ rl_normal_destroy(struct ipcp_entry *ipcp)
 #endif
 
 static struct ipcp_factory normal_factory = {
-    .owner                  = THIS_MODULE,
-    .dif_type               = SHIM_DIF_TYPE,
-    .create                 = rl_normal_create,
-    .use_cep_ids            = true,
-    .ops.destroy            = rl_normal_destroy,
-    .ops.flow_allocate_req  = NULL, /* Reflect to userspace. */
-    .ops.flow_allocate_resp = NULL, /* Reflect to userspace. */
-    .ops.flow_init          = rl_normal_flow_init,
-    .ops.sdu_write          = rl_normal_sdu_write,
-    .ops.config             = rl_normal_config,
-    .ops.config_get         = rl_normal_config_get,
-    .ops.pduft_set          = rl_pduft_set,
-    .ops.pduft_flush        = rl_pduft_flush,
-    .ops.pduft_del          = rl_pduft_del,
-    .ops.pduft_del_addr     = rl_pduft_del_addr,
-    .ops.mgmt_sdu_build     = rl_normal_mgmt_sdu_build,
-    .ops.sdu_rx             = rl_normal_sdu_rx,
-    .ops.flow_writeable     = rl_normal_flow_writeable,
-    .ops.qos_supported      = rl_normal_qos_supported,
-    .ops.sched_config       = rl_normal_sched_config,
+    .owner                   = THIS_MODULE,
+    .dif_type                = SHIM_DIF_TYPE,
+    .create                  = rl_normal_create,
+    .use_cep_ids             = true,
+    .ops.destroy             = rl_normal_destroy,
+    .ops.flow_allocate_req   = NULL, /* Reflect to userspace. */
+    .ops.flow_allocate_resp  = NULL, /* Reflect to userspace. */
+    .ops.flow_init           = rl_normal_flow_init,
+    .ops.sdu_write           = rl_normal_sdu_write,
+    .ops.config              = rl_normal_config,
+    .ops.config_get          = rl_normal_config_get,
+    .ops.pduft_set           = rl_pduft_set,
+    .ops.pduft_flush         = rl_pduft_flush,
+    .ops.pduft_flush_by_flow = rl_pduft_flush_by_flow,
+    .ops.pduft_del           = rl_pduft_del,
+    .ops.pduft_del_addr      = rl_pduft_del_addr,
+    .ops.mgmt_sdu_build      = rl_normal_mgmt_sdu_build,
+    .ops.sdu_rx              = rl_normal_sdu_rx,
+    .ops.flow_writeable      = rl_normal_flow_writeable,
+    .ops.qos_supported       = rl_normal_qos_supported,
+    .ops.sched_config        = rl_normal_sched_config,
 };
 
 static int __init

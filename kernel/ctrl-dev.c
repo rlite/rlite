@@ -246,7 +246,8 @@ rl_ipcp_factory_register(struct ipcp_factory *factory)
     }
 
     if (factory->ops.pduft_set &&
-        (!factory->ops.pduft_del || !factory->ops.pduft_del_addr)) {
+        (!factory->ops.pduft_del || !factory->ops.pduft_del_addr ||
+         !factory->ops.pduft_flush || !factory->ops.pduft_flush_by_flow)) {
         ret = -EINVAL;
         goto out;
     }
@@ -1198,7 +1199,6 @@ static void
 flow_del(struct flow_entry *entry)
 {
     struct rl_kmsg_flow_deallocated ntfy;
-    struct pduft_entry *pfte, *tmp_pfte;
     struct ipcp_entry *upper_ipcp;
     struct ipcp_entry *ipcp;
     struct rl_buf *tmp;
@@ -1230,19 +1230,8 @@ flow_del(struct flow_entry *entry)
     }
     entry->txrx.rx_qsize = 0;
 
-    list_for_each_entry_safe (pfte, tmp_pfte, &entry->pduft_entries, fnode) {
-        rlm_addr_t dst_addr = pfte->match.dst_addr;
-        int r;
-
-        BUG_ON(!upper_ipcp || !upper_ipcp->ops.pduft_del);
-        /* Here we are sure that 'upper_ipcp' will not be destroyed
-         * before 'entry' is destroyed.. */
-        r = upper_ipcp->ops.pduft_del(upper_ipcp, pfte);
-        if (r == 0) {
-            PD("Removed IPC process %s PDUFT entry: %llu --> %u\n",
-               upper_ipcp->name, (unsigned long long)dst_addr,
-               entry->local_port);
-        }
+    if (upper_ipcp) {
+        upper_ipcp->ops.pduft_flush_by_flow(upper_ipcp, entry);
     }
     if (entry->local_appl)
         rl_free(entry->local_appl, RL_MT_FLOW);
@@ -1406,7 +1395,6 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper, uint32_t event_id,
         atomic_set(&entry->refcnt, 1); /* Cogito, ergo sum. */
         entry->flags = RL_FLOW_PENDING | RL_FLOW_NEVER_BOUND;
         memcpy(&entry->spec, flowspec, sizeof(*flowspec));
-        INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp);
         hash_add(dm->flow_table, &entry->node, entry->local_port);
         if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
