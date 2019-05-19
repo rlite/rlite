@@ -37,14 +37,16 @@ std::string CeftReplica::AppendEntriesRespObjClass = "raft_ae_r";
 int
 CeftReplica::init(const std::list<raft::ReplicaId> &peers)
 {
+    raft::RaftSMOutput out;
+
     set_verbosity(raft::RaftSM::kVerboseInfo);
 
-    raft::RaftSMOutput out;
     if (RaftSM::init(peers, &out)) {
-        UPE(rib->uipcp, "Failed to init Raft state machine for DFT\n");
+        UPE(rib->uipcp, "Failed to init Raft state machine\n");
         return -1;
     }
     UPI(rib->uipcp, "Raft replica initialized\n");
+
     return process_sm_output(std::move(out));
 }
 int
@@ -154,15 +156,14 @@ CeftReplica::process_timeout()
     return process_sm_output(std::move(out));
 }
 
-/* Apply a command to the replicated state machine. We just pass the command
- * to the same multimap implementation used by the fully replicated DFT. */
+/* Apply a command to the replicated state machine. */
 int
 CeftReplica::apply(raft::LogIndex index, raft::Term term,
                    const char *const serbuf)
 {
     std::unique_ptr<CDAPMessage> rm;
 
-    /* Check if the committe entry has an associated client request. */
+    /* Check if the committed entry has an associated client request. */
     auto mit = pending.find(index);
     if (mit != pending.end()) {
         rm = std::move(mit->second->m);
