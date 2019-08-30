@@ -1470,8 +1470,9 @@ UipcpRib::policy_param_mod(const std::string &component,
 
         if (eto < minval) {
             params_map[EnrollmentPrefix]["timeout"].durval = minval;
-            UPD(uipcp, "%s.timeout fixed up to %ldms\n",
-                EnrollmentPrefix.c_str(), minval.count());
+            UPD(uipcp, "%s.timeout fixed up to %lldms\n",
+                EnrollmentPrefix.c_str(),
+                static_cast<long long int>(minval.count()));
         }
     }
 
