@@ -29,6 +29,11 @@
 #include <sys/eventfd.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <sys/socket.h>
+#include <linux/ethtool.h>
+#include <sys/ioctl.h>
+#include <linux/if.h>
+#include <linux/sockios.h>
 
 #include "rlite/conf.h"
 #include "rlite/utils.h"
@@ -910,6 +915,8 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     list_init(&uipcp->topo.lowers);
     list_init(&uipcp->topo.uppers);
 
+    uipcp->if_speed = 0;
+
     if (!ops) {
         /* This is IPCP without userspace implementation.
          * We have created an entry, there is nothing more
@@ -1563,6 +1570,13 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     upd->dif_name       = NULL;
     uipcp->pcisizes     = upd->pcisizes;
 
+    if (strcmp(uipcp->dif_type, "shim-eth") == 0) {
+        if (uipcp_get_if_speed(uipcp)) {
+            return -1;
+        }
+        PD("Interface speed: %lu\n", uipcp->if_speed);
+    }
+
     if (!mss_changed) {
         goto out;
     }
@@ -1579,6 +1593,39 @@ out:
     }
 
     uipcp_put(uipcp);
+
+    return 0;
+}
+
+int
+uipcp_get_if_speed(struct uipcp *uipcp)
+{
+    int skfd;
+    char *if_name = rl_conf_ipcp_config_get(uipcp->id, "netdev");
+
+    PD("Interface name: %s\n", if_name);
+
+    if ((skfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        UPW(uipcp, "uipcp_get_if_speed() failed [%s]\n", strerror(errno));
+        return -1;
+    }
+
+    struct ethtool_cmd edata;
+    edata.cmd = ETHTOOL_GSET;
+
+    struct ifreq ifr;
+    strncpy(ifr.ifr_name, if_name, sizeof(ifr.ifr_name));
+    ifr.ifr_data = &edata;
+
+    int ret = ioctl(skfd, SIOCETHTOOL, &ifr);
+    if (ret < 0) {
+        UPW(uipcp, "uipcp_get_if_speed() failed: ioctl on %s: [%s]\n", if_name,
+            strerror(errno));
+        return -1;
+    }
+
+    int speed       = ethtool_cmd_speed(&edata);
+    uipcp->if_speed = speed == -1 ? 0 : speed * 1000 * 1000; // Mbps -> bps
 
     return 0;
 }

@@ -66,6 +66,7 @@ class CeftReplica : public raft::RaftSM {
 
 protected:
     UipcpRib *rib = nullptr;
+    static std::string DummyMessageObjClass;
 
 public:
     RL_NODEFAULT_NONCOPIABLE(CeftReplica);

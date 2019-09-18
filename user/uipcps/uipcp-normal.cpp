@@ -44,6 +44,7 @@
 
 #include "rlite/conf.h"
 #include "uipcp-normal.hpp"
+#include "BwRes.pb.h"
 
 using namespace std;
 
@@ -64,6 +65,7 @@ std::string Routing::TableName =
 std::string AddrAllocator::ObjClass      = "aa_entries";
 std::string AddrAllocator::Prefix        = "/mgmt/addralloc";
 std::string AddrAllocator::TableName     = AddrAllocator::Prefix + "/table";
+std::string FlowAllocator::ObjClass      = "fa_entries";
 std::string FlowAllocator::FlowObjClass  = "flow";
 std::string FlowAllocator::Prefix        = "/mgmt/flowalloc";
 std::string FlowAllocator::TableName     = FlowAllocator::Prefix + "/flows";
@@ -531,7 +533,8 @@ UipcpRib::UipcpRib(struct uipcp *_u)
                          });
 
     for (const auto &component :
-         {DFT::Prefix, Routing::Prefix, AddrAllocator::Prefix}) {
+         {DFT::Prefix, Routing::Prefix, AddrAllocator::Prefix,
+          FlowAllocator::Prefix}) {
         rib_handler_register(
             component + "/policy",
             [this](const CDAPMessage *rm, const MsgSrcInfo &src) {
@@ -539,7 +542,8 @@ UipcpRib::UipcpRib(struct uipcp *_u)
             });
     }
 
-    for (const auto &component : {DFT::Prefix, AddrAllocator::Prefix}) {
+    for (const auto &component :
+         {DFT::Prefix, AddrAllocator::Prefix, FlowAllocator::Prefix}) {
         rib_handler_register(
             component + "/params",
             [this](const CDAPMessage *rm, const MsgSrcInfo &src) {

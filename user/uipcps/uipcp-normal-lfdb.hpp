@@ -61,11 +61,18 @@ using NodeId = std::string;
  * Free Alternate algorithm. */
 struct LFDB {
     struct Edge {
+        NodeId from;
         NodeId to;
         unsigned int cost;
+        unsigned int capacity;
 
-        Edge(const NodeId &to_, unsigned int cost_) : to(to_), cost(cost_) {}
-        Edge(Edge &&) = default;
+        Edge(const NodeId &to_, unsigned int cost_) : to(to_), cost(cost_){};
+        Edge(const NodeId &from_, const NodeId &to_, unsigned int cost_,
+             unsigned int capacity_)
+            : from(from_), to(to_), cost(cost_), capacity(capacity_){};
+        Edge(const Edge &) = default;
+        Edge &operator=(const Edge &) = default;
+        Edge(Edge &&)                 = default;
     };
 
     struct DijkstraInfo {
@@ -112,6 +119,14 @@ public:
         std::unordered_map<NodeId, DijkstraInfo> &info);
 
     int compute_next_hops(const NodeId &local_node);
+
+    std::vector<NodeId> compute_max_flow(
+        const NodeId &src_node, const NodeId &dest_node,
+        const std::unordered_map<NodeId, std::vector<Edge>> &graph,
+        const unsigned int req_flow);
+    std::vector<NodeId> find_flow_path(const NodeId &src_node,
+                                       const NodeId &dest_node,
+                                       const unsigned int req_flow);
 
     /* Dump the routing table. */
     void dump_routing(std::stringstream &ss, const NodeId &local_node) const;

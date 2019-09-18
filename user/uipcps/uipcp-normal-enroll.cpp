@@ -787,7 +787,8 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
         {
             /* Send component policies. */
             for (const auto &c :
-                 {DFT::Prefix, Routing::Prefix, AddrAllocator::Prefix}) {
+                 {DFT::Prefix, Routing::Prefix, AddrAllocator::Prefix,
+                  FlowAllocator::Prefix}) {
                 m = CDAPMessage();
                 m.m_write("policy", c + "/policy");
                 m.set_obj_value(rib->policies[c]);
@@ -802,7 +803,8 @@ EnrollmentResources::enroller_default(std::unique_lock<std::mutex> &lk)
 
         {
             /* Send component parameters. */
-            for (const auto &c : {DFT::Prefix, AddrAllocator::Prefix}) {
+            for (const auto &c :
+                 {DFT::Prefix, AddrAllocator::Prefix, FlowAllocator::Prefix}) {
                 for (const auto &kv : rib->params_map[c]) {
                     std::stringstream oss;
                     std::string val;

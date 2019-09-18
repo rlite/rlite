@@ -276,8 +276,10 @@ message LowerFlow {  // Contains the information of a flow state object
   optional uint32 cost = 3;         // The cost associated to the N-1 flow
   optional uint32 seqnum =
       4;  // A sequence number to be able to discard old information
-  optional bool state = 5;  // Tells if the N-1 flow is up or down
-  optional uint32 age = 6;  // Age of this FSO (in seconds)
+  optional bool state = 5;       // Tells if the N-1 flow is up or down
+  optional uint32 age = 6;       // Age of this FSO (in seconds)
+  optional uint64 bw_total = 7;  // Total available bandwidth of the flow
+  optional uint64 bw_free = 8;   // Free available bandwidth of the flow
 }
 
 message LowerFlowList {          // Contains the information of a flow service

@@ -260,6 +260,9 @@ struct uipcp {
 
     /* Siblings. */
     struct list_head node;
+
+    /* Interface speeds */
+    unsigned long int if_speed;
 };
 
 static inline int
@@ -279,6 +282,8 @@ int uipcp_put(struct uipcp *uipcp);
 int uipcp_del(struct uipcp *uipcp);
 
 int uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd);
+
+int uipcp_get_if_speed(struct uipcp *uipcp);
 
 struct uipcp *uipcp_lookup(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id);
 
