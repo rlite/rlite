@@ -27,12 +27,14 @@
 #include <iostream>
 #include <functional>
 
-#include "uipcp-normal.hpp"
-#include "uipcp-normal-lfdb.hpp"
+#include "uipcp-normal-lower-flows.hpp"
+#include "BwRes.pb.h"
 
 using namespace std;
 
 namespace rlite {
+
+std::string BwResRouting::PerFlowObjClass = "PerFlowRoute";
 
 static std::string
 to_string(const gpb::LowerFlow &lf)
@@ -49,63 +51,6 @@ operator==(const gpb::LowerFlow &a, const gpb::LowerFlow &o)
     return a.local_node() == o.local_node() &&
            a.remote_node() == o.remote_node() && a.cost() == o.cost();
 }
-
-/* Routing engine able to run the Dijkstra algorithm and compute kernel
- * forwarding tables, using the information contained into an LFDB instance.
- * This class is used as a component for the main Routing classes. */
-class RoutingEngine : public LFDB {
-public:
-    RL_NODEFAULT_NONCOPIABLE(RoutingEngine);
-    RoutingEngine(UipcpRib *rib, bool lfa_enabled)
-        : LFDB(/*lfa_enabled=*/lfa_enabled,
-               /*verbose=*/rl_verbosity >= RL_VERB_VERY),
-          rib(rib),
-          last_run(std::chrono::system_clock::now())
-    {
-    }
-
-    /* Recompute routing and forwarding table and possibly
-     * update kernel forwarding data structures. */
-    void update_kernel_routing(const NodeId &);
-
-    void flow_state_update(struct rl_kmsg_flow_state *upd);
-
-    /* Used by the routing class to ask the RoutingEngine to actually recompute
-     * the routing table. */
-    void schedule_recomputation() { recompute = true; }
-
-    /* Forwarding table computation and kernel update. */
-    int compute_fwd_table();
-
-private:
-    /* The forwarding table computed by compute_fwd_table().
-     * It maps a NodeId --> (dst_addr, local_port). */
-    std::unordered_map<rlm_addr_t, std::pair<NodeId, rl_port_t>> next_ports;
-
-    /* Set of ports that are currently down. */
-    std::unordered_set<rl_port_t> ports_down;
-
-    /* Should update_kernel_routing() really run the graph algorithms and
-     * udpate the kernel. */
-    bool recompute = true;
-
-    /* Backpointer. */
-    UipcpRib *rib;
-
-    /* Last time we ran the routing algorithm. */
-    std::chrono::system_clock::time_point last_run;
-
-    /* Minimum size of the LFDB after which we start to rate limit routing
-     * computations. */
-    size_t coalesce_size_threshold = 50;
-
-    /* Minimum number of seconds that must elapse between two consecutive
-     * routing table computations, if rate limiting is active. */
-    Secs coalesce_period = Secs(5);
-
-    /* Timer to provide an upper bound for the coalescing period. */
-    std::unique_ptr<TimeoutEvent> coalesce_timer;
-};
 
 void
 RoutingEngine::flow_state_update(struct rl_kmsg_flow_state *upd)
@@ -320,52 +265,6 @@ RoutingEngine::update_kernel_routing(const NodeId &addr)
      * (in userspace) and update the corresponding kernel data structure. */
     compute_fwd_table();
 }
-
-/* Link state routing, optionally supporting LFA. */
-class LinkStateRouting : public Routing {
-    /* Routing engine. */
-    RoutingEngine re;
-
-    /* Timer ID for age increment of LFDB entries. */
-    std::unique_ptr<TimeoutEvent> age_incr_timer;
-
-public:
-    RL_NODEFAULT_NONCOPIABLE(LinkStateRouting);
-    LinkStateRouting(UipcpRib *rib, bool lfa)
-        : Routing(rib), re(rib, /*lfa_enabled=*/lfa)
-    {
-        age_incr_tmr_restart();
-    }
-    ~LinkStateRouting() { age_incr_timer.reset(); }
-
-    void dump(std::stringstream &ss) const override { re.dump(ss); }
-    void dump_routing(std::stringstream &ss) const override
-    {
-        re.dump_routing(ss, rib->myname);
-    }
-
-    bool add(const gpb::LowerFlow &lf);
-    bool del(const NodeId &local_node, const NodeId &remote_node);
-    void update_local(const std::string &neigh_name) override;
-    void update_kernel(bool force = true) override;
-    int flow_state_update(struct rl_kmsg_flow_state *upd) override;
-    void neigh_disconnected(const std::string &neigh_name) override;
-
-    int rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src) override;
-
-    int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
-                   unsigned int limit) const override;
-    int neighs_refresh(size_t limit) override;
-    void age_incr();
-    void age_incr_tmr_restart();
-
-    /* Time interval (in seconds) between two consecutive increments
-     * of the age of LFDB entries. */
-    static constexpr int kAgeIncrIntvalSecs = 10;
-
-    /* Max age (in seconds) for an LFDB entry not to be discarded. */
-    static constexpr int kAgeMaxSecs = 900;
-};
 
 /* The add method has overwrite semantic, and possibly resets the age.
  * Returns true if something changed. */
@@ -700,25 +599,6 @@ LinkStateRouting::neigh_disconnected(const std::string &neigh_name)
     }
 }
 
-class StaticRouting : public Routing {
-    /* Routing engine, only used to compute kernel fowarding tables. */
-    RoutingEngine re;
-
-public:
-    RL_NODEFAULT_NONCOPIABLE(StaticRouting);
-    StaticRouting(UipcpRib *_ur) : Routing(_ur), re(_ur, /*lfa_enabled=*/true)
-    {
-    }
-    ~StaticRouting() {}
-
-    void dump(std::stringstream &ss) const override { re.dump(ss); }
-    void dump_routing(std::stringstream &ss) const override
-    {
-        re.dump_routing(ss, rib->myname);
-    }
-    int route_mod(const struct rl_cmsg_ipcp_route_mod *req) override;
-};
-
 int
 StaticRouting::route_mod(const struct rl_cmsg_ipcp_route_mod *req)
 {
@@ -755,6 +635,170 @@ StaticRouting::route_mod(const struct rl_cmsg_ipcp_route_mod *req)
     }
 
     re.compute_fwd_table();
+
+    return 0;
+}
+
+void
+BwResRouting::update_local(const string &node_name)
+{
+    gpb::LowerFlowList lfl;
+    gpb::LowerFlow *lf;
+    std::unique_ptr<CDAPMessage> sm;
+    std::shared_ptr<Neighbor> neigh;
+
+    if ((neigh = rib->get_neighbor(node_name, false)) == nullptr) {
+        return; /* Not our neighbor. */
+    }
+
+    lf = lfl.add_flows();
+    lf->set_local_node(rib->myname);
+    lf->set_remote_node(node_name);
+    lf->set_cost(1);
+    lf->set_seqnum(1); /* not meaningful */
+    lf->set_state(true);
+    lf->set_age(0);
+    lf->set_bw_total(0);
+    lf->set_bw_free(0);
+
+    for (auto f : neigh->flows) {
+        rl_ipcp_id_t lower_ipcp_id;
+        int ret = uipcp_lookup_id_by_dif(
+            rib->uipcp->uipcps, f.second->supp_dif.c_str(), &lower_ipcp_id);
+        if (ret) {
+            continue;
+        };
+        pthread_mutex_lock(&rib->uipcp->uipcps->lock);
+        struct uipcp *lower_uipcp =
+            uipcp_lookup(rib->uipcp->uipcps, lower_ipcp_id);
+        pthread_mutex_unlock(&rib->uipcp->uipcps->lock);
+        if (lower_uipcp && strcmp(lower_uipcp->dif_type, "shim-eth") == 0) {
+            lf->set_bw_total(lower_uipcp->if_speed);
+            lf->set_bw_free(lower_uipcp->if_speed);
+            break;
+        }
+    }
+
+    sm = utils::make_unique<CDAPMessage>();
+    sm->m_create(ObjClass, TableName);
+    rib->send_to_myself(std::move(sm), &lfl);
+}
+
+void
+BwResRouting::reserve_flow(const std::vector<NodeId> path, unsigned int bw)
+{
+    for (auto src = path.begin(); std::next(src) != path.end(); ++src) {
+        auto dst = std::next(src);
+        auto lf  = re.find(*src, *dst);
+        if (lf) {
+            lf->set_bw_free(lf->bw_free() - bw);
+        }
+        lf = re.find(*dst, *src);
+        if (lf) {
+            lf->set_bw_free(lf->bw_free() - bw);
+        }
+    }
+}
+
+void
+BwResRouting::free_flow(const std::vector<NodeId> path, unsigned int bw)
+{
+    for (auto src = path.begin(); std::next(src) != path.end(); ++src) {
+        auto dst = std::next(src);
+        auto lf  = re.find(*src, *dst);
+        if (lf) {
+            lf->set_bw_free(lf->bw_free() + bw);
+        }
+        lf = re.find(*dst, *src);
+        if (lf) {
+            lf->set_bw_free(lf->bw_free() + bw);
+        }
+    }
+}
+
+int
+BwResRouting::rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
+{
+    const char *objbuf;
+    size_t objlen;
+    bool add_f = true;
+
+    if (rm->obj_class == BwResRouting::PerFlowObjClass) {
+        rm->get_obj_value(objbuf, objlen);
+
+        gpb::BwResRoute route;
+        route.ParseFromArray(objbuf, objlen);
+
+        rl_port_t port_id;
+        struct rl_pci_match match = {};
+        match.src_addr            = route.src_addr();
+        match.dst_addr            = route.dst_addr();
+        match.src_cepid           = route.src_cepid();
+        match.dst_cepid           = route.dst_cepid();
+
+        auto neigh = rib->neighbors.find(route.next_hop());
+
+        if (neigh != rib->neighbors.end()) {
+            port_id = neigh->second->flows.begin()->second->port_id;
+            if (rm->op_code == gpb::M_CREATE) {
+                UPD(rib->uipcp,
+                    "Adding a per-flow route entry %lu %lu %u %u %s %d\n",
+                    match.src_addr, match.dst_addr, match.src_cepid,
+                    match.dst_cepid, route.next_hop().c_str(), port_id);
+                uipcp_pduft_set(rib->uipcp, port_id, &match);
+            } else if (rm->op_code == gpb::M_DELETE) {
+                UPD(rib->uipcp,
+                    "Deleting a per-flow route entry %lu %lu %u %u %s %d\n",
+                    match.src_addr, match.dst_addr, match.src_cepid,
+                    match.dst_cepid, route.next_hop().c_str(), port_id);
+                uipcp_pduft_del(rib->uipcp, port_id, &match);
+            }
+        }
+
+    } else {
+        if (rm->op_code != gpb::M_CREATE && rm->op_code != gpb::M_DELETE) {
+            UPE(rib->uipcp, "M_CREATE or M_DELETE expected\n");
+            return 0;
+        }
+
+        if (rm->op_code == gpb::M_DELETE) {
+            add_f = false;
+        }
+
+        rm->get_obj_value(objbuf, objlen);
+        if (!objbuf) {
+            UPE(rib->uipcp, "M_START does not contain a nested message\n");
+            abort();
+            return 0;
+        }
+
+        gpb::LowerFlowList lfl;
+        gpb::LowerFlowList prop_lfl;
+
+        lfl.ParseFromArray(objbuf, objlen);
+
+        for (const gpb::LowerFlow &f : lfl.flows()) {
+            if (add_f) {
+                if (add(f)) {
+                    *prop_lfl.add_flows() = f;
+                }
+
+            } else {
+                if (del(f.local_node(), f.remote_node())) {
+                    *prop_lfl.add_flows() = f;
+                }
+            }
+        }
+
+        if (prop_lfl.flows_size() > 0) {
+            /* Send the received lower flows to the other neighbors. */
+            rib->neighs_sync_obj_excluding(src.neigh, add_f, ObjClass,
+                                           TableName, &prop_lfl);
+
+            /* Update the kernel routing table. */
+            update_kernel(/*force=*/false);
+        }
+    }
 
     return 0;
 }
