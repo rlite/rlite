@@ -37,6 +37,7 @@
 #include <linux/spinlock.h>
 #include <linux/delay.h>
 #include <linux/poll.h>
+#include <asm/div64.h>
 
 #define RMTQ_MAX_SIZE (1 << 17)
 
@@ -327,7 +328,7 @@ sched_wrr_do_config(struct rl_sched *sched, unsigned int max_queue_size,
 
         /* Normalize the weight to the minimum one. */
         norm_weight <<= 20;
-        norm_weight /= min_weight;
+        do_div(norm_weight, min_weight);
         norm_weight *= quantum;
         norm_weight >>= 20;
         wrrq->weight = wrrq->credit = norm_weight;
@@ -814,6 +815,8 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     }
 
     if (flow->cfg.dtcp.bandwidth) {
+        uint64_t bs;
+
         /* With the following definitions:
          *      R := requested bandwidth in bps
          *      M := token bucket timer period in milliseconds
@@ -834,8 +837,9 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
         } else {
             dtp->tkbk.intval_ms = TKBK_INTVAL_MSEC;
         }
-        dtp->tkbk.bucket_size =
-            (flow->cfg.dtcp.bandwidth * dtp->tkbk.intval_ms) / 8000;
+        bs = flow->cfg.dtcp.bandwidth * dtp->tkbk.intval_ms;
+        do_div(bs, 8000);
+        dtp->tkbk.bucket_size = (unsigned long)bs;
         dtp->tkbk.t_last_refill = ktime_get();
     }
 
