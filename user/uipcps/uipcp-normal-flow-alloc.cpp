@@ -731,11 +731,11 @@ LocalFlowAllocator::dump_memtrack(std::stringstream &ss) const
 class BwResFlowAllocator : public LocalFlowAllocator {
     class Replica : public CeftReplica {
         struct Command {
-            char flow_id[127];
-            char from[31];
+            char flow_id[128];
+            char from[32];
             char to[31];
-            uint32_t bw;
             uint8_t opcode;
+            uint32_t bw;
             uint64_t src_addr;
             uint64_t dst_addr;
             uint32_t src_cepid;

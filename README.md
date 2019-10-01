@@ -1071,18 +1071,12 @@ of a normal IPCP process:
 | enrollment          | *                 | keepalive          | Neighbor keepalive timeout (0 to disable). |
 | enrollment          | *                 | keepalive-thresh   | Number of allowed unacked keepalive requests. If exceeded, the N-1 low is pruned. |
 | enrollment          | *                 | auto-reconnect     | Automatically re-enroll to neighbors pruned because unresponsive. |
-| flowalloc           | local             | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
-| flowalloc           | local             | max-rtxq-len       | Maximum size of the retransmission queue (in PDUs). |
-| flowalloc           | local             | initial-rtx-timeout| Initial value for the DTCP retransmission timer. |
-| flowalloc           | local             | initial-a          | Initial value for the DTCP A timer. |
-| flowalloc           | local             | initial-credit     | Initial size of the DTCP flow control window (in PDUs). |
-| flowalloc           | local             | max-cwq-len        | Maximum size of the DTCP closed window queue (in PDUs). |
-| flowalloc           | bw-res            | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
-| flowalloc           | bw-res            | max-rtxq-len       | Maximum size of the retransmission queue (in PDUs). |
-| flowalloc           | bw-res            | initial-rtx-timeout| Initial value for the DTCP retransmission timer. |
-| flowalloc           | bw-res            | initial-a          | Initial value for the DTCP A timer. |
-| flowalloc           | bw-res            | initial-credit     | Initial size of the DTCP flow control window (in PDUs). |
-| flowalloc           | bw-res            | max-cwq-len        | Maximum size of the DTCP closed window queue (in PDUs). |
+| flowalloc           | *                 | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
+| flowalloc           | *                 | max-rtxq-len       | Maximum size of the retransmission queue (in PDUs). |
+| flowalloc           | *                 | initial-rtx-timeout| Initial value for the DTCP retransmission timer. |
+| flowalloc           | *                 | initial-a          | Initial value for the DTCP A timer. |
+| flowalloc           | *                 | initial-credit     | Initial size of the DTCP flow control window (in PDUs). |
+| flowalloc           | *                 | max-cwq-len        | Maximum size of the DTCP closed window queue (in PDUs). |
 | flowalloc           | bw-res            | replicas  | Names of the IPCPs that constitute the fault-tolerant cluster. |
 | flowalloc           | bw-res            | cli-timeout  | Timeout for the client request to the replicas. |
 | flowalloc           | bw-res            | reject-unlimited-flows  | Reject flows that do not include average bandwidth as part of the request. |

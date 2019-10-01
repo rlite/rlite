@@ -279,9 +279,9 @@ LFDB::compute_max_flow(
         for (const Edge &edge : edges) {
             if (pred.find(edge.to) == pred.end() &&
                 (pred.find(cur) == pred.end() ||
-                 edge.to != pred.find(cur)->second.from) &&
+                 edge.to != pred.find(cur)->second.to) &&
                 edge.capacity >= req_flow) {
-                pred.emplace(edge.to, edge);
+                pred.emplace(edge.to, Edge(cur, edge.cost));
                 q.push(edge.to);
                 if (edge.to == dest_node) {
                     found = true;
@@ -295,8 +295,8 @@ LFDB::compute_max_flow(
     if (pred.find(dest_node) != pred.end()) {
         path.insert(path.begin(), dest_node);
         for (auto e = pred.find(dest_node); e != pred.end();
-             e      = pred.find(e->second.from)) {
-            path.insert(path.begin(), e->second.from);
+             e      = pred.find(e->second.to)) {
+            path.insert(path.begin(), e->second.to);
         }
     }
 
@@ -347,8 +347,8 @@ LFDB::find_flow_path(const NodeId &src_node, const NodeId &dest_node,
             }
 
             graph[kvj.second.local_node()].emplace_back(
-                kvj.second.local_node(), kvj.second.remote_node(),
-                kvj.second.cost(), kvj.second.bw_free());
+                kvj.second.remote_node(), kvj.second.cost(),
+                kvj.second.bw_free());
             if (!graph.count(kvj.second.remote_node())) {
                 /* Make sure graph contains all the nodes, even if with
                  * empty lists. */

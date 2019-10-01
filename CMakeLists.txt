@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 2.8)
 
 project(rlite)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Compiler checks
 message(STATUS "C Compiler: ${CMAKE_C_COMPILER}")
 message(STATUS "C++ Compiler: ${CMAKE_CXX_COMPILER}")

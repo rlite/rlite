@@ -1603,6 +1603,14 @@ uipcp_get_if_speed(struct uipcp *uipcp)
     int skfd;
     char *if_name = rl_conf_ipcp_config_get(uipcp->id, "netdev");
 
+    struct ethtool_cmd edata;
+    struct ifreq ifr;
+
+    int ret;
+    int speed;
+
+    memset(&ifr, 0, sizeof(ifr));
+
     PD("Interface name: %s\n", if_name);
 
     if ((skfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -1610,21 +1618,19 @@ uipcp_get_if_speed(struct uipcp *uipcp)
         return -1;
     }
 
-    struct ethtool_cmd edata;
     edata.cmd = ETHTOOL_GSET;
 
-    struct ifreq ifr;
     strncpy(ifr.ifr_name, if_name, sizeof(ifr.ifr_name));
     ifr.ifr_data = &edata;
 
-    int ret = ioctl(skfd, SIOCETHTOOL, &ifr);
+    ret = ioctl(skfd, SIOCETHTOOL, &ifr);
     if (ret < 0) {
         UPW(uipcp, "uipcp_get_if_speed() failed: ioctl on %s: [%s]\n", if_name,
             strerror(errno));
         return -1;
     }
 
-    int speed       = ethtool_cmd_speed(&edata);
+    speed       = ethtool_cmd_speed(&edata);
     uipcp->if_speed = speed == -1 ? 0 : speed * 1000 * 1000; // Mbps -> bps
 
     return 0;

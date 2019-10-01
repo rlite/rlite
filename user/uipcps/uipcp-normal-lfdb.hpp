@@ -61,15 +61,13 @@ using NodeId = std::string;
  * Free Alternate algorithm. */
 struct LFDB {
     struct Edge {
-        NodeId from;
         NodeId to;
         unsigned int cost;
         unsigned int capacity;
 
-        Edge(const NodeId &to_, unsigned int cost_) : to(to_), cost(cost_){};
-        Edge(const NodeId &from_, const NodeId &to_, unsigned int cost_,
-             unsigned int capacity_)
-            : from(from_), to(to_), cost(cost_), capacity(capacity_){};
+        Edge(const NodeId &to_, unsigned int cost_, unsigned int capacity_)
+            : to(to_), cost(cost_), capacity(capacity_){};
+        Edge(const NodeId &to_, unsigned int cost_) : Edge(to_, cost_, 0){};
         Edge(const Edge &) = default;
         Edge &operator=(const Edge &) = default;
         Edge(Edge &&)                 = default;

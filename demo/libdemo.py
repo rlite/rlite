@@ -526,7 +526,8 @@ class Demo:
                 vars_dict['ifname'] = port['veth']
                 outs += 'PORT%(idx)s=%(ifname)s\n' % vars_dict
             outs += '$SUDO ip link set $PORT%(idx)s up\n' % vars_dict
-            outs += '$SUDO ethtool -s $PORT%(idx)s speed %(shimspeed)s\n' % vars_dict
+            if vars_dict['shimspeed'] != 0:
+                outs += '$SUDO ethtool -s $PORT%(idx)s speed %(shimspeed)s\n' % vars_dict
             ctrl_cmds.append(
                 'ipcp-create %(shim)s.%(vmname)s.IPCP shim-%(shimtype)s %(shim)s.DIF\n'
                 % vars_dict)
