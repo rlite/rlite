@@ -839,7 +839,7 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
         }
         bs = flow->cfg.dtcp.bandwidth * dtp->tkbk.intval_ms;
         do_div(bs, 8000);
-        dtp->tkbk.bucket_size = (unsigned long)bs;
+        dtp->tkbk.bucket_size   = (unsigned long)bs;
         dtp->tkbk.t_last_refill = ktime_get();
     }
 

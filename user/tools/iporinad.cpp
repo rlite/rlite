@@ -214,21 +214,23 @@ public:
  */
 
 struct Obj {
-    virtual int serialize(char *buf, unsigned int size) const = 0;
+    virtual int serialize(char *buf, long unsigned int size) const = 0;
     virtual ~Obj() {}
 };
 
 static int
-ser_common(::google::protobuf::MessageLite &gm, char *buf, int size)
+ser_common(::google::protobuf::MessageLite &gm, char *buf,
+           long unsigned int size)
 {
-    if (gm.ByteSize() > size) {
-        fprintf(stderr, "User buffer too small [%u/%u]\n", gm.ByteSize(), size);
+    if (gm.ByteSizeLong() > size) {
+        fprintf(stderr, "User buffer too small [%lu/%lu]\n", gm.ByteSizeLong(),
+                size);
         return -1;
     }
 
     gm.SerializeToArray(buf, size);
 
-    return gm.ByteSize();
+    return gm.ByteSizeLong();
 }
 
 struct Hello : public Obj {
@@ -238,8 +240,8 @@ struct Hello : public Obj {
     uint32_t num_routes; /* How many route to exchange */
 
     Hello() : num_routes(0) {}
-    Hello(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    Hello(const char *buf, long unsigned int size);
+    int serialize(char *buf, long unsigned int size) const;
 };
 
 static void
@@ -262,7 +264,7 @@ Hello2gpb(const Hello &m, gpb::hello_msg_t &gm)
     return 0;
 }
 
-Hello::Hello(const char *buf, unsigned int size) : num_routes(0)
+Hello::Hello(const char *buf, long unsigned int size) : num_routes(0)
 {
     gpb::hello_msg_t gm;
 
@@ -272,7 +274,7 @@ Hello::Hello(const char *buf, unsigned int size) : num_routes(0)
 }
 
 int
-Hello::serialize(char *buf, unsigned int size) const
+Hello::serialize(char *buf, long unsigned int size) const
 {
     gpb::hello_msg_t gm;
 
@@ -286,8 +288,8 @@ struct RouteObj : public Obj {
 
     RouteObj() {}
     RouteObj(const string &s) : route(s) {}
-    RouteObj(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    RouteObj(const char *buf, long unsigned int size);
+    int serialize(char *buf, long unsigned int size) const;
 };
 
 static void
@@ -304,7 +306,7 @@ RouteObj2gpb(const RouteObj &m, gpb::route_msg_t &gm)
     return 0;
 }
 
-RouteObj::RouteObj(const char *buf, unsigned int size)
+RouteObj::RouteObj(const char *buf, long unsigned int size)
 {
     gpb::route_msg_t gm;
 
@@ -314,7 +316,7 @@ RouteObj::RouteObj(const char *buf, unsigned int size)
 }
 
 int
-RouteObj::serialize(char *buf, unsigned int size) const
+RouteObj::serialize(char *buf, long unsigned int size) const
 {
     gpb::route_msg_t gm;
 
