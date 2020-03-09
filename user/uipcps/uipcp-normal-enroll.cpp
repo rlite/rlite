@@ -1627,7 +1627,7 @@ UipcpRib::enroll(const char *neigh_name, const char *supp_dif_name,
     EnrollmentResources *er;
     std::shared_ptr<Neighbor> neigh;
     std::shared_ptr<NeighFlow> nf;
-    int ret;
+    int ret = 0;
 
     std::unique_lock<std::mutex> lk(mutex);
     neigh = get_neighbor(string(neigh_name), true);
