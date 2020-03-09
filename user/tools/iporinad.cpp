@@ -222,15 +222,21 @@ static int
 ser_common(::google::protobuf::MessageLite &gm, char *buf,
            long unsigned int size)
 {
-    if (gm.ByteSizeLong() > size) {
-        fprintf(stderr, "User buffer too small [%lu/%lu]\n", gm.ByteSizeLong(),
+#ifdef HAVE_GPB_BYTE_SIZE_LONG
+    long unsigned int bytesize = gm.ByteSizeLong();
+#else
+    long unsigned int bytesize = gm.ByteSize();
+#endif
+
+    if (bytesize > size) {
+        fprintf(stderr, "User buffer too small [%lu/%lu]\n", bytesize,
                 size);
         return -1;
     }
 
     gm.SerializeToArray(buf, size);
 
-    return gm.ByteSizeLong();
+    return bytesize;
 }
 
 struct Hello : public Obj {

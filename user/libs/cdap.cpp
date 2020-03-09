@@ -1075,7 +1075,11 @@ msg_ser_stateless(CDAPMessage *m, char **buf, size_t *len)
 
     gm = static_cast<gpb::CDAPMessage>(*m);
 
+#ifdef HAVE_GPB_BYTE_SIZE_LONG
     *len = gm.ByteSizeLong();
+#else
+    *len = gm.ByteSize();
+#endif
     *buf = new char[*len];
 
     gm.SerializeToArray(*buf, *len);

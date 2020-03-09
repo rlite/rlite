@@ -987,10 +987,15 @@ UipcpRib::obj_serialize(CDAPMessage *m,
                         const ::google::protobuf::MessageLite *obj)
 {
     if (obj) {
-        auto objbuf = std::unique_ptr<char[]>(new char[obj->ByteSizeLong()]);
+#ifdef HAVE_GPB_BYTE_SIZE_LONG
+        long unsigned int bytesize = obj->ByteSizeLong();
+#else
+        long unsigned int bytesize = obj->ByteSize();
+#endif
+        auto objbuf = std::unique_ptr<char[]>(new char[bytesize]);
 
-        obj->SerializeToArray(objbuf.get(), obj->ByteSizeLong());
-        m->set_obj_value(std::move(objbuf), obj->ByteSizeLong());
+        obj->SerializeToArray(objbuf.get(), bytesize);
+        m->set_obj_value(std::move(objbuf), bytesize);
     }
 
     return 0;
