@@ -1,5 +1,5 @@
-sudo: required
-dist: bionic
+os: linux
+dist: xenial
 language: cpp
 
 before_install:
