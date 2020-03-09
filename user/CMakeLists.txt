@@ -6,6 +6,8 @@ if(PROTOBUF_PROTOC_EXECUTABLE STREQUAL "PROTOBUF_PROTOC_EXECUTABLE-NOTFOUND")
 	message(FATAL_ERROR "Cannot find protocol buffer compiler")
 endif()
 
+message(STATUS "PROTOBUF VERSION ${Protobuf_VERSION}")
+
 add_subdirectory(libs)
 add_subdirectory(tools)
 add_subdirectory(uipcps)
