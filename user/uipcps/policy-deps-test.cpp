@@ -197,11 +197,11 @@ main(int argc, char **argv)
         }
     }
 
+    char uipcp_name[32];
     struct uipcp uipcp;
-    std::string name = "policy-deps-test";
-    uipcp.name       = new char[name.length() + 1];
-    name.copy(uipcp.name, name.length());
-    uipcp.name[name.length()] = '\0';
+
+    strncpy(uipcp_name, "policy-deps-test", sizeof(uipcp_name));
+    uipcp.name       = uipcp_name;
     TestPolicyDeps test(&uipcp);
     if (test.init()) {
         std::cout << "Initialization of RIB for testing failed" << std::endl;
