@@ -22,8 +22,8 @@ usr_count:
 ker_count:
 	find common kernel $(FINDCMD)
 
-stat count:
-	cloc . || (find common kernel user include $(FINDCMD); echo "install 'cloc' for better code statistics")
+count:
+	cloc --exclude-dir=build,tmp-kernel-test-dir,.git . || (find common kernel user include $(FINDCMD); echo "install 'cloc' for better code statistics")
 
 clean: usr_clean ker_clean
 
