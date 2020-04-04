@@ -31,8 +31,6 @@
 
 using namespace std;
 
-using NodeId = std::string;
-
 namespace rlite {
 
 struct FlowRequest {
@@ -155,6 +153,7 @@ public:
     int flows_handler_create(const CDAPMessage *rm,
                              const MsgSrcInfo &src) override;
     int flows_handler_create_r(const CDAPMessage *rm) override;
+    int flows_handler_create_r(const CDAPMessage *rm, int invoke_id);
     int flows_handler_delete(const CDAPMessage *rm,
                              const MsgSrcInfo &src) override;
 
@@ -432,6 +431,12 @@ LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
 int
 LocalFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
 {
+    return flows_handler_create_r(rm, rm->invoke_id);
+}
+
+int
+LocalFlowAllocator::flows_handler_create_r(const CDAPMessage *rm, int invoke_id)
+{
     rlm_addr_t remote_addr;
     const char *objbuf;
     size_t objlen;
@@ -442,11 +447,11 @@ LocalFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
         return 0;
     }
 
-    auto f = flow_reqs_out.find(rm->invoke_id);
+    auto f = flow_reqs_out.find(invoke_id);
     if (f == flow_reqs_out.end()) {
         UPE(rib->uipcp,
             "M_CREATE_R does not match any pending request (invoke_id=%d)\n",
-            rm->invoke_id);
+            invoke_id);
         return 0;
     }
 
@@ -633,7 +638,9 @@ int
 LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm,
                                          const MsgSrcInfo &src)
 {
+#if 0
     rlm_addr_t expected_src_addr;
+#endif
     rl_port_t local_port;
     stringstream decode;
     string objname;
@@ -651,6 +658,7 @@ LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm,
 
     FlowRequest *freq = f->second.get();
 
+#if 0
     expected_src_addr = rib->lookup_node_address(
         (freq->flags & RL_FLOWREQ_INITIATOR) ? freq->gpb.dst_ipcp()
                                              : freq->gpb.src_ipcp());
@@ -661,6 +669,7 @@ LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm,
             (long unsigned)src.addr, (long unsigned)expected_src_addr);
         return 0;
     }
+#endif
 
     /* We received a delete request from the peer, so we won't need to send
      * him a delete request. */
@@ -827,7 +836,7 @@ public:
     void dump(std::stringstream &ss) const override;
     int flows_handler_create(const CDAPMessage *rm,
                              const MsgSrcInfo &src) override;
-    int flows_handler_create_r(const CDAPMessage *rm, int invoke_id);
+    // int flows_handler_create_r(const CDAPMessage *rm, int invoke_id);
     int flows_handler_delete(const CDAPMessage *rm,
                              const MsgSrcInfo &src) override;
     int fa_resp(struct rl_kmsg_fa_resp *resp) override;
@@ -934,12 +943,10 @@ BwResFlowAllocator::Replica::replica_process_rib_msg(
         return 0;
     }
 
-    /* Either we are the leader (so we can go ahead and serve the request),
-     * or this is a request that does not require consensus (so we can serve it
-     * because it's ok to be eventually consistent). */
+    /* We are the leader (so we can go ahead and serve the request). */
     if (!leader()) {
-        /* We are not the leader and this is not a read request. We
-         * need to deny the request to preserve consistency. */
+        /* We are not the leader. We * need to deny the request to preserve
+         * consistency. */
         UPD(uipcp, "Ignoring request, let the leader answer\n");
         return 0;
     }
@@ -962,14 +969,13 @@ BwResFlowAllocator::Replica::replica_process_rib_msg(
         rm->get_obj_value(objbuf, objlen);
         freq.ParseFromArray(objbuf, objlen);
 
-        m->set_obj_value(std::move(objbuf), objlen);
-        rlm_addr_t remote_addr = rib->lookup_node_address(freq.dst_ipcp());
+        m->set_obj_value(objbuf, objlen);
 
         std::string flow_id(freq.src_ipcp() + freq.dst_ipcp() +
                             std::to_string(freq.src_port()));
         pending[rm->invoke_id] = invoke_id;
 
-        rib->send_to_dst_addr(std::move(m), remote_addr);
+        rib->send_to_dst_node(std::move(m), freq.dst_ipcp());
     } else if (rm->op_code == gpb::M_CREATE_R) {
         auto m = utils::make_unique<CDAPMessage>();
 
@@ -992,12 +998,10 @@ BwResFlowAllocator::Replica::replica_process_rib_msg(
 
         std::string flow_id(from + to + std::to_string(freq.src_port()));
 
-        rlm_addr_t orig_src_addr = rib->lookup_node_address(freq.src_ipcp());
-
         if (rm->result) {
             m->result        = rm->result;
             m->result_reason = rm->result_reason;
-            rib->send_to_dst_addr(std::move(m), orig_src_addr);
+            rib->send_to_dst_node(std::move(m), freq.src_ipcp());
             return 0;
         }
 
@@ -1008,7 +1012,7 @@ BwResFlowAllocator::Replica::replica_process_rib_msg(
             m->result        = -1;
             m->result_reason = "No suitable path found";
             UPD(rib->uipcp, "No path found\n");
-            rib->send_to_dst_addr(std::move(m), orig_src_addr);
+            rib->send_to_dst_node(std::move(m), freq.src_ipcp());
             return 0;
         }
 
@@ -1022,15 +1026,9 @@ BwResFlowAllocator::Replica::replica_process_rib_msg(
         for (auto src = path.begin(); std::next(src) != path.end(); ++src) {
             auto dst = std::next(src);
 
-            auto m = utils::make_unique<CDAPMessage>();
-
-            m->op_code   = gpb::M_CREATE_R;
-            m->obj_name  = rm->obj_name;
-            m->obj_class = Replica::DummyMessageObjClass;
-            m->invoke_id = rm->invoke_id;
-
             auto cbuf  = std::unique_ptr<char[]>(new char[sizeof(Command)]);
             Command *c = reinterpret_cast<Command *>(cbuf.get());
+            memset(c, 0, sizeof(*c));
 
             /* Fill in the command struct (already serialized). */
             strncpy(c->flow_id, flow_id.c_str(), sizeof(c->flow_id) - 1);
@@ -1040,7 +1038,7 @@ BwResFlowAllocator::Replica::replica_process_rib_msg(
             c->opcode = Command::OpcodeAdd;
 
             /* Return the command to the caller. */
-            commands->push_back(make_pair(std::move(cbuf), std::move(m)));
+            commands->push_back(make_pair(std::move(cbuf), nullptr));
 
             if (!(src == path.begin() && std::next(dst) == path.end())) {
                 auto m_src       = utils::make_unique<CDAPMessage>();
@@ -1075,6 +1073,7 @@ BwResFlowAllocator::Replica::replica_process_rib_msg(
 
         auto cbuf  = std::unique_ptr<char[]>(new char[sizeof(Command)]);
         Command *c = reinterpret_cast<Command *>(cbuf.get());
+        memset(c, 0, sizeof(*c));
 
         /* Fill in the command struct (already serialized). */
         strncpy(c->flow_id, flow_id.c_str(), sizeof(c->flow_id) - 1);
@@ -1084,10 +1083,8 @@ BwResFlowAllocator::Replica::replica_process_rib_msg(
         c->dst_cepid = dst_cepid;
         c->opcode    = Command::OpcodeReserve;
 
-        m->obj_class = DummyMessageObjClass;
-
         /* Return the command to the caller. */
-        commands->push_back(make_pair(std::move(cbuf), std::move(m)));
+        commands->push_back(make_pair(std::move(cbuf), nullptr));
 
         {
             auto m = utils::make_unique<CDAPMessage>();
@@ -1097,9 +1094,9 @@ BwResFlowAllocator::Replica::replica_process_rib_msg(
             m->obj_class = FlowObjClass;
             m->invoke_id = rm->invoke_id;
 
-            m->set_obj_value(std::move(objbuf), objlen);
+            m->set_obj_value(objbuf, objlen);
 
-            rib->send_to_dst_addr(std::move(m), orig_src_addr);
+            rib->send_to_dst_node(std::move(m), freq.src_ipcp());
         }
         pending.erase(rm->invoke_id);
     } else if (rm->op_code == gpb::M_DELETE) {
@@ -1123,6 +1120,7 @@ BwResFlowAllocator::Replica::replica_process_rib_msg(
 
             auto cbuf  = std::unique_ptr<char[]>(new char[sizeof(Command)]);
             Command *c = reinterpret_cast<Command *>(cbuf.get());
+            memset(c, 0, sizeof(*c));
 
             /* Fill in the command struct (already serialized). */
             c->opcode = Command::OpcodeFree;
@@ -1198,9 +1196,7 @@ BwResFlowAllocator::Client::allocate(const FlowRequest &freq)
     std::string flow_id(freq.gpb.src_ipcp() + freq.gpb.dst_ipcp() +
                         std::to_string(freq.gpb.src_port()));
 
-    auto objbuf = std::unique_ptr<char[]>(new char[freq.gpb.ByteSize()]);
-    freq.gpb.SerializeToArray(objbuf.get(), freq.gpb.ByteSize());
-    m->set_obj_value(std::move(objbuf), freq.gpb.ByteSize());
+    rib->obj_serialize(m.get(), &freq.gpb);
 
     auto timeout =
         rib->get_param_value<Msecs>(FlowAllocator::Prefix, "cli-timeout");
@@ -1287,15 +1283,15 @@ BwResFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
 
     if (!req->flowspec.avg_bandwidth) {
         if (rib->get_param_value<bool>(FlowAllocator::Prefix,
-                                       "reject-unlimited-flows")) {
+                                       "reject-inf-bw")) {
             return uipcp_issue_fa_resp_arrived(rib->uipcp, req->local_port,
                                                /*remote_port=*/0,
                                                /*remote_cep=*/0,
                                                /*qos_id=*/0, /*remote_addr=*/0,
                                                /*response=*/1, /*cfg=*/nullptr);
         } else {
-            req->flowspec.avg_bandwidth = rib->get_param_value<int>(
-                FlowAllocator::Prefix, "default-unlimited-bandwidth");
+            req->flowspec.avg_bandwidth =
+                rib->get_param_value<int>(FlowAllocator::Prefix, "default-bw");
         }
     }
 
@@ -1571,57 +1567,6 @@ BwResFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
     return ret;
 }
 
-/* (4) Initiator FA <-- Slave FA : M_CREATE_R */
-int
-BwResFlowAllocator::flows_handler_create_r(const CDAPMessage *rm, int invoke_id)
-{
-    rlm_addr_t remote_addr;
-    const char *objbuf;
-    size_t objlen;
-
-    rm->get_obj_value(objbuf, objlen);
-    if (!objbuf) {
-        UPE(rib->uipcp, "M_CREATE_R does not contain a nested message\n");
-        return 0;
-    }
-
-    auto f = flow_reqs_out.find(invoke_id);
-    if (f == flow_reqs_out.end()) {
-        UPE(rib->uipcp,
-            "M_CREATE_R does not match any pending request "
-            "(invoke_id=%d)\n",
-            invoke_id);
-        return 0;
-    }
-
-    /* Move the FlowRequest object to the final data structure (flow_reqs).
-     */
-    FlowRequest remote_freq;
-    FlowRequest *freq               = f->second.get();
-    flow_reqs[freq->gpb.src_port()] = std::move(f->second);
-    flow_reqs_out.erase(f);
-
-    remote_freq.gpb.ParseFromArray(objbuf, objlen);
-    /* Update the local freq object with the remote one. */
-    freq->gpb.set_dst_port(remote_freq.gpb.dst_port());
-    freq->gpb.mutable_connections(0)->set_dst_cep(
-        remote_freq.gpb.connections(0).dst_cep());
-
-    rib->stats.fa_response_received++;
-
-    remote_addr = rib->lookup_node_address(freq->gpb.dst_ipcp());
-    if (remote_addr == RL_ADDR_NULL) {
-        UPE(rib->uipcp, "Could not find address of remote IPCP %s\n",
-            freq->gpb.dst_ipcp().c_str());
-        return 0;
-    }
-
-    return uipcp_issue_fa_resp_arrived(
-        rib->uipcp, freq->gpb.src_port(), freq->gpb.dst_port(),
-        freq->gpb.connections(0).dst_cep(), freq->gpb.connections(0).qosid(),
-        remote_addr, rm->result ? 1 : 0, &freq->flowcfg);
-}
-
 int
 BwResFlowAllocator::flows_handler_delete(const CDAPMessage *rm,
                                          const MsgSrcInfo &src)
@@ -1714,8 +1659,8 @@ UipcpRib::fa_lib_init()
                PolicyParam(Msecs(int(CeftReplica::kHeartBeatTimeoutMsecs)))},
               {"raft-rtx-timeout",
                PolicyParam(Msecs(int(CeftReplica::kRtxTimeoutMsecs)))},
-              {"reject-unlimited-flows", PolicyParam(false)},
-              {"default-unlimited-bandwidth",
+              {"reject-inf-bw", PolicyParam(false)},
+              {"default-bw",
                PolicyParam(BwResFlowAllocator::DefaultBandwidth)}},
              {}),
 

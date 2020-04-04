@@ -44,7 +44,7 @@ using RoutingTables =
 
 /* Representation of a list of reachability tests. See the description
  * below. */
-using ReachabilityTest  = std::tuple<int, int, int>;
+using ReachabilityTest  = std::tuple<int, int, int, bool>;
 using ReachabilityTests = std::vector<ReachabilityTest>;
 
 struct TestLFDB : public rlite::LFDB {
@@ -83,8 +83,8 @@ struct TestLFDB : public rlite::LFDB {
     bool reachable(int src_node, int dest_node, const unsigned int req_flow);
 };
 
-/* Returns true if the routing tables are able to route a packet from
- * 'src_node' to 'dst_node' with exactly 'n' hops. */
+/* Returns true if a path from * 'src_node' to 'dst_node' of at least
+ * capacity 'req_flow' exists. */
 bool
 TestLFDB::reachable(int src_node, int dst_node, const unsigned int req_flow)
 {
@@ -93,25 +93,22 @@ TestLFDB::reachable(int src_node, int dst_node, const unsigned int req_flow)
 
     std::cout << "Flow " << req_flow << " from " << cur << " to " << dst
               << std::endl;
-    find_flow_path(cur, dst, req_flow);
+    std::vector<rlite::NodeId> result = find_flow_path(cur, dst, req_flow);
 
-    return true;
+    return !result.empty();
 }
 
 int
 main(int argc, char **argv)
 {
     auto usage = []() {
-        std::cout << "lfdb-test -n SIZE\n"
-                     "          -v be verbose\n"
-                     "          -h show this help and exit\n";
+        std::cout << "lfdb-bw-test -v be verbose\n"
+                     "             -h show this help and exit\n";
     };
     int verbosity = 0;
-    int n         = 100;
     int opt;
-    n++;
 
-    while ((opt = getopt(argc, argv, "hnv:")) != -1) {
+    while ((opt = getopt(argc, argv, "hv:")) != -1) {
         switch (opt) {
         case 'h':
             usage();
@@ -119,10 +116,6 @@ main(int argc, char **argv)
 
         case 'v':
             verbosity++;
-            break;
-
-        case 'n':
-            n = std::atoi(optarg);
             break;
 
         default:
@@ -133,21 +126,25 @@ main(int argc, char **argv)
         }
     }
 
-    /* Test vectors are stored in a list of pairs. Each pair is made of a list
-     * of links and a list of reachability tests. A list of links describes
-     * a network graph, where nodes are integer numbers; each link in the list
-     * is a tuple of integers, which represents a link between two nodes and
-     * their available bandwidth. An item in list of reachability tests is a
-     * tuple of integers; the first integer refers to the source node, the
-     * second to the destination node and the third is the requested bandwidth
-     * for the flow. */
+    /* Test vectors are stored in a list of pairs. Each pair is made of
+     * a list of links and a list of reachability tests. A list of links
+     * describes a network graph, where nodes are integer numbers; each
+     * link in the list is a tuple of integers, which represents a link
+     * between two nodes and their available bandwidth. An item in list
+     * of reachability tests is a tuple of integers and a bool; the first
+     * integer refers to the source node, the second to the destination
+     * node and the third is the requested bandwidth for the flow. The
+     * boolean is the expected value of the test. Each reachability test
+     * is independent and does not take into account previous tests in
+     * the list. */
+
     std::list<std::pair<TestLFDB::LinksList, ReachabilityTests>> test_vectors =
         {{/*links=*/{TestLFDB::Link(0, 1, 10), TestLFDB::Link(0, 3, 5),
                      TestLFDB::Link(1, 2, 10), TestLFDB::Link(2, 3, 10)},
-          /*reachability_tests=*/{ReachabilityTest(0, 0, 5),
-                                  ReachabilityTest(0, 2, 5),
-                                  ReachabilityTest(0, 3, 7),
-                                  ReachabilityTest(0, 2, 12)}},
+          /*reachability_tests=*/{ReachabilityTest(0, 0, 5, false),
+                                  ReachabilityTest(0, 2, 5, true),
+                                  ReachabilityTest(0, 3, 7, true),
+                                  ReachabilityTest(0, 2, 12, false)}},
          {/*links=*/{TestLFDB::Link(0, 1, 10), TestLFDB::Link(0, 2, 5),
                      TestLFDB::Link(0, 3, 10), TestLFDB::Link(1, 4, 10),
                      TestLFDB::Link(2, 3, 5), TestLFDB::Link(2, 5, 5),
@@ -155,8 +152,8 @@ main(int argc, char **argv)
                      TestLFDB::Link(4, 5, 10), TestLFDB::Link(4, 6, 5),
                      TestLFDB::Link(4, 7, 5), TestLFDB::Link(5, 6, 10),
                      TestLFDB::Link(6, 7, 10), TestLFDB::Link(7, 8, 5)},
-          /*reachability_tests=*/{ReachabilityTest(3, 7, 7),
-                                  ReachabilityTest(1, 7, 5)}}};
+          /*reachability_tests=*/{ReachabilityTest(3, 7, 7, true),
+                                  ReachabilityTest(1, 7, 5, true)}}};
 
     int counter = 1;
     for (const auto &p : test_vectors) {
@@ -182,8 +179,16 @@ main(int argc, char **argv)
         auto start = std::chrono::system_clock::now();
 
         for (const auto &rtest : reachability_tests) {
-            lfdb.reachable(std::get<0>(rtest), std::get<1>(rtest),
-                           std::get<2>(rtest));
+            if (lfdb.reachable(std::get<0>(rtest), std::get<1>(rtest),
+                               std::get<2>(rtest)) != std::get<3>(rtest)) {
+                std::cerr << (std::get<3>(rtest) ? "Cannot reach node "
+                                                 : "Can reach node ")
+                          << std::get<0>(rtest) << " from node "
+                          << std::get<1>(rtest) << " with bandwidth "
+                          << std::get<2>(rtest) << std::endl;
+                std::cout << "Test # " << counter << " failed" << std::endl;
+                return -1;
+            }
         }
         auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now() - start);

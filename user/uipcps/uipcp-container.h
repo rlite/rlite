@@ -261,7 +261,7 @@ struct uipcp {
     /* Siblings. */
     struct list_head node;
 
-    /* Interface speeds */
+    /* Interface speed */
     unsigned long int if_speed;
 };
 

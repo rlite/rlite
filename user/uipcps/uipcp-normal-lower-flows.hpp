@@ -1,5 +1,6 @@
 #include "uipcp-normal.hpp"
 #include "uipcp-normal-lfdb.hpp"
+#include <vector>
 
 using namespace std;
 
@@ -15,7 +16,7 @@ public:
         : LFDB(/*lfa_enabled=*/lfa_enabled,
                /*verbose=*/rl_verbosity >= RL_VERB_VERY),
           rib(rib),
-          last_run(std::chrono::system_clock::now())
+          last_run(chrono::system_clock::now())
     {
     }
 
@@ -35,10 +36,10 @@ public:
 private:
     /* The forwarding table computed by compute_fwd_table().
      * It maps a NodeId --> (dst_addr, local_port). */
-    std::unordered_map<rlm_addr_t, std::pair<NodeId, rl_port_t>> next_ports;
+    unordered_map<rlm_addr_t, pair<NodeId, rl_port_t>> next_ports;
 
     /* Set of ports that are currently down. */
-    std::unordered_set<rl_port_t> ports_down;
+    unordered_set<rl_port_t> ports_down;
 
     /* Should update_kernel_routing() really run the graph algorithms and
      * udpate the kernel. */
@@ -48,7 +49,7 @@ private:
     UipcpRib *rib;
 
     /* Last time we ran the routing algorithm. */
-    std::chrono::system_clock::time_point last_run;
+    chrono::system_clock::time_point last_run;
 
     /* Minimum size of the LFDB after which we start to rate limit routing
      * computations. */
@@ -59,7 +60,7 @@ private:
     Secs coalesce_period = Secs(5);
 
     /* Timer to provide an upper bound for the coalescing period. */
-    std::unique_ptr<TimeoutEvent> coalesce_timer;
+    unique_ptr<TimeoutEvent> coalesce_timer;
 };
 
 /* Link state routing, optionally supporting LFA. */
@@ -69,7 +70,7 @@ protected:
     RoutingEngine re;
 
     /* Timer ID for age increment of LFDB entries. */
-    std::unique_ptr<TimeoutEvent> age_incr_timer;
+    unique_ptr<TimeoutEvent> age_incr_timer;
 
 public:
     RL_NODEFAULT_NONCOPIABLE(LinkStateRouting);
@@ -80,22 +81,22 @@ public:
     }
     ~LinkStateRouting() { age_incr_timer.reset(); }
 
-    void dump(std::stringstream &ss) const override { re.dump(ss); }
-    void dump_routing(std::stringstream &ss) const override
+    void dump(stringstream &ss) const override { re.dump(ss); }
+    void dump_routing(stringstream &ss) const override
     {
         re.dump_routing(ss, rib->myname);
     }
 
     bool add(const gpb::LowerFlow &lf);
     bool del(const NodeId &local_node, const NodeId &remote_node);
-    void update_local(const std::string &neigh_name) override;
+    void update_local(const string &neigh_name) override;
     void update_kernel(bool force = true) override;
     int flow_state_update(struct rl_kmsg_flow_state *upd) override;
-    void neigh_disconnected(const std::string &neigh_name) override;
+    void neigh_disconnected(const string &neigh_name) override;
 
     int rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src) override;
 
-    int sync_neigh(const std::shared_ptr<NeighFlow> &nf,
+    int sync_neigh(const shared_ptr<NeighFlow> &nf,
                    unsigned int limit) const override;
     int neighs_refresh(size_t limit) override;
     void age_incr();
@@ -109,44 +110,25 @@ public:
     static constexpr int kAgeMaxSecs = 900;
 };
 
-class StaticRouting : public Routing {
-    /* Routing engine, only used to compute kernel fowarding tables. */
-    RoutingEngine re;
-
-public:
-    RL_NODEFAULT_NONCOPIABLE(StaticRouting);
-    StaticRouting(UipcpRib *_ur) : Routing(_ur), re(_ur, /*lfa_enabled=*/true)
-    {
-    }
-    ~StaticRouting() {}
-
-    void dump(std::stringstream &ss) const override { re.dump(ss); }
-    void dump_routing(std::stringstream &ss) const override
-    {
-        re.dump_routing(ss, rib->myname);
-    }
-    int route_mod(const struct rl_cmsg_ipcp_route_mod *req) override;
-};
-
 class BwResRouting : public LinkStateRouting {
 public:
     RL_NODEFAULT_NONCOPIABLE(BwResRouting);
     BwResRouting(UipcpRib *rib, bool lfa) : LinkStateRouting(rib, lfa) {}
 
-    std::vector<NodeId> find_flow_path(const NodeId &src_node,
-                                       const NodeId &dest_node,
-                                       const unsigned int req_flow)
+    vector<NodeId> find_flow_path(const NodeId &src_node,
+                                  const NodeId &dest_node,
+                                  const unsigned int req_flow)
     {
         return re.find_flow_path(src_node, dest_node, req_flow);
     }
 
-    void update_local(const string &node_name);
-    void reserve_flow(const std::vector<NodeId> path, unsigned int bw);
-    void free_flow(const std::vector<NodeId> path, unsigned int bw);
+    void update_local(const string &node_name) override;
+    void reserve_flow(const vector<NodeId> path, unsigned int bw);
+    void free_flow(const vector<NodeId> path, unsigned int bw);
 
     int rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src) override;
 
-    static std::string PerFlowObjClass;
+    static string PerFlowObjClass;
 };
 
 } // namespace rlite

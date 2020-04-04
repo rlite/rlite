@@ -34,6 +34,25 @@ using namespace std;
 
 namespace rlite {
 
+class StaticRouting : public Routing {
+    /* Routing engine, only used to compute kernel fowarding tables. */
+    RoutingEngine re;
+
+public:
+    RL_NODEFAULT_NONCOPIABLE(StaticRouting);
+    StaticRouting(UipcpRib *_ur) : Routing(_ur), re(_ur, /*lfa_enabled=*/true)
+    {
+    }
+    ~StaticRouting() {}
+
+    void dump(std::stringstream &ss) const override { re.dump(ss); }
+    void dump_routing(std::stringstream &ss) const override
+    {
+        re.dump_routing(ss, rib->myname);
+    }
+    int route_mod(const struct rl_cmsg_ipcp_route_mod *req) override;
+};
+
 std::string BwResRouting::PerFlowObjClass = "PerFlowRoute";
 
 static std::string
@@ -662,17 +681,15 @@ BwResRouting::update_local(const string &node_name)
     lf->set_bw_free(0);
 
     for (auto f : neigh->flows) {
-        rl_ipcp_id_t lower_ipcp_id;
-        int ret = uipcp_lookup_id_by_dif(
-            rib->uipcp->uipcps, f.second->supp_dif.c_str(), &lower_ipcp_id);
-        if (ret) {
+        if (f.second->lower_ipcp_id != (rl_ipcp_id_t)RL_IPCP_ID_NONE) {
             continue;
-        };
+        }
         pthread_mutex_lock(&rib->uipcp->uipcps->lock);
         struct uipcp *lower_uipcp =
-            uipcp_lookup(rib->uipcp->uipcps, lower_ipcp_id);
+            uipcp_lookup(rib->uipcp->uipcps, f.second->lower_ipcp_id);
         pthread_mutex_unlock(&rib->uipcp->uipcps->lock);
         if (lower_uipcp && strcmp(lower_uipcp->dif_type, "shim-eth") == 0) {
+            assert(lower_uipcp->if_speed > 0);
             lf->set_bw_total(lower_uipcp->if_speed);
             lf->set_bw_free(lower_uipcp->if_speed);
             break;

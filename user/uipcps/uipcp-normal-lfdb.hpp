@@ -28,6 +28,7 @@
 
 #include "BaseRIB.pb.h"
 #include "rlite/cpputils.hpp"
+#include "uipcp-normal.hpp"
 
 namespace rlite {
 
@@ -53,8 +54,6 @@ class NameIdsManager {
         return *nid;
     }
 };
-
-using NodeId = std::string;
 
 /* The Lower Flows database, with functionalities to compute the next hops,
  * i.e. the Dijkstra algorithm. This has also optional support for the Loop
@@ -117,6 +116,9 @@ public:
         std::unordered_map<NodeId, DijkstraInfo> &info);
 
     int compute_next_hops(const NodeId &local_node);
+
+    void build_graph(std::unordered_map<NodeId, std::vector<Edge>> &graph,
+                     const NodeId &src_node);
 
     std::vector<NodeId> compute_max_flow(
         const NodeId &src_node, const NodeId &dest_node,

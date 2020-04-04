@@ -156,42 +156,7 @@ LFDB::compute_next_hops(const NodeId &local_node)
     std::unordered_map<NodeId, std::vector<Edge>> graph;
     std::unordered_map<NodeId, DijkstraInfo> info;
 
-    /* Clean up state left from the previous run. */
-    next_hops.clear();
-
-    /* Build the graph from the Lower Flow Database. */
-    graph[local_node] = std::vector<Edge>();
-    for (const auto &kvi : db) {
-        for (const auto &kvj : kvi.second) {
-            const gpb::LowerFlow *revlf;
-
-            revlf = find(kvj.second.local_node(), kvj.second.remote_node());
-
-            if (revlf == nullptr || revlf->cost() != kvj.second.cost()) {
-                /* Something is wrong, this could be malicious or erroneous. */
-                continue;
-            }
-
-            graph[kvj.second.local_node()].emplace_back(
-                kvj.second.remote_node(), kvj.second.cost());
-            if (!graph.count(kvj.second.remote_node())) {
-                /* Make sure graph contains all the nodes, even if with
-                 * empty lists. */
-                graph[kvj.second.remote_node()] = std::vector<Edge>();
-            }
-        }
-    }
-
-    if (verbose) {
-        std::cout << "Graph [" << db.size() << " nodes]:" << std::endl;
-        for (const auto &kvg : graph) {
-            std::cout << kvg.first << ": {";
-            for (const Edge &edge : kvg.second) {
-                std::cout << "(" << edge.to << "," << edge.cost << "), ";
-            }
-            std::cout << "}" << std::endl;
-        }
-    }
+    build_graph(graph, local_node);
 
     /* Compute shortest paths rooted at the local node, and use the
      * result to fill in the next_hops routing table. */
@@ -253,6 +218,50 @@ LFDB::compute_next_hops(const NodeId &local_node)
     }
 
     return 0;
+}
+
+void
+LFDB::build_graph(std::unordered_map<NodeId, std::vector<Edge>> &graph,
+                  const NodeId &src_node)
+{
+    /* Clean up state left from the previous run. */
+    next_hops.clear();
+
+    /* Build the graph from the Lower Flow Database. */
+    graph[src_node] = std::vector<Edge>();
+    for (const auto &kvi : db) {
+        for (const auto &kvj : kvi.second) {
+            const gpb::LowerFlow *revlf;
+
+            revlf = find(kvj.second.local_node(), kvj.second.remote_node());
+
+            if (revlf == nullptr || revlf->cost() != kvj.second.cost()) {
+                /* Something is wrong, this could be malicious or erroneous. */
+                continue;
+            }
+
+            graph[kvj.second.local_node()].emplace_back(
+                kvj.second.remote_node(), kvj.second.cost(),
+                kvj.second.bw_free());
+            if (!graph.count(kvj.second.remote_node())) {
+                /* Make sure graph contains all the nodes, even if with
+                 * empty lists. */
+                graph[kvj.second.remote_node()] = std::vector<Edge>();
+            }
+        }
+    }
+
+    if (verbose) {
+        std::cout << "Graph [" << db.size() << " nodes]:" << std::endl;
+        for (const auto &kvg : graph) {
+            std::cout << kvg.first << ": {";
+            for (const Edge &edge : kvg.second) {
+                std::cout << "(" << edge.to << "," << edge.cost << ","
+                          << edge.capacity << "), ";
+            }
+            std::cout << "}" << std::endl;
+        }
+    }
 }
 
 std::vector<NodeId>
@@ -330,44 +339,7 @@ LFDB::find_flow_path(const NodeId &src_node, const NodeId &dest_node,
         neigh_infos;
     std::unordered_map<NodeId, std::vector<Edge>> graph;
 
-    /* Clean up state left from the previous run. */
-    next_hops.clear();
-
-    /* Build the graph from the Lower Flow Database. */
-    graph[src_node] = std::vector<Edge>();
-    for (const auto &kvi : db) {
-        for (const auto &kvj : kvi.second) {
-            const gpb::LowerFlow *revlf;
-
-            revlf = find(kvj.second.local_node(), kvj.second.remote_node());
-
-            if (revlf == nullptr || revlf->cost() != kvj.second.cost()) {
-                /* Something is wrong, this could be malicious or erroneous. */
-                continue;
-            }
-
-            graph[kvj.second.local_node()].emplace_back(
-                kvj.second.remote_node(), kvj.second.cost(),
-                kvj.second.bw_free());
-            if (!graph.count(kvj.second.remote_node())) {
-                /* Make sure graph contains all the nodes, even if with
-                 * empty lists. */
-                graph[kvj.second.remote_node()] = std::vector<Edge>();
-            }
-        }
-    }
-
-    if (verbose) {
-        std::cout << "Graph [" << db.size() << " nodes]:" << std::endl;
-        for (const auto &kvg : graph) {
-            std::cout << kvg.first << ": {";
-            for (const Edge &edge : kvg.second) {
-                std::cout << "(" << edge.to << "," << edge.cost << ","
-                          << edge.capacity << "), ";
-            }
-            std::cout << "}" << std::endl;
-        }
-    }
+    build_graph(graph, src_node);
 
     ret = compute_max_flow(src_node, dest_node, graph, req_flow);
 

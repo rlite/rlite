@@ -71,6 +71,8 @@ namespace rlite {
 using Msecs = std::chrono::milliseconds;
 using Secs  = std::chrono::seconds;
 
+using NodeId = std::string;
+
 enum class PolicyParamType {
     Int = 0,
     Bool,
