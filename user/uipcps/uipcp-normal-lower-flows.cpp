@@ -681,9 +681,15 @@ BwResRouting::update_local(const string &node_name)
     lf->set_bw_free(0);
 
     for (auto f : neigh->flows) {
-        if (f.second->lower_ipcp_id != (rl_ipcp_id_t)RL_IPCP_ID_NONE) {
-            continue;
-        }
+        rl_ipcp_id_t lower_ipcp_id = f.second->lower_ipcp_id;
+        if (lower_ipcp_id == (rl_ipcp_id_t)RL_IPCP_ID_NONE) {
+            int ret = uipcp_lookup_id_by_dif(
+                rib->uipcp->uipcps, f.second->supp_dif.c_str(), &lower_ipcp_id);
+            if (ret) {
+                continue;
+            };
+        };
+
         pthread_mutex_lock(&rib->uipcp->uipcps->lock);
         struct uipcp *lower_uipcp =
             uipcp_lookup(rib->uipcp->uipcps, f.second->lower_ipcp_id);

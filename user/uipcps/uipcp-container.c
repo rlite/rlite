@@ -1607,7 +1607,7 @@ uipcp_get_if_speed(struct uipcp *uipcp)
     struct ifreq ifr;
 
     int ret;
-    int speed;
+    unsigned long speed;
 
     if (if_name == NULL) {
         return -1;
@@ -1615,6 +1615,7 @@ uipcp_get_if_speed(struct uipcp *uipcp)
 
     /* netdev param not configured yet */
     if (!strcmp(if_name, "")) {
+      free(if_name);
         return 0;
     }
 
@@ -1624,6 +1625,7 @@ uipcp_get_if_speed(struct uipcp *uipcp)
 
     if ((skfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         UPW(uipcp, "uipcp_get_if_speed() failed [%s]\n", strerror(errno));
+        free(if_name);
         return -1;
     }
 
@@ -1638,12 +1640,14 @@ uipcp_get_if_speed(struct uipcp *uipcp)
         UPW(uipcp, "uipcp_get_if_speed() failed: ioctl on %s: [%s]\n", if_name,
             strerror(errno));
         close(skfd);
+        free(if_name);
         return -1;
     }
 
     speed           = ethtool_cmd_speed(&edata);
     uipcp->if_speed = speed == -1 ? 0 : speed * 1000 * 1000; // Mbps -> bps
     close(skfd);
+    free(if_name);
 
     return 0;
 }
