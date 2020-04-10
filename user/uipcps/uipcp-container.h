@@ -262,7 +262,7 @@ struct uipcp {
     struct list_head node;
 
     /* Interface speed */
-    unsigned long int if_speed;
+    unsigned long if_speed;
 };
 
 static inline int

@@ -117,14 +117,14 @@ public:
 
     vector<NodeId> find_flow_path(const NodeId &src_node,
                                   const NodeId &dest_node,
-                                  const unsigned int req_flow)
+                                  const unsigned long req_flow)
     {
         return re.find_flow_path(src_node, dest_node, req_flow);
     }
 
     void update_local(const string &node_name) override;
-    void reserve_flow(const vector<NodeId> path, unsigned int bw);
-    void free_flow(const vector<NodeId> path, unsigned int bw);
+    void reserve_flow(const vector<NodeId> path, unsigned long bw);
+    void free_flow(const vector<NodeId> path, unsigned long bw);
 
     int rib_handler(const CDAPMessage *rm, const MsgSrcInfo &src) override;
 

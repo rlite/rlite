@@ -743,9 +743,9 @@ class BwResFlowAllocator : public LocalFlowAllocator {
         struct Command {
             char flow_id[128];
             char from[32];
-            char to[31];
+            char to[32];
             uint8_t opcode;
-            uint32_t bw;
+            uint64_t bw;
             uint64_t src_addr;
             uint64_t dst_addr;
             uint32_t src_cepid;
@@ -766,7 +766,7 @@ class BwResFlowAllocator : public LocalFlowAllocator {
             NodeId from;
             NodeId to;
             std::vector<NodeId> path;
-            unsigned int bw;
+            unsigned long bw;
             rlm_addr_t src_addr;
             rlm_addr_t dst_addr;
             rlm_cepid_t src_cepid;
@@ -836,9 +836,6 @@ public:
     int flow_deallocated(struct rl_kmsg_flow_deallocated *req) override;
     void dump(std::stringstream &ss) const override;
     int flows_handler_create(const CDAPMessage *rm,
-                             const MsgSrcInfo &src) override;
-    // int flows_handler_create_r(const CDAPMessage *rm, int invoke_id);
-    int flows_handler_delete(const CDAPMessage *rm,
                              const MsgSrcInfo &src) override;
     int fa_resp(struct rl_kmsg_fa_resp *resp) override;
 
@@ -920,13 +917,16 @@ BwResFlowAllocator::Replica::apply(const char *const serbuf,
         table[c->flow_id].dst_addr  = c->dst_addr;
         table[c->flow_id].src_cepid = c->src_cepid;
         table[c->flow_id].dst_cepid = c->dst_cepid;
-        UPD(rib->uipcp, "Commit %s <-- %u\n", c->flow_id, table[c->flow_id].bw);
+        UPD(rib->uipcp, "Commit %s <-- %lu\n", c->flow_id, table[c->flow_id].bw);
     } else if (c->opcode == Command::OpcodeFree) {
         BwResRouting *routing = dynamic_cast<BwResRouting *>(rib->routing);
-        routing->free_flow(table[c->flow_id].path, table[c->flow_id].bw);
-        UPD(rib->uipcp, "Commit %s <-- -%u\n", c->flow_id,
-            table[c->flow_id].bw);
-        table.erase(c->flow_id);
+        // prevent a double free happening when the flow destination is also the raft leader
+        if (table.find(c->flow_id) != table.end()) {
+            routing->free_flow(table[c->flow_id].path, table[c->flow_id].bw);
+            UPD(rib->uipcp, "Commit %s <-- -%lu\n", c->flow_id,
+                table[c->flow_id].bw);
+            table.erase(c->flow_id);
+        }
     }
 
     return 0;
@@ -946,7 +946,7 @@ BwResFlowAllocator::Replica::replica_process_rib_msg(
 
     /* We are the leader (so we can go ahead and serve the request). */
     if (!leader()) {
-        /* We are not the leader. We * need to deny the request to preserve
+        /* We are not the leader. We need to deny the request to preserve
          * consistency. */
         UPD(uipcp, "Ignoring request, let the leader answer\n");
         return 0;
@@ -995,7 +995,7 @@ BwResFlowAllocator::Replica::replica_process_rib_msg(
 
         std::string from(freq.src_ipcp());
         std::string to(freq.dst_ipcp());
-        int bw = freq.qos().avg_bw();
+        unsigned long bw = freq.qos().avg_bw();
 
         std::string flow_id(from + to + std::to_string(freq.src_port()));
 
@@ -1566,46 +1566,6 @@ BwResFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
     rib->stats.fa_response_issued++;
 
     return ret;
-}
-
-int
-BwResFlowAllocator::flows_handler_delete(const CDAPMessage *rm,
-                                         const MsgSrcInfo &src)
-{
-    /* rlm_addr_t expected_src_addr; */
-    rl_port_t local_port;
-    stringstream decode;
-    string objname;
-
-    decode << rm->obj_name.substr(TableName.size() + 1);
-    decode >> local_port;
-
-    /* Lookup the corresponding FlowRequest by port_id. */
-    auto f = flow_reqs.find(local_port);
-    if (f == flow_reqs.end()) {
-        UPV(rib->uipcp, "No flow port_id %u (may be already deleted locally)\n",
-            local_port);
-        return 0;
-    }
-
-    FlowRequest *freq = f->second.get();
-
-    /* expected_src_addr = rib->lookup_node_address( */
-    /*     (freq->flags & RL_FLOWREQ_INITIATOR) ? freq->gpb.dst_ipcp() */
-    /*                                          : freq->gpb.src_ipcp()); */
-    /* if (src.addr != expected_src_addr) { */
-    /*     UPW(rib->uipcp, */
-    /*         "Remote flow deallocation from unmatching address " */
-    /*         "'%lu' (expected=%lu)\n", */
-    /*         (long unsigned)src.addr, (long unsigned)expected_src_addr); */
-    /*     return 0; */
-    /* } */
-
-    /* We received a delete request from the peer, so we won't need to send
-     * him a delete request. */
-    freq->flags &= ~RL_FLOWREQ_SEND_DEL;
-
-    return uipcp_issue_flow_dealloc(rib->uipcp, local_port, freq->uid);
 }
 
 void

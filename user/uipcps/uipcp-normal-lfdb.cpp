@@ -268,7 +268,7 @@ std::vector<NodeId>
 LFDB::compute_max_flow(
     const NodeId &src_node, const NodeId &dest_node,
     const std::unordered_map<NodeId, std::vector<Edge>> &graph,
-    const unsigned int req_flow)
+    const unsigned long req_flow)
 {
     /* A variation of the Edmonds-Karp algorithm.
      * We're not interested in total maximum flow, but in the shortest
@@ -327,7 +327,7 @@ LFDB::compute_max_flow(
 
 std::vector<NodeId>
 LFDB::find_flow_path(const NodeId &src_node, const NodeId &dest_node,
-                     const unsigned int req_flow)
+                     const unsigned long req_flow)
 {
     std::vector<NodeId> ret;
 
@@ -335,8 +335,6 @@ LFDB::find_flow_path(const NodeId &src_node, const NodeId &dest_node,
         return ret;
     }
 
-    std::unordered_map<NodeId, std::unordered_map<NodeId, DijkstraInfo>>
-        neigh_infos;
     std::unordered_map<NodeId, std::vector<Edge>> graph;
 
     build_graph(graph, src_node);

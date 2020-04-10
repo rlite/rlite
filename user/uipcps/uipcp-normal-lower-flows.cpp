@@ -708,7 +708,7 @@ BwResRouting::update_local(const string &node_name)
 }
 
 void
-BwResRouting::reserve_flow(const std::vector<NodeId> path, unsigned int bw)
+BwResRouting::reserve_flow(const std::vector<NodeId> path, unsigned long bw)
 {
     for (auto src = path.begin(); std::next(src) != path.end(); ++src) {
         auto dst = std::next(src);
@@ -724,7 +724,7 @@ BwResRouting::reserve_flow(const std::vector<NodeId> path, unsigned int bw)
 }
 
 void
-BwResRouting::free_flow(const std::vector<NodeId> path, unsigned int bw)
+BwResRouting::free_flow(const std::vector<NodeId> path, unsigned long bw)
 {
     for (auto src = path.begin(); std::next(src) != path.end(); ++src) {
         auto dst = std::next(src);
