@@ -1210,9 +1210,9 @@ BwResFlowAllocator::Client::allocate(const FlowRequest &freq)
 
     UPI(rib->uipcp,
         "Issued flow bandwidth reservation request from '%s' to '%s' of "
-        "bandwidth '%u (invoke_id=%d)\n",
+        "bandwidth '%llu (invoke_id=%d)\n",
         freq.gpb.src_ipcp().c_str(), freq.gpb.dst_ipcp().c_str(),
-        freq.flowcfg.dtcp.bandwidth, freq.invoke_id);
+        (unsigned long long)freq.flowcfg.dtcp.bandwidth, freq.invoke_id);
 
     return 0;
 }
