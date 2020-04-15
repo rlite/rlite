@@ -1574,7 +1574,7 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         if (uipcp_get_if_speed(uipcp)) {
             return -1;
         }
-        PD("Interface speed: %lu\n", uipcp->if_speed);
+        PD("Interface speed: %llu\n", uipcp->if_speed);
     }
 
     if (!mss_changed) {
@@ -1607,7 +1607,7 @@ uipcp_get_if_speed(struct uipcp *uipcp)
     struct ifreq ifr;
 
     int ret;
-    unsigned long speed;
+    unsigned long long speed;
 
     if (if_name == NULL) {
         return -1;

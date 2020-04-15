@@ -85,16 +85,17 @@ struct PolicyParam {
     PolicyParamType type;
     union {
         bool b;
-        int i;
+        long long i;
     } value;
-    int min;
-    int max;
+    long long min;
+    long long max;
     std::string stringval;
     Msecs durval;
 
     PolicyParam();
     PolicyParam(bool param_value);
     PolicyParam(int param_value, int range_min = 0, int range_max = 0);
+    PolicyParam(long long param_value, long long range_min = 0, long long range_max = 0);
     PolicyParam(const std::string &s);
     PolicyParam(const Msecs durval);
 
@@ -102,7 +103,7 @@ struct PolicyParam {
 
     int set_value(const std::string &param_value, std::string *error_reason);
     bool get_bool_value() const;
-    int get_int_value() const;
+    long long get_int_value() const;
     std::string get_string_value() const;
     Msecs get_duration_value() const;
 };
@@ -802,6 +803,9 @@ bool UipcpRib::get_param_value<bool>(const std::string &component,
 
 template <>
 int UipcpRib::get_param_value<int>(const std::string &component,
+                                   const std::string &param_name);
+template <>
+long long UipcpRib::get_param_value<long long>(const std::string &component,
                                    const std::string &param_name);
 
 template <>

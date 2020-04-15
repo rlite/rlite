@@ -39,7 +39,7 @@ done
 # Carry out the enrollments, with A being the enrollment master.
 ip netns exec a rlite-ctl dif-policy-mod bwresdif flowalloc bw-res
 ip netns exec a rlite-ctl dif-policy-param-mod bwresdif flowalloc replicas a.n,b.n,c.n
-ip netns exec a rlite-ctl dif-policy-param-mod bwresdif flowalloc default-bw 2000000000 # 2 Gbps
+ip netns exec a rlite-ctl dif-policy-param-mod bwresdif flowalloc default-bw 4000000000 # 4 Gbps
 ip netns exec a rlite-ctl ipcp-enroller-enable a.n
 for li in ab ac ad; do
     left=${li:0:1}
@@ -50,7 +50,7 @@ done
 # Check that policy and policy parameters were transferred on enrollment.
 for cont in a b c d; do
     ip netns exec ${cont} rlite-ctl dif-policy-list bwresdif flowalloc | grep -q "\<bw-res\>"
-    ip netns exec ${cont} rlite-ctl dif-policy-param-list bwresdif flowalloc | grep -q "/mgmt/flowalloc.default-bw = '2000000000'"
+    ip netns exec ${cont} rlite-ctl dif-policy-param-list bwresdif flowalloc | grep -q "/mgmt/flowalloc.default-bw = '4000000000'"
     ip netns exec ${cont} rlite-ctl dif-policy-param-list bwresdif flowalloc | grep -q "/mgmt/flowalloc.replicas = 'a.n,b.n,c.n'"
 done
 
@@ -62,17 +62,14 @@ sleep 0.5 # give some time to commit registration to the cluster
 ip netns exec c rinaperf -v -z rpinst1 -t ping -D 2 &
 sleep 0.5 # give some time to reserve flow
 RIB="$(ip netns exec b rlite-ctl dif-rib-show)"
-printf "%s" "$RIB" | grep -q -F 'c.na.n1: c.n->a.n (c.n,a.n,) : 2000000000'
-printf "%s" "$RIB" | grep -q -F 'Local: c.n, Remote: a.n, Cost: 1, Seqnum: 1, State: 1, Age: 10, Total Bandwidth: 10000000000, Free Bandwidth: 6000000000'
+echo "$RIB"
+printf "%s" "$RIB" | grep -q -F 'c.na.n1: c.n->a.n (c.n,a.n,) : 4000000000'
+printf "%s" "$RIB" | grep -q -F 'Local: c.n, Remote: a.n, Cost: 1, Seqnum: 1, State: 1, Age: 10, Total Bandwidth: 10000000000, Free Bandwidth: 2000000000'
 sleep 3 # clean the flows
-# use up 9Gbps
-ip netns exec c rinaperf -v -z rpinst1 -t ping -D 3 -B 1500000000 &
-sleep 0.5
-ip netns exec c rinaperf -v -z rpinst1 -t ping -D 3 -B 1500000000 &
-sleep 0.5
-ip netns exec c rinaperf -v -z rpinst1 -t ping -D 3 -B 1500000000 &
+# use up 8Gbps
+ip netns exec c rinaperf -v -z rpinst1 -t ping -D 3 &
 sleep 0.5 # give some time to reserve flow
-# try to allocate another 4Gbps -> should fail
+# try to allocate another 8Gbps -> should fail
 if ip netns exec c rinaperf -v -z rpinst1 -t ping -c 1; then
     false
 else

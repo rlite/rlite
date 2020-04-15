@@ -766,7 +766,7 @@ class BwResFlowAllocator : public LocalFlowAllocator {
             NodeId from;
             NodeId to;
             std::vector<NodeId> path;
-            unsigned long bw;
+            unsigned long long bw;
             rlm_addr_t src_addr;
             rlm_addr_t dst_addr;
             rlm_cepid_t src_cepid;
@@ -840,7 +840,7 @@ public:
     int fa_resp(struct rl_kmsg_fa_resp *resp) override;
 
     /* Th default bandwidth for flows that do not set it, bits per second */
-    static constexpr int DefaultBandwidth = 5 * 1000 * 100;
+    static constexpr long long DefaultBandwidth = 5 * 1000 * 100;
 };
 
 int
@@ -917,13 +917,13 @@ BwResFlowAllocator::Replica::apply(const char *const serbuf,
         table[c->flow_id].dst_addr  = c->dst_addr;
         table[c->flow_id].src_cepid = c->src_cepid;
         table[c->flow_id].dst_cepid = c->dst_cepid;
-        UPD(rib->uipcp, "Commit %s <-- %lu\n", c->flow_id, table[c->flow_id].bw);
+        UPD(rib->uipcp, "Commit %s <-- %llu\n", c->flow_id, table[c->flow_id].bw);
     } else if (c->opcode == Command::OpcodeFree) {
         BwResRouting *routing = dynamic_cast<BwResRouting *>(rib->routing);
         // prevent a double free happening when the flow destination is also the raft leader
         if (table.find(c->flow_id) != table.end()) {
             routing->free_flow(table[c->flow_id].path, table[c->flow_id].bw);
-            UPD(rib->uipcp, "Commit %s <-- -%lu\n", c->flow_id,
+            UPD(rib->uipcp, "Commit %s <-- -%llu\n", c->flow_id,
                 table[c->flow_id].bw);
             table.erase(c->flow_id);
         }
@@ -995,7 +995,7 @@ BwResFlowAllocator::Replica::replica_process_rib_msg(
 
         std::string from(freq.src_ipcp());
         std::string to(freq.dst_ipcp());
-        unsigned long bw = freq.qos().avg_bw();
+        unsigned long long bw = freq.qos().avg_bw();
 
         std::string flow_id(from + to + std::to_string(freq.src_port()));
 
@@ -1292,7 +1292,7 @@ BwResFlowAllocator::fa_req(struct rl_kmsg_fa_req *req,
                                                /*response=*/1, /*cfg=*/nullptr);
         } else {
             req->flowspec.avg_bandwidth =
-                rib->get_param_value<int>(FlowAllocator::Prefix, "default-bw");
+                rib->get_param_value<long long>(FlowAllocator::Prefix, "default-bw");
         }
     }
 

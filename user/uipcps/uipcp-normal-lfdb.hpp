@@ -62,9 +62,9 @@ struct LFDB {
     struct Edge {
         NodeId to;
         unsigned int cost;
-        unsigned long capacity;
+        unsigned long long capacity;
 
-        Edge(const NodeId &to_, unsigned int cost_, unsigned long capacity_)
+        Edge(const NodeId &to_, unsigned int cost_, unsigned long long capacity_)
             : to(to_), cost(cost_), capacity(capacity_){};
         Edge(const NodeId &to_, unsigned int cost_) : Edge(to_, cost_, 0){};
         Edge(const Edge &) = default;
@@ -123,10 +123,10 @@ public:
     std::vector<NodeId> compute_max_flow(
         const NodeId &src_node, const NodeId &dest_node,
         const std::unordered_map<NodeId, std::vector<Edge>> &graph,
-        const unsigned long req_flow);
+        const unsigned long long req_flow);
     std::vector<NodeId> find_flow_path(const NodeId &src_node,
                                        const NodeId &dest_node,
-                                       const unsigned long req_flow);
+                                       const unsigned long long req_flow);
 
     /* Dump the routing table. */
     void dump_routing(std::stringstream &ss, const NodeId &local_node) const;

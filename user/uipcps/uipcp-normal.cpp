@@ -1166,12 +1166,12 @@ UipcpRib::status_handler(const CDAPMessage *rm, const MsgSrcInfo &src)
 }
 
 static int
-string2int(const string &s, int &ret)
+string2int(const string &s, long long &ret)
 {
     char *dummy;
     const char *cstr = s.c_str();
 
-    ret = strtoul(cstr, &dummy, 10);
+    ret = strtoull(cstr, &dummy, 10);
     if (!s.size() || *dummy != '\0') {
         ret = ~0U;
         return -1;
@@ -1919,6 +1919,16 @@ UipcpRib::get_param_value<int>(const std::string &component,
 }
 
 template <>
+long long
+UipcpRib::get_param_value<long long>(const std::string &component,
+                               const std::string &param_name)
+{
+    assert(params_map.count(component) &&
+           params_map[component].count(param_name));
+    return params_map[component][param_name].get_int_value();
+}
+
+template <>
 string
 UipcpRib::get_param_value<string>(const std::string &component,
                                   const std::string &param_name)
@@ -1963,6 +1973,14 @@ PolicyParam::PolicyParam(int param_value, int range_min, int range_max)
     max     = range_max;
 }
 
+PolicyParam::PolicyParam(long long param_value, long long range_min, long long range_max)
+{
+    type    = PolicyParamType::Int;
+    value.i = param_value;
+    min     = range_min;
+    max     = range_max;
+}
+
 PolicyParam::PolicyParam(Msecs val)
 {
     type   = PolicyParamType::Duration;
@@ -1979,7 +1997,7 @@ int
 PolicyParam::set_value(const std::string &param_value,
                        std::string *error_reason)
 {
-    int val;
+    long long val;
     bool enable;
 
     assert(type != PolicyParamType::Undefined);
@@ -2058,7 +2076,7 @@ PolicyParam::set_value(const std::string &param_value,
     return 0;
 }
 
-int
+long long
 PolicyParam::get_int_value() const
 {
     assert(type == PolicyParamType::Int);
