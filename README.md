@@ -1045,6 +1045,9 @@ components of a normal IPCP process:
 | addralloc           | centralized-fault-tolerant | Allocation handled by a fault-tolerant cluster of replicas |
 | dft                 | fully-replicated | Every node has a full copy of the DFT |
 | dft                 | centralized-fault-tolerant | DFT stored in a fault-tolerant cluster of replicas |
+| flowalloc           | local            | Local flow allocation             |
+| flowalloc           | bw-res           | Distributed fault-tolerant flow allocator with support for bandwidth reservation |
+| routing             | bw-res-link-state       | Link state routing algorithm with additonal features required by bw-res flowalloc      |
 | routing             | link-state       | Link state routing algorithm      |
 | routing             | link-state-lfa   | Link state enhanced with Loop Free Alternate |
 | routing             | static           | Statically configured routing rules |
@@ -1068,12 +1071,16 @@ of a normal IPCP process:
 | enrollment          | *                 | keepalive          | Neighbor keepalive timeout (0 to disable). |
 | enrollment          | *                 | keepalive-thresh   | Number of allowed unacked keepalive requests. If exceeded, the N-1 low is pruned. |
 | enrollment          | *                 | auto-reconnect     | Automatically re-enroll to neighbors pruned because unresponsive. |
-| flowalloc           | local             | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
-| flowalloc           | local             | max-rtxq-len       | Maximum size of the retransmission queue (in PDUs). |
-| flowalloc           | local             | initial-rtx-timeout| Initial value for the DTCP retransmission timer. |
-| flowalloc           | local             | initial-a          | Initial value for the DTCP A timer. |
-| flowalloc           | local             | initial-credit     | Initial size of the DTCP flow control window (in PDUs). |
-| flowalloc           | local             | max-cwq-len        | Maximum size of the DTCP closed window queue (in PDUs). |
+| flowalloc           | *                 | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
+| flowalloc           | *                 | max-rtxq-len       | Maximum size of the retransmission queue (in PDUs). |
+| flowalloc           | *                 | initial-rtx-timeout| Initial value for the DTCP retransmission timer. |
+| flowalloc           | *                 | initial-a          | Initial value for the DTCP A timer. |
+| flowalloc           | *                 | initial-credit     | Initial size of the DTCP flow control window (in PDUs). |
+| flowalloc           | *                 | max-cwq-len        | Maximum size of the DTCP closed window queue (in PDUs). |
+| flowalloc           | bw-res            | replicas  | Names of the IPCPs that constitute the fault-tolerant cluster. |
+| flowalloc           | bw-res            | cli-timeout  | Timeout for the client request to the replicas. |
+| flowalloc           | bw-res            | reject-inf-bw  | Reject flows that do not include average bandwidth as part of the request. |
+| flowalloc           | bw-res            | default-bw  | Bandwidth to set for flows that do not include it as part of the request. |
 | resalloc            | *                 | reliable-flows     | Use dedicated reliable N-1-flows for management traffic rather than reusing kernel-bound unreliable N-1 flows if possible (boolean). |
 | resalloc            | *                 | reliable-n-flows   | Use dedicated reliable N-flows if reliable N-1-flows are not available (boolean). |
 | resalloc            | *                 | broadcast-enroller | Let the IPCP register the name of the DIF (DAF name) in addition to the IPCP name (boolean). |

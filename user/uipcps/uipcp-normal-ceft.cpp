@@ -183,13 +183,16 @@ CeftReplica::apply(raft::LogIndex index, raft::Term term,
         if (mit->second->term == term) {
             /* Send the response to the client and flush the pending response.
              */
-            int invoke_id = rm->invoke_id;
-            rib->send_to_dst_addr(std::move(rm), mit->second->requestor_addr);
-            UPD(rib->uipcp,
-                "Pending response for index %u sent to client %llu "
-                "(invoke_id=%d)\n",
-                index, (long long unsigned)mit->second->requestor_addr,
-                invoke_id);
+            if (rm != NULL) {
+                int invoke_id = rm->invoke_id;
+                rib->send_to_dst_addr(std::move(rm),
+                                      mit->second->requestor_addr);
+                UPD(rib->uipcp,
+                    "Pending response for index %u sent to client %llu "
+                    "(invoke_id=%d)\n",
+                    index, (long long unsigned)mit->second->requestor_addr,
+                    invoke_id);
+            }
         }
         pending.erase(index);
     }

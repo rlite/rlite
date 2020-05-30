@@ -43,7 +43,7 @@ extern "C" {
 #endif
 
 /* Expected control API version. */
-#define RL_API_VERSION 8
+#define RL_API_VERSION 9
 
 #define RLITE_CTRLDEV_NAME "/dev/rlite"
 #define RLITE_IODEV_NAME "/dev/rlite-io"
@@ -241,7 +241,7 @@ struct dtcp_config {
     } rtx;
 
     uint32_t initial_a; /* A */
-    uint32_t bandwidth; /* in bps */
+    uint64_t bandwidth; /* in bps */
 };
 
 struct rl_flow_config {

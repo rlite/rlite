@@ -515,7 +515,10 @@ class Demo:
                 'id': vm['id'],
                 'vmname': vm['name'],
                 'shimtype': shim['type'],
+                'shimspeed': shim['speed']
             }
+            if shim['speed_unit'] == 'g':
+                vars_dict['shimspeed'] = vars_dict['shimspeed']*1000
             if mac2ifname:
                 vars_dict['mac'] = port['mac']
                 outs += 'PORT%(idx)s=$(mac2ifname %(mac)s)\n' % vars_dict
@@ -523,6 +526,8 @@ class Demo:
                 vars_dict['ifname'] = port['veth']
                 outs += 'PORT%(idx)s=%(ifname)s\n' % vars_dict
             outs += '$SUDO ip link set $PORT%(idx)s up\n' % vars_dict
+            if vars_dict['shimspeed'] != 0:
+                outs += '$SUDO ethtool -s $PORT%(idx)s speed %(shimspeed)s\n' % vars_dict
             ctrl_cmds.append(
                 'ipcp-create %(shim)s.%(vmname)s.IPCP shim-%(shimtype)s %(shim)s.DIF\n'
                 % vars_dict)

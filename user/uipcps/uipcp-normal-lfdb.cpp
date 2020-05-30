@@ -44,7 +44,8 @@ LFDB::dump(std::stringstream &ss) const
                << ", Remote: " << flow.remote_node()
                << ", Cost: " << flow.cost() << ", Seqnum: " << flow.seqnum()
                << ", State: " << flow.state() << ", Age: " << flow.age()
-               << std::endl;
+               << ", Total Bandwidth: " << flow.bw_total()
+               << ", Free Bandwidth: " << flow.bw_free() << std::endl;
         }
     }
 
@@ -155,42 +156,7 @@ LFDB::compute_next_hops(const NodeId &local_node)
     std::unordered_map<NodeId, std::vector<Edge>> graph;
     std::unordered_map<NodeId, DijkstraInfo> info;
 
-    /* Clean up state left from the previous run. */
-    next_hops.clear();
-
-    /* Build the graph from the Lower Flow Database. */
-    graph[local_node] = std::vector<Edge>();
-    for (const auto &kvi : db) {
-        for (const auto &kvj : kvi.second) {
-            const gpb::LowerFlow *revlf;
-
-            revlf = find(kvj.second.local_node(), kvj.second.remote_node());
-
-            if (revlf == nullptr || revlf->cost() != kvj.second.cost()) {
-                /* Something is wrong, this could be malicious or erroneous. */
-                continue;
-            }
-
-            graph[kvj.second.local_node()].emplace_back(
-                kvj.second.remote_node(), kvj.second.cost());
-            if (!graph.count(kvj.second.remote_node())) {
-                /* Make sure graph contains all the nodes, even if with
-                 * empty lists. */
-                graph[kvj.second.remote_node()] = std::vector<Edge>();
-            }
-        }
-    }
-
-    if (verbose) {
-        std::cout << "Graph [" << db.size() << " nodes]:" << std::endl;
-        for (const auto &kvg : graph) {
-            std::cout << kvg.first << ": {";
-            for (const Edge &edge : kvg.second) {
-                std::cout << "(" << edge.to << "," << edge.cost << "), ";
-            }
-            std::cout << "}" << std::endl;
-        }
-    }
+    build_graph(graph, local_node);
 
     /* Compute shortest paths rooted at the local node, and use the
      * result to fill in the next_hops routing table. */
@@ -252,6 +218,137 @@ LFDB::compute_next_hops(const NodeId &local_node)
     }
 
     return 0;
+}
+
+void
+LFDB::build_graph(std::unordered_map<NodeId, std::vector<Edge>> &graph,
+                  const NodeId &src_node)
+{
+    /* Clean up state left from the previous run. */
+    next_hops.clear();
+
+    /* Build the graph from the Lower Flow Database. */
+    graph[src_node] = std::vector<Edge>();
+    for (const auto &kvi : db) {
+        for (const auto &kvj : kvi.second) {
+            const gpb::LowerFlow *revlf;
+
+            revlf = find(kvj.second.local_node(), kvj.second.remote_node());
+
+            if (revlf == nullptr || revlf->cost() != kvj.second.cost()) {
+                /* Something is wrong, this could be malicious or erroneous. */
+                continue;
+            }
+
+            graph[kvj.second.local_node()].emplace_back(
+                kvj.second.remote_node(), kvj.second.cost(),
+                kvj.second.bw_free());
+            if (!graph.count(kvj.second.remote_node())) {
+                /* Make sure graph contains all the nodes, even if with
+                 * empty lists. */
+                graph[kvj.second.remote_node()] = std::vector<Edge>();
+            }
+        }
+    }
+
+    if (verbose) {
+        std::cout << "Graph [" << db.size() << " nodes]:" << std::endl;
+        for (const auto &kvg : graph) {
+            std::cout << kvg.first << ": {";
+            for (const Edge &edge : kvg.second) {
+                std::cout << "(" << edge.to << "," << edge.cost << ","
+                          << edge.capacity << "), ";
+            }
+            std::cout << "}" << std::endl;
+        }
+    }
+}
+
+std::vector<NodeId>
+LFDB::compute_max_flow(
+    const NodeId &src_node, const NodeId &dest_node,
+    const std::unordered_map<NodeId, std::vector<Edge>> &graph,
+    const unsigned long long req_flow)
+{
+    /* A variation of the Edmonds-Karp algorithm.
+     * We're not interested in total maximum flow, but in the shortest
+     * augumenting path that has enough capacity. */
+
+    std::queue<NodeId> q;
+    q.push(src_node);
+    std::unordered_map<NodeId, Edge> pred;
+    bool found = false;
+
+    while (!found && !q.empty()) {
+        NodeId cur = q.front();
+        q.pop();
+        auto graphit                   = graph.find(cur);
+        const std::vector<Edge> &edges = graphit->second;
+
+        for (const Edge &edge : edges) {
+            if (pred.find(edge.to) == pred.end() &&
+                (pred.find(cur) == pred.end() ||
+                 edge.to != pred.find(cur)->second.to) &&
+                edge.capacity >= req_flow) {
+                pred.emplace(edge.to, Edge(cur, edge.cost));
+                q.push(edge.to);
+                if (edge.to == dest_node) {
+                    found = true;
+                }
+            }
+        }
+    }
+
+    std::vector<NodeId> path;
+
+    if (pred.find(dest_node) != pred.end()) {
+        path.insert(path.begin(), dest_node);
+        for (auto e = pred.find(dest_node); e != pred.end();
+             e      = pred.find(e->second.to)) {
+            path.insert(path.begin(), e->second.to);
+        }
+    }
+
+    if (verbose) {
+        if (path.size()) {
+            std::cout << "Found path [" << path.size()
+                      << " nodes]:" << std::endl;
+            for (auto e : path) {
+                std::cout << e << ",";
+            }
+            std::cout << std::endl;
+        } else {
+            std::cout << "Path not found" << std::endl;
+        }
+    }
+
+    return path;
+}
+
+std::vector<NodeId>
+LFDB::find_flow_path(const NodeId &src_node, const NodeId &dest_node,
+                     const unsigned long long req_flow)
+{
+    std::vector<NodeId> ret;
+
+    if (src_node == dest_node) {
+        return ret;
+    }
+
+    std::unordered_map<NodeId, std::vector<Edge>> graph;
+
+    build_graph(graph, src_node);
+
+    ret = compute_max_flow(src_node, dest_node, graph, req_flow);
+
+    if (verbose) {
+        std::stringstream ss;
+
+        dump_routing(ss, src_node);
+        std::cout << ss.str();
+    }
+
+    return ret;
 }
 
 gpb::LowerFlow *

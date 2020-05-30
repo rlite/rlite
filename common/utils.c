@@ -791,12 +791,12 @@ flow_config_dump(const struct rl_flow_config *c)
                  "   max_sdu_gap=%llu\n"
                  "   dtcp_flags=%x\n"
                  "   dtcp.initial_a=%u\n"
-                 "   dtcp.bandwidth=%u\n"
+                 "   dtcp.bandwidth=%llu\n"
                  "   dtcp.flow_control=%x\n"
                  "   dtcp.rtx_control=%x\n",
                  c->msg_boundaries, c->in_order_delivery,
                  (long long unsigned)c->max_sdu_gap, c->dtcp.flags,
-                 c->dtcp.initial_a, c->dtcp.bandwidth,
+                 c->dtcp.initial_a, (long long unsigned)c->dtcp.bandwidth,
                  !!(c->dtcp.flags & DTCP_CFG_FLOW_CTRL),
                  !!(c->dtcp.flags & DTCP_CFG_RTX_CTRL));
 
