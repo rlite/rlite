@@ -108,7 +108,7 @@ main(int argc, char **argv)
     int verbosity = 0;
     int opt;
 
-    while ((opt = getopt(argc, argv, "hv:")) != -1) {
+    while ((opt = getopt(argc, argv, "hv")) != -1) {
         switch (opt) {
         case 'h':
             usage();
