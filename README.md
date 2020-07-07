@@ -58,7 +58,7 @@ The main goal of *rlite* is to become a baseline implementation for RINA
 systems to be used in production. In order to achieve this goal, *rlite*
 focuses on robustness and performance by leveraging on a clean keep-it-simple
 design. The current implementation includes about 30 Klocs of C/C++ code,
-splitted between kernel-space and user-space.
+split between kernel-space and user-space.
 
 Considerable attention is devoted to provide a POSIX-like API for applications
 that can be easily assimilated by programmers used to the socket API, while
@@ -366,7 +366,7 @@ Other programs are available for testing and deployment:
 
 * **rinaperf**, a multi-threaded client/server application for network
                 throughput and latency performance measurement. Use
-                `rinaperf -h` to see the available commmands. This program
+                `rinaperf -h` to see the available commands. This program
                 is described in section 7.3.
 * **rina-echo-async**, a single-threaded client/server application
                        implementing a echo service using only
@@ -374,7 +374,7 @@ Other programs are available for testing and deployment:
                        and manage multiple flows in parallel, without using
                        blocking allocation or blocking I/O. This program is
                        described in section 7.4.
-* **rina-gw**, a deamon program implementing a gateway between a TCP/IP
+* **rina-gw**, a daemon program implementing a gateway between a TCP/IP
                network and a RINA network.
 * **iporinad**, a daemon program which is able to tunnel IP traffic over
                 a RINA network
@@ -636,7 +636,7 @@ To keep the example simple (and without loss of generality w.r.t. the
 configuration) here we will assume that each network is composed by only one
 node; let X be the node of the first network and Y the node of the second
 network. In a real deployment, of course, X and Y would be just the edge
-nodes of a bigger RINA nework (e.g. with nodes physically connected through
+nodes of a bigger RINA network (e.g. with nodes physically connected through
 shim-eth DIFs like shown in section 5.2), and act as a *gateway* towards
 the IP network.
 
@@ -656,7 +656,7 @@ to /etc/hosts (making sure that they do not clash with other entries):
     10.10.10.52     ynorm.IPCP
 
 On both X and Y, load *rlite* kernel modules and run the **rlite-uipcps**
-deamon (in foreground in the example)
+daemon (in foreground in the example)
 
     $ sudo modprobe rlite
     $ sudo modprobe rlite-normal
@@ -959,7 +959,7 @@ IPC without the need of the uipcp server.
 It supports two configuration parameter:
  * **queued**: if 0, SDUs written are immediately forwarded (e.g. in process
     context to the destination flow; if different from 0, SDUs written are
-    fowarded in a deferred context (a Linux workqueue in the current
+    forwarded in a deferred context (a Linux workqueue in the current
     implementation).
  * **drop-fract**: if different from 0, an SDU packet is dropped every
                     **drop-fract** SDUs.
@@ -1015,7 +1015,7 @@ header.
 The flavours are specified at configure time, so that the build system
 can create the necessary kernel modules in addition to the default one.
 The management part of the normal IPCP process, implemented by the
-**rlite-uipcps** deamon, is instead used by all the flavours.
+**rlite-uipcps** daemon, is instead used by all the flavours.
 The flavours.conf file in the root directory contains the flavours
 specification, where each line has the following syntax
 
@@ -1149,7 +1149,7 @@ In the following configuration file example
     I2R serv.DIF rinaservice2 0.0.0.0 9063
     R2I vpn3.DIF tcpservice1 32.1.42.190 8729
 
-the first directive cofigures rina-gw to proxy incoming connections on
+the first directive configures rina-gw to proxy incoming connections on
 destination port 9063 (on any host interface) towards the rinaservice2
 application running in serv.DIF; the second directive asks rina-gw to proxy
 incoming flow allocation requests for the destination application
@@ -1650,7 +1650,7 @@ In any case, -1 is returned on error, with the errno code properly set.
 
     int rina_flow_alloc_wait(int wfd)
 
-This function waits for the completion of a flow allocation procedure previosuly initiated with
+This function waits for the completion of a flow allocation procedure previously initiated with
 a call to `rina_flow_alloc()` with the `RINA_F_NOWAIT` flag set. The wfd file descriptor
 must match the one returned by `rina_flow_alloc()`. On success, it returns a file descriptor
 that can be subsequently used with standard I/O system calls to exchange SDUs on the flow and
@@ -1786,7 +1786,7 @@ At this point the server can start accepting incoming flow allocation requests b
 `rina_flow_accept` on the control file descriptor (passed as first argument). When the
 `RINA_F_NOWAIT` flag is not specified, this operation has the same meaning of the socket accept
 call. In detail:
- * The function blocks until a flow allocation request comes, and the request is implicitely
+ * The function blocks until a flow allocation request comes, and the request is implicitly
 accepted.
  * A file descriptor is returned to be used for flow I/O.
  * The name of the remote application can be obtained through the remote appl output
