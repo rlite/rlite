@@ -1578,7 +1578,7 @@ __ipcp_put(struct ipcp_entry *entry)
 
     /* If the module was refcounted for this IPC process instance,
      * remove the reference. Note that this operation **must** happen
-     * after the destructor invokation, in order to avoid a race
+     * after the destructor invocation, in order to avoid a race
      * conditions that may lead to kernel page faults. */
     if (entry->owner) {
         module_put(entry->owner);

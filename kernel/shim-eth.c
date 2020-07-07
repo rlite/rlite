@@ -43,10 +43,10 @@
 #define ETH_P_RLITE 0xD1F0
 
 struct arpt_entry {
-    /* Targed Hardware Address. Only support 48-bit addresses for now. */
+    /* Target Hardware Address. Only support 48-bit addresses for now. */
     uint8_t tha[6];
 
-    /* Targed Protocol Address, represented as a serialized string. */
+    /* Target Protocol Address, represented as a serialized string. */
     char *tpa;
 
     /* Sender Protocol Address, represented as a serialized string. */

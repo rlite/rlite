@@ -171,7 +171,7 @@ tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
             /* We have completely read the 2-bytes header. */
             priv->cur_rx_rblen = ntohs(priv->cur_rx_rblen);
             if (unlikely(!priv->cur_rx_rblen)) {
-                PE("Warning: zero lenght packet\n");
+                PE("Warning: zero length packet\n");
             } else {
                 priv->cur_rx_hdr = false;
                 priv->cur_rx_rb  = rl_buf_alloc(

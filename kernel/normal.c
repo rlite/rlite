@@ -847,7 +847,7 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 }
 
 /* Internet checksum computation is endianness independent, so it can be
- * peformed in host order. The caller is expected to store the result in
+ * performed in host order. The caller is expected to store the result in
  * host order. */
 static uint32_t
 inet_csum(const void *data, uint16_t len, uint32_t sum /* host endianness */)
@@ -2143,7 +2143,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
     }
 
     if (unlikely(seqnum < dtp->rcv_next_seq_num)) {
-        /* This is a duplicate. Probably we sould not drop it
+        /* This is a duplicate. We should probably not drop it
          * if the flow configuration does not require it. */
         RPD(1, "Dropping duplicate PDU [seq=%lu]\n", (long unsigned)seqnum);
         rl_buf_free(rb);

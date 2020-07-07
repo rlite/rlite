@@ -327,7 +327,7 @@ rl_io_write_iter(struct kiocb *iocb,
                     rb = NULL;
                     /* We avoid restarting the system call, because the other
                      * end could have shutdown the flow, ops.sdu_write()
-                     * could keep returning -EAGAIN forever, and appication
+                     * could keep returning -EAGAIN forever, and application
                      * could get stuck in the write() syscall forever. */
                     ret = -EINTR;
                     break;
