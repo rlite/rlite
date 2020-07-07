@@ -86,7 +86,7 @@ private:
     std::unordered_set<rl_port_t> ports_down;
 
     /* Should update_kernel_routing() really run the graph algorithms and
-     * udpate the kernel. */
+     * update the kernel. */
     bool recompute = true;
 
     /* Backpointer. */
@@ -701,7 +701,7 @@ LinkStateRouting::neigh_disconnected(const std::string &neigh_name)
 }
 
 class StaticRouting : public Routing {
-    /* Routing engine, only used to compute kernel fowarding tables. */
+    /* Routing engine, only used to compute kernel forwarding tables. */
     RoutingEngine re;
 
 public:

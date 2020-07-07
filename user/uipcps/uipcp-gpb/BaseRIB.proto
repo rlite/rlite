@@ -169,7 +169,7 @@ message DtcpConfig {  // configuration of DTCP for a connection
       1;  // indicates if flow control is enabled in this connection
   optional FlowCtrlConfig flow_ctrl_cfg = 2;  // the flow control configuration
   optional bool rtx_ctrl =
-      3;  // inidicates if rtx control is enabled in this connection
+      3;  // indicates if rtx control is enabled in this connection
   optional RtxCtrlConfig rtx_ctrl_cfg = 4;  // the rtx control configuration
   optional PolicyDescr lost_ctrl_pdu =
       5;  // Determines what action to take when the PM detects that a control

@@ -579,7 +579,7 @@ uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
     int tmrid;
 
     if (!cb) {
-        UPE(uipcp, "NULL timer calback\n");
+        UPE(uipcp, "NULL timer callback\n");
         return -1;
     }
 

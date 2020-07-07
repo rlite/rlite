@@ -1794,7 +1794,7 @@ UipcpRib::trigger_re_enrollments()
         assert(mit != neighbors_seen.end());
         if (neighbors_deleted.count(nc) == 0) {
             /* This neighbor was not deleted, so we avoid enrolling to it,
-             * as this was not explicitely asked. */
+             * as this was not explicitly asked. */
             continue;
         }
 

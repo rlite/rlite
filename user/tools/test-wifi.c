@@ -1,5 +1,5 @@
 /*
- * A tool to test interactions with wpa_supplicant deamon.
+ * A tool to test interactions with wpa_supplicant daemon.
  *
  * Copyright (C) 2017 Nextworks
  * Author: Michal Koutenský <koutak.m@gmail.com>

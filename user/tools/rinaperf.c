@@ -1691,7 +1691,7 @@ main(int argc, char **argv)
      *     packets (or transactions) nor the test duration, use a 10 seconds
      *     test duration.
      *   - When in perf mode, use the flow MSS as a packet size, unless the
-     *     user has specified the size explicitely.
+     *     user has specified the size explicitly.
      */
     if (strcmp(type, "ping") == 0) {
         if (!interval_specified) {

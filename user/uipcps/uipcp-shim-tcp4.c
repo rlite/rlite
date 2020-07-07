@@ -360,7 +360,7 @@ shim_tcp4_fa_req(struct uipcp *uipcp, const struct rl_msg_base *msg)
 
     list_add_tail(&ep->node, &shim->endpoints);
 
-    /* Succesfull connect() is interpreted as positive flow allocation response.
+    /* Successful connect() is interpreted as positive flow allocation response.
      */
     memset(&cfg, 0, sizeof(cfg));
     cfg.fd = ep->fd;

@@ -658,7 +658,7 @@ RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
     }
 
     if (resp->vote_granted) {
-        /* Register the vote on peristent memory. */
+        /* Register the vote on persistent memory. */
         if ((ret = vote_for_candidate(msg.candidate_id))) {
             return ret;
         }

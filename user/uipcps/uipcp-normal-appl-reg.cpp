@@ -171,7 +171,7 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
     return 0;
 }
 
-/* Tries ot add or remove an entry 'e' from the DFT multimap. If not nullptr,
+/* Tries to add or remove an entry 'e' from the DFT multimap. If not nullptr,
  * the entries added and/or removed are appended to 'added' and 'removed'
  * respectively. */
 void

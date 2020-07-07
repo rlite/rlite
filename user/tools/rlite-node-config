@@ -148,11 +148,11 @@ while True:
         if line.startswith("#") or line == "":
             continue
 
-        splitted = line.split()
-        if splitted[0] == 'ipcp-enroll' or splitted[0] == 'ipcp-lower-flow-alloc':
-            enrolls.append((linecnt, splitted))
+        splits = line.split()
+        if splits[0] == 'ipcp-enroll' or splits[0] == 'ipcp-lower-flow-alloc':
+            enrolls.append((linecnt, splits))
         else:
-            cmds.append((linecnt, splitted))
+            cmds.append((linecnt, splits))
 
     fin.close()
 
