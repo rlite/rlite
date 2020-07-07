@@ -37,7 +37,7 @@
 #include <linux/hashtable.h>
 #include <linux/spinlock.h>
 #include <linux/uio.h>
-#include <asm/compat.h>
+#include <linux/compat.h>
 
 static LIST_HEAD(rl_iodevs);
 static DEFINE_MUTEX(rl_iodevs_lock);

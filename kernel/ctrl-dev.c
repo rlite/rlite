@@ -39,8 +39,8 @@
 #include <linux/hashtable.h>
 #include <linux/spinlock.h>
 #include <linux/nsproxy.h>
+#include <linux/compat.h>
 #include <net/net_namespace.h>
-#include <asm/compat.h>
 
 int verbosity = RL_VERB_DBG;
 EXPORT_SYMBOL(verbosity);
