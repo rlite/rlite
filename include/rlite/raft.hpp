@@ -136,7 +136,7 @@ struct RaftTimerCmd {
 
 /* The output of an invocation of the Raft state machine. May contain
  * some messages to send to the other replicas, commands to start
- * or stop some timers, and log entries that have been commited to
+ * or stop some timers, and log entries that have been committed to
  * the replicated state machine. */
 struct RaftSMOutput {
     RaftSMOutput()                     = default;

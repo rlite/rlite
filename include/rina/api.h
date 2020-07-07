@@ -110,7 +110,7 @@ int rina_unregister(int fd, const char *dif_name, const char *local_appl,
                     int flags);
 
 /*
- * Wait for the completion of a (un)registration procedure previosuly initiated
+ * Wait for the completion of a (un)registration procedure previously initiated
  * with a call to rina_[un]register() on @fd with the RINA_F_NOWAIT flag set.
  * The @wfd file descriptor must match the one returned by rina_[un]register().
  *
@@ -195,7 +195,7 @@ int rina_flow_alloc(const char *dif_name, const char *local_appl,
                     const struct rina_flow_spec *flowspec, unsigned int flags);
 
 /*
- * Wait for the completion of a flow allocation procedure previosuly initiated
+ * Wait for the completion of a flow allocation procedure previously initiated
  * with a call to rina_flow_alloc() with the RINA_F_NOWAIT flag set. The @wfd
  * file descriptor must match the one returned by rina_flow_alloc().
  *

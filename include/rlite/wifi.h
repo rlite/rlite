@@ -1,5 +1,5 @@
 /*
- * A library for interaction with wpa_supplicant deamon.
+ * A library for interaction with wpa_supplicant daemon.
  *
  * Copyright (C) 2017 Nextworks
  * Author: Michal Koutenský <koutak.m@gmail.com>
