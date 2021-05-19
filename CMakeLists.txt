@@ -54,3 +54,17 @@ enable_testing()
 
 add_subdirectory(user)
 add_subdirectory(tests)
+
+# Support for generating deb, tar.gz, rpm, etc.
+# The CPACK_GENERATOR value is actually overridden by the cpack -G option.
+set(CPACK_GENERATOR "DEB;TGZ")
+set(CPACK_PACKAGE_VERSION_MAJOR 0)
+set(CPACK_PACKAGE_VERSION_MINOR 9)
+set(CPACK_PACKAGE_RELEASE 1)
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "gcc g++")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Vincenzo Maffione")
+set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
+set(CPACK_DEBIAN_PACKAGE_SECTION "net")
+SET(CPACK_SET_DESTDIR "ON")
+set(CPACK_PACKAGE_DESCRIPTION "Recursive Inter-Network Architecture implementation")
+include(CPack)

@@ -50,3 +50,6 @@ format:
 
 intest:
 	tests/run-integration-tests.sh
+
+deb: usr
+	cd build && cpack -G DEB .
